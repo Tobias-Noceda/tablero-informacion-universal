@@ -1,0 +1,62 @@
+# Version control
+.git
+.gitignore
+.github
+
+# Dependencies (installed in image)
+node_modules
+pnpm-store
+
+# Build artifacts (recreated)
+build
+dist
+.svelte-kit
+
+# Development tools
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+
+# Documentation
+README.md
+*.md
+
+# Testing/Dev files
+.vitest
+coverage
+*.spec.ts
+*.test.ts
+.storybook
+src/stories
+
+# Temporary files
+.env.local
+.env.*.local
+*.log
+npm-debug.log
+pnpm-debug.log
+
+# CI/CD
+.gitlab-ci.yml
+.travis.yml
+.github/
+Jenkinsfile
+
+# Docker files (not needed in build)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Other
+node
+pnpm-workspace.yaml
+vitest.shims.d.ts
+tsconfig.json
+eslint.config.js
+.prettierrc
+.prettierignore
+
+# dist files (if generated locally)
+dist

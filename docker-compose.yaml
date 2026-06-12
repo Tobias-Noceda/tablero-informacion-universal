@@ -1,0 +1,74 @@
+services:
+  # backend:
+  #   build: ./backend
+  #   depends_on:
+  #     - mongo
+  #     - redis
+  #   networks:
+  #     - app
+  #     - mongo
+  #     - redis
+  #     - backend
+
+  frontend:
+    build:
+      context: ./frontend
+      # Option A: If Dockerfile is at frontend/dist/Dockerfile
+      dockerfile: dist/Dockerfile
+      # Option B: If Dockerfile is at frontend/Dockerfile (recommended)
+      # dockerfile: Dockerfile
+    container_name: sveltekit-frontend
+    networks:
+      - frontend
+    # restart: unless-stopped
+    # environment:
+    #   NODE_ENV: production
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost/index.html"]
+    #   interval: 30s
+    #   timeout: 3s
+    #   retries: 3
+    #   start_period: 10s
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
+    networks:
+      - mongo
+    volumes:
+      - mongo_data:/data/db
+
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - redis
+
+  alb:
+    image: nginx:stable-alpine
+    ports:
+      - "80:80"
+    depends_on:
+      - frontend
+      # - backend
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - frontend
+      # - backend
+
+networks:
+  app: {}
+  mongo: {}
+  redis: {}
+  frontend: {}
+  # backend: {}
+
+volumes:
+  mongo_data: {}
