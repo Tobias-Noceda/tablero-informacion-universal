@@ -34,6 +34,14 @@ func (srv *PostItsService) GetPostIt(id uuid.UUID) (*models.PostIts, error) {
 	return srv.db.FindPostIt(id)
 }
 
+func (srv *PostItsService) UpdatePostIt(id uuid.UUID, set map[string]any) error {
+	if len(set) == 0 {
+		return nil
+	}
+
+	return srv.db.UpdatePostIt(id, set)
+}
+
 func (srv *PostItsService) MovePostIt(id uuid.UUID, pos models.Position) error {
 	postit, err := srv.GetPostIt(id)
 	if err != nil {
