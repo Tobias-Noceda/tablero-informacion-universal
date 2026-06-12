@@ -3,7 +3,7 @@ package postits
 import "github.com/google/uuid"
 
 type CreatePostItRequest struct {
-	Board     uuid.UUID         `json:"owner" binding:"required"`
+	Board     uuid.UUID         `json:"board" binding:"required"`
 	WellKnown string            `json:"well-known"`
 	Params    map[string]string `json:"params"`
 }

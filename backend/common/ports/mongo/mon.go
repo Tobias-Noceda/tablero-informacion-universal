@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	MONGO_URL       = "mongodb://user:password@mongo:27017"
+	MONGO_URL       = "mongodb://user:password@mongo:27017/?authSource=admin"
 	MONGO_DATABASE  = "prod"
 	REQUEST_TIMEOUT = 10 * time.Second
 )
