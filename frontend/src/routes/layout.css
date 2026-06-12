@@ -1,3 +1,115 @@
 @import 'tailwindcss';
+
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+:root {
+	color-scheme: light;
+	--app-background: #ffffff;
+	--app-foreground: #111827;
+	--app-main: #005166;
+    --app-main-text: #ffffff;
+    --app-main-hover: #00414a;
+	--app-main-border: #00414a;
+	--app-sidebar: #6fa3ac;
+	--app-sidebar-hover: #5a8b95;
+	--app-sidebar-border: #5a8b95;
+
+	--app-border: #d1d5db;
+	--app-skeleton: #e2e8f0;
+	--app-error-bg: #fee2e2;
+	--app-error-text: #b91c1c;
+
+	--app-color-primary: var(--app-main);
+	--app-color-primary-hover: var(--app-main-hover);
+	--app-color-primary-border: var(--app-main-border);
+	--app-color-primary-text: var(--app-main-text);
+
+	--app-color-secondary: var(--app-sidebar);
+	--app-color-secondary-hover: var(--app-sidebar-hover);
+	--app-color-secondary-border: var(--app-sidebar-border);
+	--app-color-secondary-text: var(--app-foreground);
+
+	--app-color-tertiary: #a7a7a7;
+	--app-color-tertiary-hover: #8c8c8c;
+	--app-color-tertiary-border: #8c8c8c;
+	--app-color-tertiary-text: var(--app-foreground);
+
+	--app-color-destructive: #dc2626;
+	--app-color-destructive-hover: #b91c1c;
+	--app-color-destructive-border: #b91c1c;
+	--app-color-destructive-text: #ffffff;
+
+	--app-color-success: #16a34a;
+	--app-color-success-hover: #15803d;
+	--app-color-success-border: #15803d;
+	--app-color-success-text: #ffffff;
+
+	--app-primary: var(--app-foreground);
+	--app-secondary: #676767;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		color-scheme: dark;
+		--app-background: #0b1020;
+		--app-foreground: #f9fafb;
+
+		--app-primary: var(--app-foreground);
+		--app-secondary: #cfcfcf;
+
+		--app-border: #374151;
+		--app-skeleton: #1e2a3a;
+		--app-error-bg: rgba(220, 38, 38, 0.15);
+		--app-error-text: #fca5a5;
+	}
+}
+
+@theme {
+	--color-background: var(--app-background);
+	--color-foreground: var(--app-foreground);
+
+	--color-main: var(--app-main);
+    --color-main-text: var(--app-main-text);
+    --color-main-hover: var(--app-main-hover);
+	--color-main-border: var(--app-main-border);
+
+	--color-sidebar: var(--app-sidebar);
+	--color-sidebar-hover: var(--app-sidebar-hover);
+	--color-sidebar-border: var(--app-sidebar-border);
+
+	--color-primary: var(--app-primary);
+	--color-primary-hover: var(--app-primary-hover);
+	--color-primary-border: var(--app-primary-border);
+	--color-primary-text: var(--app-primary-text);
+
+	--color-secondary: var(--app-secondary);
+	--color-secondary-hover: var(--app-secondary-hover);
+	--color-secondary-border: var(--app-secondary-border);
+	--color-secondary-text: var(--app-secondary-text);
+
+	--color-tertiary: var(--app-color-tertiary);
+	--color-tertiary-hover: var(--app-color-tertiary-hover);
+	--color-tertiary-border: var(--app-color-tertiary-border);
+	--color-tertiary-text: var(--app-color-tertiary-text);
+
+	--color-destructive: var(--app-color-destructive);
+	--color-destructive-hover: var(--app-color-destructive-hover);
+	--color-destructive-border: var(--app-color-destructive-border);
+	--color-destructive-text: var(--app-color-destructive-text);
+	
+	--color-success: var(--app-color-success);
+	--color-success-hover: var(--app-color-success-hover);
+	--color-success-border: var(--app-color-success-border);
+	--color-success-text: var(--app-color-success-text);
+
+	--color-border: var(--app-border);
+	--color-skeleton: var(--app-skeleton);
+	--color-error-bg: var(--app-error-bg);
+	--color-error-text: var(--app-error-text);
+}
+
+html {
+	background-color: var(--app-background);
+	color: var(--app-foreground);
+}

@@ -4,7 +4,7 @@ import "github.com/google/uuid"
 
 type CreatePostItRequest struct {
 	Board     uuid.UUID         `json:"board" binding:"required"`
-	WellKnown string            `json:"well-known"`
+	WellKnown string            `json:"well_known"`
 	Params    map[string]string `json:"params"`
 }
 

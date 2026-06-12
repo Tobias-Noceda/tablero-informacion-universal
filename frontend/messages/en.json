@@ -1,4 +1,15 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
-	"hello_world": "Hello, {name} from en!"
+	"hello_world": "Hello, {name} from en!",
+	"input_loading": "Loading...",
+	"create_board": "Create a new board",
+	"board_name_label": "Board name",
+	"board_name_placeholder": "My board",
+	"cancel": "Cancel",
+	"create": "Create",
+	"accept": "Accept",
+	"nodes": {
+		"note": "Note",
+		"smart_card": "Smart Card"
+	}
 }

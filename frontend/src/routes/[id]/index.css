@@ -1,0 +1,48 @@
+@import url('@xyflow/svelte/dist/style.css');
+/* we put the theme css at the end to override some of the default css variables and styles */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: sans-serif;
+}
+
+.dndflow {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  height: 100%;
+}
+
+.dndflow aside {
+  font-size: 12px;
+  /* background: var(--xy-theme-panel-bg, #ffffff); */
+  /* color: var(--xy-theme-panel-text, #111827); */
+}
+
+.dndflow .reactflow-wrapper {
+  flex-grow: 1;
+  height: 100%;
+}
+
+/* Sidebar is outside .react-flow so it doesn't get theme variables in dark mode. */
+@media (prefers-color-scheme: dark) {
+  .dndflow aside {
+    /* background: #141519; */
+    color: #f3f4f6;
+    border-right-color: #3f434c;
+  }
+
+  .dndflow .node {
+    border-color: #3f434c;
+    /* background: #1a1b1e; */
+    color: #f3f4f6;
+  }
+}
+
+@media screen and (min-width: 768px) {
+  .dndflow {
+    flex-direction: row;
+  }
+}
