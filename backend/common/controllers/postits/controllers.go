@@ -51,7 +51,11 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		return
 	}
 
-	postIt, err := ctrl.service.CreatePostIt(&models.PostIts{})
+	postIt, err := ctrl.service.CreatePostIt(&models.PostIts{
+		Board:     req.Board,
+		WellKnown: req.WellKnown,
+		Params:    req.Params,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -59,7 +63,7 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, postIt)
+	c.JSON(http.StatusCreated, postIt)
 }
 
 // GetPostIt godoc
