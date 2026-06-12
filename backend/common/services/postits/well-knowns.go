@@ -129,7 +129,7 @@ var configuredPostIts = map[string]models.PostIts{
 	},
 	"dolar_oficial": {
 		WellKnown: "dolar_oficial",
-		Resource:  getURL("https://dolarapi.com/v1/dolares"),
+		Resource:  getURL("https://dolarapi.com/v1/dolares/oficial"),
 		Request: models.Request{
 			Method: "GET",
 		},

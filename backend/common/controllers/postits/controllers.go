@@ -51,7 +51,11 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		return
 	}
 
-	postIt, err := ctrl.service.CreatePostIt(&models.PostIts{})
+	postIt, err := ctrl.service.CreatePostIt(&models.PostIts{
+		Board:     req.Board,
+		WellKnown: req.WellKnown,
+		Params:    req.Params,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -59,7 +63,7 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, postIt)
+	c.JSON(http.StatusCreated, postIt)
 }
 
 // GetPostIt godoc
@@ -166,12 +170,12 @@ func (ctrl *Controller) ExecutePostIt(c *gin.Context) {
 }
 
 // EditPostIt godoc
-// @Summary      Update a post-it settings in the board
-// @Description  Update a post-it.
+// @Summary      Update a post-it settings
+// @Description  Update the editable settings of a post-it. Only the provided fields are changed.
 // @Tags         post-its
 // @Accept       json
-// @Param        id       path      string                  true  "Board UUID" format(uuid)
-// @Param        request  body      UpdateBoardNameRequest  true  "Board name update payload"
+// @Param        id       path      string               true  "Post-it UUID" format(uuid)
+// @Param        request  body      UpdatePostItRequest  true  "Post-it settings update payload"
 // @Success      204      "No Content"
 // @Failure      400      {object}  map[string]string{"error": "string"}
 // @Failure      500      {object}  map[string]string{"error": "string"}
@@ -187,7 +191,7 @@ func (ctrl *Controller) EditPostIt(c *gin.Context) {
 		return
 	}
 
-	var req MovePostItRequest
+	var req UpdatePostItRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -196,7 +200,28 @@ func (ctrl *Controller) EditPostIt(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.service.MovePostIt(id, models.Position{X: req.X, Y: req.Y})
+	set := map[string]any{}
+	if req.Params != nil {
+		set["params"] = req.Params
+	}
+	if req.Query != nil {
+		set["query"] = *req.Query
+	}
+	if req.Response != nil {
+		set["response"] = *req.Response
+	}
+	if req.Rate != nil {
+		set["rate"] = *req.Rate
+	}
+
+	if len(set) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "no fields to update",
+		})
+		return
+	}
+
+	err = ctrl.service.UpdatePostIt(id, set)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),

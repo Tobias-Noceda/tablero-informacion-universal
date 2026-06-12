@@ -45,3 +45,11 @@ func (srv *BoardService) RemoveCollaboratorFromBoard(boardID uuid.UUID, cognitoI
 func (srv *BoardService) UpdateBoardName(id uuid.UUID, name string) error {
 	return srv.db.UpdateBoardName(id, name)
 }
+
+func (srv *BoardService) ConnectPostIts(boardID, source, target uuid.UUID) error {
+	return srv.db.ConnectPostIts(boardID, source, target)
+}
+
+func (srv *BoardService) DisconnectPostIts(boardID, source, target uuid.UUID) error {
+	return srv.db.DisconnectPostIts(boardID, source, target)
+}
