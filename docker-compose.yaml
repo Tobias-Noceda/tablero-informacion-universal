@@ -7,7 +7,6 @@ services:
     ports:
       - "31126:31126"
     networks:
-      - app
       - mongo
       - redis
       - backend
@@ -15,22 +14,10 @@ services:
   frontend:
     build:
       context: ./frontend
-      # Option A: If Dockerfile is at frontend/dist/Dockerfile
       dockerfile: dist/Dockerfile
-      # Option B: If Dockerfile is at frontend/Dockerfile (recommended)
-      # dockerfile: Dockerfile
     container_name: sveltekit-frontend
     networks:
       - frontend
-    # restart: unless-stopped
-    # environment:
-    #   NODE_ENV: production
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost/index.html"]
-    #   interval: 30s
-    #   timeout: 3s
-    #   retries: 3
-    #   start_period: 10s
 
   mongo:
     image: mongo:latest
@@ -66,7 +53,6 @@ services:
       - backend
 
 networks:
-  app: {}
   mongo: {}
   redis: {}
   frontend: {}

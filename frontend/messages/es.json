@@ -9,7 +9,10 @@
 	"create": "Crear",
 	"accept": "Aceptar",
 	"nodes": {
-		"note": "Nota",
-		"smart_card": "Tarjeta inteligente"
+		"static_card": "Nota",
+		"temperature": "Temperatura",
+		"events_search": "Búsqueda de Eventos",
+		"dog_facts": "Hechos sobre Perros",
+		"dolar_oficial": "Dólar Oficial"
 	}
 }

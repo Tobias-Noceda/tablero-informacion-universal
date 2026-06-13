@@ -12,6 +12,7 @@
 	import { isSidebarOpen, toggleSidebar } from '$stores/sidebar';
 	import { boardList, refreshBoards } from '$stores/boards';
 	import { cn } from '$lib/utils';
+	import { resolve } from '$app/paths';
 
 	onMount(() => {
 		refreshBoards().catch((err) => console.error('Failed to load boards', err));
@@ -60,8 +61,8 @@
 				<div class="flex flex-col bg-sidebar-hover p-2 w-50 gap-1 overflow-y-auto">
 					{#each $boardList as board (board.id)}
 						<a
-							href="/board/{board.id}"
-							class="px-2 py-1.5 rounded-md text-white text-sm hover:bg-main-hover transition-colors truncate"
+							href={resolve(`/board/${board.id}`)}
+							class="px-2 py-1.5 rounded-md text-white text-sm hover:bg-sidebar-hover border border-sidebar-border transition-colors truncate"
 						>
 							{board.name}
 						</a>

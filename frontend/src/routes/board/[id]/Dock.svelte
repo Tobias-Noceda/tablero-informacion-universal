@@ -18,22 +18,49 @@
 <aside>
   <div class="nodes-container items-center justify-center">
     <div
-      class="input-node node"
-      ondragstart={(event) => onDragStart(event, 'input')}
+      class="static_card node"
+      ondragstart={(event) => onDragStart(event, 'static_card')}
       draggable={true}
       role="button"
       tabindex="0"
     >
-      {m["nodes.note"]()}
+      {m["nodes.static_card"]()}
+    </div>
+    <!-- <div
+      class="temperature node"
+      ondragstart={(event) => onDragStart(event, 'temperature')}
+      draggable={true}
+      role="button"
+      tabindex="0"
+    >
+      {m["nodes.temperature"]()}
+    </div> -->
+    <div
+      class="events_search node"
+      ondragstart={(event) => onDragStart(event, 'events_search')}
+      draggable={true}
+      role="button"
+      tabindex="0"
+    >
+      {m["nodes.events_search"]()}
     </div>
     <div
-      class="default-node node"
-      ondragstart={(event) => onDragStart(event, 'default')}
+      class="dog_facts node"
+      ondragstart={(event) => onDragStart(event, 'dog_facts')}
       draggable={true}
       role="button"
       tabindex="0"
     >
-      {m["nodes.smart_card"]()}
+      {m["nodes.dog_facts"]()}
+    </div>
+    <div
+      class="dolar_oficial node"
+      ondragstart={(event) => onDragStart(event, 'dolar_oficial')}
+      draggable={true}
+      role="button"
+      tabindex="0"
+    >
+      {m["nodes.dolar_oficial"]()}
     </div>
   </div>
 </aside>

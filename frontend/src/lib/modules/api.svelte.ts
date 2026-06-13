@@ -62,7 +62,9 @@ export function put(path: `/${string}`, body: unknown, options?: RequestInit, fe
 };
 
 export function patch(path: `/${string}`, body: unknown, options?: RequestInit, fetchFn: typeof fetch = fetch): Promise<Response> {
-	return fetchFn(new SvelteURL(path), {
+	const url = resolvePath(path);
+
+	return fetchFn(new SvelteURL(url), {
 		...options,
 		method: 'PATCH',
 		headers: {
@@ -74,7 +76,9 @@ export function patch(path: `/${string}`, body: unknown, options?: RequestInit, 
 };
 
 export function del(path: `/${string}`, options?: RequestInit, fetchFn: typeof fetch = fetch): Promise<Response> {
-	return fetchFn(new SvelteURL(path), {
+	const url = resolvePath(path);
+
+	return fetchFn(new SvelteURL(url), {
 		...options,
 		method: 'DELETE',
 		headers: {
