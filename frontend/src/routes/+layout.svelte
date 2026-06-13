@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { locales, type Locale } from '$lib/paraglide/runtime';
 	import './layout.css';
 	import favicon from '$assets/favicon.svg';
@@ -9,7 +10,12 @@
 
 	import { setLocale, getLocale } from '$lib/paraglide/runtime';
 	import { isSidebarOpen, toggleSidebar } from '$stores/sidebar';
+	import { boardList, refreshBoards } from '$stores/boards';
 	import { cn } from '$lib/utils';
+
+	onMount(() => {
+		refreshBoards().catch((err) => console.error('Failed to load boards', err));
+	});
 
 	let { children } = $props();
 
@@ -51,8 +57,15 @@
 				</div>
 			</div>
 			{#if $isSidebarOpen}
-				<div class="flex flex-col bg-sidebar-hover p-2 w-50">
-					<!-- list of boards -->
+				<div class="flex flex-col bg-sidebar-hover p-2 w-50 gap-1 overflow-y-auto">
+					{#each $boardList as board (board.id)}
+						<a
+							href="/board/{board.id}"
+							class="px-2 py-1.5 rounded-md text-white text-sm hover:bg-main-hover transition-colors truncate"
+						>
+							{board.name}
+						</a>
+					{/each}
 				</div>
 			{/if}
 			<div class="flex flex-col flex-1 overflow-auto bg-background">

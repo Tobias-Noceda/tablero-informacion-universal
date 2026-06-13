@@ -6,6 +6,7 @@
 	import Modal from "$components/Modal/Modal.svelte";
 	import { m } from "$lib/paraglide/messages";
     import * as boardApi from "$services/board";
+    import { refreshBoards } from "$stores/boards";
 
 	let showModal = $state(false);
     let boardName = $state('');
@@ -14,6 +15,7 @@
         const trimmed = boardName.trim();
         if (!trimmed) return;
         const board = await boardApi.create(trimmed);
+        await refreshBoards();
         showModal = false;
         await goto(resolve(`/board/${board.id}`));
 	}
