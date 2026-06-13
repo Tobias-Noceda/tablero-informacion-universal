@@ -21,9 +21,9 @@ func NewController(service *srv.BoardService) *Controller {
 func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 	boardGroup := router.Group("/boards")
 	{
-		boardGroup.GET("/", ctrl.GetUserBoards)
+		boardGroup.GET("", ctrl.GetUserBoards)
 		boardGroup.GET("/:id", ctrl.GetBoard)
-		boardGroup.POST("/", ctrl.CreateBoard)
+		boardGroup.POST("", ctrl.CreateBoard)
 		boardGroup.DELETE("/:id", ctrl.DeleteBoard)
 
 		boardGroup.GET("/:id/post-its", ctrl.GetBoardPostIts)

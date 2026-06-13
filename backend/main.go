@@ -32,6 +32,7 @@ func main() {
 	executer := &executer.DewIt{}
 
 	router := gin.Default()
+	router.RedirectTrailingSlash = false
 	router.Use(middleware.CORSMiddleware())
 
 	boardController := boards.NewController(b_srv.New(db))

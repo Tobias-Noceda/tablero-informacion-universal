@@ -22,7 +22,7 @@ func NewController(service *srv.PostItsService) *Controller {
 func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 	boardGroup := router.Group("/post-its")
 	{
-		boardGroup.POST("/", ctrl.CreatePostIt)
+		boardGroup.POST("", ctrl.CreatePostIt)
 		boardGroup.GET("/:id", ctrl.ExecutePostIt)
 		boardGroup.DELETE("/:id", ctrl.DeletePostIt)
 
