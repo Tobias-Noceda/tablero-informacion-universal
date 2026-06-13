@@ -6,21 +6,18 @@ on:
       - '**'
     tags:
       - '**'
- 
+
 jobs:
   mirror:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0   # full history, all refs
-
       - name: Mirror to Bitbucket
         env:
           BB_EMAIL: ${{ secrets.BITBUCKET_EMAIL }}
           BB_TOKEN: ${{ secrets.BITBUCKET_API_TOKEN }}
         run: |
-          AUTH=$(printf '%s:%s' "$BB_EMAIL" "$BB_TOKEN" | base64 -w0)
-          git -c http.extraHeader="Authorization: Basic ${AUTH}" \
-            push --mirror "https://bitbucket.org/itba/pf-2026a-tablero-informacion-universal.git"
+          ENC_EMAIL=$(printf '%s' "$BB_EMAIL" | sed 's/@/%40/')
+          git clone --mirror "https://github.com/${{ github.repository }}.git" repo.git
+          cd repo.git
+          git push --mirror \
+            "https://${ENC_EMAIL}:${BB_TOKEN}@bitbucket.org/itba/pf-2026a-tablero-informacion-universal.git"
