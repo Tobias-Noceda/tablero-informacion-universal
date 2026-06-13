@@ -1,18 +1,21 @@
 <script lang="ts">
+	import { goto } from "$app/navigation";
+	import { resolve } from "$app/paths";
 	import Icon from "$components/Icon/Icon.svelte";
 	import Input from "$components/Input/Input.svelte";
 	import Modal from "$components/Modal/Modal.svelte";
 	import { m } from "$lib/paraglide/messages";
+    import * as boardApi from "$services/board";
 
 	let showModal = $state(false);
     let boardName = $state('');
 
-	function handleCreate() {
+	async function handleCreate() {
         const trimmed = boardName.trim();
         if (!trimmed) return;
-        // TODO: call API to create board
-		console.log('Create board:', trimmed);
+        const board = await boardApi.create(trimmed);
         showModal = false;
+        await goto(resolve(`/board/${board.id}`));
 	}
 </script>
 

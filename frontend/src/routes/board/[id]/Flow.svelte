@@ -4,6 +4,13 @@
 	import { useDnD } from './DnDProvider.svelte';
 	import Dock from './Dock.svelte';
 
+	import * as boardApi from '$services/board';
+	import * as postItsApi from '$services/post-it';
+
+	const { boardId } = $props();
+
+	// const nodes = await
+
 	let selectedNode: Node | null = $state(null);
 
 	let nodes = $state.raw([

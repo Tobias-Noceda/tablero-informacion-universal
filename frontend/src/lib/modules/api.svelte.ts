@@ -1,4 +1,3 @@
-import { resolve } from '$app/paths';
 import { error } from '@sveltejs/kit';
 import { SvelteURL } from 'svelte/reactivity';
 
@@ -9,7 +8,7 @@ function resolvePath(path: `/${string}`) {
 	} catch (e) {
 		if (!(e instanceof TypeError)) throw e;
 		// Assume it's a relative path (/api/...)
-		return resolve(path);
+		return new SvelteURL(`http://localhost:31126${path}`);
 	}
 }
 
