@@ -36,7 +36,7 @@ const config = {
 			$types: 'src/lib/types',
 		},
 		version: {
-			name: (+Date.now()).toString(36),
+			name: process.env.BUILD_VERSION ?? '1',
 		}
 	}
 };
