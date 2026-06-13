@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/Secreto31126/tesis/common/controllers/boards"
 	"github.com/Secreto31126/tesis/common/controllers/postits"
+	"github.com/Secreto31126/tesis/common/middleware"
 	"github.com/Secreto31126/tesis/common/ports/executer"
 	"github.com/Secreto31126/tesis/common/ports/mongo"
 	"github.com/Secreto31126/tesis/common/ports/redis"
@@ -31,6 +32,7 @@ func main() {
 	executer := &executer.DewIt{}
 
 	router := gin.Default()
+	router.Use(middleware.CORSMiddleware())
 
 	boardController := boards.NewController(b_srv.New(db))
 	postitController := postits.NewController(p_srv.New(db, cache, executer))
