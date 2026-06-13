@@ -4,7 +4,7 @@ import EventsSearchNode from "./EventsSearch/EventsSearch.svelte";
 import StaticCardNode from "./StaticCard/StaticCard.svelte";
 import TemperatureNode from "./Temperature/Temperature.svelte";
 
-export const nodes = {
+export const nodesMap = {
     "static_card": StaticCardNode,
     "temperature": TemperatureNode,
     "events_search": EventsSearchNode,

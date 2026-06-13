@@ -8,6 +8,7 @@
 	import type { Board } from '$types/api';
 	import Modal from '$components/Modal/Modal.svelte';
 	import Input from '$components/Input/Input.svelte';
+	import { nodesMap } from '$components/Nodes/node-map';
 
 	let { nodes, edges, name, boardId }: {
 		nodes: Node[],
@@ -15,6 +16,8 @@
 		name: string,
 		boardId: string,
 	} = $props();
+
+	$effect(() => console.log(nodes));
 
 	let selectedNode: Node | null = $state(null);
 
@@ -68,11 +71,11 @@
 		if (creatingNode.type === 'static_card' && !text.trim()) return;
 		if (creatingNode.type === 'events_search' && !keyword.trim()) return;
 
-		const params: Record<string, string> = creatingNode.type === 'static_card' ? { text: text.trim() } : { keyword: keyword.trim() };
+		const params: Record<string, string> = creatingNode.type === 'static_card' ? { text: text.trim() } : { "$keyword": keyword.trim() };
 
 		const newPostIt = await postItsApi.create_well_known(boardId, creatingNode.type!, params);
 		await postItsApi.move(newPostIt.id, creatingNode.position.x, creatingNode.position.y);
-		
+
 		const newNode = {
 			...creatingNode,
 			data: { text, keyword }
@@ -92,6 +95,7 @@
 			<SvelteFlow
 				bind:nodes
 				bind:edges
+				nodeTypes={nodesMap}
 				fitView
 				ondragover={onDragOver}
 				ondrop={onDrop}

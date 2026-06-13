@@ -27,7 +27,7 @@ func (srv *PostItsService) CreatePostIt(postIt *models.PostIts) (*models.PostIts
 		postIt = wk
 	}
 
-	return srv.db.CreatePostIt(postIt, postIt.WellKnown, models.Position{X: 0, Y: 0})
+	return srv.db.CreatePostIt(postIt, postIt.WellKnown, models.Position{X: 750, Y: 350})
 }
 
 func (srv *PostItsService) GetPostIt(id uuid.UUID) (*models.PostIts, error) {

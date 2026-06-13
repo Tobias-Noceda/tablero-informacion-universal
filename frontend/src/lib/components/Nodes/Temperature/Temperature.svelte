@@ -19,5 +19,5 @@
   <Handle type="source" position={Position.Left} isConnectable />
   <Handle type="source" position={Position.Right} isConnectable />
 {:catch}
-  Upsi
+  An error has occurred
 {/await}

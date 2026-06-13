@@ -62,7 +62,7 @@
 					{#each $boardList as board (board.id)}
 						<a
 							href={resolve(`/board/${board.id}`)}
-							class="px-2 py-1.5 rounded-md text-white text-sm hover:bg-sidebar-hover border border-sidebar-border transition-colors truncate"
+							class="px-2 py-1.5 rounded-md text-white text-sm hover:bg-sidebar border border-sidebar transition-colors truncate"
 						>
 							{board.name}
 						</a>
