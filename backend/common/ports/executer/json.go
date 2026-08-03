@@ -12,7 +12,7 @@ import (
 
 type JsonDewIt struct{}
 
-func (this *JsonDewIt) parse(postit *models.PostIts, body io.ReadCloser) (any, error) {
+func (this *JsonDewIt) parse(postit *models.PostIts, body io.Reader) (any, error) {
 	data, err := this.decode(body)
 	if err != nil {
 		return nil, err
@@ -21,7 +21,7 @@ func (this *JsonDewIt) parse(postit *models.PostIts, body io.ReadCloser) (any, e
 	return this.query(data, postit.Query)
 }
 
-func (this *JsonDewIt) decode(body io.ReadCloser) (any, error) {
+func (this *JsonDewIt) decode(body io.Reader) (any, error) {
 	var data any
 	if err := json.NewDecoder(body).Decode(&data); err != nil {
 		return nil, err

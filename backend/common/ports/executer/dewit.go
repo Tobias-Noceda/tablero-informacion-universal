@@ -17,7 +17,7 @@ func New() *DewIt {
 }
 
 type parser interface {
-	parse(*models.PostIts, io.ReadCloser) (any, error)
+	parse(*models.PostIts, io.Reader) (any, error)
 }
 
 func (e *DewIt) Execute(postit *models.PostIts) (any, error) {
@@ -50,9 +50,9 @@ func (e *DewIt) Execute(postit *models.PostIts) (any, error) {
 	}
 
 	defer res.Body.Close()
-	io.LimitReader(res.Body, MAX_PAYLOAD_SIZE)
+	body := io.LimitReader(res.Body, MAX_PAYLOAD_SIZE)
 
-	return parser.parse(postit, res.Body)
+	return parser.parse(postit, body)
 }
 
 func (*DewIt) getParser(postit *models.PostIts) (parser, error) {

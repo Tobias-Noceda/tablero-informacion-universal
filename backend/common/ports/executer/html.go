@@ -10,7 +10,7 @@ import (
 
 type HtmlDewIt struct{}
 
-func (this *HtmlDewIt) parse(postit *models.PostIts, body io.ReadCloser) (any, error) {
+func (this *HtmlDewIt) parse(postit *models.PostIts, body io.Reader) (any, error) {
 	data, err := this.decode(body)
 	if err != nil {
 		return nil, err
@@ -19,7 +19,7 @@ func (this *HtmlDewIt) parse(postit *models.PostIts, body io.ReadCloser) (any, e
 	return this.query(data, postit.Query)
 }
 
-func (e *HtmlDewIt) decode(body io.ReadCloser) (*goquery.Document, error) {
+func (e *HtmlDewIt) decode(body io.Reader) (*goquery.Document, error) {
 	doc, err := goquery.NewDocumentFromReader(body)
 	if err != nil {
 		return nil, err
