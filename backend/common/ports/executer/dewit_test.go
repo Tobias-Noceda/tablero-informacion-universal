@@ -17,9 +17,9 @@ func nopCloser(s string) io.ReadCloser {
 }
 
 func TestParse_DetectsTypes(t *testing.T) {
-	e := New()
+	e := &JsonDewIt{}
 
-	obj, err := e.parse(nopCloser(`{"a":1}`))
+	obj, err := e.decode(nopCloser(`{"a":1}`))
 	if err != nil {
 		t.Fatalf("object parse: %v", err)
 	}
@@ -27,7 +27,7 @@ func TestParse_DetectsTypes(t *testing.T) {
 		t.Errorf("object parsed as %T, want map", obj)
 	}
 
-	arr, err := e.parse(nopCloser(`[1,2,3]`))
+	arr, err := e.decode(nopCloser(`[1,2,3]`))
 	if err != nil {
 		t.Fatalf("array parse: %v", err)
 	}
@@ -37,14 +37,16 @@ func TestParse_DetectsTypes(t *testing.T) {
 }
 
 func TestParse_InvalidJSON(t *testing.T) {
-	e := New()
-	if _, err := e.parse(nopCloser(`{not json`)); err == nil {
+	e := &JsonDewIt{}
+
+	if _, err := e.decode(nopCloser(`{not json`)); err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
 }
 
 func TestQuery_ObjectProjection(t *testing.T) {
-	e := New()
+	e := &JsonDewIt{}
+
 	data := map[string]any{"compra": 1000.0, "venta": 1050.0, "extra": "x"}
 
 	res, err := e.query(data, map[string]string{"compra": ".compra", "venta": ".venta"})
@@ -63,7 +65,7 @@ func TestQuery_ObjectProjection(t *testing.T) {
 // Reproduces the dolar_oficial bug: an object projection over an array payload
 // must surface a gojq error rather than silently succeeding.
 func TestQuery_ObjectQueryOverArrayErrors(t *testing.T) {
-	e := New()
+	e := &JsonDewIt{}
 	data := []any{
 		map[string]any{"casa": "oficial", "compra": 1000.0},
 	}
@@ -75,7 +77,7 @@ func TestQuery_ObjectQueryOverArrayErrors(t *testing.T) {
 
 // The array-aware alternative query should work against the same array payload.
 func TestQuery_ArrayFilterSelectsElement(t *testing.T) {
-	e := New()
+	e := &JsonDewIt{}
 	data := []any{
 		map[string]any{"casa": "oficial", "compra": 1000.0, "venta": 1050.0},
 		map[string]any{"casa": "blue", "compra": 1200.0, "venta": 1250.0},
@@ -95,7 +97,7 @@ func TestQuery_ArrayFilterSelectsElement(t *testing.T) {
 }
 
 func TestQuery_NoResults(t *testing.T) {
-	e := New()
+	e := &JsonDewIt{}
 	data := []any{}
 
 	if _, err := e.query(data, map[string]string{"empty": ".[]"}); err == nil {
@@ -104,7 +106,7 @@ func TestQuery_NoResults(t *testing.T) {
 }
 
 func TestQuery_InvalidSyntax(t *testing.T) {
-	e := New()
+	e := &JsonDewIt{}
 	if _, err := e.query(map[string]any{}, map[string]string{"broken": "{ "}); err == nil {
 		t.Fatal("expected parse error for invalid query syntax")
 	}
