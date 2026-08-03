@@ -14,11 +14,6 @@ import (
 	"github.com/itchyny/gojq"
 )
 
-const (
-	REQUEST_TIMEOUT = 10 * time.Second
-	QUERY_TIMEOUT   = 250 * time.Millisecond
-)
-
 type DewIt struct{}
 
 func New() *DewIt {
