@@ -96,7 +96,7 @@ func TestGetPostItSettings_OK(t *testing.T) {
 	id := uuid.New()
 	db := &mocks.MockDB{
 		FindPostItFn: func(_ uuid.UUID) (*models.PostIts, error) {
-			return &models.PostIts{Id: id, Rate: 5, Query: "{ compra: .compra }"}, nil
+			return &models.PostIts{Id: id, Rate: 5, Query: map[string]string{"compra": ".compra"}}, nil
 		},
 	}
 	r := setupRouter(db, nil, nil)
