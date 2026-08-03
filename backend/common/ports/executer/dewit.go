@@ -45,6 +45,7 @@ func (e *DewIt) Execute(postit *models.PostIts) (any, error) {
 	}
 
 	defer res.Body.Close()
+	io.LimitReader(res.Body, MAX_PAYLOAD_SIZE)
 
 	data, err := e.parse(res.Body)
 	if err != nil {
@@ -83,7 +84,7 @@ func (*DewIt) request(url *url.URL, method string, queries, headers map[string]s
 		req.Header.Add(k, v)
 	}
 
-	res, err := (&http.Client{}).Do(req)
+	res, err := httpClient().Do(req)
 	if err != nil {
 		return nil, err
 	}
