@@ -59,6 +59,8 @@ func (*DewIt) getParser(postit *models.PostIts) (parser, error) {
 	switch postit.Response {
 	case "json":
 		return &JsonDewIt{}, nil
+	case "html":
+		return &HtmlDewIt{}, nil
 	default:
 		return nil, fmt.Errorf("Unsupported content type, no parser implemented")
 	}
