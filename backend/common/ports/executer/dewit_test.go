@@ -47,7 +47,7 @@ func TestQuery_ObjectProjection(t *testing.T) {
 	e := New()
 	data := map[string]any{"compra": 1000.0, "venta": 1050.0, "extra": "x"}
 
-	res, err := e.query(data, "{ compra: .compra, venta: .venta }")
+	res, err := e.query(data, map[string]string{"compra": ".compra", "venta": ".venta"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -68,7 +68,7 @@ func TestQuery_ObjectQueryOverArrayErrors(t *testing.T) {
 		map[string]any{"casa": "oficial", "compra": 1000.0},
 	}
 
-	if _, err := e.query(data, "{ compra: .compra }"); err == nil {
+	if _, err := e.query(data, map[string]string{"compra": ".compra"}); err == nil {
 		t.Fatal("expected error when projecting an object query over an array")
 	}
 }
@@ -81,7 +81,7 @@ func TestQuery_ArrayFilterSelectsElement(t *testing.T) {
 		map[string]any{"casa": "blue", "compra": 1200.0, "venta": 1250.0},
 	}
 
-	res, err := e.query(data, `.[] | select(.casa == "oficial") | { compra, venta }`)
+	res, err := e.query(data, map[string]string{"compra": `.[] | select(.casa == "oficial") | .compra`})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -98,14 +98,14 @@ func TestQuery_NoResults(t *testing.T) {
 	e := New()
 	data := []any{}
 
-	if _, err := e.query(data, ".[]"); err == nil {
+	if _, err := e.query(data, map[string]string{"empty": ".[]"}); err == nil {
 		t.Fatal("expected 'no results' error for empty iteration")
 	}
 }
 
 func TestQuery_InvalidSyntax(t *testing.T) {
 	e := New()
-	if _, err := e.query(map[string]any{}, "{ broken"); err == nil {
+	if _, err := e.query(map[string]any{}, map[string]string{"broken": "{ "}); err == nil {
 		t.Fatal("expected parse error for invalid query syntax")
 	}
 }
@@ -156,7 +156,7 @@ func TestExecute_EndToEnd(t *testing.T) {
 	postit := &models.PostIts{
 		Resource: resource,
 		Request:  models.Request{Method: http.MethodGet},
-		Query:    "{ compra: .compra, venta: .venta }",
+		Query:    map[string]string{"compra": ".compra", "venta": ".venta"},
 	}
 
 	res, err := e.Execute(postit)
@@ -190,7 +190,7 @@ func TestExecute_PopulatesQueryParamsIntoRequest(t *testing.T) {
 			Method:  http.MethodGet,
 			Queries: map[string]string{"keyword": "$kw"},
 		},
-		Query: ".ok",
+		Query: map[string]string{"ok": ".ok"},
 	}
 
 	if _, err := e.Execute(postit); err != nil {
@@ -212,7 +212,7 @@ func TestExecute_Non200Errors(t *testing.T) {
 	postit := &models.PostIts{
 		Resource: resource,
 		Request:  models.Request{Method: http.MethodGet},
-		Query:    ".",
+		Query:    map[string]string{".": "."},
 	}
 
 	if _, err := e.Execute(postit); err == nil {

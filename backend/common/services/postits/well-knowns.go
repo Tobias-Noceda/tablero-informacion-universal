@@ -93,8 +93,11 @@ var configuredPostIts = map[string]models.PostIts{
 			},
 		},
 		Response: "json",
-		Query:    "{ min: .hourly.temperature_2m | min, max: .hourly.temperature_2m | max }",
-		Rate:     30,
+		Query: map[string]string{
+			"min": ".hourly.temperature_2m | min",
+			"max": ".hourly.temperature_2m | max",
+		},
+		Rate: 30,
 	},
 	"events_search": {
 		WellKnown: "events_search",
@@ -114,8 +117,12 @@ var configuredPostIts = map[string]models.PostIts{
 			},
 		},
 		Response: "json",
-		Query:    "{ name: ._embedded.events[0].name, sales: ._embedded.events[0].sales.public.startDateTime, image: ._embedded.events[0].images[0].url }",
-		Rate:     120,
+		Query: map[string]string{
+			"name":  "._embedded.events[0].name",
+			"sales": "._embedded.events[0].sales.public.startDateTime",
+			"image": "._embedded.events[0].images[0].url",
+		},
+		Rate: 120,
 	},
 	"dog_facts": {
 		WellKnown: "dog_facts",
@@ -124,8 +131,10 @@ var configuredPostIts = map[string]models.PostIts{
 			Method: "GET",
 		},
 		Response: "json",
-		Query:    ".data[0].attributes",
-		Rate:     5,
+		Query: map[string]string{
+			"body": ".data[0].attributes.body",
+		},
+		Rate: 5,
 	},
 	"dolar_oficial": {
 		WellKnown: "dolar_oficial",
@@ -134,7 +143,10 @@ var configuredPostIts = map[string]models.PostIts{
 			Method: "GET",
 		},
 		Response: "json",
-		Query:    "{ compra: .compra, venta: .venta }",
-		Rate:     120,
+		Query: map[string]string{
+			"compra": ".compra",
+			"venta":  ".venta",
+		},
+		Rate: 120,
 	},
 }
