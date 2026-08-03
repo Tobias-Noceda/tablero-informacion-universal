@@ -36,7 +36,7 @@ func httpClient() *http.Client {
 
 				for _, ip := range ips {
 					if !isSafeIP(ip) {
-						return nil, fmt.Errorf("Blocked IP: %s", ip)
+						continue
 					}
 
 					conn, err := dialer.DialContext(ctx, network, net.JoinHostPort(ip.String(), port))
