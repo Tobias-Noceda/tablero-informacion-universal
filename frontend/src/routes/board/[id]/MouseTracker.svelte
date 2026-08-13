@@ -17,22 +17,17 @@
 	let frame: number | null = null;
 
 	function isNumber(n: unknown): n is number {
-		return Number.isSafeInteger(n);
+		return Number.isFinite(n);
 	}
 
 	function setConnection(conn: DataConnection) {
-		const id = conn.connectionId;
+		const id = conn.peer;
 
 		conn.on('open', () => {
 			connections.set(id, conn);
-			mouses.add(id, {
-				username: conn.label,
-				picture: 'TBD'
-			});
+			mouses.add(id, conn.metadata);
 
 			conn.on('data', (data) => {
-				console.log('Received', data);
-
 				if (Array.isArray(data) && isNumber(data[0]) && isNumber(data[1])) {
 					const pos = { x: data[0], y: data[1] };
 					mouses.update(id, pos);
@@ -61,8 +56,11 @@
 			// TBD: Read the ids from a DB (MemCache maybe?)
 			page.url.searchParams.getAll('peer').forEach((p) => {
 				const conn = peer.connect(p, {
-					label: 'username_' + id,
-					reliable: true
+					reliable: true,
+					metadata: {
+						username: 'Messi',
+						picture: 'TBD'
+					}
 				});
 
 				setConnection(conn);
@@ -102,24 +100,28 @@
 		});
 	}
 
-	// eslint-disable-next-line svelte/no-inspect
-	$inspect(mouses).with(console.trace);
+	let width = $state(0);
+	let height = $state(0);
+
+	function visible(x: number, y: number) {
+		const margin = 10;
+		return -margin < x && x < width - margin && -margin < y && y < height - margin;
+	}
 </script>
 
+<svelte:window bind:innerWidth={width} bind:innerHeight={height} />
+
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div onmousemove={move}>
+<div onmousemove={move} onmousedown={move} class="contents">
 	{@render children()}
 </div>
 
 {#each mouses.data() as mouse (mouse.username)}
-	{#if mouse.position}
-		<p>{mouse.username}: {mouse.position.x} {mouse.position.y}</p>
+	{#if mouse.position && visible(mouse.position.x, mouse.position.y)}
 		<div
 			class="size-2 absolute bg-red-700"
 			style:top="{mouse.position.y}px"
-			style:right="{mouse.position.x}px"
+			style:left="{mouse.position.x}px"
 		></div>
-	{:else}
-		<p>{mouse.username}: Loading...</p>
 	{/if}
 {/each}

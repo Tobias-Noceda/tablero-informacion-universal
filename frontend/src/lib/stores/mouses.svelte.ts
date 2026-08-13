@@ -34,7 +34,11 @@ class MousePositions {
 		const client = this.#map.get(id);
 		if (!client) return false;
 
-		client.position = this.#toScreen(position);
+		this.#map.set(id, {
+			...client,
+			position: this.#toScreen(position)
+		});
+
 		return true;
 	}
 
