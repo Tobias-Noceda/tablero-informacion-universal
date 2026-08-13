@@ -9,6 +9,7 @@
 	import Modal from '$components/Modal/Modal.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import { nodesMap } from '$components/Nodes/node-map';
+	import { mouses } from '$stores/mouses.svelte';
 
 	let { nodes, edges, name, boardId }: {
 		nodes: Node[],
@@ -29,7 +30,9 @@
 	// let start_date = $state('');
 	// let end_date = $state('');
 
-	const { screenToFlowPosition } = useSvelteFlow();
+	const { screenToFlowPosition, flowToScreenPosition } = useSvelteFlow();
+
+	mouses.updateMappers(screenToFlowPosition, flowToScreenPosition);
 
 	const type = useDnD();
 

@@ -3,6 +3,7 @@
 
 	import Flow from './Flow.svelte';
 	import DnDProvider from './DnDProvider.svelte';
+	import MouseTracker from './MouseTracker.svelte';
 
 	import { page } from '$app/state';
 	import type { Node, Edge } from '@xyflow/svelte';
@@ -11,12 +12,14 @@
 
 	const { data } = $props();
 	const { nodes, edges, name } = $derived(data) as {
-		nodes: Node[],
-		edges: Edge[],
-		name: string,
+		nodes: Node[];
+		edges: Edge[];
+		name: string;
 	};
 </script>
 
 <DnDProvider>
-	<Flow {name} {nodes} {edges} boardId={id} />
+	<MouseTracker>
+		<Flow {name} {nodes} {edges} boardId={id} />
+	</MouseTracker>
 </DnDProvider>
