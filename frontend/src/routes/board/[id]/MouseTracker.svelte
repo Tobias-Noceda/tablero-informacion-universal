@@ -112,7 +112,7 @@
 <svelte:window bind:innerWidth={width} bind:innerHeight={height} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div onmousemove={move} onmousedown={move} class="contents">
+<div onmousemove={move} class="contents">
 	{@render children()}
 </div>
 
