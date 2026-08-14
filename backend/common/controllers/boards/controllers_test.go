@@ -47,7 +47,7 @@ func TestCreateBoard_OK(t *testing.T) {
 	}
 	r := setupRouter(db)
 
-	w := do(r, http.MethodPost, "/boards/", `{"name":"B","owner":"o1"}`)
+	w := do(r, http.MethodPost, "/boards", `{"name":"B","owner":"o1"}`)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201 (body: %s)", w.Code, w.Body.String())
 	}
@@ -60,7 +60,7 @@ func TestCreateBoard_OK(t *testing.T) {
 
 func TestCreateBoard_MissingFields(t *testing.T) {
 	r := setupRouter(nil)
-	w := do(r, http.MethodPost, "/boards/", `{"name":"B"}`)
+	w := do(r, http.MethodPost, "/boards", `{"name":"B"}`)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", w.Code)
 	}
@@ -68,7 +68,7 @@ func TestCreateBoard_MissingFields(t *testing.T) {
 
 func TestGetUserBoards_MissingCognitoID(t *testing.T) {
 	r := setupRouter(nil)
-	w := do(r, http.MethodGet, "/boards/", "")
+	w := do(r, http.MethodGet, "/boards", "")
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500 (missing cognito_id)", w.Code)
 	}
@@ -85,7 +85,7 @@ func TestGetUserBoards_OK(t *testing.T) {
 	}
 	r := setupRouter(db)
 
-	w := do(r, http.MethodGet, "/boards/?cognito_id=user-1", "")
+	w := do(r, http.MethodGet, "/boards?cognito_id=user-1", "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
@@ -330,8 +330,8 @@ func TestBoardHandlers_ServiceErrors(t *testing.T) {
 	cases := []struct {
 		name, method, path, body string
 	}{
-		{"GetUserBoards", http.MethodGet, "/boards/?cognito_id=u", ""},
-		{"CreateBoard", http.MethodPost, "/boards/", `{"name":"B","owner":"o"}`},
+		{"GetUserBoards", http.MethodGet, "/boards?cognito_id=u", ""},
+		{"CreateBoard", http.MethodPost, "/boards", `{"name":"B","owner":"o"}`},
 		{"DeleteBoard", http.MethodDelete, "/boards/" + id, ""},
 		{"AddCollaborator", http.MethodPost, "/boards/" + id + "/collaborators", `{"cognito_id":"c"}`},
 		{"RemoveCollaborator", http.MethodDelete, "/boards/" + id + "/collaborators", `{"cognito_id":"c"}`},
