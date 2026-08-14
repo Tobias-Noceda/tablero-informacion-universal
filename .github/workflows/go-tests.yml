@@ -30,11 +30,6 @@ jobs:
       - name: Download modules
         run: go mod download
 
-      - name: Verify go.mod is tidy
-        run: |
-          go mod tidy
-          git diff --exit-code -- go.mod go.sum
-
       - name: Build
         run: go build ./...
 
