@@ -80,13 +80,7 @@
 
 			if (frame) cancelAnimationFrame(frame);
 
-			connections
-				.values()
-				.filter((c) => c.open)
-				.forEach((c) => c.close());
-
 			peer.destroy();
-
 			connections.clear();
 			mouses.clear();
 		};
