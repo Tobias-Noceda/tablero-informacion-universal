@@ -93,8 +93,11 @@ var configuredPostIts = map[string]models.PostIts{
 			},
 		},
 		Response: "json",
-		Query:    "{ min: .hourly.temperature_2m | min, max: .hourly.temperature_2m | max }",
-		Rate:     30,
+		Query: map[string]string{
+			"min": ".hourly.temperature_2m | min",
+			"max": ".hourly.temperature_2m | max",
+		},
+		Rate: 30,
 	},
 	"events_search": {
 		WellKnown: "events_search",
@@ -114,8 +117,12 @@ var configuredPostIts = map[string]models.PostIts{
 			},
 		},
 		Response: "json",
-		Query:    "{ name: ._embedded.events[0].name, sales: ._embedded.events[0].sales.public.startDateTime, image: ._embedded.events[0].images[0].url }",
-		Rate:     120,
+		Query: map[string]string{
+			"name":  "._embedded.events[0].name",
+			"sales": "._embedded.events[0].sales.public.startDateTime",
+			"image": "._embedded.events[0].images[0].url",
+		},
+		Rate: 120,
 	},
 	"dog_facts": {
 		WellKnown: "dog_facts",
@@ -124,8 +131,10 @@ var configuredPostIts = map[string]models.PostIts{
 			Method: "GET",
 		},
 		Response: "json",
-		Query:    ".data[0].attributes",
-		Rate:     5,
+		Query: map[string]string{
+			"body": ".data[0].attributes.body",
+		},
+		Rate: 5,
 	},
 	"dolar_oficial": {
 		WellKnown: "dolar_oficial",
@@ -134,8 +143,11 @@ var configuredPostIts = map[string]models.PostIts{
 			Method: "GET",
 		},
 		Response: "json",
-		Query:    "{ compra: .compra, venta: .venta }",
-		Rate:     120,
+		Query: map[string]string{
+			"compra": ".compra",
+			"venta":  ".venta",
+		},
+		Rate: 120,
 	},
 	"riesgo_pais": {
 		WellKnown: "riesgo_pais",
@@ -147,8 +159,11 @@ var configuredPostIts = map[string]models.PostIts{
 			},
 		},
 		Response: "json",
-		Query:    "{ valor: .valor, fecha: .fecha }",
-		Rate:     3600,
+		Query: map[string]string{
+			"valor": ".valor",
+			"fecha": ".fecha",
+		},
+		Rate: 3600,
 	},
 	"crypto_price": {
 		WellKnown: "crypto_price",
@@ -169,8 +184,11 @@ var configuredPostIts = map[string]models.PostIts{
 			},
 		},
 		Response: "json",
-		Query:    ".[] | { price: (to_entries[] | select(.key | endswith(\"_24h_change\") | not) | .value), change: (to_entries[] | select(.key | endswith(\"_24h_change\")) | .value) }",
-		Rate:     60,
+		Query: map[string]string{
+			"price":  ".[] | to_entries[] | select(.key | endswith(\"_24h_change\") | not) | .value",
+			"change": ".[] | to_entries[] | select(.key | endswith(\"_24h_change\")) | .value",
+		},
+		Rate: 60,
 	},
 	"air_quality": {
 		WellKnown: "air_quality",
@@ -191,8 +209,12 @@ var configuredPostIts = map[string]models.PostIts{
 			},
 		},
 		Response: "json",
-		Query:    "{ aqi: .current.us_aqi, pm25: .current.pm2_5, time: .current.time }",
-		Rate:     900,
+		Query: map[string]string{
+			"aqi":  ".current.us_aqi",
+			"pm25": ".current.pm2_5",
+			"time": ".current.time",
+		},
+		Rate: 900,
 	},
 	"github_repo": {
 		WellKnown: "github_repo",
@@ -213,8 +235,13 @@ var configuredPostIts = map[string]models.PostIts{
 			},
 		},
 		Response: "json",
-		Query:    ".items[0] | { name: .full_name, stars: .stargazers_count, forks: .forks_count, issues: .open_issues_count, description: .description }",
-		// Unauthenticated search is capped at 10 requests/minute.
+		Query: map[string]string{
+			"name":        ".items[0].full_name",
+			"stars":       ".items[0].stargazers_count",
+			"forks":       ".items[0].forks_count",
+			"issues":      ".items[0].open_issues_count",
+			"description": ".items[0].description",
+		},
 		Rate: 300,
 	},
 }

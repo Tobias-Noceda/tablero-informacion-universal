@@ -3,6 +3,7 @@ package executer
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -16,10 +17,17 @@ func nopCloser(s string) io.ReadCloser {
 	return io.NopCloser(strings.NewReader(s))
 }
 
-func TestParse_DetectsTypes(t *testing.T) {
-	e := New()
+func allowLoopback(t *testing.T) {
+	t.Helper()
+	original := isSafeIP
+	isSafeIP = func(net.IP) bool { return true }
+	t.Cleanup(func() { isSafeIP = original })
+}
 
-	obj, err := e.parse(nopCloser(`{"a":1}`))
+func TestParse_DetectsTypes(t *testing.T) {
+	e := &JsonDewIt{}
+
+	obj, err := e.decode(nopCloser(`{"a":1}`))
 	if err != nil {
 		t.Fatalf("object parse: %v", err)
 	}
@@ -27,7 +35,7 @@ func TestParse_DetectsTypes(t *testing.T) {
 		t.Errorf("object parsed as %T, want map", obj)
 	}
 
-	arr, err := e.parse(nopCloser(`[1,2,3]`))
+	arr, err := e.decode(nopCloser(`[1,2,3]`))
 	if err != nil {
 		t.Fatalf("array parse: %v", err)
 	}
@@ -37,17 +45,19 @@ func TestParse_DetectsTypes(t *testing.T) {
 }
 
 func TestParse_InvalidJSON(t *testing.T) {
-	e := New()
-	if _, err := e.parse(nopCloser(`{not json`)); err == nil {
+	e := &JsonDewIt{}
+
+	if _, err := e.decode(nopCloser(`{not json`)); err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
 }
 
 func TestQuery_ObjectProjection(t *testing.T) {
-	e := New()
+	e := &JsonDewIt{}
+
 	data := map[string]any{"compra": 1000.0, "venta": 1050.0, "extra": "x"}
 
-	res, err := e.query(data, "{ compra: .compra, venta: .venta }")
+	res, err := e.query(data, map[string]string{"compra": ".compra", "venta": ".venta"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -63,25 +73,25 @@ func TestQuery_ObjectProjection(t *testing.T) {
 // Reproduces the dolar_oficial bug: an object projection over an array payload
 // must surface a gojq error rather than silently succeeding.
 func TestQuery_ObjectQueryOverArrayErrors(t *testing.T) {
-	e := New()
+	e := &JsonDewIt{}
 	data := []any{
 		map[string]any{"casa": "oficial", "compra": 1000.0},
 	}
 
-	if _, err := e.query(data, "{ compra: .compra }"); err == nil {
+	if _, err := e.query(data, map[string]string{"compra": ".compra"}); err == nil {
 		t.Fatal("expected error when projecting an object query over an array")
 	}
 }
 
 // The array-aware alternative query should work against the same array payload.
 func TestQuery_ArrayFilterSelectsElement(t *testing.T) {
-	e := New()
+	e := &JsonDewIt{}
 	data := []any{
 		map[string]any{"casa": "oficial", "compra": 1000.0, "venta": 1050.0},
 		map[string]any{"casa": "blue", "compra": 1200.0, "venta": 1250.0},
 	}
 
-	res, err := e.query(data, `.[] | select(.casa == "oficial") | { compra, venta }`)
+	res, err := e.query(data, map[string]string{"compra": `.[] | select(.casa == "oficial") | .compra`})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -95,17 +105,17 @@ func TestQuery_ArrayFilterSelectsElement(t *testing.T) {
 }
 
 func TestQuery_NoResults(t *testing.T) {
-	e := New()
+	e := &JsonDewIt{}
 	data := []any{}
 
-	if _, err := e.query(data, ".[]"); err == nil {
+	if _, err := e.query(data, map[string]string{"empty": ".[]"}); err == nil {
 		t.Fatal("expected 'no results' error for empty iteration")
 	}
 }
 
 func TestQuery_InvalidSyntax(t *testing.T) {
-	e := New()
-	if _, err := e.query(map[string]any{}, "{ broken"); err == nil {
+	e := &JsonDewIt{}
+	if _, err := e.query(map[string]any{}, map[string]string{"broken": "{ "}); err == nil {
 		t.Fatal("expected parse error for invalid query syntax")
 	}
 }
@@ -145,6 +155,7 @@ func TestExecute_NoResourceReturnsParams(t *testing.T) {
 }
 
 func TestExecute_EndToEnd(t *testing.T) {
+	allowLoopback(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"compra":1000,"venta":1050,"casa":"oficial"}`)
@@ -156,7 +167,8 @@ func TestExecute_EndToEnd(t *testing.T) {
 	postit := &models.PostIts{
 		Resource: resource,
 		Request:  models.Request{Method: http.MethodGet},
-		Query:    "{ compra: .compra, venta: .venta }",
+		Response: "json",
+		Query:    map[string]string{"compra": ".compra", "venta": ".venta"},
 	}
 
 	res, err := e.Execute(postit)
@@ -173,6 +185,7 @@ func TestExecute_EndToEnd(t *testing.T) {
 }
 
 func TestExecute_PopulatesQueryParamsIntoRequest(t *testing.T) {
+	allowLoopback(t)
 	var gotKeyword string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotKeyword = r.URL.Query().Get("keyword")
@@ -190,7 +203,8 @@ func TestExecute_PopulatesQueryParamsIntoRequest(t *testing.T) {
 			Method:  http.MethodGet,
 			Queries: map[string]string{"keyword": "$kw"},
 		},
-		Query: ".ok",
+		Response: "json",
+		Query:    map[string]string{"ok": ".ok"},
 	}
 
 	if _, err := e.Execute(postit); err != nil {
@@ -202,6 +216,7 @@ func TestExecute_PopulatesQueryParamsIntoRequest(t *testing.T) {
 }
 
 func TestExecute_Non200Errors(t *testing.T) {
+	allowLoopback(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
@@ -212,7 +227,8 @@ func TestExecute_Non200Errors(t *testing.T) {
 	postit := &models.PostIts{
 		Resource: resource,
 		Request:  models.Request{Method: http.MethodGet},
-		Query:    ".",
+		Response: "json",
+		Query:    map[string]string{".": "."},
 	}
 
 	if _, err := e.Execute(postit); err == nil {
@@ -221,6 +237,7 @@ func TestExecute_Non200Errors(t *testing.T) {
 }
 
 func TestExecute_DoesNotMutateSharedResource(t *testing.T) {
+	allowLoopback(t)
 	var seen []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen = append(seen, r.URL.RawQuery)
@@ -240,8 +257,9 @@ func TestExecute_DoesNotMutateSharedResource(t *testing.T) {
 				Method:  http.MethodGet,
 				Queries: map[string]string{"ids": "$coin"},
 			},
-			Params: map[string]string{"$coin": coin},
-			Query:  ".",
+			Params:   map[string]string{"$coin": coin},
+			Response: "json",
+			Query:    map[string]string{"ok": ".ok"},
 		}
 		if _, err := e.Execute(postit); err != nil {
 			t.Fatalf("%s: unexpected error: %v", coin, err)
