@@ -22,9 +22,9 @@ var ErrForbidden = errors.New("Not allowed to manage this board's secrets")
 const REFRESH_LOCK_TTL = 30 * time.Second
 
 type SecretsService struct {
-	store  infrastructure.SecretStore
-	boards infrastructure.BoardReader
-	sealer *crypto.Sealer
+	store      infrastructure.SecretStore
+	boards     infrastructure.BoardReader
+	sealer     *crypto.Sealer
 	tokens     infrastructure.TokenClient
 	locks      infrastructure.Locker
 	handshakes infrastructure.HandshakeStore
