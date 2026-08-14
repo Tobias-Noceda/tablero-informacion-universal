@@ -17,7 +17,8 @@
 		"riesgo_pais": "Country Risk",
 		"crypto_price": "Crypto Price",
 		"air_quality": "Air Quality",
-		"github_repo": "GitHub Repository"
+		"github_repo": "GitHub Repository",
+		"exchange_rate": "Exchange Rate"
 	},
 	"secrets": {
 		"title": "Board credentials",

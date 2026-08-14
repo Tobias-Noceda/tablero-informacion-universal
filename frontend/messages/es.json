@@ -17,7 +17,8 @@
 		"riesgo_pais": "Riesgo País",
 		"crypto_price": "Precio Cripto",
 		"air_quality": "Calidad del Aire",
-		"github_repo": "Repositorio GitHub"
+		"github_repo": "Repositorio GitHub",
+		"exchange_rate": "Cotización"
 	},
 	"secrets": {
 		"title": "Credenciales del tablero",
