@@ -3,6 +3,8 @@
 
 	import { type DataConnection, Peer } from 'peerjs';
 
+	import Cursor from '$components/Cursor/Cursor.svelte';
+
 	import { mouses, type ClientData } from '$stores/mouses.svelte';
 	import * as boardApi from '$services/board';
 
@@ -108,30 +110,15 @@
 				.forEach((c) => c.send(data));
 		});
 	}
-
-	let width = $state(0);
-	let height = $state(0);
-
-	function visible(x: number, y: number) {
-		const margin = 10;
-		return -margin < x && x < width - margin && -margin < y && y < height - margin;
-	}
 </script>
-
-<svelte:window bind:innerWidth={width} bind:innerHeight={height} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div onmousemove={move} class="contents">
 	{@render children()}
 </div>
 
-{#each mouses.data() as [id, position] (id)}
-	{#if position.position && visible(position.position.x, position.position.y)}
-		<div
-			class="size-2 absolute"
-			style:background-color={position.color}
-			style:top="{position.position.y}px"
-			style:left="{position.position.x}px"
-		></div>
+{#each mouses.data() as [id, { position, color }] (id)}
+	{#if position}
+		<Cursor {position} {color} />
 	{/if}
 {/each}
