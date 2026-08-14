@@ -409,7 +409,7 @@ func (ctrl *Controller) DisconnectPostIts(c *gin.Context) {
 
 func (ctrl *Controller) ConnectClient(c *gin.Context) {
 	idParam := c.Param("id")
-	clientParam := c.Query("id")
+	clientParam := c.Query("peer")
 
 	id, err := uuid.Parse(idParam)
 	if err != nil {
@@ -440,7 +440,7 @@ func (ctrl *Controller) ConnectClient(c *gin.Context) {
 
 func (ctrl *Controller) DisconnectClient(c *gin.Context) {
 	idParam := c.Param("id")
-	clientParam := c.Query("id")
+	clientParam := c.Query("peer")
 
 	id, err := uuid.Parse(idParam)
 	if err != nil {
