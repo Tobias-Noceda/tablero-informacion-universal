@@ -39,7 +39,7 @@ func main() {
 	}
 
 	executer := executer.New()
-	secrets := s_srv.New(db, db, sealer, oauth.New(), cache)
+	secrets := s_srv.New(db, db, sealer, oauth.New(), cache, cache)
 
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
