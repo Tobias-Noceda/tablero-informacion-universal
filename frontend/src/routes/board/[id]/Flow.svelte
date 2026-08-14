@@ -10,6 +10,8 @@
 	import Input from '$components/Input/Input.svelte';
 	import Button from '$components/Button/Button.svelte';
 	import SecretsPanel from '$components/Secrets/SecretsPanel.svelte';
+	import * as secretsApi from '$services/secrets';
+	import type { SecretMeta } from '$types/api';
 	import { m } from '$lib/paraglide/messages';
 	import { nodesMap, parameters } from '$components/Nodes/node-map';
 
@@ -25,6 +27,14 @@
 	let selectedNode: Node | null = $state(null);
 
 	let managingSecrets = $state(false);
+	let boardSecrets = $state<SecretMeta[]>([]);
+
+	// Refreshed whenever the panel closes, so a credential added there is
+	// immediately pickable when creating a node.
+	$effect(() => {
+		if (managingSecrets) return;
+		secretsApi.list(boardId).then((s) => (boardSecrets = s)).catch(() => (boardSecrets = []));
+	});
 	let creatingNode = $state<Board['postits'][number] | null>(null);
 	let paramValues = $state<Record<string, string>>({});
 
@@ -149,13 +159,34 @@
 		>
 			<h2 class="text-lg font-semibold">Create Node</h2>
 			{#each creatingParams as param (param.key)}
-				<Input
-					label={param.label}
-					placeholder={param.placeholder}
-					type={param.type === 'number' ? 'number' : 'text'}
-					required={param.default === undefined}
-					bind:value={paramValues[param.key]}
-				/>
+				{#if param.type === 'secret'}
+					<!-- The value stored is the secret's name, prefixed, so the
+					     backend resolves it against this board at run time. -->
+					<label class="flex flex-col gap-1 text-sm">
+						{param.label}
+						{#if boardSecrets.length === 0}
+							<span class="text-xs text-destructive">{m['secrets.no_credentials']()}</span>
+						{:else}
+							<select
+								class="bg-background border border-main-border rounded-md px-2 py-1"
+								bind:value={paramValues[param.key]}
+							>
+								<option value="">{m['secrets.pick_credential']()}</option>
+								{#each boardSecrets as secret (secret.name)}
+									<option value={`$${secret.name}`}>{secret.name} ({secret.kind})</option>
+								{/each}
+							</select>
+						{/if}
+					</label>
+				{:else}
+					<Input
+						label={param.label}
+						placeholder={param.placeholder}
+						type={param.type === 'number' ? 'number' : 'text'}
+						required={param.default === undefined}
+						bind:value={paramValues[param.key]}
+					/>
+				{/if}
 			{/each}
 		</Modal>
 	{/if}
