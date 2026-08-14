@@ -62,7 +62,7 @@ func (srv *PostItsService) DeletePostIt(id uuid.UUID) error {
 func secretRefs(postit *models.PostIts) []string {
 	seen := make(map[string]struct{})
 
-	for _, source := range []map[string]string{postit.Request.Headers, postit.Request.Queries} {
+	for _, source := range []map[string]string{postit.Request.Headers, postit.Request.Queries, postit.Params} {
 		for _, value := range source {
 			name, found := strings.CutPrefix(value, "$")
 			if !found || !models.ValidSecretName(name) {
@@ -95,6 +95,13 @@ func (srv *PostItsService) prepare(postit *models.PostIts) (*models.PostIts, err
 	if clone.Params == nil {
 		clone.Params = make(map[string]string, len(resolved))
 	}
+
+	for param, value := range clone.Params {
+		if secret, ok := resolved[value]; ok {
+			clone.Params[param] = secret
+		}
+	}
+
 	maps.Copy(clone.Params, resolved)
 
 	return &clone, nil
