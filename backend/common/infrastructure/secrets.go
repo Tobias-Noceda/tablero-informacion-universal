@@ -1,6 +1,8 @@
 package infrastructure
 
 import (
+	"time"
+
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/google/uuid"
 )
@@ -15,6 +17,23 @@ type SecretResolver interface {
 // "may this caller manage this board's credentials".
 type BoardReader interface {
 	FindBoard(id uuid.UUID) (*models.Board, error)
+}
+
+// TokenClient talks to an OAuth2 provider's token endpoint. Both methods write
+// the result back into material rather than returning it, because a refresh
+// can also replace the refresh token itself.
+type TokenClient interface {
+	Fetch(material *models.OAuth2Material) error
+	Exchange(material *models.OAuth2Material, code, redirectURI, verifier string) error
+}
+
+// Locker serialises token refreshes across processes. Two workers refreshing
+// the same credential at once would both spend the refresh token, and a
+// provider that rotates them invalidates whichever lands second.
+type Locker interface {
+	// Acquire reports whether the caller now holds the lock.
+	Acquire(key string, ttl time.Duration) (bool, error)
+	Release(key string) error
 }
 
 type SecretStore interface {
