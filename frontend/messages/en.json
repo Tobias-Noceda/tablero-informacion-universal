@@ -54,6 +54,8 @@
 		"method_bearer_hint": "Sent as \"Bearer <value>\". Use it in the Authorization header.",
 		"method_basic_hint": "Sent as \"Basic <base64 of user:password>\". The backend does the base64.",
 		"username": "Username",
-		"password": "Password"
+		"password": "Password",
+		"pick_credential": "Pick a credential",
+		"no_credentials": "This board has no credentials yet. Add one first."
 	}
 }

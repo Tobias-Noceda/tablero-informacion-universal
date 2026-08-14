@@ -54,6 +54,8 @@
 		"method_bearer_hint": "Se envía como «Bearer <valor>». Usalo en el header Authorization.",
 		"method_basic_hint": "Se envía como «Basic <usuario:contraseña en base64>». El backend hace el base64.",
 		"username": "Usuario",
-		"password": "Contraseña"
+		"password": "Contraseña",
+		"pick_credential": "Elegí una credencial",
+		"no_credentials": "El tablero no tiene credenciales. Cargá una primero."
 	}
 }
