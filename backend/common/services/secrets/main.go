@@ -25,8 +25,9 @@ type SecretsService struct {
 	store  infrastructure.SecretStore
 	boards infrastructure.BoardReader
 	sealer *crypto.Sealer
-	tokens infrastructure.TokenClient
-	locks  infrastructure.Locker
+	tokens     infrastructure.TokenClient
+	locks      infrastructure.Locker
+	handshakes infrastructure.HandshakeStore
 }
 
 func New(
@@ -35,8 +36,9 @@ func New(
 	sealer *crypto.Sealer,
 	tokens infrastructure.TokenClient,
 	locks infrastructure.Locker,
+	handshakes infrastructure.HandshakeStore,
 ) *SecretsService {
-	return &SecretsService{store, boards, sealer, tokens, locks}
+	return &SecretsService{store, boards, sealer, tokens, locks, handshakes}
 }
 
 func (srv *SecretsService) authorize(board uuid.UUID, cognitoID string, ownerOnly bool) error {
