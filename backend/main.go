@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/Secreto31126/tesis/common/controllers/boards"
 	"github.com/Secreto31126/tesis/common/controllers/postits"
+	s_ctrl "github.com/Secreto31126/tesis/common/controllers/secrets"
 	"github.com/Secreto31126/tesis/common/middleware"
 	"github.com/Secreto31126/tesis/common/ports/crypto"
 	"github.com/Secreto31126/tesis/common/ports/executer"
@@ -37,7 +38,7 @@ func main() {
 	}
 
 	executer := executer.New()
-	secrets := s_srv.New(db, sealer)
+	secrets := s_srv.New(db, db, sealer)
 
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
@@ -45,10 +46,12 @@ func main() {
 
 	boardController := boards.NewController(b_srv.New(db))
 	postitController := postits.NewController(p_srv.New(db, cache, executer, secrets))
+	secretController := s_ctrl.NewController(secrets)
 
 	api := router.Group("/v1")
 	boardController.RegisterRoutes(api)
 	postitController.RegisterRoutes(api)
+	secretController.RegisterRoutes(api)
 
 	router.Run(ADDR)
 }
