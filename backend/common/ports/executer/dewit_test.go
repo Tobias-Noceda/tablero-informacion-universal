@@ -3,6 +3,7 @@ package executer
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,6 +15,13 @@ import (
 
 func nopCloser(s string) io.ReadCloser {
 	return io.NopCloser(strings.NewReader(s))
+}
+
+func allowLoopback(t *testing.T) {
+	t.Helper()
+	original := isSafeIP
+	isSafeIP = func(net.IP) bool { return true }
+	t.Cleanup(func() { isSafeIP = original })
 }
 
 func TestParse_DetectsTypes(t *testing.T) {
@@ -147,6 +155,7 @@ func TestExecute_NoResourceReturnsParams(t *testing.T) {
 }
 
 func TestExecute_EndToEnd(t *testing.T) {
+	allowLoopback(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"compra":1000,"venta":1050,"casa":"oficial"}`)
@@ -158,6 +167,7 @@ func TestExecute_EndToEnd(t *testing.T) {
 	postit := &models.PostIts{
 		Resource: resource,
 		Request:  models.Request{Method: http.MethodGet},
+		Response: "json",
 		Query:    map[string]string{"compra": ".compra", "venta": ".venta"},
 	}
 
@@ -175,6 +185,7 @@ func TestExecute_EndToEnd(t *testing.T) {
 }
 
 func TestExecute_PopulatesQueryParamsIntoRequest(t *testing.T) {
+	allowLoopback(t)
 	var gotKeyword string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotKeyword = r.URL.Query().Get("keyword")
@@ -192,7 +203,8 @@ func TestExecute_PopulatesQueryParamsIntoRequest(t *testing.T) {
 			Method:  http.MethodGet,
 			Queries: map[string]string{"keyword": "$kw"},
 		},
-		Query: map[string]string{"ok": ".ok"},
+		Response: "json",
+		Query:    map[string]string{"ok": ".ok"},
 	}
 
 	if _, err := e.Execute(postit); err != nil {
@@ -204,6 +216,7 @@ func TestExecute_PopulatesQueryParamsIntoRequest(t *testing.T) {
 }
 
 func TestExecute_Non200Errors(t *testing.T) {
+	allowLoopback(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
@@ -214,6 +227,7 @@ func TestExecute_Non200Errors(t *testing.T) {
 	postit := &models.PostIts{
 		Resource: resource,
 		Request:  models.Request{Method: http.MethodGet},
+		Response: "json",
 		Query:    map[string]string{".": "."},
 	}
 
@@ -223,6 +237,7 @@ func TestExecute_Non200Errors(t *testing.T) {
 }
 
 func TestExecute_DoesNotMutateSharedResource(t *testing.T) {
+	allowLoopback(t)
 	var seen []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen = append(seen, r.URL.RawQuery)
