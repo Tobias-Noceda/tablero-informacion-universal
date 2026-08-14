@@ -19,7 +19,7 @@
 </script>
 
 <DnDProvider>
-	<MouseTracker>
+	<MouseTracker boardId={id}>
 		<Flow {name} {nodes} {edges} boardId={id} />
 	</MouseTracker>
 </DnDProvider>

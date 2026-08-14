@@ -4,13 +4,11 @@
 	import { type DataConnection, Peer } from 'peerjs';
 
 	import { mouses, type ClientData } from '$stores/mouses.svelte';
+	import * as boardApi from '$services/board';
 
 	import { SvelteMap } from 'svelte/reactivity';
-	import { page } from '$app/state';
 
-	let { children }: { children: Snippet } = $props();
-
-	const id = crypto.randomUUID();
+	let { children, boardId }: { children: Snippet; boardId: string } = $props();
 
 	const connections = new SvelteMap<string, DataConnection>();
 
@@ -42,19 +40,28 @@
 			console.log('Lost', id);
 		});
 
-		conn.on('error', console.error);
+		conn.on('error', (err) => {
+			console.error(err);
+
+			if (err.type === 'connection-closed') {
+				// Report closed peers to the API
+				boardApi.offline(boardId, id);
+			}
+		});
 	}
 
 	$effect(() => {
+		const id = crypto.randomUUID();
 		const peer = new Peer(id);
 
 		peer.on('connection', setConnection);
 
-		peer.on('open', (id) => {
+		peer.on('open', async (id) => {
 			console.log('My peer ID is', id);
 
-			// TBD: Read the ids from a DB (MemCache maybe?)
-			page.url.searchParams.getAll('peer').forEach((p) => {
+			const list = await boardApi.online(boardId, id);
+
+			list.forEach((p) => {
 				const conn = peer.connect(p, {
 					reliable: true,
 					metadata: {
@@ -69,6 +76,8 @@
 		});
 
 		return () => {
+			boardApi.offline(boardId, id);
+
 			if (frame) cancelAnimationFrame(frame);
 
 			connections
