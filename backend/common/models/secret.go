@@ -19,6 +19,7 @@ const (
 	SecretApiKey SecretKind = "api_key"
 	SecretBearer SecretKind = "bearer"
 	SecretBasic  SecretKind = "basic"
+	SecretOAuth2 SecretKind = "oauth2"
 )
 
 type Secret struct {
