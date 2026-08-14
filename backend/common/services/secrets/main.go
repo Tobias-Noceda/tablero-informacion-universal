@@ -128,7 +128,7 @@ func (srv *SecretsService) PutOAuth2(board uuid.UUID, cognitoID, name string, ma
 		return err
 	}
 
-	return srv.seal(board, name, models.SecretOAuth2, plaintext)
+	return srv.seal(board, name, models.SecretOAuth2, plaintext, material.Flow, false)
 }
 
 func validEndpoint(raw string) error {
