@@ -83,7 +83,7 @@ func (db *RedisDB) ConnectClientToBoard(board *models.Board, id uuid.UUID) ([]st
 		}
 
 		_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
-			pipe.SAdd(ctx, key, id)
+			pipe.SAdd(ctx, key, id.String())
 			return nil
 		})
 
@@ -99,5 +99,5 @@ func (db *RedisDB) DisconnectClientFromBoard(board *models.Board, id uuid.UUID) 
 
 	key := onlineBoardKey(board)
 
-	return db.client.SRem(ctx, key, id).Err()
+	return db.client.SRem(ctx, key, id.String()).Err()
 }
