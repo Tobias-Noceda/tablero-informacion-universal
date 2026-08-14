@@ -268,3 +268,28 @@ func (m *MockLocker) Release(key string) error {
 	}
 	return nil
 }
+
+// MockHandshakeStore is an in-memory infrastructure.HandshakeStore. Take
+// removes the entry, mirroring the single-use guarantee.
+type MockHandshakeStore struct {
+	entries map[string][]byte
+}
+
+var _ infrastructure.HandshakeStore = (*MockHandshakeStore)(nil)
+
+func (m *MockHandshakeStore) Put(key string, value []byte, ttl time.Duration) error {
+	if m.entries == nil {
+		m.entries = make(map[string][]byte)
+	}
+	m.entries[key] = value
+	return nil
+}
+
+func (m *MockHandshakeStore) Take(key string) ([]byte, error) {
+	value, ok := m.entries[key]
+	if !ok {
+		return nil, errors.New("no such handshake")
+	}
+	delete(m.entries, key)
+	return value, nil
+}
