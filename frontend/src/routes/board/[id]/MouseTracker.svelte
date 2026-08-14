@@ -125,13 +125,13 @@
 	{@render children()}
 </div>
 
-{#each mouses.data() as mouse (mouse.username)}
-	{#if mouse.position && visible(mouse.position.x, mouse.position.y)}
+{#each mouses.data() as [id, position] (id)}
+	{#if position.position && visible(position.position.x, position.position.y)}
 		<div
 			class="size-2 absolute"
-			style:background-color={mouse.color}
-			style:top="{mouse.position.y}px"
-			style:left="{mouse.position.x}px"
+			style:background-color={position.color}
+			style:top="{position.position.y}px"
+			style:left="{position.position.x}px"
 		></div>
 	{/if}
 {/each}

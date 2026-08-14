@@ -47,8 +47,8 @@ class MousePositions {
 		return this.#toFlow(position);
 	}
 
-	data(): IteratorObject<ClientData> {
-		return this.#map.values();
+	data(): IteratorObject<[string, ClientData]> {
+		return this.#map.entries();
 	}
 
 	clear() {
