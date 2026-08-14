@@ -4,6 +4,8 @@
 	import Modal from '$components/Modal/Modal.svelte';
 	import * as secretsApi from '$services/secrets';
 	import type { OAuth2Flow, SecretMeta, UUID } from '$types/api';
+
+	type StaticKind = 'api_key' | 'bearer' | 'basic';
 	import { m } from '$lib/paraglide/messages';
 
 	let { board, onclose }: { board: UUID; onclose: () => void } = $props();
@@ -17,6 +19,9 @@
 
 	let name = $state('');
 	let value = $state('');
+	let kind = $state<StaticKind>('api_key');
+	let basicUser = $state('');
+	let basicPassword = $state('');
 	let flow = $state<OAuth2Flow>('client_credentials');
 	let clientId = $state('');
 	let clientSecret = $state('');
@@ -26,9 +31,14 @@
 
 	const nameLooksValid = $derived(/^[A-Z][A-Z0-9_]{0,63}$/.test(name));
 
+	const staticValue = $derived(
+		kind === 'basic' ? `${basicUser}:${basicPassword}` : value.trim()
+	);
+
 	const canSave = $derived(
 		drafting === 'static'
-			? nameLooksValid && value.trim() !== ''
+			? nameLooksValid &&
+					(kind === 'basic' ? basicUser !== '' && basicPassword !== '' : value.trim() !== '')
 			: nameLooksValid &&
 					clientId.trim() !== '' &&
 					clientSecret.trim() !== '' &&
@@ -52,6 +62,9 @@
 		drafting = null;
 		name = '';
 		value = '';
+		kind = 'api_key';
+		basicUser = '';
+		basicPassword = '';
 		clientId = '';
 		clientSecret = '';
 		tokenUrl = '';
@@ -64,7 +77,7 @@
 		error = '';
 		try {
 			if (drafting === 'static') {
-				await secretsApi.put(board, name, 'api_key', value);
+				await secretsApi.put(board, name, kind, staticValue);
 			} else {
 				await secretsApi.put_oauth2(board, {
 					name,
@@ -167,7 +180,22 @@
 			{/if}
 
 			{#if drafting === 'static'}
-				<Input label={m['secrets.value']()} type="password" bind:value required />
+				<label class="flex flex-col gap-1 text-sm">
+					{m['secrets.method']()}
+					<select class="bg-background border border-main-border rounded-md px-2 py-1" bind:value={kind}>
+						<option value="api_key">{m['secrets.method_api_key']()}</option>
+						<option value="bearer">{m['secrets.method_bearer']()}</option>
+						<option value="basic">{m['secrets.method_basic']()}</option>
+					</select>
+				</label>
+				<p class="text-xs opacity-70">{m[`secrets.method_${kind}_hint`]()}</p>
+
+				{#if kind === 'basic'}
+					<Input label={m['secrets.username']()} bind:value={basicUser} required />
+					<Input label={m['secrets.password']()} type="password" bind:value={basicPassword} required />
+				{:else}
+					<Input label={m['secrets.value']()} type="password" bind:value required />
+				{/if}
 			{:else}
 				<label class="flex flex-col gap-1 text-sm">
 					{m['secrets.flow']()}
