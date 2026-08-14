@@ -2,6 +2,7 @@ package postits
 
 import (
 	"errors"
+	"slices"
 	"testing"
 
 	"github.com/Secreto31126/tesis/common/mocks"
@@ -19,7 +20,7 @@ func newService(db *mocks.MockDB, cache *mocks.MockCache, run *mocks.MockExecute
 	if run == nil {
 		run = &mocks.MockExecuter{}
 	}
-	return New(db, cache, run)
+	return New(db, cache, run, &mocks.MockSecretResolver{})
 }
 
 func TestCreatePostIt_PlainPassesThrough(t *testing.T) {
@@ -285,5 +286,70 @@ func TestDeletePostIt_Delegates(t *testing.T) {
 	}
 	if !called {
 		t.Error("DeletePostIt was not delegated")
+	}
+}
+
+func TestSecretRefs_OnlyMatchesUpperCaseNames(t *testing.T) {
+	postit := &models.PostIts{
+		Request: models.Request{
+			Headers: map[string]string{"Authorization": "$API_KEY", "Accept": "application/json"},
+			Queries: map[string]string{"lat": "$latitude", "token": "$TOKEN", "size": "1"},
+		},
+	}
+
+	got := secretRefs(postit)
+	slices.Sort(got)
+
+	want := []string{"API_KEY", "TOKEN"}
+	if !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v ($latitude is a param, not a secret)", got, want)
+	}
+}
+
+// The post-it the caller holds is serialised back to the client, so a resolved
+// secret must never end up on it.
+func TestExecutePostIt_DoesNotLeakSecretsOntoTheCaller(t *testing.T) {
+	board := uuid.New()
+	postit := &models.PostIts{
+		Id:    uuid.New(),
+		Board: board,
+		Request: models.Request{
+			Method:  "GET",
+			Headers: map[string]string{"Authorization": "$API_KEY"},
+			Queries: map[string]string{"q": "$SEARCH"},
+		},
+	}
+
+	resolver := &mocks.MockSecretResolver{
+		ResolveFn: func(_ uuid.UUID, _ []string) (map[string]string, error) {
+			return map[string]string{"$API_KEY": "super-secret", "$SEARCH": "also-secret"}, nil
+		},
+	}
+
+	var executed *models.PostIts
+	run := &mocks.MockExecuter{
+		ExecuteFn: func(p *models.PostIts) (any, error) {
+			executed = p
+			// Mimic the executer substituting in place.
+			p.Request.Headers["Authorization"] = p.Params["$API_KEY"]
+			return map[string]any{"ok": true}, nil
+		},
+	}
+
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver)
+
+	if _, err := svc.ExecutePostIt(postit); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+
+	if executed.Params["$API_KEY"] != "super-secret" {
+		t.Error("the executer did not receive the resolved secret")
+	}
+
+	if _, present := postit.Params["$API_KEY"]; present {
+		t.Error("the resolved secret was written onto the caller's post-it params")
+	}
+	if postit.Request.Headers["Authorization"] != "$API_KEY" {
+		t.Errorf("the caller's headers were mutated to %q", postit.Request.Headers["Authorization"])
 	}
 }

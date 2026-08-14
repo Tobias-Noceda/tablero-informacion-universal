@@ -65,8 +65,6 @@ func (srv *SecretsService) Put(board uuid.UUID, name string, kind models.SecretK
 	})
 }
 
-// List returns metadata only. There is deliberately no method that returns a
-// stored value to a caller outside the executer path.
 func (srv *SecretsService) List(board uuid.UUID) ([]models.SecretMeta, error) {
 	stored, err := srv.store.ListSecrets(board)
 	if err != nil {
@@ -85,8 +83,6 @@ func (srv *SecretsService) Delete(board uuid.UUID, name string) error {
 	return srv.store.DeleteSecret(board, name)
 }
 
-// Resolve decrypts the named secrets for one execution. The returned map is
-// keyed by "$NAME" so it can be merged straight into a post-it's params.
 func (srv *SecretsService) Resolve(board uuid.UUID, names []string) (map[string]string, error) {
 	if len(names) == 0 {
 		return nil, nil
