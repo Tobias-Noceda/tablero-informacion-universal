@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/base64"
 	"regexp"
 	"time"
 
@@ -47,6 +48,18 @@ type SecretMeta struct {
 	Authorized bool       `json:"authorized"`
 	CreatedAt  time.Time  `json:"created_at"`
 	UpdatedAt  time.Time  `json:"updated_at"`
+}
+
+func Present(kind SecretKind, value string) string {
+	switch kind {
+	case SecretBearer:
+		return "Bearer " + value
+	case SecretBasic:
+		// The stored value is "user:password"; the wire form is base64.
+		return "Basic " + base64.StdEncoding.EncodeToString([]byte(value))
+	default:
+		return value
+	}
 }
 
 func (s *Secret) Meta() SecretMeta {

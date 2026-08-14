@@ -272,7 +272,7 @@ func (srv *SecretsService) Resolve(board uuid.UUID, names []string) (map[string]
 		}
 
 		if s.Kind != models.SecretOAuth2 {
-			resolved["$"+s.Name] = string(value)
+			resolved["$"+s.Name] = models.Present(s.Kind, string(value))
 			continue
 		}
 
