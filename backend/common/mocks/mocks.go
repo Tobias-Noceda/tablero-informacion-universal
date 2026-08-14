@@ -172,3 +172,53 @@ func (m *MockExecuter) Execute(postit *models.PostIts) (any, error) {
 	}
 	return nil, nil
 }
+
+type MockSecretResolver struct {
+	ResolveFn func(board uuid.UUID, names []string) (map[string]string, error)
+}
+
+var _ infrastructure.SecretResolver = (*MockSecretResolver)(nil)
+
+func (m *MockSecretResolver) Resolve(board uuid.UUID, names []string) (map[string]string, error) {
+	if m.ResolveFn != nil {
+		return m.ResolveFn(board, names)
+	}
+	return nil, nil
+}
+
+type MockSecretStore struct {
+	UpsertSecretFn func(secret *models.Secret) error
+	FindSecretsFn  func(board uuid.UUID, names []string) ([]models.Secret, error)
+	ListSecretsFn  func(board uuid.UUID) ([]models.Secret, error)
+	DeleteSecretFn func(board uuid.UUID, name string) error
+}
+
+var _ infrastructure.SecretStore = (*MockSecretStore)(nil)
+
+func (m *MockSecretStore) UpsertSecret(secret *models.Secret) error {
+	if m.UpsertSecretFn != nil {
+		return m.UpsertSecretFn(secret)
+	}
+	return nil
+}
+
+func (m *MockSecretStore) FindSecrets(board uuid.UUID, names []string) ([]models.Secret, error) {
+	if m.FindSecretsFn != nil {
+		return m.FindSecretsFn(board, names)
+	}
+	return nil, nil
+}
+
+func (m *MockSecretStore) ListSecrets(board uuid.UUID) ([]models.Secret, error) {
+	if m.ListSecretsFn != nil {
+		return m.ListSecretsFn(board)
+	}
+	return nil, nil
+}
+
+func (m *MockSecretStore) DeleteSecret(board uuid.UUID, name string) error {
+	if m.DeleteSecretFn != nil {
+		return m.DeleteSecretFn(board, name)
+	}
+	return nil
+}
