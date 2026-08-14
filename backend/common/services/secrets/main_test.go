@@ -3,6 +3,7 @@ package secrets
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"strings"
 	"testing"
 
@@ -44,6 +45,10 @@ func newStore() *memoryStore {
 	return s
 }
 
+const owner = "owner-cognito-id"
+
+const collaborator = "collab-cognito-id"
+
 func service(t *testing.T, store *memoryStore) *SecretsService {
 	t.Helper()
 	key := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x2B}, 32))
@@ -51,15 +56,20 @@ func service(t *testing.T, store *memoryStore) *SecretsService {
 	if err != nil {
 		t.Fatalf("sealer: %v", err)
 	}
-	return New(store, sealer)
+	boards := &mocks.MockDB{
+		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
+			return &models.Board{Id: id, Owner: owner, Collaborators: []string{collaborator}}, nil
+		},
+	}
+	return New(store, boards, sealer)
 }
 
 func TestPut_StoresOnlyCiphertext(t *testing.T) {
 	store := newStore()
-	srv := service(t, store)
 	board := uuid.New()
+	srv := service(t, store)
 
-	if err := srv.Put(board, "TICKETMASTER_KEY", models.SecretApiKey, "kpGJZiOXIoaB"); err != nil {
+	if err := srv.Put(board, owner, "TICKETMASTER_KEY", models.SecretApiKey, "kpGJZiOXIoaB"); err != nil {
 		t.Fatalf("put: %v", err)
 	}
 
@@ -77,10 +87,10 @@ func TestPut_StoresOnlyCiphertext(t *testing.T) {
 
 func TestResolve_RoundTripKeyedForParams(t *testing.T) {
 	store := newStore()
-	srv := service(t, store)
 	board := uuid.New()
+	srv := service(t, store)
 
-	if err := srv.Put(board, "API_KEY", models.SecretApiKey, "abc123"); err != nil {
+	if err := srv.Put(board, owner, "API_KEY", models.SecretApiKey, "abc123"); err != nil {
 		t.Fatalf("put: %v", err)
 	}
 
@@ -96,10 +106,10 @@ func TestResolve_RoundTripKeyedForParams(t *testing.T) {
 // A secret belongs to one board. Asking from another must not decrypt it.
 func TestResolve_IsScopedToItsBoard(t *testing.T) {
 	store := newStore()
+	ownerBoard := uuid.New()
 	srv := service(t, store)
-	owner := uuid.New()
 
-	if err := srv.Put(owner, "API_KEY", models.SecretApiKey, "abc123"); err != nil {
+	if err := srv.Put(ownerBoard, owner, "API_KEY", models.SecretApiKey, "abc123"); err != nil {
 		t.Fatalf("put: %v", err)
 	}
 
@@ -114,12 +124,12 @@ func TestResolve_IsScopedToItsBoard(t *testing.T) {
 
 func TestList_NeverCarriesTheValue(t *testing.T) {
 	store := newStore()
-	srv := service(t, store)
 	board := uuid.New()
+	srv := service(t, store)
 
-	_ = srv.Put(board, "API_KEY", models.SecretApiKey, "abc123")
+	_ = srv.Put(board, owner, "API_KEY", models.SecretApiKey, "abc123")
 
-	metas, err := srv.List(board)
+	metas, err := srv.List(board, owner)
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -133,8 +143,8 @@ func TestList_NeverCarriesTheValue(t *testing.T) {
 
 func TestPut_Rejects(t *testing.T) {
 	store := newStore()
-	srv := service(t, store)
 	board := uuid.New()
+	srv := service(t, store)
 
 	cases := []struct {
 		label string
@@ -152,12 +162,69 @@ func TestPut_Rejects(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		if err := srv.Put(board, c.name, c.kind, c.value); err == nil {
+		if err := srv.Put(board, owner, c.name, c.kind, c.value); err == nil {
 			t.Errorf("%s: expected rejection", c.label)
 		}
 	}
 
 	if len(store.rows) != 0 {
 		t.Errorf("a rejected secret was still persisted: %+v", store.rows)
+	}
+}
+
+func TestPut_OwnerOnly(t *testing.T) {
+	store := newStore()
+	srv := service(t, store)
+	board := uuid.New()
+
+	for _, caller := range []string{collaborator, "stranger", ""} {
+		err := srv.Put(board, caller, "API_KEY", models.SecretApiKey, "v")
+		if !errors.Is(err, ErrForbidden) {
+			t.Errorf("caller %q got %v, want ErrForbidden", caller, err)
+		}
+	}
+
+	if len(store.rows) != 0 {
+		t.Error("a non-owner managed to write a secret")
+	}
+}
+
+func TestDelete_OwnerOnly(t *testing.T) {
+	store := newStore()
+	deleted := false
+	store.DeleteSecretFn = func(_ uuid.UUID, _ string) error {
+		deleted = true
+		return nil
+	}
+	srv := service(t, store)
+	board := uuid.New()
+
+	if err := srv.Delete(board, collaborator, "API_KEY"); !errors.Is(err, ErrForbidden) {
+		t.Errorf("collaborator got %v, want ErrForbidden", err)
+	}
+	if deleted {
+		t.Error("a collaborator deleted a secret")
+	}
+
+	if err := srv.Delete(board, owner, "API_KEY"); err != nil {
+		t.Errorf("owner got %v, want nil", err)
+	}
+	if !deleted {
+		t.Error("the owner's delete did not reach the store")
+	}
+}
+
+// A collaborator may know which credentials exist, without reading them.
+func TestList_AllowsCollaboratorButNotStrangers(t *testing.T) {
+	store := newStore()
+	srv := service(t, store)
+	board := uuid.New()
+
+	if _, err := srv.List(board, collaborator); err != nil {
+		t.Errorf("collaborator got %v, want nil", err)
+	}
+
+	if _, err := srv.List(board, "stranger"); !errors.Is(err, ErrForbidden) {
+		t.Errorf("stranger got %v, want ErrForbidden", err)
 	}
 }
