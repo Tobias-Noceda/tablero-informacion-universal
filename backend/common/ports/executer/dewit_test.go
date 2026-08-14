@@ -219,3 +219,42 @@ func TestExecute_Non200Errors(t *testing.T) {
 		t.Fatal("expected error when the resource returns a non-200 status")
 	}
 }
+
+func TestExecute_DoesNotMutateSharedResource(t *testing.T) {
+	var seen []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.URL.RawQuery)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"ok":true}`)
+	}))
+	defer srv.Close()
+
+	// Well-knowns hand the same *url.URL to every post-it built from them.
+	resource, _ := url.Parse(srv.URL)
+	e := New()
+
+	for _, coin := range []string{"bitcoin", "ethereum"} {
+		postit := &models.PostIts{
+			Resource: resource,
+			Request: models.Request{
+				Method:  http.MethodGet,
+				Queries: map[string]string{"ids": "$coin"},
+			},
+			Params: map[string]string{"$coin": coin},
+			Query:  ".",
+		}
+		if _, err := e.Execute(postit); err != nil {
+			t.Fatalf("%s: unexpected error: %v", coin, err)
+		}
+	}
+
+	if resource.RawQuery != "" {
+		t.Errorf("shared resource was mutated: RawQuery = %q, want empty", resource.RawQuery)
+	}
+	want := []string{"ids=bitcoin", "ids=ethereum"}
+	for i := range want {
+		if seen[i] != want[i] {
+			t.Errorf("request %d: server saw %q, want %q", i+1, seen[i], want[i])
+		}
+	}
+}

@@ -69,17 +69,19 @@ func (*DewIt) populate(input, out map[string]string) error {
 	return nil
 }
 
-func (*DewIt) request(url *url.URL, method string, queries, headers map[string]string) (*http.Response, error) {
+func (*DewIt) request(resource *url.URL, method string, queries, headers map[string]string) (*http.Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), REQUEST_TIMEOUT)
 	defer cancel()
 
-	q := url.Query()
-	for k, v := range queries {
-		q.Add(k, v)
-	}
-	url.RawQuery = q.Encode()
+	target := *resource
 
-	req, err := http.NewRequestWithContext(ctx, method, url.String(), nil)
+	q := target.Query()
+	for k, v := range queries {
+		q.Set(k, v)
+	}
+	target.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, method, target.String(), nil)
 	if err != nil {
 		return nil, err
 	}
