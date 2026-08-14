@@ -1,8 +1,10 @@
 package secrets
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"slices"
 	"time"
 
@@ -16,14 +18,25 @@ const MAX_SECRET_SIZE = 8 << 10 // 8kb, generous for a token, far below a payloa
 
 var ErrForbidden = errors.New("Not allowed to manage this board's secrets")
 
+// REFRESH_LOCK_TTL bounds how long a crashed refresh can block the others.
+const REFRESH_LOCK_TTL = 30 * time.Second
+
 type SecretsService struct {
 	store  infrastructure.SecretStore
 	boards infrastructure.BoardReader
 	sealer *crypto.Sealer
+	tokens infrastructure.TokenClient
+	locks  infrastructure.Locker
 }
 
-func New(store infrastructure.SecretStore, boards infrastructure.BoardReader, sealer *crypto.Sealer) *SecretsService {
-	return &SecretsService{store, boards, sealer}
+func New(
+	store infrastructure.SecretStore,
+	boards infrastructure.BoardReader,
+	sealer *crypto.Sealer,
+	tokens infrastructure.TokenClient,
+	locks infrastructure.Locker,
+) *SecretsService {
+	return &SecretsService{store, boards, sealer, tokens, locks}
 }
 
 func (srv *SecretsService) authorize(board uuid.UUID, cognitoID string, ownerOnly bool) error {
@@ -71,24 +84,70 @@ func (srv *SecretsService) Put(board uuid.UUID, cognitoID, name string, kind mod
 		return fmt.Errorf("Unsupported secret kind")
 	}
 
-	sealed, err := srv.sealer.Seal(aad(board, name), []byte(value))
+	return srv.seal(board, name, kind, []byte(value))
+}
+
+func (srv *SecretsService) PutOAuth2(board uuid.UUID, cognitoID, name string, material *models.OAuth2Material) error {
+	if err := srv.authorize(board, cognitoID, true); err != nil {
+		return err
+	}
+
+	if !models.ValidSecretName(name) {
+		return fmt.Errorf("Secret name must match [A-Z][A-Z0-9_]*")
+	}
+
+	switch material.Flow {
+	case models.OAuth2ClientCredentials, models.OAuth2AuthorizationCode:
+	default:
+		return fmt.Errorf("Unsupported OAuth2 flow")
+	}
+
+	if material.ClientID == "" || material.ClientSecret == "" {
+		return fmt.Errorf("Client id and secret are required")
+	}
+
+	if err := validEndpoint(material.TokenURL); err != nil {
+		return fmt.Errorf("Token URL: %w", err)
+	}
+
+	if material.Flow == models.OAuth2AuthorizationCode && material.AuthURL != "" {
+		if err := validEndpoint(material.AuthURL); err != nil {
+			return fmt.Errorf("Authorization URL: %w", err)
+		}
+	}
+
+	material.AccessToken = ""
+	material.RefreshToken = ""
+	material.TokenType = ""
+	material.ExpiresAt = time.Time{}
+
+	plaintext, err := json.Marshal(material)
 	if err != nil {
 		return err
 	}
 
-	now := time.Now().UTC()
+	return srv.seal(board, name, models.SecretOAuth2, plaintext)
+}
 
-	return srv.store.UpsertSecret(&models.Secret{
-		Id:         uuid.New(),
-		Board:      board,
-		Name:       name,
-		Kind:       kind,
-		Ciphertext: sealed.Ciphertext,
-		Nonce:      sealed.Nonce,
-		KeyVersion: sealed.KeyVersion,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-	})
+func validEndpoint(raw string) error {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("is not a valid URL")
+	}
+
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		return fmt.Errorf("must be http or https")
+	}
+
+	if parsed.Host == "" {
+		return fmt.Errorf("must be absolute")
+	}
+
+	if parsed.User != nil {
+		return fmt.Errorf("must not embed credentials")
+	}
+
+	return nil
 }
 
 func (srv *SecretsService) List(board uuid.UUID, cognitoID string) ([]models.SecretMeta, error) {
@@ -117,6 +176,81 @@ func (srv *SecretsService) Delete(board uuid.UUID, cognitoID, name string) error
 	return srv.store.DeleteSecret(board, name)
 }
 
+// store seals a value and writes it, preserving the board + name binding.
+func (srv *SecretsService) seal(board uuid.UUID, name string, kind models.SecretKind, plaintext []byte) error {
+	sealed, err := srv.sealer.Seal(aad(board, name), plaintext)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now().UTC()
+
+	return srv.store.UpsertSecret(&models.Secret{
+		Id:         uuid.New(),
+		Board:      board,
+		Name:       name,
+		Kind:       kind,
+		Ciphertext: sealed.Ciphertext,
+		Nonce:      sealed.Nonce,
+		KeyVersion: sealed.KeyVersion,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+	})
+}
+
+func (srv *SecretsService) unseal(s *models.Secret) ([]byte, error) {
+	return srv.sealer.Open(aad(s.Board, s.Name), &crypto.Sealed{
+		Ciphertext: s.Ciphertext,
+		Nonce:      s.Nonce,
+		KeyVersion: s.KeyVersion,
+	})
+}
+
+func (srv *SecretsService) refresh(s *models.Secret, material *models.OAuth2Material) error {
+	key := "oauth-refresh:" + s.Board.String() + ":" + s.Name
+
+	held, err := srv.locks.Acquire(key, REFRESH_LOCK_TTL)
+	if err != nil {
+		return err
+	}
+
+	if !held {
+		fresh, err := srv.store.FindSecrets(s.Board, []string{s.Name})
+		if err != nil {
+			return err
+		}
+		if len(fresh) == 0 {
+			return fmt.Errorf("Credential disappeared during refresh")
+		}
+
+		plaintext, err := srv.unseal(&fresh[0])
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(plaintext, material); err != nil {
+			return err
+		}
+		if material.NeedsRefresh() {
+			return fmt.Errorf("Another refresh is in progress")
+		}
+
+		return nil
+	}
+
+	defer srv.locks.Release(key)
+
+	if err := srv.tokens.Fetch(material); err != nil {
+		return err
+	}
+
+	plaintext, err := json.Marshal(material)
+	if err != nil {
+		return err
+	}
+
+	return srv.seal(s.Board, s.Name, models.SecretOAuth2, plaintext)
+}
+
 func (srv *SecretsService) Resolve(board uuid.UUID, names []string) (map[string]string, error) {
 	if len(names) == 0 {
 		return nil, nil
@@ -129,16 +263,28 @@ func (srv *SecretsService) Resolve(board uuid.UUID, names []string) (map[string]
 
 	resolved := make(map[string]string, len(stored))
 	for _, s := range stored {
-		value, err := srv.sealer.Open(aad(s.Board, s.Name), &crypto.Sealed{
-			Ciphertext: s.Ciphertext,
-			Nonce:      s.Nonce,
-			KeyVersion: s.KeyVersion,
-		})
+		value, err := srv.unseal(&s)
 		if err != nil {
 			return nil, err
 		}
 
-		resolved["$"+s.Name] = string(value)
+		if s.Kind != models.SecretOAuth2 {
+			resolved["$"+s.Name] = string(value)
+			continue
+		}
+
+		var material models.OAuth2Material
+		if err := json.Unmarshal(value, &material); err != nil {
+			return nil, err
+		}
+
+		if material.NeedsRefresh() {
+			if err := srv.refresh(&s, &material); err != nil {
+				return nil, err
+			}
+		}
+
+		resolved["$"+s.Name] = material.Header()
 	}
 
 	return resolved, nil
