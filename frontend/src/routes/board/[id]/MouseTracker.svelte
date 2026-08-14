@@ -10,6 +10,8 @@
 
 	let { children, boardId }: { children: Snippet; boardId: string } = $props();
 
+	const colors = ['#FF0000', '#F0F000', '#00FF00', '#00F0F0', '#0000FF', '#F000F0'];
+
 	const connections = new SvelteMap<string, DataConnection>();
 
 	let frame: number | null = null;
@@ -54,13 +56,14 @@
 
 			const list = await boardApi.online(boardId, id);
 
+			const color = colors[list.length % colors.length];
 			list.forEach((p) => {
 				const conn = peer.connect(p, {
 					reliable: true,
 					metadata: {
 						username: 'Messi',
 						picture: 'TBD',
-						color: '#FF0000'
+						color
 					} satisfies ClientData
 				});
 
@@ -77,8 +80,8 @@
 			}
 		});
 
-		return () => {
-			boardApi.offline(boardId, id);
+		return async () => {
+			await boardApi.offline(boardId, id);
 
 			if (frame) cancelAnimationFrame(frame);
 
