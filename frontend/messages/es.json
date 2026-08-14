@@ -41,6 +41,9 @@
 		"delete": "Borrar",
 		"authorize": "Autorizar",
 		"callback_ok": "Credencial autorizada. Ya podés cerrar esta pestaña.",
-		"callback_fail": "No se pudo completar la autorización."
+		"callback_fail": "No se pudo completar la autorización.",
+		"authorized": "autorizada",
+		"pending": "falta autorizar",
+		"reauthorize": "Reautorizar"
 	}
 }

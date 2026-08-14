@@ -41,6 +41,9 @@
 		"delete": "Delete",
 		"authorize": "Authorize",
 		"callback_ok": "Credential authorized. You can close this tab.",
-		"callback_fail": "The authorization could not be completed."
+		"callback_fail": "The authorization could not be completed.",
+		"authorized": "authorized",
+		"pending": "needs authorization",
+		"reauthorize": "Reauthorize"
 	}
 }
