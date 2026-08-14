@@ -287,29 +287,47 @@ func TestResolve_OAuth2DoesNotRefreshWithoutTheLock(t *testing.T) {
 // The winner writes a usable token; the loser re-reads it instead of failing.
 func TestResolve_OAuth2LoserPicksUpTheWinnersToken(t *testing.T) {
 	store := newStore()
-	locks := &mocks.MockLocker{
-		AcquireFn: func(string, time.Duration) (bool, error) { return false, nil },
+	board := uuid.New()
+
+	// Seed a credential that still needs a token, then let a winner refresh it
+	// into a second, usable revision.
+	seeder := oauthService(t, store, nil, nil)
+	if err := seeder.PutOAuth2(board, owner, "SPOTIFY", clientCredentials()); err != nil {
+		t.Fatalf("seed: %v", err)
 	}
-	winner := &mocks.MockTokenClient{
+	stale := store.rows[0]
+
+	winner := oauthService(t, store, &mocks.MockTokenClient{
 		FetchFn: func(m *models.OAuth2Material) error {
 			m.AccessToken = "winners-token"
 			m.ExpiresAt = time.Now().Add(time.Hour)
 			return nil
 		},
-	}
-
-	// The winner refreshes first, with the lock granted.
-	first := oauthService(t, store, winner, nil)
-	board := uuid.New()
-	_ = first.PutOAuth2(board, owner, "SPOTIFY", clientCredentials())
-	if _, err := first.Resolve(board, []string{"SPOTIFY"}); err != nil {
+	}, nil)
+	if _, err := winner.Resolve(board, []string{"SPOTIFY"}); err != nil {
 		t.Fatalf("winner resolve: %v", err)
 	}
+	refreshed := store.rows[0]
 
-	// The loser sees a stale copy but the store already holds a good token.
-	loser := oauthService(t, store, &mocks.MockTokenClient{}, locks)
-	stale := store.rows[0]
-	store.rows = append(store.rows[1:], stale)
+	// The loser's first read is the stale revision, so it tries to refresh;
+	// it loses the lock, re-reads, and finds what the winner stored.
+	reads := 0
+	store.FindSecretsFn = func(_ uuid.UUID, _ []string) ([]models.Secret, error) {
+		reads++
+		if reads == 1 {
+			return []models.Secret{stale}, nil
+		}
+		return []models.Secret{refreshed}, nil
+	}
+
+	loser := oauthService(t, store, &mocks.MockTokenClient{
+		FetchFn: func(*models.OAuth2Material) error {
+			t.Error("the loser refreshed despite not holding the lock")
+			return nil
+		},
+	}, &mocks.MockLocker{
+		AcquireFn: func(string, time.Duration) (bool, error) { return false, nil },
+	})
 
 	resolved, err := loser.Resolve(board, []string{"SPOTIFY"})
 	if err != nil {
@@ -317,5 +335,8 @@ func TestResolve_OAuth2LoserPicksUpTheWinnersToken(t *testing.T) {
 	}
 	if !strings.Contains(resolved["$SPOTIFY"], "winners-token") {
 		t.Errorf("loser got %q, want the winner's token", resolved["$SPOTIFY"])
+	}
+	if reads != 2 {
+		t.Errorf("store read %d times, want a re-read after losing the lock", reads)
 	}
 }

@@ -21,7 +21,14 @@ type memoryStore struct {
 
 func newStore() *memoryStore {
 	s := &memoryStore{}
+	// Mirrors the Mongo upsert: one row per board + name, replaced in place.
 	s.UpsertSecretFn = func(secret *models.Secret) error {
+		for i, row := range s.rows {
+			if row.Board == secret.Board && row.Name == secret.Name {
+				s.rows[i] = *secret
+				return nil
+			}
+		}
 		s.rows = append(s.rows, *secret)
 		return nil
 	}
