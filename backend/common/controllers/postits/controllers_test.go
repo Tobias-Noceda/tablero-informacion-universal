@@ -55,7 +55,7 @@ func TestCreatePostIt_OK(t *testing.T) {
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPost, "/post-its/", `{"board":"`+board.String()+`","well-known":"dolar_oficial"}`)
+	w := do(r, http.MethodPost, "/post-its", `{"board":"`+board.String()+`","well-known":"dolar_oficial"}`)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201 (body: %s)", w.Code, w.Body.String())
 	}
@@ -78,7 +78,7 @@ func TestCreatePostIt_OK(t *testing.T) {
 
 func TestCreatePostIt_MissingBoard(t *testing.T) {
 	r := setupRouter(nil, nil, nil)
-	w := do(r, http.MethodPost, "/post-its/", `{"well-known":"dolar_oficial"}`)
+	w := do(r, http.MethodPost, "/post-its", `{"well-known":"dolar_oficial"}`)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400 (board is required)", w.Code)
 	}
@@ -86,7 +86,7 @@ func TestCreatePostIt_MissingBoard(t *testing.T) {
 
 func TestCreatePostIt_BadJSON(t *testing.T) {
 	r := setupRouter(nil, nil, nil)
-	w := do(r, http.MethodPost, "/post-its/", `{not json`)
+	w := do(r, http.MethodPost, "/post-its", `{not json`)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", w.Code)
 	}
@@ -296,7 +296,7 @@ func TestCreatePostIt_ServiceError(t *testing.T) {
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPost, "/post-its/", `{"board":"`+uuid.New().String()+`"}`)
+	w := do(r, http.MethodPost, "/post-its", `{"board":"`+uuid.New().String()+`"}`)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
 	}
