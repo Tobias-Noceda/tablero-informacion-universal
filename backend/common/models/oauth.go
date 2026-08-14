@@ -12,7 +12,9 @@ type OAuth2Material struct {
 	ClientID     string `json:"client_id"`
 	ClientSecret string `json:"client_secret"`
 	TokenURL     string `json:"token_url"`
-	Scopes       string `json:"scopes,omitempty"`
+	// Where the user is sent to consent. authorization_code only.
+	AuthURL string `json:"auth_url,omitempty"`
+	Scopes  string `json:"scopes,omitempty"`
 
 	// Only set once a user has completed an authorization_code grant.
 	RefreshToken string `json:"refresh_token,omitempty"`
