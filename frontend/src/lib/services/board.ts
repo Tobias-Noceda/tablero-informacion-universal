@@ -54,5 +54,5 @@ export async function online(id: UUID, peer: UUID) {
 }
 
 export async function offline(id: UUID, peer: UUID) {
-	return api.del(`/v1/boards/${id}/online?${new URLSearchParams({ peer })}`);
+	return api.del(`/v1/boards/${id}/online?${new URLSearchParams({ peer })}`, { keepalive: true });
 }
