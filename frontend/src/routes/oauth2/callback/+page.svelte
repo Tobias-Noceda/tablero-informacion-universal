@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages';
+	import * as api from '$modules/api.svelte';
 
 	// The provider redirects the browser here with ?state=&code=. Both are
 	// handed straight to the backend, which is the only side that holds the
@@ -22,15 +23,9 @@
 			code: params.get('code') ?? ''
 		});
 
-		fetch(`/api/v1/oauth2/callback?${query}`)
-			.then((res) => {
-				if (res.ok) {
-					done = true;
-					return;
-				}
-				return res.json().then((body) => {
-					error = body?.error ?? String(res.status);
-				});
+		api.get(`/v1/oauth2/callback?${query}`)
+			.then(() => {
+				done = true;
 			})
 			.catch((e) => {
 				error = e instanceof Error ? e.message : String(e);

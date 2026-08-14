@@ -132,6 +132,10 @@
 		</div>
 	{/if}
 
+	{#if managingSecrets}
+		<SecretsPanel board={boardId} onclose={() => (managingSecrets = false)} />
+	{/if}
+
 	{#if creatingNode}
 		<Modal
 			onclose={() => (creatingNode = null)}
