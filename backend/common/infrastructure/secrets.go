@@ -27,6 +27,14 @@ type TokenClient interface {
 	Exchange(material *models.OAuth2Material, code, redirectURI, verifier string) error
 }
 
+// HandshakeStore holds an in-flight OAuth2 authorization between the redirect
+// out and the callback back. Take must return an entry at most once, so a
+// replayed state cannot drive a second exchange.
+type HandshakeStore interface {
+	Put(key string, value []byte, ttl time.Duration) error
+	Take(key string) ([]byte, error)
+}
+
 // Locker serialises token refreshes across processes. Two workers refreshing
 // the same credential at once would both spend the refresh token, and a
 // provider that rotates them invalidates whichever lands second.
