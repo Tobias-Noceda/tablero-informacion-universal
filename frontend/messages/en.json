@@ -13,6 +13,10 @@
 		"temperature": "Temperature",
 		"events_search": "Events Search",
 		"dog_facts": "Dog Facts",
-		"dolar_oficial": "Official Dollar"
+		"dolar_oficial": "Official Dollar",
+		"riesgo_pais": "Country Risk",
+		"crypto_price": "Crypto Price",
+		"air_quality": "Air Quality",
+		"github_repo": "GitHub Repository"
 	}
 }
