@@ -3,6 +3,7 @@ package executer
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -14,6 +15,13 @@ import (
 
 func nopCloser(s string) io.ReadCloser {
 	return io.NopCloser(strings.NewReader(s))
+}
+
+func allowLoopback(t *testing.T) {
+	t.Helper()
+	original := isSafeIP
+	isSafeIP = func(net.IP) bool { return true }
+	t.Cleanup(func() { isSafeIP = original })
 }
 
 func TestParse_DetectsTypes(t *testing.T) {
@@ -147,6 +155,7 @@ func TestExecute_NoResourceReturnsParams(t *testing.T) {
 }
 
 func TestExecute_EndToEnd(t *testing.T) {
+	allowLoopback(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprint(w, `{"compra":1000,"venta":1050,"casa":"oficial"}`)
@@ -158,6 +167,7 @@ func TestExecute_EndToEnd(t *testing.T) {
 	postit := &models.PostIts{
 		Resource: resource,
 		Request:  models.Request{Method: http.MethodGet},
+		Response: "json",
 		Query:    map[string]string{"compra": ".compra", "venta": ".venta"},
 	}
 
@@ -175,6 +185,7 @@ func TestExecute_EndToEnd(t *testing.T) {
 }
 
 func TestExecute_PopulatesQueryParamsIntoRequest(t *testing.T) {
+	allowLoopback(t)
 	var gotKeyword string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotKeyword = r.URL.Query().Get("keyword")
@@ -192,7 +203,8 @@ func TestExecute_PopulatesQueryParamsIntoRequest(t *testing.T) {
 			Method:  http.MethodGet,
 			Queries: map[string]string{"keyword": "$kw"},
 		},
-		Query: map[string]string{"ok": ".ok"},
+		Response: "json",
+		Query:    map[string]string{"ok": ".ok"},
 	}
 
 	if _, err := e.Execute(postit); err != nil {
@@ -204,6 +216,7 @@ func TestExecute_PopulatesQueryParamsIntoRequest(t *testing.T) {
 }
 
 func TestExecute_Non200Errors(t *testing.T) {
+	allowLoopback(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "boom", http.StatusInternalServerError)
 	}))
@@ -214,10 +227,52 @@ func TestExecute_Non200Errors(t *testing.T) {
 	postit := &models.PostIts{
 		Resource: resource,
 		Request:  models.Request{Method: http.MethodGet},
+		Response: "json",
 		Query:    map[string]string{".": "."},
 	}
 
 	if _, err := e.Execute(postit); err == nil {
 		t.Fatal("expected error when the resource returns a non-200 status")
+	}
+}
+
+func TestExecute_DoesNotMutateSharedResource(t *testing.T) {
+	allowLoopback(t)
+	var seen []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen = append(seen, r.URL.RawQuery)
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"ok":true}`)
+	}))
+	defer srv.Close()
+
+	// Well-knowns hand the same *url.URL to every post-it built from them.
+	resource, _ := url.Parse(srv.URL)
+	e := New()
+
+	for _, coin := range []string{"bitcoin", "ethereum"} {
+		postit := &models.PostIts{
+			Resource: resource,
+			Request: models.Request{
+				Method:  http.MethodGet,
+				Queries: map[string]string{"ids": "$coin"},
+			},
+			Params:   map[string]string{"$coin": coin},
+			Response: "json",
+			Query:    map[string]string{"ok": ".ok"},
+		}
+		if _, err := e.Execute(postit); err != nil {
+			t.Fatalf("%s: unexpected error: %v", coin, err)
+		}
+	}
+
+	if resource.RawQuery != "" {
+		t.Errorf("shared resource was mutated: RawQuery = %q, want empty", resource.RawQuery)
+	}
+	want := []string{"ids=bitcoin", "ids=ethereum"}
+	for i := range want {
+		if seen[i] != want[i] {
+			t.Errorf("request %d: server saw %q, want %q", i+1, seen[i], want[i])
+		}
 	}
 }

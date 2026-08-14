@@ -149,4 +149,99 @@ var configuredPostIts = map[string]models.PostIts{
 		},
 		Rate: 120,
 	},
+	"riesgo_pais": {
+		WellKnown: "riesgo_pais",
+		Resource:  getURL("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo"),
+		Request: models.Request{
+			Method: "GET",
+			Headers: map[string]string{
+				"Accept": "application/json",
+			},
+		},
+		Response: "json",
+		Query: map[string]string{
+			"valor": ".valor",
+			"fecha": ".fecha",
+		},
+		Rate: 3600,
+	},
+	"crypto_price": {
+		WellKnown: "crypto_price",
+		Params: map[string]string{
+			"$coin":     "bitcoin",
+			"$currency": "usd",
+		},
+		Resource: getURL("https://api.coingecko.com/api/v3/simple/price"),
+		Request: models.Request{
+			Method: "GET",
+			Queries: map[string]string{
+				"ids":                 "$coin",
+				"vs_currencies":       "$currency",
+				"include_24hr_change": "true",
+			},
+			Headers: map[string]string{
+				"Accept": "application/json",
+			},
+		},
+		Response: "json",
+		Query: map[string]string{
+			"price":  ".[] | to_entries[] | select(.key | endswith(\"_24h_change\") | not) | .value",
+			"change": ".[] | to_entries[] | select(.key | endswith(\"_24h_change\")) | .value",
+		},
+		Rate: 60,
+	},
+	"air_quality": {
+		WellKnown: "air_quality",
+		Params: map[string]string{
+			"$latitude":  "-34.6131",
+			"$longitude": "-58.3772",
+		},
+		Resource: getURL("https://air-quality-api.open-meteo.com/v1/air-quality"),
+		Request: models.Request{
+			Method: "GET",
+			Queries: map[string]string{
+				"latitude":  "$latitude",
+				"longitude": "$longitude",
+				"current":   "us_aqi,pm2_5",
+			},
+			Headers: map[string]string{
+				"Accept": "application/json",
+			},
+		},
+		Response: "json",
+		Query: map[string]string{
+			"aqi":  ".current.us_aqi",
+			"pm25": ".current.pm2_5",
+			"time": ".current.time",
+		},
+		Rate: 900,
+	},
+	"github_repo": {
+		WellKnown: "github_repo",
+		Params: map[string]string{
+			"$query": "",
+		},
+		Resource: getURL("https://api.github.com/search/repositories"),
+		Request: models.Request{
+			Method: "GET",
+			Queries: map[string]string{
+				"q":        "$query",
+				"sort":     "stars",
+				"order":    "desc",
+				"per_page": "1",
+			},
+			Headers: map[string]string{
+				"Accept": "application/vnd.github+json",
+			},
+		},
+		Response: "json",
+		Query: map[string]string{
+			"name":        ".items[0].full_name",
+			"stars":       ".items[0].stargazers_count",
+			"forks":       ".items[0].forks_count",
+			"issues":      ".items[0].open_issues_count",
+			"description": ".items[0].description",
+		},
+		Rate: 300,
+	},
 }

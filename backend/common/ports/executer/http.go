@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-func isSafeIP(ip net.IP) bool {
+var isSafeIP = func(ip net.IP) bool {
 	return !(ip.IsLoopback() ||
 		ip.IsPrivate() ||
 		ip.IsLinkLocalUnicast() ||
