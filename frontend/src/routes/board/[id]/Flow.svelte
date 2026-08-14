@@ -8,6 +8,9 @@
 	import type { Board } from '$types/api';
 	import Modal from '$components/Modal/Modal.svelte';
 	import Input from '$components/Input/Input.svelte';
+	import Button from '$components/Button/Button.svelte';
+	import SecretsPanel from '$components/Secrets/SecretsPanel.svelte';
+	import { m } from '$lib/paraglide/messages';
 	import { nodesMap, parameters } from '$components/Nodes/node-map';
 
 	let { nodes, edges, name, boardId }: {
@@ -21,6 +24,7 @@
 
 	let selectedNode: Node | null = $state(null);
 
+	let managingSecrets = $state(false);
 	let creatingNode = $state<Board['postits'][number] | null>(null);
 	let paramValues = $state<Record<string, string>>({});
 
@@ -88,7 +92,12 @@
 
 <div class="flex flex-row h-full w-full">
 	<main class="dndflow">
-		<h1 class="text-2xl font-bold mb-4 ml-3">{name}</h1>
+		<div class="flex flex-row items-center justify-between mb-4 ml-3 mr-3">
+			<h1 class="text-2xl font-bold">{name}</h1>
+			<Button variant="secondary" onclick={() => (managingSecrets = true)}>
+				{m['secrets.title']()}
+			</Button>
+		</div>
 		<div class="reactflow-wrapper">
 			<SvelteFlow
 				bind:nodes
