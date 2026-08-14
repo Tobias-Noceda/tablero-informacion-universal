@@ -18,5 +18,29 @@
 		"crypto_price": "Precio Cripto",
 		"air_quality": "Calidad del Aire",
 		"github_repo": "Repositorio GitHub"
+	},
+	"secrets": {
+		"title": "Credenciales del tablero",
+		"close": "Cerrar",
+		"loading": "Cargando...",
+		"empty": "Este tablero no tiene credenciales.",
+		"add_static": "Agregar API key",
+		"add_oauth2": "Agregar OAuth2",
+		"name": "Nombre",
+		"name_hint": "Solo mayúsculas, números y guión bajo. Debe empezar con una letra.",
+		"value": "Valor",
+		"flow": "Flujo",
+		"client_id": "Client ID",
+		"client_secret": "Client secret",
+		"token_url": "Token URL",
+		"auth_url": "URL de autorización",
+		"scopes": "Scopes",
+		"write_only": "El valor se guarda cifrado y no se puede volver a ver. Para cambiarlo, reemplazá la credencial.",
+		"save": "Guardar",
+		"cancel": "Cancelar",
+		"delete": "Borrar",
+		"authorize": "Autorizar",
+		"callback_ok": "Credencial autorizada. Ya podés cerrar esta pestaña.",
+		"callback_fail": "No se pudo completar la autorización."
 	}
 }
