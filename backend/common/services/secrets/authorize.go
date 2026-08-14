@@ -130,7 +130,7 @@ func (srv *SecretsService) Callback(state, code string) error {
 		return err
 	}
 
-	return srv.seal(secret.Board, secret.Name, models.SecretOAuth2, plaintext)
+	return srv.seal(secret.Board, secret.Name, models.SecretOAuth2, plaintext, secret.Flow, true)
 }
 
 func handshakeKey(state string) string {

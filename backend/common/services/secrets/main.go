@@ -86,7 +86,7 @@ func (srv *SecretsService) Put(board uuid.UUID, cognitoID, name string, kind mod
 		return fmt.Errorf("Unsupported secret kind")
 	}
 
-	return srv.seal(board, name, kind, []byte(value))
+	return srv.seal(board, name, kind, []byte(value), "", false)
 }
 
 func (srv *SecretsService) PutOAuth2(board uuid.UUID, cognitoID, name string, material *models.OAuth2Material) error {
@@ -178,8 +178,7 @@ func (srv *SecretsService) Delete(board uuid.UUID, cognitoID, name string) error
 	return srv.store.DeleteSecret(board, name)
 }
 
-// store seals a value and writes it, preserving the board + name binding.
-func (srv *SecretsService) seal(board uuid.UUID, name string, kind models.SecretKind, plaintext []byte) error {
+func (srv *SecretsService) seal(board uuid.UUID, name string, kind models.SecretKind, plaintext []byte, flow string, authorized bool) error {
 	sealed, err := srv.sealer.Seal(aad(board, name), plaintext)
 	if err != nil {
 		return err
@@ -197,6 +196,8 @@ func (srv *SecretsService) seal(board uuid.UUID, name string, kind models.Secret
 		KeyVersion: sealed.KeyVersion,
 		CreatedAt:  now,
 		UpdatedAt:  now,
+		Flow:       flow,
+		Authorized: authorized,
 	})
 }
 
@@ -250,7 +251,7 @@ func (srv *SecretsService) refresh(s *models.Secret, material *models.OAuth2Mate
 		return err
 	}
 
-	return srv.seal(s.Board, s.Name, models.SecretOAuth2, plaintext)
+	return srv.seal(s.Board, s.Name, models.SecretOAuth2, plaintext, s.Flow, s.Authorized)
 }
 
 func (srv *SecretsService) Resolve(board uuid.UUID, names []string) (map[string]string, error) {

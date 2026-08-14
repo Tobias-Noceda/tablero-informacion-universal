@@ -20,6 +20,8 @@ func (db *MongoDB) UpsertSecret(secret *models.Secret) error {
 			"nonce":      secret.Nonce,
 			"keyversion": secret.KeyVersion,
 			"updatedat":  secret.UpdatedAt,
+			"flow":       secret.Flow,
+			"authorized": secret.Authorized,
 		},
 		"$setOnInsert": bson.M{
 			"_id":       secret.Id,
