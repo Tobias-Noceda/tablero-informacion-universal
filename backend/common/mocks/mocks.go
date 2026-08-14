@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"errors"
+	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
@@ -219,6 +220,51 @@ func (m *MockSecretStore) ListSecrets(board uuid.UUID) ([]models.Secret, error) 
 func (m *MockSecretStore) DeleteSecret(board uuid.UUID, name string) error {
 	if m.DeleteSecretFn != nil {
 		return m.DeleteSecretFn(board, name)
+	}
+	return nil
+}
+
+// MockTokenClient is a configurable test double for infrastructure.TokenClient.
+type MockTokenClient struct {
+	FetchFn    func(material *models.OAuth2Material) error
+	ExchangeFn func(material *models.OAuth2Material, code, redirectURI, verifier string) error
+}
+
+var _ infrastructure.TokenClient = (*MockTokenClient)(nil)
+
+func (m *MockTokenClient) Fetch(material *models.OAuth2Material) error {
+	if m.FetchFn != nil {
+		return m.FetchFn(material)
+	}
+	return nil
+}
+
+func (m *MockTokenClient) Exchange(material *models.OAuth2Material, code, redirectURI, verifier string) error {
+	if m.ExchangeFn != nil {
+		return m.ExchangeFn(material, code, redirectURI, verifier)
+	}
+	return nil
+}
+
+// MockLocker is a configurable test double for infrastructure.Locker. It grants
+// the lock unless told otherwise.
+type MockLocker struct {
+	AcquireFn func(key string, ttl time.Duration) (bool, error)
+	ReleaseFn func(key string) error
+}
+
+var _ infrastructure.Locker = (*MockLocker)(nil)
+
+func (m *MockLocker) Acquire(key string, ttl time.Duration) (bool, error) {
+	if m.AcquireFn != nil {
+		return m.AcquireFn(key, ttl)
+	}
+	return true, nil
+}
+
+func (m *MockLocker) Release(key string) error {
+	if m.ReleaseFn != nil {
+		return m.ReleaseFn(key)
 	}
 	return nil
 }
