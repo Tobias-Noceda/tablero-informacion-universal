@@ -8,4 +8,6 @@ import (
 type Cache interface {
 	FindPostItResult(id uuid.UUID) (any, error)
 	AddPostItResult(postit *models.PostIts, data any) error
+	ConnectClientToBoard(board *models.Board, id uuid.UUID) ([]string, error)
+	DisconnectClientFromBoard(board *models.Board, id uuid.UUID) error
 }

@@ -11,18 +11,28 @@ import (
 
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
-	srv "github.com/Secreto31126/tesis/common/services/boards"
+	b_srv "github.com/Secreto31126/tesis/common/services/boards"
+	r_srv "github.com/Secreto31126/tesis/common/services/realtime"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
-func setupRouter(db *mocks.MockDB) *gin.Engine {
+func setupRouter(db *mocks.MockDB, cache *mocks.MockCache) *gin.Engine {
 	if db == nil {
 		db = &mocks.MockDB{}
 	}
+
+	if cache == nil {
+		cache = &mocks.MockCache{}
+	}
+
 	gin.SetMode(gin.TestMode)
+
 	r := gin.New()
-	NewController(srv.New(db)).RegisterRoutes(r)
+	bs := b_srv.New(db)
+	rs := r_srv.New(*bs, cache)
+
+	NewController(bs, rs).RegisterRoutes(r)
 	return r
 }
 
@@ -45,7 +55,7 @@ func TestCreateBoard_OK(t *testing.T) {
 			return &models.Board{Id: id, Name: name, Owner: owner}, nil
 		},
 	}
-	r := setupRouter(db)
+	r := setupRouter(db, nil)
 
 	w := do(r, http.MethodPost, "/boards/", `{"name":"B","owner":"o1"}`)
 	if w.Code != http.StatusCreated {
@@ -59,7 +69,7 @@ func TestCreateBoard_OK(t *testing.T) {
 }
 
 func TestCreateBoard_MissingFields(t *testing.T) {
-	r := setupRouter(nil)
+	r := setupRouter(nil, nil)
 	w := do(r, http.MethodPost, "/boards/", `{"name":"B"}`)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", w.Code)
@@ -67,7 +77,7 @@ func TestCreateBoard_MissingFields(t *testing.T) {
 }
 
 func TestGetUserBoards_MissingCognitoID(t *testing.T) {
-	r := setupRouter(nil)
+	r := setupRouter(nil, nil)
 	w := do(r, http.MethodGet, "/boards/", "")
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500 (missing cognito_id)", w.Code)
@@ -83,7 +93,7 @@ func TestGetUserBoards_OK(t *testing.T) {
 			return []models.Board{{Id: uuid.New()}}, nil
 		},
 	}
-	r := setupRouter(db)
+	r := setupRouter(db, nil)
 
 	w := do(r, http.MethodGet, "/boards/?cognito_id=user-1", "")
 	if w.Code != http.StatusOK {
@@ -100,7 +110,7 @@ func TestConnectPostIts_OK(t *testing.T) {
 			return nil
 		},
 	}
-	r := setupRouter(db)
+	r := setupRouter(db, nil)
 
 	body := `{"source":"` + src.String() + `","target":"` + tgt.String() + `"}`
 	w := do(r, http.MethodPost, "/boards/"+board.String()+"/strands", body)
@@ -113,7 +123,7 @@ func TestConnectPostIts_OK(t *testing.T) {
 }
 
 func TestConnectPostIts_InvalidBoardUUID(t *testing.T) {
-	r := setupRouter(nil)
+	r := setupRouter(nil, nil)
 	w := do(r, http.MethodPost, "/boards/not-a-uuid/strands", `{"source":"`+uuid.New().String()+`","target":"`+uuid.New().String()+`"}`)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", w.Code)
@@ -129,7 +139,7 @@ func TestDisconnectPostIts_OK(t *testing.T) {
 			return nil
 		},
 	}
-	r := setupRouter(db)
+	r := setupRouter(db, nil)
 
 	body := `{"source":"` + src.String() + `","target":"` + tgt.String() + `"}`
 	w := do(r, http.MethodDelete, "/boards/"+board.String()+"/strands", body)
@@ -149,7 +159,7 @@ func TestUpdateBoardName_OK(t *testing.T) {
 			return nil
 		},
 	}
-	r := setupRouter(db)
+	r := setupRouter(db, nil)
 
 	w := do(r, http.MethodPatch, "/boards/"+uuid.New().String()+"/name", `{"name":"Renamed"}`)
 	if w.Code != http.StatusNoContent {
@@ -168,7 +178,7 @@ func TestAddCollaborator_OK(t *testing.T) {
 			return nil
 		},
 	}
-	r := setupRouter(db)
+	r := setupRouter(db, nil)
 
 	w := do(r, http.MethodPost, "/boards/"+uuid.New().String()+"/collaborators", `{"cognito_id":"collab-1"}`)
 	if w.Code != http.StatusNoContent {
@@ -187,7 +197,7 @@ func TestDeleteBoard_OK(t *testing.T) {
 			return nil
 		},
 	}
-	r := setupRouter(db)
+	r := setupRouter(db, nil)
 
 	w := do(r, http.MethodDelete, "/boards/"+uuid.New().String(), "")
 	if w.Code != http.StatusNoContent {
@@ -205,7 +215,7 @@ func TestGetBoard_OK(t *testing.T) {
 			return &models.Board{Id: id, Name: "B"}, nil
 		},
 	}
-	r := setupRouter(db)
+	r := setupRouter(db, nil)
 
 	w := do(r, http.MethodGet, "/boards/"+id.String(), "")
 	if w.Code != http.StatusOK {
@@ -219,7 +229,7 @@ func TestGetBoard_OK(t *testing.T) {
 }
 
 func TestGetBoard_InvalidUUID(t *testing.T) {
-	r := setupRouter(nil)
+	r := setupRouter(nil, nil)
 	w := do(r, http.MethodGet, "/boards/not-a-uuid", "")
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", w.Code)
@@ -232,7 +242,7 @@ func TestGetBoard_ServiceError(t *testing.T) {
 			return nil, errors.New("mongo: no documents in result")
 		},
 	}
-	r := setupRouter(db)
+	r := setupRouter(db, nil)
 
 	w := do(r, http.MethodGet, "/boards/"+uuid.New().String(), "")
 	if w.Code != http.StatusInternalServerError {
@@ -246,7 +256,7 @@ func TestGetBoardPostIts_OK(t *testing.T) {
 			return []models.PostIts{{Id: uuid.New()}, {Id: uuid.New()}}, nil
 		},
 	}
-	r := setupRouter(db)
+	r := setupRouter(db, nil)
 
 	w := do(r, http.MethodGet, "/boards/"+uuid.New().String()+"/post-its", "")
 	if w.Code != http.StatusOK {
@@ -260,7 +270,7 @@ func TestGetBoardPostIts_OK(t *testing.T) {
 }
 
 func TestGetBoardPostIts_InvalidUUID(t *testing.T) {
-	r := setupRouter(nil)
+	r := setupRouter(nil, nil)
 	w := do(r, http.MethodGet, "/boards/nope/post-its", "")
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", w.Code)
@@ -275,7 +285,7 @@ func TestRemoveCollaborator_OK(t *testing.T) {
 			return nil
 		},
 	}
-	r := setupRouter(db)
+	r := setupRouter(db, nil)
 
 	w := do(r, http.MethodDelete, "/boards/"+uuid.New().String()+"/collaborators", `{"cognito_id":"collab-2"}`)
 	if w.Code != http.StatusNoContent {
@@ -287,7 +297,7 @@ func TestRemoveCollaborator_OK(t *testing.T) {
 }
 
 func TestRemoveCollaborator_MissingField(t *testing.T) {
-	r := setupRouter(nil)
+	r := setupRouter(nil, nil)
 	w := do(r, http.MethodDelete, "/boards/"+uuid.New().String()+"/collaborators", `{}`)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400 (cognito_id required)", w.Code)
@@ -300,7 +310,7 @@ func TestConnectPostIts_ServiceError(t *testing.T) {
 			return errors.New("mongo: no documents in result")
 		},
 	}
-	r := setupRouter(db)
+	r := setupRouter(db, nil)
 
 	body := `{"source":"` + uuid.New().String() + `","target":"` + uuid.New().String() + `"}`
 	w := do(r, http.MethodPost, "/boards/"+uuid.New().String()+"/strands", body)
@@ -341,7 +351,7 @@ func TestBoardHandlers_ServiceErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := setupRouter(errDB())
+			r := setupRouter(errDB(), nil)
 			w := do(r, tc.method, tc.path, tc.body)
 			if w.Code != http.StatusInternalServerError {
 				t.Fatalf("status = %d, want 500 (body: %s)", w.Code, w.Body.String())
@@ -363,7 +373,7 @@ func TestBoardHandlers_InvalidUUID(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := setupRouter(nil)
+			r := setupRouter(nil, nil)
 			w := do(r, tc.method, tc.path, tc.body)
 			if w.Code != http.StatusBadRequest {
 				t.Fatalf("status = %d, want 400", w.Code)
@@ -384,7 +394,7 @@ func TestBoardHandlers_BadBody(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			r := setupRouter(nil)
+			r := setupRouter(nil, nil)
 			w := do(r, tc.method, tc.path, `{bad json`)
 			if w.Code != http.StatusBadRequest {
 				t.Fatalf("status = %d, want 400", w.Code)

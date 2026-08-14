@@ -139,8 +139,10 @@ func (m *MockDB) UpdateBoardName(id uuid.UUID, name string) error {
 
 // MockCache is a configurable test double for infrastructure.Cache.
 type MockCache struct {
-	FindPostItResultFn func(id uuid.UUID) (any, error)
-	AddPostItResultFn  func(postit *models.PostIts, data any) error
+	FindPostItResultFn          func(id uuid.UUID) (any, error)
+	AddPostItResultFn           func(postit *models.PostIts, data any) error
+	ConnectClientToBoardFn      func(board *models.Board, id uuid.UUID) ([]string, error)
+	DisconnectClientFromBoardFn func(board *models.Board, id uuid.UUID) error
 }
 
 var _ infrastructure.Cache = (*MockCache)(nil)
@@ -155,6 +157,20 @@ func (m *MockCache) FindPostItResult(id uuid.UUID) (any, error) {
 func (m *MockCache) AddPostItResult(postit *models.PostIts, data any) error {
 	if m.AddPostItResultFn != nil {
 		return m.AddPostItResultFn(postit, data)
+	}
+	return nil
+}
+
+func (m *MockCache) ConnectClientToBoard(board *models.Board, id uuid.UUID) ([]string, error) {
+	if m.ConnectClientToBoardFn != nil {
+		return m.ConnectClientToBoardFn(board, id)
+	}
+	return nil, ErrCacheMiss
+}
+
+func (m *MockCache) DisconnectClientFromBoard(board *models.Board, id uuid.UUID) error {
+	if m.DisconnectClientFromBoardFn != nil {
+		return m.DisconnectClientFromBoardFn(board, id)
 	}
 	return nil
 }
