@@ -76,7 +76,7 @@
 
 			// Report unreachable peers to the API
 			if (err.type === 'peer-unavailable') {
-				boardApi.offline(boardId, id);
+				// boardApi.offline(boardId, id);
 			}
 		});
 
