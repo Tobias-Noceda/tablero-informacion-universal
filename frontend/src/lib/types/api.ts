@@ -64,6 +64,9 @@ export type OAuth2Flow = 'client_credentials' | 'authorization_code';
 export type SecretMeta = {
     name: string;
     kind: SecretKind;
+    // Only present for OAuth2 credentials.
+    flow?: OAuth2Flow;
+    authorized: boolean;
     created_at: string;
     updated_at: string;
 }

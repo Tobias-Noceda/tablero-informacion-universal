@@ -126,12 +126,19 @@
 				<li class="flex items-center justify-between gap-2 border border-main-border rounded-md px-3 py-2">
 					<div class="flex flex-col">
 						<code class="text-sm">${secret.name}</code>
-						<span class="text-xs opacity-60">{secret.kind}</span>
+						<span class="text-xs opacity-60">
+							{secret.kind}{secret.flow ? ` · ${secret.flow}` : ''}
+							{#if secret.flow === 'authorization_code'}
+								· {secret.authorized ? m['secrets.authorized']() : m['secrets.pending']()}
+							{/if}
+						</span>
 					</div>
 					<div class="flex gap-2">
-						{#if secret.kind === 'oauth2'}
+						<!-- Only the code flow has a user to send to a consent screen;
+						     client_credentials needs no handshake at all. -->
+						{#if secret.flow === 'authorization_code'}
 							<Button variant="secondary" class="text-xs px-2 py-1" onclick={() => consent(secret)}>
-								{m['secrets.authorize']()}
+								{secret.authorized ? m['secrets.reauthorize']() : m['secrets.authorize']()}
 							</Button>
 						{/if}
 						<Button variant="destructive" class="text-xs px-2 py-1" onclick={() => remove(secret)}>
