@@ -242,8 +242,9 @@ func TestExecute_DoesNotMutateSharedResource(t *testing.T) {
 				Method:  http.MethodGet,
 				Queries: map[string]string{"ids": "$coin"},
 			},
-			Params: map[string]string{"$coin": coin},
-			Query:  ".",
+			Params:   map[string]string{"$coin": coin},
+			Response: "json",
+			Query:    map[string]string{"ok": ".ok"},
 		}
 		if _, err := e.Execute(postit); err != nil {
 			t.Fatalf("%s: unexpected error: %v", coin, err)
