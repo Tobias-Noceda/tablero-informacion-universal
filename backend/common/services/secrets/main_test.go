@@ -235,3 +235,55 @@ func TestList_AllowsCollaboratorButNotStrangers(t *testing.T) {
 		t.Errorf("stranger got %v, want ErrForbidden", err)
 	}
 }
+
+// The stored kind decides the wire form, so the same secret can serve an API
+// that wants a raw header and one that wants an Authorization scheme.
+func TestResolve_ShapesTheValuePerKind(t *testing.T) {
+	cases := []struct {
+		kind  models.SecretKind
+		value string
+		want  string
+	}{
+		{models.SecretApiKey, "cur_live_abc123", "cur_live_abc123"},
+		{models.SecretBearer, "ey.jwt.token", "Bearer ey.jwt.token"},
+		// base64("alice:s3cr3t")
+		{models.SecretBasic, "alice:s3cr3t", "Basic YWxpY2U6czNjcjN0"},
+	}
+
+	for _, c := range cases {
+		store := newStore()
+		srv := service(t, store)
+		board := uuid.New()
+
+		if err := srv.Put(board, owner, "CRED", c.kind, c.value); err != nil {
+			t.Fatalf("%s: put: %v", c.kind, err)
+		}
+
+		resolved, err := srv.Resolve(board, []string{"CRED"})
+		if err != nil {
+			t.Fatalf("%s: resolve: %v", c.kind, err)
+		}
+		if resolved["$CRED"] != c.want {
+			t.Errorf("%s resolved to %q, want %q", c.kind, resolved["$CRED"], c.want)
+		}
+	}
+}
+
+// Whatever the wire form, what gets persisted is the raw credential.
+func TestPut_StoresTheRawValueNotTheWireForm(t *testing.T) {
+	store := newStore()
+	srv := service(t, store)
+	board := uuid.New()
+
+	if err := srv.Put(board, owner, "CRED", models.SecretBearer, "ey.jwt.token"); err != nil {
+		t.Fatalf("put: %v", err)
+	}
+
+	plaintext, err := srv.unseal(&store.rows[0])
+	if err != nil {
+		t.Fatalf("unseal: %v", err)
+	}
+	if string(plaintext) != "ey.jwt.token" {
+		t.Errorf("stored %q, want the raw token without the Bearer prefix", plaintext)
+	}
+}
