@@ -14,7 +14,6 @@ const (
 	MAX_REDIRECTS    = 3
 )
 
-
 var IsSafeIP = func(ip net.IP) bool {
 	return !(ip.IsLoopback() ||
 		ip.IsPrivate() ||
