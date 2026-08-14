@@ -35,7 +35,7 @@ func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(store, boards, sealer, &mocks.MockTokenClient{}, &mocks.MockLocker{})).RegisterRoutes(r)
+	NewController(srv.New(store, boards, sealer, &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})).RegisterRoutes(r)
 	return r
 }
 

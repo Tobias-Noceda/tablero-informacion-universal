@@ -68,7 +68,7 @@ func service(t *testing.T, store *memoryStore) *SecretsService {
 			return &models.Board{Id: id, Owner: owner, Collaborators: []string{collaborator}}, nil
 		},
 	}
-	return New(store, boards, sealer, &mocks.MockTokenClient{}, &mocks.MockLocker{})
+	return New(store, boards, sealer, &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})
 }
 
 func TestPut_StoresOnlyCiphertext(t *testing.T) {
