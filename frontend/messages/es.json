@@ -45,6 +45,15 @@
 		"callback_fail": "No se pudo completar la autorización.",
 		"authorized": "autorizada",
 		"pending": "falta autorizar",
-		"reauthorize": "Reautorizar"
+		"reauthorize": "Reautorizar",
+		"method": "Método de autenticación",
+		"method_api_key": "Valor crudo (API key)",
+		"method_bearer": "Bearer token",
+		"method_basic": "Basic (usuario y contraseña)",
+		"method_api_key_hint": "Se envía tal cual, sin prefijo. Es lo que usan las APIs con header o parámetro propio, como apikey.",
+		"method_bearer_hint": "Se envía como «Bearer <valor>». Usalo en el header Authorization.",
+		"method_basic_hint": "Se envía como «Basic <usuario:contraseña en base64>». El backend hace el base64.",
+		"username": "Usuario",
+		"password": "Contraseña"
 	}
 }
