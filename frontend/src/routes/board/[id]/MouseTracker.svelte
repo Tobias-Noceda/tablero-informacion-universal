@@ -3,7 +3,7 @@
 
 	import { type DataConnection, Peer } from 'peerjs';
 
-	import { mouses } from '$stores/mouses.svelte';
+	import { mouses, type ClientData } from '$stores/mouses.svelte';
 
 	import { SvelteMap } from 'svelte/reactivity';
 	import { page } from '$app/state';
@@ -59,8 +59,9 @@
 					reliable: true,
 					metadata: {
 						username: 'Messi',
-						picture: 'TBD'
-					}
+						picture: 'TBD',
+						color: '#FF0000'
+					} satisfies ClientData
 				});
 
 				setConnection(conn);
@@ -119,7 +120,8 @@
 {#each mouses.data() as mouse (mouse.username)}
 	{#if mouse.position && visible(mouse.position.x, mouse.position.y)}
 		<div
-			class="size-2 absolute bg-red-700"
+			class="size-2 absolute"
+			style:background-color={mouse.color}
 			style:top="{mouse.position.y}px"
 			style:left="{mouse.position.x}px"
 		></div>

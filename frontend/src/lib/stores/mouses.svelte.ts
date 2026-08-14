@@ -6,6 +6,7 @@ export type ClientData = {
 	position?: Position;
 	username: string;
 	picture: string;
+	color: string;
 };
 
 export type Mapper = (p: Position) => Position;
