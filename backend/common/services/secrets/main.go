@@ -1,7 +1,9 @@
 package secrets
 
 import (
+	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
@@ -12,13 +14,33 @@ import (
 
 const MAX_SECRET_SIZE = 8 << 10 // 8kb, generous for a token, far below a payload
 
+var ErrForbidden = errors.New("Not allowed to manage this board's secrets")
+
 type SecretsService struct {
 	store  infrastructure.SecretStore
+	boards infrastructure.BoardReader
 	sealer *crypto.Sealer
 }
 
-func New(store infrastructure.SecretStore, sealer *crypto.Sealer) *SecretsService {
-	return &SecretsService{store, sealer}
+func New(store infrastructure.SecretStore, boards infrastructure.BoardReader, sealer *crypto.Sealer) *SecretsService {
+	return &SecretsService{store, boards, sealer}
+}
+
+func (srv *SecretsService) authorize(board uuid.UUID, cognitoID string, ownerOnly bool) error {
+	found, err := srv.boards.FindBoard(board)
+	if err != nil {
+		return err
+	}
+
+	if found.Owner == cognitoID {
+		return nil
+	}
+
+	if !ownerOnly && slices.Contains(found.Collaborators, cognitoID) {
+		return nil
+	}
+
+	return ErrForbidden
 }
 
 // aad binds a ciphertext to the board and name it was created under.
@@ -26,7 +48,11 @@ func aad(board uuid.UUID, name string) string {
 	return board.String() + "|" + name
 }
 
-func (srv *SecretsService) Put(board uuid.UUID, name string, kind models.SecretKind, value string) error {
+func (srv *SecretsService) Put(board uuid.UUID, cognitoID, name string, kind models.SecretKind, value string) error {
+	if err := srv.authorize(board, cognitoID, true); err != nil {
+		return err
+	}
+
 	if !models.ValidSecretName(name) {
 		return fmt.Errorf("Secret name must match [A-Z][A-Z0-9_]*")
 	}
@@ -65,7 +91,11 @@ func (srv *SecretsService) Put(board uuid.UUID, name string, kind models.SecretK
 	})
 }
 
-func (srv *SecretsService) List(board uuid.UUID) ([]models.SecretMeta, error) {
+func (srv *SecretsService) List(board uuid.UUID, cognitoID string) ([]models.SecretMeta, error) {
+	if err := srv.authorize(board, cognitoID, false); err != nil {
+		return nil, err
+	}
+
 	stored, err := srv.store.ListSecrets(board)
 	if err != nil {
 		return nil, err
@@ -79,7 +109,11 @@ func (srv *SecretsService) List(board uuid.UUID) ([]models.SecretMeta, error) {
 	return metas, nil
 }
 
-func (srv *SecretsService) Delete(board uuid.UUID, name string) error {
+func (srv *SecretsService) Delete(board uuid.UUID, cognitoID, name string) error {
+	if err := srv.authorize(board, cognitoID, true); err != nil {
+		return err
+	}
+
 	return srv.store.DeleteSecret(board, name)
 }
 

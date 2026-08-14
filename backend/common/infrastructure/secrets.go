@@ -11,6 +11,12 @@ type SecretResolver interface {
 	Resolve(board uuid.UUID, names []string) (map[string]string, error)
 }
 
+// BoardReader is the slice of Database the secrets service needs to answer
+// "may this caller manage this board's credentials".
+type BoardReader interface {
+	FindBoard(id uuid.UUID) (*models.Board, error)
+}
+
 type SecretStore interface {
 	// Creates or replaces a board secret, keyed by board + name
 	UpsertSecret(secret *models.Secret) error
