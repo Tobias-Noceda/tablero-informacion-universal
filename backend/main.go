@@ -8,6 +8,7 @@ import (
 	"github.com/Secreto31126/tesis/common/ports/crypto"
 	"github.com/Secreto31126/tesis/common/ports/executer"
 	"github.com/Secreto31126/tesis/common/ports/mongo"
+	"github.com/Secreto31126/tesis/common/ports/oauth"
 	"github.com/Secreto31126/tesis/common/ports/redis"
 	b_srv "github.com/Secreto31126/tesis/common/services/boards"
 	p_srv "github.com/Secreto31126/tesis/common/services/postits"
@@ -38,7 +39,7 @@ func main() {
 	}
 
 	executer := executer.New()
-	secrets := s_srv.New(db, db, sealer)
+	secrets := s_srv.New(db, db, sealer, oauth.New(), cache)
 
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
