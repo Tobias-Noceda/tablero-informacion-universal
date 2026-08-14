@@ -40,14 +40,7 @@
 			console.log('Lost', id);
 		});
 
-		conn.on('error', (err) => {
-			console.error(err);
-
-			if (err.type === 'connection-closed') {
-				// Report closed peers to the API
-				boardApi.offline(boardId, id);
-			}
-		});
+		conn.on('error', console.error);
 	}
 
 	$effect(() => {
@@ -73,6 +66,15 @@
 
 				setConnection(conn);
 			});
+		});
+
+		peer.on('error', (err) => {
+			console.error(err);
+
+			// Report unreachable peers to the API
+			if (err.type === 'peer-unavailable') {
+				boardApi.offline(boardId, id);
+			}
 		});
 
 		return () => {
