@@ -2,21 +2,12 @@ package executer
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/Secreto31126/tesis/common/models"
-	"github.com/itchyny/gojq"
-)
-
-const (
-	REQUEST_TIMEOUT = 10 * time.Second
-	QUERY_TIMEOUT   = 250 * time.Millisecond
 )
 
 type DewIt struct{}
@@ -25,9 +16,18 @@ func New() *DewIt {
 	return &DewIt{}
 }
 
+type parser interface {
+	parse(*models.PostIts, io.Reader) (any, error)
+}
+
 func (e *DewIt) Execute(postit *models.PostIts) (any, error) {
 	if postit.Resource == nil {
 		return postit.Params, nil
+	}
+
+	parser, err := e.getParser(postit)
+	if err != nil {
+		return nil, err
 	}
 
 	if postit.Request.Queries != nil {
@@ -50,13 +50,20 @@ func (e *DewIt) Execute(postit *models.PostIts) (any, error) {
 	}
 
 	defer res.Body.Close()
+	body := io.LimitReader(res.Body, MAX_PAYLOAD_SIZE)
 
-	data, err := e.parse(res.Body)
-	if err != nil {
-		return nil, err
+	return parser.parse(postit, body)
+}
+
+func (*DewIt) getParser(postit *models.PostIts) (parser, error) {
+	switch postit.Response {
+	case "json":
+		return &JsonDewIt{}, nil
+	case "html":
+		return &HtmlDewIt{}, nil
+	default:
+		return nil, fmt.Errorf("Unsupported content type, no parser implemented")
 	}
-
-	return e.query(data, postit.Query)
 }
 
 func (*DewIt) populate(input, out map[string]string) error {
@@ -69,17 +76,19 @@ func (*DewIt) populate(input, out map[string]string) error {
 	return nil
 }
 
-func (*DewIt) request(url *url.URL, method string, queries, headers map[string]string) (*http.Response, error) {
+func (*DewIt) request(resource *url.URL, method string, queries, headers map[string]string) (*http.Response, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), REQUEST_TIMEOUT)
 	defer cancel()
 
-	q := url.Query()
-	for k, v := range queries {
-		q.Add(k, v)
-	}
-	url.RawQuery = q.Encode()
+	target := *resource
 
-	req, err := http.NewRequestWithContext(ctx, method, url.String(), nil)
+	q := target.Query()
+	for k, v := range queries {
+		q.Set(k, v)
+	}
+	target.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, method, target.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -88,54 +97,13 @@ func (*DewIt) request(url *url.URL, method string, queries, headers map[string]s
 		req.Header.Add(k, v)
 	}
 
-	res, err := (&http.Client{}).Do(req)
+	res, err := httpClient().Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("Resource didn't return 200")
-	}
-
-	return res, nil
-}
-
-func (e *DewIt) parse(body io.ReadCloser) (any, error) {
-	var data any
-
-	if err := json.NewDecoder(body).Decode(&data); err != nil {
-		return nil, err
-	}
-
-	// TODO: delete this
-	switch v := data.(type) {
-	case map[string]any:
-		log.Println("It's an object!", v)
-	case []any:
-		log.Println("It's an array!", v)
-	default:
-		log.Println("It's a primitive type!", v)
-	}
-
-	return data, nil
-}
-
-func (e *DewIt) query(data any, query string) (any, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), QUERY_TIMEOUT)
-	defer cancel()
-
-	cmd, err := gojq.Parse(query)
-	if err != nil {
-		return nil, err
-	}
-
-	res, ok := cmd.RunWithContext(ctx, data).Next()
-	if !ok {
-		return nil, fmt.Errorf("Query matched no results")
-	}
-
-	if err, ok := res.(error); ok {
-		return nil, err
 	}
 
 	return res, nil

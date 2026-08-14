@@ -13,10 +13,9 @@ type MovePostItRequest struct {
 	Y float32 `json:"y" binding:"required,number"`
 }
 
-
 type UpdatePostItRequest struct {
 	Params   map[string]string `json:"params"`
-	Query    *string           `json:"query"`
+	Query    map[string]string `json:"query"`
 	Response *string           `json:"response"`
 	Rate     *int              `json:"rate"`
 }

@@ -75,7 +75,7 @@ func TestCreatePostIt_ResolvesWellKnown(t *testing.T) {
 	if got.Resource == nil || got.Resource.Host != "dolarapi.com" {
 		t.Errorf("resource not populated from well-known: %+v", got.Resource)
 	}
-	if got.Query == "" {
+	if len(got.Query) == 0 {
 		t.Error("query not populated from well-known")
 	}
 }

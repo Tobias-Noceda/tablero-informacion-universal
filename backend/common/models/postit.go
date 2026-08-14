@@ -20,8 +20,8 @@ type PostIts struct {
 	WellKnown string            `bson:"wellknown" json:"wellknown"`
 	Resource  *url.URL          `bson:"resource" json:"resource"`
 	Request   Request           `bson:"request" json:"request"`
-	Response  string            `bson:"response" json:"response"` // API response type, used in Accept header
-	Query     string            `bson:"query" json:"query"`    // https//github.com/itchyny/gojq
-	Rate      int               `bson:"rate" json:"rate"`     // A rate-less post-it should only be updated on creation
-	Envs      []Envs            `bson:"envs" json:"envs"`     // Board + Post-it defined env variables
+	Response  string            `bson:"response" json:"response"` // API response type, used to select the query parser
+	Query     map[string]string `bson:"query" json:"query"`       // An object of key:query to map to, either with jq or jquery
+	Rate      int               `bson:"rate" json:"rate"`         // A rate-less post-it should only be updated on creation
+	Envs      []Envs            `bson:"envs" json:"envs"`         // Board + Post-it defined env variables
 }

@@ -205,7 +205,7 @@ func (ctrl *Controller) EditPostIt(c *gin.Context) {
 		set["params"] = req.Params
 	}
 	if req.Query != nil {
-		set["query"] = *req.Query
+		set["query"] = req.Query
 	}
 	if req.Response != nil {
 		set["response"] = *req.Response

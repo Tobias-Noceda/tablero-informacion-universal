@@ -62,6 +62,42 @@
     >
       {m["nodes.dolar_oficial"]()}
     </div>
+    <div
+      class="riesgo_pais node"
+      ondragstart={(event) => onDragStart(event, 'riesgo_pais')}
+      draggable={true}
+      role="button"
+      tabindex="0"
+    >
+      {m["nodes.riesgo_pais"]()}
+    </div>
+    <div
+      class="crypto_price node"
+      ondragstart={(event) => onDragStart(event, 'crypto_price')}
+      draggable={true}
+      role="button"
+      tabindex="0"
+    >
+      {m["nodes.crypto_price"]()}
+    </div>
+    <div
+      class="air_quality node"
+      ondragstart={(event) => onDragStart(event, 'air_quality')}
+      draggable={true}
+      role="button"
+      tabindex="0"
+    >
+      {m["nodes.air_quality"]()}
+    </div>
+    <div
+      class="github_repo node"
+      ondragstart={(event) => onDragStart(event, 'github_repo')}
+      draggable={true}
+      role="button"
+      tabindex="0"
+    >
+      {m["nodes.github_repo"]()}
+    </div>
   </div>
 </aside>
 

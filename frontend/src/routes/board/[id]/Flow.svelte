@@ -8,7 +8,7 @@
 	import type { Board } from '$types/api';
 	import Modal from '$components/Modal/Modal.svelte';
 	import Input from '$components/Input/Input.svelte';
-	import { nodesMap } from '$components/Nodes/node-map';
+	import { nodesMap, parameters } from '$components/Nodes/node-map';
 
 	let { nodes, edges, name, boardId }: {
 		nodes: Node[],
@@ -22,12 +22,12 @@
 	let selectedNode: Node | null = $state(null);
 
 	let creatingNode = $state<Board['postits'][number] | null>(null);
-	let text = $state('');
-	let keyword = $state('');
-	// let latitude = $state('');
-	// let longitude = $state('');
-	// let start_date = $state('');
-	// let end_date = $state('');
+	let paramValues = $state<Record<string, string>>({});
+
+	const creatingParams = $derived(creatingNode ? (parameters[creatingNode.type!] ?? []) : []);
+	const missingRequired = $derived(
+		creatingParams.some((p) => p.default === undefined && !(paramValues[p.key] ?? '').trim())
+	);
 
 	const { screenToFlowPosition } = useSvelteFlow();
 
@@ -53,11 +53,16 @@
 			y: event.clientY
 		});
 
-		if (type.current === 'dog_facts' || type.current === 'dolar_oficial') {
+		if ((parameters[type.current] ?? []).length === 0) {
 			const newPostIt = await postItsApi.create_well_known(boardId, type.current, {});
 			await postItsApi.move(newPostIt.id, position.x, position.y);
 			nodes = [...nodes, { id: newPostIt.id, position, type: type.current } as Node];
+			return;
 		}
+
+		paramValues = Object.fromEntries(
+			(parameters[type.current] ?? []).map((p) => [p.key, p.default ?? ''])
+		);
 		creatingNode = {
 			id: crypto.randomUUID(),
 			type: type.current,
@@ -66,25 +71,18 @@
 	};
 
 	const createNode = async () => {
-		if (!creatingNode) return;
+		if (!creatingNode || missingRequired) return;
 
-		if (creatingNode.type === 'static_card' && !text.trim()) return;
-		if (creatingNode.type === 'events_search' && !keyword.trim()) return;
-
-		const params: Record<string, string> = creatingNode.type === 'static_card' ? { text: text.trim() } : { "$keyword": keyword.trim() };
+		const params = Object.fromEntries(
+			creatingParams.map((p) => [p.key, (paramValues[p.key] ?? '').trim()])
+		);
 
 		const newPostIt = await postItsApi.create_well_known(boardId, creatingNode.type!, params);
 		await postItsApi.move(newPostIt.id, creatingNode.position.x, creatingNode.position.y);
 
-		const newNode = {
-			...creatingNode,
-			data: { text, keyword }
-		};
-
-		nodes = [...nodes, newNode];
+		nodes = [...nodes, { ...creatingNode, id: newPostIt.id, data: params }];
 		creatingNode = null;
-		text = '';
-		keyword = '';
+		paramValues = {};
 	};
 </script>
 
@@ -134,16 +132,18 @@
 				}
 			}}
 			acceptText="Create"
-			acceptDisabled={(creatingNode.type === 'default' && text.trim() === '') ||
-				(creatingNode.type === 'events_search' && keyword.trim() === '')}
+			acceptDisabled={missingRequired}
 		>
 			<h2 class="text-lg font-semibold">Create Node</h2>
-			{#if creatingNode.type === 'static_card'}
-				<Input label="Text" placeholder="Enter text" bind:value={text} />
-			{/if}
-			{#if creatingNode.type === 'events_search'}
-				<Input label="Keyword" placeholder="Enter keyword" bind:value={keyword} />
-			{/if}
+			{#each creatingParams as param (param.key)}
+				<Input
+					label={param.label}
+					placeholder={param.placeholder}
+					type={param.type === 'number' ? 'number' : 'text'}
+					required={param.default === undefined}
+					bind:value={paramValues[param.key]}
+				/>
+			{/each}
 		</Modal>
 	{/if}
 </div>

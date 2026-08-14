@@ -96,7 +96,7 @@ func TestGetPostItSettings_OK(t *testing.T) {
 	id := uuid.New()
 	db := &mocks.MockDB{
 		FindPostItFn: func(_ uuid.UUID) (*models.PostIts, error) {
-			return &models.PostIts{Id: id, Rate: 5, Query: "{ compra: .compra }"}, nil
+			return &models.PostIts{Id: id, Rate: 5, Query: map[string]string{"compra": ".compra"}}, nil
 		},
 	}
 	r := setupRouter(db, nil, nil)
@@ -107,11 +107,11 @@ func TestGetPostItSettings_OK(t *testing.T) {
 	}
 	var got struct {
 		Rate  int
-		Query string
+		Query map[string]string
 	}
 	_ = json.Unmarshal(w.Body.Bytes(), &got)
-	if got.Rate != 5 || got.Query != "{ compra: .compra }" {
-		t.Errorf("got %+v, want rate=5 query set", got)
+	if got.Rate != 5 || got.Query["compra"] != ".compra" {
+		t.Errorf("got %+v, want rate=5 and query[compra]=.compra", got)
 	}
 }
 
@@ -134,12 +134,13 @@ func TestEditPostIt_BuildsSetMap(t *testing.T) {
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPatch, "/post-its/"+id.String()+"/settings", `{"rate":5,"query":"{ x: .x }"}`)
+	w := do(r, http.MethodPatch, "/post-its/"+id.String()+"/settings", `{"rate":5,"query":{"x":".x"}}`)
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204 (body: %s)", w.Code, w.Body.String())
 	}
-	if gotSet["rate"] == nil || gotSet["query"] != "{ x: .x }" {
-		t.Errorf("set = %v, want rate and query", gotSet)
+	query, ok := gotSet["query"].(map[string]string)
+	if gotSet["rate"] == nil || !ok || query["x"] != ".x" {
+		t.Errorf("set = %v, want rate and query[x]=.x", gotSet)
 	}
 	if _, ok := gotSet["response"]; ok {
 		t.Errorf("set should not contain response when omitted: %v", gotSet)

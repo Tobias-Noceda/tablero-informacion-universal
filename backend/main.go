@@ -29,7 +29,7 @@ func main() {
 	}
 	defer cache.Close()
 
-	executer := &executer.DewIt{}
+	executer := executer.New()
 
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
