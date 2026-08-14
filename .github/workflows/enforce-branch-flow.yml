@@ -1,0 +1,26 @@
+name: Enforce branch flow
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize]
+    branches:
+      - main
+
+jobs:
+  check-source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only develop (or hotfix/*) may merge into main
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_REF" in
+            develop|hotfix/*)
+              echo "OK: '$HEAD_REF' is allowed to target main."
+              ;;
+            *)
+              echo "::error::PRs into main must come from 'develop' (or 'hotfix/*'). This PR comes from '$HEAD_REF'."
+              echo "Retarget this PR to 'develop', then merge develop into main."
+              exit 1
+              ;;
+          esac
