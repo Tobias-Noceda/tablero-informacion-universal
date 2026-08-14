@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/Secreto31126/tesis/common/mocks"
@@ -20,27 +21,51 @@ import (
 	"github.com/google/uuid"
 )
 
-// The exchange_rate well-known has to declare the key as a secret reference,
-// not as a param, or creating the post-it would demand the key up front.
-func TestWellKnown_ExchangeRateReferencesTheSecret(t *testing.T) {
-	wk, err := findWellKnown("exchange_rate", nil)
+// No well-known may name a specific credential: which one to use is the
+// user's choice, made per post-it from the board's stored secrets.
+func TestWellKnowns_DoNotHardcodeACredential(t *testing.T) {
+	for key, wk := range configuredPostIts {
+		for _, source := range []map[string]string{wk.Params, wk.Request.Headers, wk.Request.Queries} {
+			for field, value := range source {
+				name, isRef := strings.CutPrefix(value, "$")
+				if isRef && models.ValidSecretName(name) {
+					t.Errorf("%s: %q hardcodes the secret %q", key, field, name)
+				}
+			}
+		}
+	}
+}
+
+// A well-known that needs a credential asks for one, and wires it through a
+// param rather than naming a secret itself.
+func TestWellKnown_ExchangeRateAsksForACredential(t *testing.T) {
+	wk := configuredPostIts["exchange_rate"]
+
+	if wk.Request.Headers["apikey"] != "$credential" {
+		t.Errorf("apikey header = %q, want it to defer to the user's choice", wk.Request.Headers["apikey"])
+	}
+	if def, declared := wk.Params["$credential"]; !declared || def != "" {
+		t.Errorf("credential param = %q/%v, want a required param", def, declared)
+	}
+
+	// Being required means creation fails until the user picks one.
+	if _, err := findWellKnown("exchange_rate", nil); err == nil {
+		t.Error("the post-it was created without a credential")
+	}
+}
+
+// Once the user picks one, it is the picked name that gets resolved.
+func TestWellKnown_ExchangeRateUsesTheChosenCredential(t *testing.T) {
+	wk, err := findWellKnown("exchange_rate", map[string]string{"$credential": "$MY_CURRENCY_KEY"})
 	if err != nil {
 		t.Fatalf("findWellKnown: %v", err)
 	}
 
-	if wk.Request.Headers["apikey"] != "$CURRENCY_API_KEY" {
-		t.Errorf("apikey header = %q", wk.Request.Headers["apikey"])
-	}
-	if _, isParam := wk.Params["$CURRENCY_API_KEY"]; isParam {
-		t.Error("the key is declared as a param, so creation would require it")
-	}
-
 	refs := secretRefs(wk)
-	if !slices.Contains(refs, "CURRENCY_API_KEY") {
-		t.Errorf("secretRefs = %v, want it to include CURRENCY_API_KEY", refs)
+	if !slices.Contains(refs, "MY_CURRENCY_KEY") {
+		t.Errorf("secretRefs = %v, want the chosen credential", refs)
 	}
-	// The ordinary params must not be mistaken for secrets.
-	for _, unwanted := range []string{"base", "currency"} {
+	for _, unwanted := range []string{"base", "currency", "credential"} {
 		if slices.Contains(refs, unwanted) {
 			t.Errorf("%q was treated as a secret", unwanted)
 		}
@@ -109,11 +134,11 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 		Id:       uuid.New(),
 		Board:    board,
 		Resource: resource,
-		Params:   map[string]string{"$base": "USD", "$currency": "ARS"},
+		Params:   map[string]string{"$base": "USD", "$currency": "ARS", "$credential": "$CURRENCY_API_KEY"},
 		Request: models.Request{
 			Method:  http.MethodGet,
 			Queries: map[string]string{"base_currency": "$base", "currencies": "$currency"},
-			Headers: map[string]string{"apikey": "$CURRENCY_API_KEY"},
+			Headers: map[string]string{"apikey": "$credential"},
 		},
 		Response: "json",
 		Query: map[string]string{
@@ -146,8 +171,11 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 	}
 
 	// The key must not have stuck to the post-it the caller still holds.
-	if postit.Request.Headers["apikey"] != "$CURRENCY_API_KEY" {
+	if postit.Request.Headers["apikey"] != "$credential" {
 		t.Errorf("caller's header became %q", postit.Request.Headers["apikey"])
+	}
+	if postit.Params["$credential"] != "$CURRENCY_API_KEY" {
+		t.Errorf("caller's credential param became %q", postit.Params["$credential"])
 	}
 	if _, leaked := postit.Params["$CURRENCY_API_KEY"]; leaked {
 		t.Error("the decrypted key was written onto the caller's params")
