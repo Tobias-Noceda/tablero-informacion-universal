@@ -1,14 +1,16 @@
 <script lang="ts">
-	import { SvelteFlow, Controls, useSvelteFlow, type Node, type Edge } from '@xyflow/svelte';
+	import { SvelteFlow, Controls, useSvelteFlow, type Node, type Edge, ConnectionMode, type Connection } from '@xyflow/svelte';
 
 	import { useDnD } from './DnDProvider.svelte';
 	import Dock from './Dock.svelte';
 
 	import * as postItsApi from '$services/post-it';
+	import * as edgesApi from '$services/edge';
 	import type { Board } from '$types/api';
 	import Modal from '$components/Modal/Modal.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import { nodesMap, parameters } from '$components/Nodes/node-map';
+	import { edgesMap } from '$components/Edges/edge-map';
 
 	let { nodes, edges, name, boardId }: {
 		nodes: Node[],
@@ -17,7 +19,7 @@
 		boardId: string,
 	} = $props();
 
-	$effect(() => console.log(nodes));
+	// $effect(() => console.log(nodes));
 
 	let selectedNode: Node | null = $state(null);
 
@@ -70,6 +72,13 @@
 		};
 	};
 
+	const onConnect = async (connection: Connection) => {
+		// console.log('onConnect', connection);
+		const newEdge = await edgesApi.connect(boardId, connection.source, connection.target)
+			.then(() => ({ id: crypto.randomUUID(), source: connection.source, target: connection.target })); 
+		edges = [...edges, { id: newEdge.id, source: connection.source, target: connection.target }];
+	};
+
 	const createNode = async () => {
 		if (!creatingNode || missingRequired) return;
 
@@ -94,7 +103,9 @@
 				bind:nodes
 				bind:edges
 				nodeTypes={nodesMap}
+				edgeTypes={edgesMap}
 				fitView
+				connectionMode={ConnectionMode.Loose}
 				ondragover={onDragOver}
 				ondrop={onDrop}
 				onnodeclick={(event) => {
@@ -104,8 +115,16 @@
 						selectedNode = event.node;
 					}
 				}}
+				onnodedragstop={(event) => {
+					const node = event.targetNode;
+					if (!node) return;
+					postItsApi.move(node.id, node.position.x, node.position.y);
+				}}
+				onconnect={onConnect}
 				colorMode="system"
 				class="bg-transparent!"
+				title="Board Flow"
+				attributionPosition={undefined}
 			>
 				<Controls />
 			</SvelteFlow>
@@ -153,5 +172,9 @@
 		display: flex;
 		flex-direction: column;
 		padding: 10px;
+	}
+
+	:global(.svelte-flow__attribution) {
+		display: none;
 	}
 </style>

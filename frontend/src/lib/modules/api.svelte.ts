@@ -2,13 +2,14 @@ import { error } from '@sveltejs/kit';
 import { SvelteURL } from 'svelte/reactivity';
 
 function resolvePath(path: `/${string}`) {
+	const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:31126'; // Default to localhost if API_URL is not set
 	try {
 		// Check if the path is a valid URL
 		return new SvelteURL(path);
 	} catch (e) {
 		if (!(e instanceof TypeError)) throw e;
 		// Assume it's a relative path (/api/...)
-		return new SvelteURL(`http://localhost:31126${path}`);
+		return new SvelteURL(`${apiUrl}${path}`);
 	}
 }
 
