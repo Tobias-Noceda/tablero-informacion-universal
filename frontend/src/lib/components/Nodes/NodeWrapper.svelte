@@ -1,21 +1,24 @@
 <script lang="ts">
+    import './index.css';
     import { Handle, Position, type NodeProps } from '@xyflow/svelte';
     import * as postitAPI from '$services/post-it';
     import type { Snippet } from 'svelte';
 
-    let { id, children }: NodeProps & { children: Snippet<[Record<string, string>]> } = $props();
+    let { id, data, children }: NodeProps & { children: Snippet<[Record<string, string>]> } = $props();
 
     const request = $derived(postitAPI.execute(id));
+
+    const isSelected = $derived.by(() => data?.isSelected ?? false);
 </script>
 
-<div class="bg-main p-4 rounded-lg">
-    <Handle type="source" id={`top-${id}`} position={Position.Top} class="handle" isConnectable />
-    <Handle type="source" id={`right-${id}`} position={Position.Right} class="handle" isConnectable />
+<div
+    class="bg-main hover:bg-main-hover p-4 rounded-lg customNode"
+    style={isSelected ? 'background-color: var(--color-main-hover)' : undefined}
+>
+    <Handle class="customHandle" position={Position.Left} type="source" />
     {#await request then data}
         {@render children(data)}
     {:catch}
         An error has occurred
     {/await}
-    <Handle type="source" id={`bottom-${id}`} position={Position.Bottom} class="handle" isConnectable />
-    <Handle type="source" id={`left-${id}`} position={Position.Left} class="handle" isConnectable />
 </div>

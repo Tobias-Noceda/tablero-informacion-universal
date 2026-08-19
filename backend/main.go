@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/Secreto31126/tesis/common/controllers/boards"
 	"github.com/Secreto31126/tesis/common/controllers/postits"
+	"github.com/Secreto31126/tesis/common/env"
 	"github.com/Secreto31126/tesis/common/middleware"
 	"github.com/Secreto31126/tesis/common/ports/executer"
 	"github.com/Secreto31126/tesis/common/ports/mongo"
@@ -12,8 +13,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const (
-	ADDR = "0.0.0.0:31126"
+var (
+	ADDR = env.Get("ADDRESS", "0.0.0.0:31126")
 )
 
 func main() {

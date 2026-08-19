@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/Secreto31126/tesis/common/env"
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/google/uuid"
@@ -13,9 +14,12 @@ import (
 )
 
 const (
-	MONGO_URL       = "mongodb://user:password@mongo:27017/?authSource=admin"
-	MONGO_DATABASE  = "prod"
 	REQUEST_TIMEOUT = 10 * time.Second
+)
+
+var (
+	MONGO_URL      = env.Get("MONGO_URL", "mongodb://user:password@mongo:27017/?authSource=admin")
+	MONGO_DATABASE = env.Get("MONGO_DATABASE", "prod")
 )
 
 type MongoDB struct {

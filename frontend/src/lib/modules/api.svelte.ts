@@ -76,7 +76,7 @@ export function patch(path: `/${string}`, body: unknown, options?: RequestInit, 
 	});
 };
 
-export function del(path: `/${string}`, options?: RequestInit, fetchFn: typeof fetch = fetch): Promise<Response> {
+export function del(path: `/${string}`, body?: unknown, options?: RequestInit, fetchFn: typeof fetch = fetch): Promise<Response> {
 	const url = resolvePath(path);
 
 	return fetchFn(new SvelteURL(url), {
@@ -84,6 +84,7 @@ export function del(path: `/${string}`, options?: RequestInit, fetchFn: typeof f
 		method: 'DELETE',
 		headers: {
 			...options?.headers,
-		}
+		},
+		body: body ? JSON.stringify(body) : undefined
 	});
 };

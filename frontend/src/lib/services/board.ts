@@ -35,15 +35,6 @@ export async function unshare(id: UUID, cognito_id = "Messi") {
     await api.del(`/v1/boards/${id}/collaborators?${new URLSearchParams({ cognito_id })}`);
 }
 
-export async function connect(id: UUID, source: UUID, target: UUID) {
-	await api.post(`/api/v1/boards/${id}/strands`, { source, target });
-}
-
-// TODO: broken
-export async function disconnect(id: UUID, source: UUID, target: UUID) {
-	await api.del(`/api/v1/boards/${id}/strands`);
-}
-
 export async function rename(id: UUID, name: string) {
     await api.post(`/v1/boards/${id}/name`, { name });
 }

@@ -5,14 +5,18 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/Secreto31126/tesis/common/env"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
 const (
-	REDIS_URL       = "redis://redis:6379/"
 	REQUEST_TIMEOUT = 5 * time.Second
+)
+
+var (
+	REDIS_URL = env.Get("REDIS_URL", "redis://redis:6379/")
 )
 
 type RedisDB struct {

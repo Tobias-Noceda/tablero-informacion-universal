@@ -1,84 +1,61 @@
 import { Position, type InternalNode } from '@xyflow/svelte';
 
-// returns the position (top,right,bottom or right) passed node compared to
-function getParams(nodeA: InternalNode, nodeB: InternalNode): [number, number, Position] {
-  const centerA = getNodeCenter(nodeA);
-  const centerB = getNodeCenter(nodeB);
+// returns the point where an edge leaving `intersectionNode` toward `targetNode`
+// crosses `intersectionNode`'s rectangular border. Pure geometry — works with a
+// single handle per node since it never looks at handle bounds.
+function getNodeIntersection(intersectionNode: InternalNode, targetNode: InternalNode) {
+  const { width: intersectionNodeWidth = 0, height: intersectionNodeHeight = 0 } =
+    intersectionNode.measured;
+  const intersectionNodePosition = intersectionNode.internals.positionAbsolute;
+  const targetPosition = targetNode.internals.positionAbsolute;
 
-  const horizontalDiff = Math.abs(centerA.x - centerB.x);
-  const verticalDiff = Math.abs(centerA.y - centerB.y);
+  const w = intersectionNodeWidth / 2;
+  const h = intersectionNodeHeight / 2;
 
-  let position: Position;
+  const x2 = intersectionNodePosition.x + w;
+  const y2 = intersectionNodePosition.y + h;
+  const x1 = targetPosition.x + (targetNode.measured.width ?? 0) / 2;
+  const y1 = targetPosition.y + (targetNode.measured.height ?? 0) / 2;
 
-  // when the horizontal difference between the nodes is bigger, we use Position.Left or Position.Right for the handle
-  if (horizontalDiff > verticalDiff) {
-    position = centerA.x > centerB.x ? Position.Left : Position.Right;
-  } else {
-    // here the vertical difference between the nodes is bigger, so we use Position.Top or Position.Bottom for the handle
-    position = centerA.y > centerB.y ? Position.Top : Position.Bottom;
-  }
+  const xx1 = (x1 - x2) / (2 * w) - (y1 - y2) / (2 * h);
+  const yy1 = (x1 - x2) / (2 * w) + (y1 - y2) / (2 * h);
+  const a = 1 / (Math.abs(xx1) + Math.abs(yy1));
+  const xx3 = a * xx1;
+  const yy3 = a * yy1;
+  const x = w * (xx3 + yy3) + x2;
+  const y = h * (-xx3 + yy3) + y2;
 
-  const [x, y] = getHandleCoordsByPosition(nodeA, position);
-  return [x, y, position];
+  return { x, y };
 }
 
-function getHandleCoordsByPosition(
-  node: InternalNode,
-  handlePosition: Position,
-): [number, number] {
-  // all handles are from type source, that's why we use handleBounds.source here
-  const handle = node.internals.handleBounds?.source?.find(
-    (h) => h.position === handlePosition,
-  );
+// figures out which side of the node the intersection point falls on, for path curvature
+function getEdgePosition(node: InternalNode, intersectionPoint: { x: number; y: number }) {
+  const nx = Math.round(node.internals.positionAbsolute.x);
+  const ny = Math.round(node.internals.positionAbsolute.y);
+  const px = Math.round(intersectionPoint.x);
+  const py = Math.round(intersectionPoint.y);
 
-  if (!handle?.width || !handle?.height) {
-    return [0, 0];
-  }
+  if (px <= nx + 1) return Position.Left;
+  if (px >= nx + (node.measured.width ?? 0) - 1) return Position.Right;
+  if (py <= ny + 1) return Position.Top;
+  if (py >= ny + (node.measured.height ?? 0) - 1) return Position.Bottom;
 
-  let offsetX = handle.width / 2;
-  let offsetY = handle.height / 2;
-
-  // this is a tiny detail to make the markerEnd of an edge visible.
-  // The handle position that gets calculated has the origin top-left, so depending which side we are using, we add a little offset
-  // when the handlePosition is Position.Right for example, we need to add an offset as big as the handle itself in order to get the correct position
-  switch (handlePosition) {
-    case Position.Left:
-      offsetX = 0;
-      break;
-    case Position.Right:
-      offsetX = handle.width;
-      break;
-    case Position.Top:
-      offsetY = 0;
-      break;
-    case Position.Bottom:
-      offsetY = handle.height;
-      break;
-  }
-
-  const x = node.internals.positionAbsolute.x + handle.x + offsetX;
-  const y = node.internals.positionAbsolute.y + handle.y + offsetY;
-
-  return [x, y];
-}
-
-function getNodeCenter(node: InternalNode) {
-  return {
-    x: node.internals.positionAbsolute.x + (node.measured.width ?? 0) / 2,
-    y: node.internals.positionAbsolute.y + (node.measured.height ?? 0) / 2,
-  };
+  return Position.Top;
 }
 
 // returns the parameters (sx, sy, tx, ty, sourcePos, targetPos) you need to create an edge
 export function getEdgeParams(source: InternalNode, target: InternalNode) {
-  const [sx, sy, sourcePos] = getParams(source, target);
-  const [tx, ty, targetPos] = getParams(target, source);
+  const sourceIntersectionPoint = getNodeIntersection(source, target);
+  const targetIntersectionPoint = getNodeIntersection(target, source);
+
+  const sourcePos = getEdgePosition(source, sourceIntersectionPoint);
+  const targetPos = getEdgePosition(target, targetIntersectionPoint);
 
   return {
-    sx,
-    sy,
-    tx,
-    ty,
+    sx: sourceIntersectionPoint.x,
+    sy: sourceIntersectionPoint.y,
+    tx: targetIntersectionPoint.x,
+    ty: targetIntersectionPoint.y,
     sourcePos,
     targetPos,
   };

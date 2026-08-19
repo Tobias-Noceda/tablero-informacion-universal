@@ -1,32 +1,32 @@
 <script lang="ts">
   import {
-    getBezierPath,
-    type EdgeProps,
-    useInternalNode,
     BaseEdge,
+    getStraightPath,
+    useInternalNode,
+    type EdgeProps,
   } from '@xyflow/svelte';
 
   import { getEdgeParams } from './utils';
 
-  let { source, target, id }: EdgeProps = $props();
+  let { id, source, target, markerEnd, data }: EdgeProps = $props();
+
+  const isSelected = $derived.by(() => data?.isSelected ?? false);
 
   const sourceNode = $derived.by(() => useInternalNode(source));
   const targetNode = $derived.by(() => useInternalNode(target));
 
-  let path: string = $derived.by(() => {
+  let path: string | undefined = $derived.by(() => {
     if (sourceNode.current && targetNode.current) {
       const edgeParams = getEdgeParams(sourceNode.current, targetNode.current);
-      return getBezierPath({
+      return getStraightPath({
         sourceX: edgeParams.sx,
         sourceY: edgeParams.sy,
-        sourcePosition: edgeParams.sourcePos,
-        targetPosition: edgeParams.targetPos,
         targetX: edgeParams.tx,
         targetY: edgeParams.ty,
       })[0];
     }
-    throw new Error('Source or target node not found for edge ' + id);
+    throw new Error('Source or target node not found');
   });
 </script>
 
-<BaseEdge {id} {path} />
+<BaseEdge {id} {path} {markerEnd} style={isSelected ? 'stroke: #727272;' : 'stroke: #3e3e3e;'} />

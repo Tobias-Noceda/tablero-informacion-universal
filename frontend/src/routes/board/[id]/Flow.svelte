@@ -11,6 +11,7 @@
 	import Input from '$components/Input/Input.svelte';
 	import { nodesMap, parameters } from '$components/Nodes/node-map';
 	import { edgesMap } from '$components/Edges/edge-map';
+	import Button from '$components/Button/Button.svelte';
 
 	let { nodes, edges, name, boardId }: {
 		nodes: Node[],
@@ -19,9 +20,8 @@
 		boardId: string,
 	} = $props();
 
-	// $effect(() => console.log(nodes));
-
 	let selectedNode: Node | null = $state(null);
+	let selectedEdge: Edge | null = $state(null);
 
 	let creatingNode = $state<Board['postits'][number] | null>(null);
 	let paramValues = $state<Record<string, string>>({});
@@ -35,6 +35,7 @@
 
 	const type = useDnD();
 
+	// Board handlers
 	const onDragOver = (event: DragEvent) => {
 		event.preventDefault();
 
@@ -72,11 +73,9 @@
 		};
 	};
 
-	const onConnect = async (connection: Connection) => {
-		// console.log('onConnect', connection);
-		const newEdge = await edgesApi.connect(boardId, connection.source, connection.target)
-			.then(() => ({ id: crypto.randomUUID(), source: connection.source, target: connection.target })); 
-		edges = [...edges, { id: newEdge.id, source: connection.source, target: connection.target }];
+	const onBoardClick = () => {
+		selectedNode = null;
+		selectedEdge = null;
 	};
 
 	const createNode = async () => {
@@ -93,6 +92,86 @@
 		creatingNode = null;
 		paramValues = {};
 	};
+
+	// Node handlers
+	const onNodeClick = async (event: { event: MouseEvent | TouchEvent, node: Node }) => {
+		event.event.preventDefault();
+		event.event.stopPropagation();
+		if (selectedNode?.id === event.node.id) {
+			selectedNode = null;
+			nodes = nodes.map((n) => { return { ...n, data: { ...n.data, isSelected: false } } });
+		} else {
+			selectedNode = event.node;
+			nodes = nodes.map((n) => { return { ...n, data: { ...n.data, isSelected: n.id === event.node.id } } });
+		}
+	};
+
+	const onNodeDragStop = async (event: { targetNode: Node | null, nodes: Node[], event: MouseEvent | TouchEvent }) => {
+		const node = event.targetNode;
+		if (!node) return;
+		await postItsApi.move(node.id, node.position.x, node.position.y);
+	};
+
+	// Edge handlers
+	const onEdgeClick = async (event: {event: MouseEvent, edge: Edge}) => {
+		event.event.preventDefault();
+		event.event.stopPropagation();
+		if (selectedEdge?.target === event.edge.target && selectedEdge?.source === event.edge.source) {
+			selectedEdge = null;
+			edges = edges.map((e) => { return { ...e, data: { ...e.data, isSelected: false } } });
+		} else {
+			selectedEdge = event.edge;
+			edges = edges.map((e) => { return { ...e, data: { ...e.data, isSelected: e.id === event.edge.id } } });
+		}
+	};
+
+	const onConnect = async (connection: Connection) => {
+		// console.log('onConnect', connection);
+		const newEdge = await edgesApi.connect(boardId, connection.source, connection.target)
+			.then(() => ({ id: crypto.randomUUID(), source: connection.source, target: connection.target })); 
+		edges = [...edges, { id: newEdge.id, source: connection.source, target: connection.target }];
+	};
+
+	// Keyboard shortcuts
+	const onKeyDown = (event: KeyboardEvent) => {
+		if (event.key === 'Delete' || event.key === 'Backspace') {
+			console.log('Deleting edge', selectedEdge);
+			if (selectedEdge) {
+				edgesApi.disconnect(boardId, selectedEdge.source, selectedEdge.target);
+				edges = edges.filter((e) => e.id !== selectedEdge?.id);
+				selectedEdge = null;
+			} else if (selectedNode) {
+				postItsApi.del(selectedNode.id);
+				nodes = nodes.filter((n) => n.id !== selectedNode?.id);
+				selectedNode = null;
+			}
+		}
+	};
+
+	// Effects
+	$effect(() => {
+		window.addEventListener('keydown', onKeyDown);
+		return () => window.removeEventListener('keydown', onKeyDown);
+	});
+
+	$effect(() => {
+		if (selectedNode) {
+			selectedEdge = null;
+		}
+	});
+
+	$effect(() => {
+		if (selectedEdge) {
+			selectedNode = null;
+		}
+	});
+
+	$effect(() => {
+		if (creatingNode) {
+			selectedNode = null;
+			selectedEdge = null;
+		}
+	});
 </script>
 
 <div class="flex flex-row h-full w-full">
@@ -104,23 +183,16 @@
 				bind:edges
 				nodeTypes={nodesMap}
 				edgeTypes={edgesMap}
+				defaultEdgeOptions={{ type: 'floating' }}
 				fitView
 				connectionMode={ConnectionMode.Loose}
 				ondragover={onDragOver}
 				ondrop={onDrop}
-				onnodeclick={(event) => {
-					if (event.node.id === selectedNode?.id) {
-						selectedNode = null;
-					} else {
-						selectedNode = event.node;
-					}
-				}}
-				onnodedragstop={(event) => {
-					const node = event.targetNode;
-					if (!node) return;
-					postItsApi.move(node.id, node.position.x, node.position.y);
-				}}
+				onnodeclick={onNodeClick}
+				onnodedragstop={onNodeDragStop}
+				onedgeclick={onEdgeClick}
 				onconnect={onConnect}
+				onpaneclick={onBoardClick}
 				colorMode="system"
 				class="bg-transparent!"
 				title="Board Flow"
@@ -133,12 +205,24 @@
 	</main>
 	{#if selectedNode}
 		<div
-			class="flex flex-col gap-2 p-4 bg-tertiary border-l border-tertiary-border rounded-l-2xl w-70 text-tertiary-text"
+			class="flex flex-col p-4 bg-tertiary border-l border-tertiary-border rounded-l-2xl w-70 h-full justify-between text-tertiary-text"
 		>
-			<h2>Selected Node</h2>
-			<p>ID: {selectedNode.id}</p>
-			<p>Type: {selectedNode.type}</p>
-			<p>Position: ({selectedNode.position.x}, {selectedNode.position.y})</p>
+			<div class="flex flex-col gap-2">
+				<h2 class="text-lg font-semibold">Selected Node</h2>
+				<p>ID: {selectedNode.id}</p>
+				<p>Type: {selectedNode.type}</p>
+				<p>Position: ({selectedNode.position.x}, {selectedNode.position.y})</p>
+			</div>
+			<Button
+				variant="destructive"
+				onclick={() => {
+					postItsApi.del(selectedNode!.id);
+					nodes = nodes.filter((n) => n.id !== selectedNode?.id);
+					selectedNode = null;
+				}}
+			>
+				Delete Node
+			</Button>
 		</div>
 	{/if}
 
