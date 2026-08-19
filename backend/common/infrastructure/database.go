@@ -29,7 +29,7 @@ type Database interface {
 	// Removes collaborator from board
 	RemoveCollaboratorFromBoard(boardID uuid.UUID, cognitoID string) error
 	// Disconnects a strand
-	DisconnectPostIts(boardID, source, target uuid.UUID) error
+	DisconnectPostIts(boardID, strandID uuid.UUID) error
 	// Connects a Strand
 	ConnectPostIts(boardID, source, target uuid.UUID) error
 	// Move Post It

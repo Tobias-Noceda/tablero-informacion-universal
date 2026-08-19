@@ -287,18 +287,17 @@ func (db *MongoDB) ConnectPostIts(boardID, source, target uuid.UUID) error {
 			},
 		},
 		bson.M{"$addToSet": bson.M{
-			"strands": models.Strand{Source: source, Target: target},
+			"strands": models.Strand{Id: uuid.New(), Source: source, Target: target},
 		}},
 	)
 }
 
-func (db *MongoDB) DisconnectPostIts(boardID, source, target uuid.UUID) error {
+func (db *MongoDB) DisconnectPostIts(boardID, strandID uuid.UUID) error {
 	return db.updateBoard(
 		bson.M{"_id": boardID},
 		bson.M{"$pull": bson.M{
 			"strands": bson.M{
-				"source": source,
-				"target": target,
+				"id": strandID,
 			},
 		}},
 	)

@@ -32,7 +32,7 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 		boardGroup.DELETE("/:id/collaborators", ctrl.RemoveCollaborator)
 
 		boardGroup.POST("/:id/strands", ctrl.ConnectPostIts)
-		boardGroup.DELETE("/:id/strands", ctrl.DisconnectPostIts)
+		boardGroup.DELETE("/:id/strands/:strand", ctrl.DisconnectPostIts)
 
 		boardGroup.PATCH("/:id/name", ctrl.UpdateBoardName)
 	}
@@ -367,12 +367,13 @@ func (ctrl *Controller) ConnectPostIts(c *gin.Context) {
 // @Description  Removes the strand (connection) between a source and target post-it on a board.
 // @Tags         boards, strands
 // @Accept       json
-// @Param        id       path      string         true  "Board UUID" format(uuid)
+// @Param        id       path      string         true  "Board UUID"  format(uuid)
+// @Param        strand   path      string         true  "Strand UUID" format(uuid)
 // @Param        request  body      StrandRequest  true  "Strand payload"
 // @Success      204      "No Content"
 // @Failure      400      {object}  map[string]string{"error": "string"}
 // @Failure      500      {object}  map[string]string{"error": "string"}
-// @Router       /boards/{id}/strands [delete]
+// @Router       /boards/{id}/strands/{strand} [delete]
 func (ctrl *Controller) DisconnectPostIts(c *gin.Context) {
 	idParam := c.Param("id")
 
@@ -384,16 +385,17 @@ func (ctrl *Controller) DisconnectPostIts(c *gin.Context) {
 		return
 	}
 
-	var req StrandRequest
+	strandIdParam := c.Param("strand")
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	strand, err := uuid.Parse(strandIdParam)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
+			"error": "invalid uuid",
 		})
 		return
 	}
 
-	err = ctrl.service.DisconnectPostIts(id, req.Source, req.Target)
+	err = ctrl.service.DisconnectPostIts(id, strand)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
