@@ -1,6 +1,6 @@
 services:
   backend:
-    build: ./backend
+    build: ./backend/api
     depends_on:
       - mongo
       - redis

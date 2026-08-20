@@ -2,12 +2,12 @@ FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY ../go.mod ../go.sum ./
 RUN go mod download
 
-COPY . .
+COPY ../common ../api ./
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/api ./main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/api ./api/main.go
 
 FROM alpine:3.21
 
