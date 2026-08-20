@@ -314,5 +314,40 @@ func (db *MongoDB) RemoveCollaboratorFromBoard(boardID uuid.UUID, cognitoID stri
 	)
 }
 
+type ChangeEvent struct {
+	FullDocument models.Board `bson:"fullDocument"`
+}
+
+type MongoStream struct {
+	stream *mongo.ChangeStream
+}
+
+func (ms MongoStream) Next(ctx context.Context) bool {
+	return ms.stream.Next(ctx)
+}
+
+func (ms MongoStream) Get() (*models.Board, error) {
+	var event ChangeEvent
+	if err := ms.stream.Decode(&event); err != nil {
+		return nil, err
+	}
+
+	return &event.FullDocument, nil
+}
+
+func (db *MongoDB) WatchBoards(ctx context.Context) (models.Stream[models.Board], error) {
+	opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
+
+	updates := bson.D{{Key: "$match", Value: bson.D{{Key: "operationType", Value: "update"}}}}
+
+	stream, err := db.boards.Watch(ctx, mongo.Pipeline{updates}, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return MongoStream{stream}, nil
+}
+
 var db, _ = New()
 var _ infrastructure.Database = db
+var _ infrastructure.Realtime = db

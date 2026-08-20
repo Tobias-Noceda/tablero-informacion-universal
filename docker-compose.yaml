@@ -11,6 +11,18 @@ services:
       - redis
       - backend
 
+  realtime:
+    build: ./backend/realtime
+    depends_on:
+      - mongo
+      # - redis
+    ports:
+      - "62113:62113"
+    networks:
+      - mongo
+      # - redis
+      - realtime
+
   frontend:
     build:
       context: ./frontend
@@ -57,6 +69,7 @@ networks:
   redis: {}
   frontend: {}
   backend: {}
+  realtime: {}
 
 volumes:
   mongo_data: {}
