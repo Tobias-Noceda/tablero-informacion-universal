@@ -153,34 +153,40 @@ func (db *MongoDB) DeletePostIt(id uuid.UUID) (strands []models.Strand, err erro
 	ctx, cancel := timeout()
 	defer cancel()
 
-	board := &models.Board{}
-	postIt := &models.PostIts{}
-
-	err = db.postit.FindOneAndDelete(ctx, bson.M{"_id": id}).Decode(postIt)
+	sess, err := db.client.StartSession()
 	if err != nil {
 		return nil, err
 	}
+	defer sess.EndSession(ctx)
 
-	opt := options.FindOneAndUpdate().SetReturnDocument(options.Before)
+	board := &models.Board{}
 
-	err = db.boards.FindOneAndUpdate(
-		ctx,
-		bson.M{"_id": postIt.Board},
-		bson.M{
-			"$pull": bson.M{
-				"postits": bson.M{"id": id},
-				"strands": bson.M{
-					"$or": []bson.M{
-						{"source": id},
-						{"target": id},
+	fn := func(ctx context.Context) (any, error) {
+		postIt := &models.PostIts{}
+
+		if err := db.postit.FindOneAndDelete(ctx, bson.M{"_id": id}).Decode(postIt); err != nil {
+			return nil, err
+		}
+
+		return nil, db.boards.FindOneAndUpdate(
+			ctx,
+			bson.M{"_id": postIt.Board},
+			bson.M{
+				"$pull": bson.M{
+					"postits": bson.M{"id": id},
+					"strands": bson.M{
+						"$or": []bson.M{
+							{"source": id},
+							{"target": id},
+						},
 					},
 				},
 			},
-		},
-		opt,
-	).Decode(board)
+			options.FindOneAndUpdate().SetReturnDocument(options.Before),
+		).Decode(board)
+	}
 
-	if err != nil {
+	if _, err := sess.WithTransaction(ctx, fn); err != nil {
 		return nil, err
 	}
 
