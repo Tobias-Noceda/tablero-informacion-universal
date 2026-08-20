@@ -17,7 +17,7 @@ type MockDB struct {
 	FindBoardPostItsFn            func(id uuid.UUID) ([]models.PostIts, error)
 	FindPostItFn                  func(id uuid.UUID) (*models.PostIts, error)
 	FindBoardFn                   func(id uuid.UUID) (*models.Board, error)
-	DeletePostItFn                func(id uuid.UUID) error
+	DeletePostItFn                func(id uuid.UUID) ([]models.Strand, error)
 	DeleteBoardFn                 func(id uuid.UUID) error
 	UpdatePostItFn                func(id uuid.UUID, set map[string]any) error
 	CreatePostItFn                func(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
@@ -60,11 +60,11 @@ func (m *MockDB) FindBoard(id uuid.UUID) (*models.Board, error) {
 	return nil, nil
 }
 
-func (m *MockDB) DeletePostIt(id uuid.UUID) error {
+func (m *MockDB) DeletePostIt(id uuid.UUID) ([]models.Strand, error) {
 	if m.DeletePostItFn != nil {
 		return m.DeletePostItFn(id)
 	}
-	return nil
+	return nil, nil
 }
 
 func (m *MockDB) DeleteBoard(id uuid.UUID) error {

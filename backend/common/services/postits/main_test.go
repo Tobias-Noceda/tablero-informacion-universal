@@ -271,16 +271,16 @@ func TestDeletePostIt_Delegates(t *testing.T) {
 	id := uuid.New()
 	called := false
 	db := &mocks.MockDB{
-		DeletePostItFn: func(p uuid.UUID) error {
+		DeletePostItFn: func(p uuid.UUID) (s []models.Strand, _ error) {
 			if p != id {
 				t.Errorf("id = %v, want %v", p, id)
 			}
 			called = true
-			return nil
+			return s, nil
 		},
 	}
 
-	if err := newService(db, nil, nil).DeletePostIt(id); err != nil {
+	if _, err := newService(db, nil, nil).DeletePostIt(id); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !called {

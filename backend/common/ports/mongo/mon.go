@@ -149,18 +149,21 @@ func (db *MongoDB) FindBoard(id uuid.UUID) (*models.Board, error) {
 	return board, nil
 }
 
-func (db *MongoDB) DeletePostIt(id uuid.UUID) error {
+func (db *MongoDB) DeletePostIt(id uuid.UUID) (strands []models.Strand, err error) {
 	ctx, cancel := timeout()
 	defer cancel()
 
+	board := &models.Board{}
 	postIt := &models.PostIts{}
 
-	err := db.postit.FindOneAndDelete(ctx, bson.M{"_id": id}).Decode(postIt)
+	err = db.postit.FindOneAndDelete(ctx, bson.M{"_id": id}).Decode(postIt)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = db.boards.UpdateOne(
+	opt := options.FindOneAndUpdate().SetReturnDocument(options.Before)
+
+	err = db.boards.FindOneAndUpdate(
 		ctx,
 		bson.M{"_id": postIt.Board},
 		bson.M{
@@ -174,9 +177,20 @@ func (db *MongoDB) DeletePostIt(id uuid.UUID) error {
 				},
 			},
 		},
-	)
+		opt,
+	).Decode(board)
 
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	for _, s := range board.Strands {
+		if s.Source == id || s.Target == id {
+			strands = append(strands, s)
+		}
+	}
+
+	return strands, nil
 }
 
 func (db *MongoDB) DeleteBoard(id uuid.UUID) error {

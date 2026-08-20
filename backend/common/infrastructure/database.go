@@ -15,7 +15,7 @@ type Database interface {
 	// Find a given board
 	FindBoard(id uuid.UUID) (*models.Board, error)
 	// Delete a given PostIt
-	DeletePostIt(id uuid.UUID) error
+	DeletePostIt(id uuid.UUID) ([]models.Strand, error)
 	// Delete a given Board
 	DeleteBoard(id uuid.UUID) error
 	// Updates a given PostIt
