@@ -1,11 +1,11 @@
 import * as api from '$modules/api.svelte';
-import type { UUID } from '$types/api';
+import type { Strand, UUID } from '$types/api';
 
-export async function connect(id: UUID, source: UUID, target: UUID) {
-	await api.post(`/v1/boards/${id}/strands`, { source, target });
+export async function connect(boardId: UUID, source: UUID, target: UUID): Promise<Strand> {
+	const response = await api.post(`/v1/boards/${boardId}/strands`, { source, target });
+	return await response.json() as Strand;
 }
 
-// TODO: broken
-export async function disconnect(id: UUID, source: UUID, target: UUID) {
-	await api.del(`/v1/boards/${id}/strands`, { source, target });
+export async function disconnect(boardId: UUID, id: UUID) {
+	await api.del(`/v1/boards/${boardId}/strands/${id}`);
 }

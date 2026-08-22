@@ -95,17 +95,17 @@ func TestConnectPostIts_OK(t *testing.T) {
 	board, src, tgt := uuid.New(), uuid.New(), uuid.New()
 	var gb, gs, gt uuid.UUID
 	db := &mocks.MockDB{
-		ConnectPostItsFn: func(b, s, t uuid.UUID) error {
+		ConnectPostItsFn: func(b, s, t uuid.UUID) (*models.Strand, error) {
 			gb, gs, gt = b, s, t
-			return nil
+			return &models.Strand{Id: uuid.New(), Source: s, Target: t}, nil
 		},
 	}
 	r := setupRouter(db)
 
 	body := `{"source":"` + src.String() + `","target":"` + tgt.String() + `"}`
 	w := do(r, http.MethodPost, "/boards/"+board.String()+"/strands", body)
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204 (body: %s)", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201 (body: %s)", w.Code, w.Body.String())
 	}
 	if gb != board || gs != src || gt != tgt {
 		t.Errorf("connected (%v,%v,%v), want (%v,%v,%v)", gb, gs, gt, board, src, tgt)
@@ -295,8 +295,8 @@ func TestRemoveCollaborator_MissingField(t *testing.T) {
 
 func TestConnectPostIts_ServiceError(t *testing.T) {
 	db := &mocks.MockDB{
-		ConnectPostItsFn: func(_, _, _ uuid.UUID) error {
-			return errors.New("mongo: no documents in result")
+		ConnectPostItsFn: func(_, _, _ uuid.UUID) (*models.Strand, error) {
+			return nil, errors.New("mongo: no documents in result")
 		},
 	}
 	r := setupRouter(db)

@@ -327,7 +327,7 @@ func (ctrl *Controller) UpdateBoardName(c *gin.Context) {
 // @Accept       json
 // @Param        id       path      string         true  "Board UUID" format(uuid)
 // @Param        request  body      StrandRequest  true  "Strand payload"
-// @Success      204      "No Content"
+// @Success      201      {object}  models.Strand
 // @Failure      400      {object}  map[string]string{"error": "string"}
 // @Failure      500      {object}  map[string]string{"error": "string"}
 // @Router       /boards/{id}/strands [post]
@@ -351,7 +351,7 @@ func (ctrl *Controller) ConnectPostIts(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.service.ConnectPostIts(id, req.Source, req.Target)
+	strand, err := ctrl.service.ConnectPostIts(id, req.Source, req.Target)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -359,7 +359,7 @@ func (ctrl *Controller) ConnectPostIts(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusCreated, strand)
 }
 
 // DisconnectPostIts godoc

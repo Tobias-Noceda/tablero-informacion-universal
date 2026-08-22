@@ -34,14 +34,14 @@ func TestConnectPostIts_Delegates(t *testing.T) {
 	board, src, tgt := uuid.New(), uuid.New(), uuid.New()
 	var gb, gs, gt uuid.UUID
 	db := &mocks.MockDB{
-		ConnectPostItsFn: func(b, s, t uuid.UUID) error {
+		ConnectPostItsFn: func(b, s, t uuid.UUID) (*models.Strand, error) {
 			gb, gs, gt = b, s, t
-			return nil
+			return &models.Strand{Id: uuid.New(), Source: s, Target: t}, nil
 		},
 	}
 
 	svc := New(db)
-	if err := svc.ConnectPostIts(board, src, tgt); err != nil {
+	if _, err := svc.ConnectPostIts(board, src, tgt); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gb != board || gs != src || gt != tgt {

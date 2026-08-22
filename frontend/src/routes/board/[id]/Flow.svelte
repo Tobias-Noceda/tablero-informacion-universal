@@ -35,6 +35,8 @@
 
 	const type = useDnD();
 
+	const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 	// Board handlers
 	const onDragOver = (event: DragEvent) => {
 		event.preventDefault();
@@ -93,6 +95,17 @@
 		paramValues = {};
 	};
 
+	const deleteNode = async (node: Node) => {
+		await postItsApi.del(node.id)
+			.then((deletedEdges) => {
+				edges = edges.filter((e) => !deletedEdges.map((edge) => edge.id).includes(e.id));
+			});
+		nodes = nodes.filter((n) => n.id !== node.id);
+		if (selectedNode?.id === node.id) {
+			selectedNode = null;
+		}
+	};
+
 	// Node handlers
 	const onNodeClick = async (event: { event: MouseEvent | TouchEvent, node: Node }) => {
 		event.event.preventDefault();
@@ -126,23 +139,32 @@
 	};
 
 	const onConnect = async (connection: Connection) => {
-		// console.log('onConnect', connection);
-		const newEdge = await edgesApi.connect(boardId, connection.source, connection.target)
-			.then(() => ({ id: crypto.randomUUID(), source: connection.source, target: connection.target })); 
+		const exists = edges.find(
+			(e) => e.source === connection.source && e.target === connection.target
+		);
+		if (exists) {
+			// assert if it is a uuid
+			if (exists.id.match(uuidRegex)) {
+				console.log('Edge already exists:', exists);
+				return;
+			} else {
+				edges = edges.filter((e) => e.id !== exists.id);
+			}
+		}
+
+		const newEdge = await edgesApi.connect(boardId, connection.source, connection.target);
 		edges = [...edges, { id: newEdge.id, source: connection.source, target: connection.target }];
-	};
+}	;
 
 	// Keyboard shortcuts
 	const onKeyDown = (event: KeyboardEvent) => {
 		if (event.key === 'Delete' || event.key === 'Backspace') {
-			console.log('Deleting edge', selectedEdge);
 			if (selectedEdge) {
-				edgesApi.disconnect(boardId, selectedEdge.source, selectedEdge.target);
+				edgesApi.disconnect(boardId, selectedEdge.id);
 				edges = edges.filter((e) => e.id !== selectedEdge?.id);
 				selectedEdge = null;
 			} else if (selectedNode) {
-				postItsApi.del(selectedNode.id);
-				nodes = nodes.filter((n) => n.id !== selectedNode?.id);
+				deleteNode(selectedNode);
 				selectedNode = null;
 			}
 		}
@@ -216,9 +238,9 @@
 			<Button
 				variant="destructive"
 				onclick={() => {
-					postItsApi.del(selectedNode!.id);
-					nodes = nodes.filter((n) => n.id !== selectedNode?.id);
-					selectedNode = null;
+					if (selectedNode) {
+						deleteNode(selectedNode);
+					}
 				}}
 			>
 				Delete Node

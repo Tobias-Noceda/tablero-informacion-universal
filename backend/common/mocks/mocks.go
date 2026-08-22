@@ -25,7 +25,7 @@ type MockDB struct {
 	AddCollaboratorToBoardFn      func(boardID uuid.UUID, cognitoID string) error
 	RemoveCollaboratorFromBoardFn func(boardID uuid.UUID, cognitoID string) error
 	DisconnectPostItsFn           func(boardID, strandID uuid.UUID) error
-	ConnectPostItsFn              func(boardID, source, target uuid.UUID) error
+	ConnectPostItsFn              func(boardID, source, target uuid.UUID) (*models.Strand, error)
 	MovePostItFn                  func(boardID, postItID uuid.UUID, pos models.Position) error
 	UpdateBoardNameFn             func(id uuid.UUID, name string) error
 }
@@ -116,11 +116,11 @@ func (m *MockDB) DisconnectPostIts(boardID, strandID uuid.UUID) error {
 	return nil
 }
 
-func (m *MockDB) ConnectPostIts(boardID, source, target uuid.UUID) error {
+func (m *MockDB) ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error) {
 	if m.ConnectPostItsFn != nil {
 		return m.ConnectPostItsFn(boardID, source, target)
 	}
-	return nil
+	return nil, nil
 }
 
 func (m *MockDB) MovePostIt(boardID, postItID uuid.UUID, pos models.Position) error {

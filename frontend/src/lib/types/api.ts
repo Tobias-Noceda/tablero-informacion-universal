@@ -55,3 +55,9 @@ export type PostIt = {
     // Board + Post-it defined env variables
     envs: Envs[];
 }
+
+export type Strand = {
+    id: UUID;
+    source: UUID;
+    target: UUID;
+}

@@ -31,7 +31,7 @@ type Database interface {
 	// Disconnects a strand
 	DisconnectPostIts(boardID, strandID uuid.UUID) error
 	// Connects a Strand
-	ConnectPostIts(boardID, source, target uuid.UUID) error
+	ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error)
 	// Move Post It
 	MovePostIt(boardID, postItID uuid.UUID, pos models.Position) error
 	// Update board's name

@@ -46,7 +46,7 @@ func (srv *BoardService) UpdateBoardName(id uuid.UUID, name string) error {
 	return srv.db.UpdateBoardName(id, name)
 }
 
-func (srv *BoardService) ConnectPostIts(boardID, source, target uuid.UUID) error {
+func (srv *BoardService) ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error) {
 	return srv.db.ConnectPostIts(boardID, source, target)
 }
 

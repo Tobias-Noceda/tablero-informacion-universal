@@ -153,40 +153,28 @@ func (db *MongoDB) DeletePostIt(id uuid.UUID) (strands []models.Strand, err erro
 	ctx, cancel := timeout()
 	defer cancel()
 
-	sess, err := db.client.StartSession()
-	if err != nil {
+	postIt := &models.PostIts{}
+	if err := db.postit.FindOneAndDelete(ctx, bson.M{"_id": id}).Decode(postIt); err != nil {
 		return nil, err
 	}
-	defer sess.EndSession(ctx)
 
 	board := &models.Board{}
-
-	fn := func(ctx context.Context) (any, error) {
-		postIt := &models.PostIts{}
-
-		if err := db.postit.FindOneAndDelete(ctx, bson.M{"_id": id}).Decode(postIt); err != nil {
-			return nil, err
-		}
-
-		return nil, db.boards.FindOneAndUpdate(
-			ctx,
-			bson.M{"_id": postIt.Board},
-			bson.M{
-				"$pull": bson.M{
-					"postits": bson.M{"id": id},
-					"strands": bson.M{
-						"$or": []bson.M{
-							{"source": id},
-							{"target": id},
-						},
+	if err := db.boards.FindOneAndUpdate(
+		ctx,
+		bson.M{"_id": postIt.Board},
+		bson.M{
+			"$pull": bson.M{
+				"postits": bson.M{"id": id},
+				"strands": bson.M{
+					"$or": []bson.M{
+						{"source": id},
+						{"target": id},
 					},
 				},
 			},
-			options.FindOneAndUpdate().SetReturnDocument(options.Before),
-		).Decode(board)
-	}
-
-	if _, err := sess.WithTransaction(ctx, fn); err != nil {
+		},
+		options.FindOneAndUpdate().SetReturnDocument(options.Before),
+	).Decode(board); err != nil {
 		return nil, err
 	}
 
@@ -298,18 +286,23 @@ func (db *MongoDB) MovePostIt(boardID, postItID uuid.UUID, pos models.Position) 
 	)
 }
 
-func (db *MongoDB) ConnectPostIts(boardID, source, target uuid.UUID) error {
-	return db.updateBoard(
+func (db *MongoDB) ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error) {
+	strand := models.Strand{Id: uuid.New(), Source: source, Target: target}
+
+	err := db.updateBoard(
 		bson.M{
 			"_id": boardID,
 			"postits.id": bson.M{
 				"$all": []uuid.UUID{source, target},
 			},
 		},
-		bson.M{"$addToSet": bson.M{
-			"strands": models.Strand{Id: uuid.New(), Source: source, Target: target},
-		}},
+		bson.M{"$addToSet": bson.M{"strands": strand}},
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &strand, nil
 }
 
 func (db *MongoDB) DisconnectPostIts(boardID, strandID uuid.UUID) error {
