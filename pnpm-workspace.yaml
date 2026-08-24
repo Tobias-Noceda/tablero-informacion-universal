@@ -1,0 +1,6 @@
+packages:
+  - "frontend"
+  - "backend/api"
+  - "backend/realtime"
+allowBuilds:
+  esbuild: true

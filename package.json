@@ -1,0 +1,17 @@
+{
+  "name": "tablero-informacion-universal",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {},
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.3.0",
+      "onFail": "warn"
+    }
+  },
+  "type": "module"
+}

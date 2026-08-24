@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/Secreto31126/tesis/common/controllers/boards"
 	"github.com/Secreto31126/tesis/common/controllers/postits"
 	"github.com/Secreto31126/tesis/common/middleware"
@@ -13,7 +15,8 @@ import (
 )
 
 const (
-	ADDR = "0.0.0.0:31126"
+	IP   = "0.0.0.0"
+	PORT = "31126"
 )
 
 func main() {
@@ -42,5 +45,10 @@ func main() {
 	boardController.RegisterRoutes(api)
 	postitController.RegisterRoutes(api)
 
-	router.Run(ADDR)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = PORT
+	}
+
+	router.Run(IP + ":" + port)
 }

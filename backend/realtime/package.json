@@ -1,0 +1,23 @@
+{
+  "name": "realtime",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "build": "go build",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "^11.3.0",
+      "onFail": "warn"
+    }
+  },
+  "type": "module",
+  "devDependencies": {
+    "vercel": "^59.5.0"
+  }
+}

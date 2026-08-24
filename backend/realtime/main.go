@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"os"
 
 	"github.com/Secreto31126/tesis/common/controllers/realtime"
 	"github.com/Secreto31126/tesis/common/middleware"
@@ -12,7 +13,8 @@ import (
 )
 
 const (
-	ADDR = "0.0.0.0:62113"
+	IP   = "0.0.0.0"
+	PORT = "62113"
 )
 
 func main() {
@@ -35,5 +37,10 @@ func main() {
 	api := router.Group("/v1")
 	controller.RegisterRoutes(api)
 
-	router.Run(ADDR)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = PORT
+	}
+
+	router.Run(IP + ":" + port)
 }
