@@ -102,7 +102,8 @@ var configuredPostIts = map[string]models.PostIts{
 	"events_search": {
 		WellKnown: "events_search",
 		Params: map[string]string{
-			"$keyword": "",
+			"$keyword":    "",
+			"$credential": "",
 		},
 		Resource: getURL("https://app.ticketmaster.com/discovery/v2/events.json"),
 		Request: models.Request{
@@ -110,7 +111,7 @@ var configuredPostIts = map[string]models.PostIts{
 			Queries: map[string]string{
 				"keyword": "$keyword",
 				"size":    "1",
-				"apikey":  "kpGJZiOXIoaBznO4tDvAxXgZN4DGpehP", // TODO: secrets manager
+				"apikey":  "$credential",
 			},
 			Headers: map[string]string{
 				"Accept": "application/json",
@@ -148,6 +149,33 @@ var configuredPostIts = map[string]models.PostIts{
 			"venta":  ".venta",
 		},
 		Rate: 120,
+	},
+	"exchange_rate": {
+		WellKnown: "exchange_rate",
+		Params: map[string]string{
+			"$base":       "USD",
+			"$currency":   "ARS",
+			"$credential": "",
+		},
+		Resource: getURL("https://api.currencyapi.com/v3/latest"),
+		Request: models.Request{
+			Method: "GET",
+			Queries: map[string]string{
+				"base_currency": "$base",
+				"currencies":    "$currency",
+			},
+			Headers: map[string]string{
+				"Accept": "application/json",
+				"apikey": "$credential",
+			},
+		},
+		Response: "json",
+		Query: map[string]string{
+			"code":    ".data[].code",
+			"value":   ".data[].value",
+			"updated": ".meta.last_updated_at",
+		},
+		Rate: 3600,
 	},
 	"riesgo_pais": {
 		WellKnown: "riesgo_pais",
