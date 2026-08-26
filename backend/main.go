@@ -8,6 +8,7 @@ import (
 	"github.com/Secreto31126/tesis/common/ports/redis"
 	b_srv "github.com/Secreto31126/tesis/common/services/boards"
 	p_srv "github.com/Secreto31126/tesis/common/services/postits"
+	r_srv "github.com/Secreto31126/tesis/common/services/realtime"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -31,12 +32,16 @@ func main() {
 
 	executer := executer.New()
 
+	boardService := b_srv.New(db)
+	postitService := p_srv.New(db, cache, executer)
+	realtimeService := r_srv.New(*boardService, cache)
+
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
 	router.Use(cors.Default())
 
-	boardController := boards.NewController(b_srv.New(db))
-	postitController := postits.NewController(p_srv.New(db, cache, executer))
+	boardController := boards.NewController(boardService, realtimeService)
+	postitController := postits.NewController(postitService)
 
 	api := router.Group("/v1")
 	boardController.RegisterRoutes(api)
