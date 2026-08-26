@@ -4,7 +4,6 @@ import (
 	"github.com/Secreto31126/tesis/common/controllers/boards"
 	"github.com/Secreto31126/tesis/common/controllers/postits"
 	s_ctrl "github.com/Secreto31126/tesis/common/controllers/secrets"
-	"github.com/Secreto31126/tesis/common/middleware"
 	"github.com/Secreto31126/tesis/common/ports/crypto"
 	"github.com/Secreto31126/tesis/common/ports/executer"
 	"github.com/Secreto31126/tesis/common/ports/mongo"
@@ -13,6 +12,7 @@ import (
 	b_srv "github.com/Secreto31126/tesis/common/services/boards"
 	p_srv "github.com/Secreto31126/tesis/common/services/postits"
 	s_srv "github.com/Secreto31126/tesis/common/services/secrets"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -43,7 +43,7 @@ func main() {
 
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
-	router.Use(middleware.CORSMiddleware())
+	router.Use(cors.Default())
 
 	boardController := boards.NewController(b_srv.New(db))
 	postitController := postits.NewController(p_srv.New(db, cache, executer, secrets))
