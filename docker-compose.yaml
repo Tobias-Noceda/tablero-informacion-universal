@@ -4,8 +4,6 @@ services:
     depends_on:
       - mongo
       - redis
-    environment:
-      SECRETS_MASTER_KEYS: ${SECRETS_MASTER_KEYS}
     ports:
       - "31126:31126"
     networks:

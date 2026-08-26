@@ -55,28 +55,3 @@ export type PostIt = {
     // Board + Post-it defined env variables
     envs: Envs[];
 }
-
-export type SecretKind = 'api_key' | 'bearer' | 'basic' | 'oauth2';
-
-export type OAuth2Flow = 'client_credentials' | 'authorization_code';
-
-// What listing a board's secrets returns. The value is never part of it.
-export type SecretMeta = {
-    name: string;
-    kind: SecretKind;
-    // Only present for OAuth2 credentials.
-    flow?: OAuth2Flow;
-    authorized: boolean;
-    created_at: string;
-    updated_at: string;
-}
-
-export type OAuth2Config = {
-    name: string;
-    flow: OAuth2Flow;
-    client_id: string;
-    client_secret: string;
-    token_url: string;
-    auth_url?: string;
-    scopes?: string;
-}

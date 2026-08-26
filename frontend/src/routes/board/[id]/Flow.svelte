@@ -8,11 +8,6 @@
 	import type { Board } from '$types/api';
 	import Modal from '$components/Modal/Modal.svelte';
 	import Input from '$components/Input/Input.svelte';
-	import Button from '$components/Button/Button.svelte';
-	import SecretsPanel from '$components/Secrets/SecretsPanel.svelte';
-	import * as secretsApi from '$services/secrets';
-	import type { SecretMeta } from '$types/api';
-	import { m } from '$lib/paraglide/messages';
 	import { nodesMap, parameters } from '$components/Nodes/node-map';
 
 	let { nodes, edges, name, boardId }: {
@@ -26,15 +21,6 @@
 
 	let selectedNode: Node | null = $state(null);
 
-	let managingSecrets = $state(false);
-	let boardSecrets = $state<SecretMeta[]>([]);
-
-	// Refreshed whenever the panel closes, so a credential added there is
-	// immediately pickable when creating a node.
-	$effect(() => {
-		if (managingSecrets) return;
-		secretsApi.list(boardId).then((s) => (boardSecrets = s)).catch(() => (boardSecrets = []));
-	});
 	let creatingNode = $state<Board['postits'][number] | null>(null);
 	let paramValues = $state<Record<string, string>>({});
 
@@ -102,12 +88,7 @@
 
 <div class="flex flex-row h-full w-full">
 	<main class="dndflow">
-		<div class="flex flex-row items-center justify-between mb-4 ml-3 mr-3">
-			<h1 class="text-2xl font-bold">{name}</h1>
-			<Button variant="secondary" onclick={() => (managingSecrets = true)}>
-				{m['secrets.title']()}
-			</Button>
-		</div>
+		<h1 class="text-2xl font-bold mb-4 ml-3">{name}</h1>
 		<div class="reactflow-wrapper">
 			<SvelteFlow
 				bind:nodes
@@ -142,10 +123,6 @@
 		</div>
 	{/if}
 
-	{#if managingSecrets}
-		<SecretsPanel board={boardId} onclose={() => (managingSecrets = false)} />
-	{/if}
-
 	{#if creatingNode}
 		<Modal
 			onclose={() => (creatingNode = null)}
@@ -159,34 +136,13 @@
 		>
 			<h2 class="text-lg font-semibold">Create Node</h2>
 			{#each creatingParams as param (param.key)}
-				{#if param.type === 'secret'}
-					<!-- The value stored is the secret's name, prefixed, so the
-					     backend resolves it against this board at run time. -->
-					<label class="flex flex-col gap-1 text-sm">
-						{param.label}
-						{#if boardSecrets.length === 0}
-							<span class="text-xs text-destructive">{m['secrets.no_credentials']()}</span>
-						{:else}
-							<select
-								class="bg-background border border-main-border rounded-md px-2 py-1"
-								bind:value={paramValues[param.key]}
-							>
-								<option value="">{m['secrets.pick_credential']()}</option>
-								{#each boardSecrets as secret (secret.name)}
-									<option value={`$${secret.name}`}>{secret.name} ({secret.kind})</option>
-								{/each}
-							</select>
-						{/if}
-					</label>
-				{:else}
-					<Input
-						label={param.label}
-						placeholder={param.placeholder}
-						type={param.type === 'number' ? 'number' : 'text'}
-						required={param.default === undefined}
-						bind:value={paramValues[param.key]}
-					/>
-				{/if}
+				<Input
+					label={param.label}
+					placeholder={param.placeholder}
+					type={param.type === 'number' ? 'number' : 'text'}
+					required={param.default === undefined}
+					bind:value={paramValues[param.key]}
+				/>
 			{/each}
 		</Modal>
 	{/if}

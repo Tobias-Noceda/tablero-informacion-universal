@@ -1,20 +1,13 @@
-package safehttp
+package executer
 
 import (
 	"context"
 	"fmt"
 	"net"
 	"net/http"
-	"time"
 )
 
-const (
-	REQUEST_TIMEOUT  = 10 * time.Second
-	MAX_PAYLOAD_SIZE = 2 << 20 // 2mb
-	MAX_REDIRECTS    = 3
-)
-
-var IsSafeIP = func(ip net.IP) bool {
+var isSafeIP = func(ip net.IP) bool {
 	return !(ip.IsLoopback() ||
 		ip.IsPrivate() ||
 		ip.IsLinkLocalUnicast() ||
@@ -23,7 +16,7 @@ var IsSafeIP = func(ip net.IP) bool {
 		ip.IsUnspecified())
 }
 
-func Client() *http.Client {
+func httpClient() *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -42,7 +35,7 @@ func Client() *http.Client {
 				}
 
 				for _, ip := range ips {
-					if !IsSafeIP(ip) {
+					if !isSafeIP(ip) {
 						continue
 					}
 
@@ -56,7 +49,7 @@ func Client() *http.Client {
 			},
 		},
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= MAX_REDIRECTS {
+			if len(via) >= 3 {
 				return fmt.Errorf("Too many redirects")
 			}
 

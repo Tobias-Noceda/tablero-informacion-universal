@@ -19,11 +19,10 @@ const (
 )
 
 type MongoDB struct {
-	client  *mongo.Client
-	users   *mongo.Collection
-	boards  *mongo.Collection
-	postit  *mongo.Collection
-	secrets *mongo.Collection
+	client *mongo.Client
+	users  *mongo.Collection
+	boards *mongo.Collection
+	postit *mongo.Collection
 }
 
 func New() (*MongoDB, error) {
@@ -44,7 +43,6 @@ func New() (*MongoDB, error) {
 	db.users = db.client.Database(MONGO_DATABASE).Collection("users")
 	db.boards = db.client.Database(MONGO_DATABASE).Collection("boards")
 	db.postit = db.client.Database(MONGO_DATABASE).Collection("postit")
-	db.secrets = db.client.Database(MONGO_DATABASE).Collection("secrets")
 
 	return db, nil
 }

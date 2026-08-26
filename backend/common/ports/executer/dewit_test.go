@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/Secreto31126/tesis/common/models"
-	"github.com/Secreto31126/tesis/common/ports/safehttp"
 )
 
 func nopCloser(s string) io.ReadCloser {
@@ -20,9 +19,9 @@ func nopCloser(s string) io.ReadCloser {
 
 func allowLoopback(t *testing.T) {
 	t.Helper()
-	original := safehttp.IsSafeIP
-	safehttp.IsSafeIP = func(net.IP) bool { return true }
-	t.Cleanup(func() { safehttp.IsSafeIP = original })
+	original := isSafeIP
+	isSafeIP = func(net.IP) bool { return true }
+	t.Cleanup(func() { isSafeIP = original })
 }
 
 func TestParse_DetectsTypes(t *testing.T) {

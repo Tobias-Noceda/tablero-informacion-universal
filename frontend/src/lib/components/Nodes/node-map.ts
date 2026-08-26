@@ -1,6 +1,5 @@
 import AirQualityNode from "./AirQuality/AirQuality.svelte";
 import CryptoPriceNode from "./CryptoPrice/CryptoPrice.svelte";
-import ExchangeRateNode from "./ExchangeRate/ExchangeRate.svelte";
 import DogFactsNode from "./DogFacts/DogFacts.svelte";
 import DolarOficialNode from "./DolarOficial/DolarOficial.svelte";
 import EventsSearchNode from "./EventsSearch/EventsSearch.svelte";
@@ -18,16 +17,14 @@ export const nodesMap = {
     "riesgo_pais": RiesgoPaisNode,
     "crypto_price": CryptoPriceNode,
     "air_quality": AirQualityNode,
-    "github_repo": GithubRepoNode,
-    "exchange_rate": ExchangeRateNode
+    "github_repo": GithubRepoNode
 };
 
 export type NodeParameter = {
     /** Exact key the backend expects in the well-known's Params map. */
     key: string;
     label: string;
-    /** "secret" renders a picker over the board's stored credentials. */
-    type: "string" | "number" | "secret";
+    type: "string" | "number";
     placeholder?: string;
     /** Prefilled value. A parameter without one must be supplied by the user. */
     default?: string;
@@ -44,8 +41,7 @@ export const parameters: Record<string, NodeParameter[]> = {
         { key: "$end_date", label: "End date", type: "string", placeholder: "YYYY-MM-DD" }
     ],
     "events_search": [
-        { key: "$keyword", label: "Keyword", type: "string", placeholder: "Enter keyword" },
-        { key: "$credential", label: "Credential", type: "secret" }
+        { key: "$keyword", label: "Keyword", type: "string", placeholder: "Enter keyword" }
     ],
     "dog_facts": [],
     "dolar_oficial": [],
@@ -60,10 +56,5 @@ export const parameters: Record<string, NodeParameter[]> = {
     ],
     "github_repo": [
         { key: "$query", label: "Repository", type: "string", placeholder: "itchyny/gojq" }
-    ],
-    "exchange_rate": [
-        { key: "$base", label: "Base currency", type: "string", placeholder: "USD", default: "USD" },
-        { key: "$currency", label: "Quote currency", type: "string", placeholder: "ARS", default: "ARS" },
-        { key: "$credential", label: "Credential", type: "secret" }
     ]
 };
