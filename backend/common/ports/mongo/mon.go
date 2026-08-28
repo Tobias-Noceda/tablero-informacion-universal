@@ -33,7 +33,7 @@ func New() (*MongoDB, error) {
 	reg.RegisterTypeEncoder(uuidType, bson.ValueEncoderFunc(uuidEncodeValue))
 	reg.RegisterTypeDecoder(uuidType, bson.ValueDecoderFunc(uuidDecodeValue))
 
-	url := os.Getenv("MONGO_URI")
+	url := os.Getenv("MONGODB_URI")
 	if url == "" {
 		url = MONGO_URL
 	}
