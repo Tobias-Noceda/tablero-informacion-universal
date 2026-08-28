@@ -1,7 +1,9 @@
 package boards
 
 import (
+	"log/slog"
 	"net/http"
+	"os"
 
 	p_srv "github.com/Secreto31126/tesis/common/services/boards"
 	r_srv "github.com/Secreto31126/tesis/common/services/realtime"
@@ -12,10 +14,12 @@ import (
 type Controller struct {
 	service  *p_srv.BoardService
 	realtime *r_srv.RealTimeService
+	logger   *slog.Logger
 }
 
 func NewController(boards *p_srv.BoardService, realtime *r_srv.RealTimeService) *Controller {
-	return &Controller{boards, realtime}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	return &Controller{boards, realtime, logger}
 }
 
 func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
@@ -62,6 +66,7 @@ func (ctrl *Controller) GetUserBoards(c *gin.Context) {
 
 	boards, err := ctrl.service.GetUserBoards(cognitoID)
 	if err != nil {
+		ctrl.logger.Error("Failed to find boards", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
