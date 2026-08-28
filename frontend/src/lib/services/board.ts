@@ -38,3 +38,12 @@ export async function unshare(id: UUID, cognito_id = "Messi") {
 export async function rename(id: UUID, name: string) {
     await api.post(`/v1/boards/${id}/name`, { name });
 }
+
+export async function online(id: UUID, peer: UUID) {
+	const res = await api.put(`/v1/boards/${id}/online?${new URLSearchParams({ peer })}`);
+    return await res.json() as string[];
+}
+
+export async function offline(id: UUID, peer: UUID) {
+	return api.del(`/v1/boards/${id}/online?${new URLSearchParams({ peer })}`, { keepalive: true });
+}

@@ -48,7 +48,7 @@ export function post(path: `/${string}`, body: unknown, options?: RequestInit, f
 	});
 };
 
-export function put(path: `/${string}`, body: unknown, options?: RequestInit, fetchFn: typeof fetch = fetch): Promise<Response> {
+export function put(path: `/${string}`, body?: unknown, options?: RequestInit, fetchFn: typeof fetch = fetch): Promise<Response> {
 	const url = resolvePath(path);
 
 	return fetchFn(new SvelteURL(url), {

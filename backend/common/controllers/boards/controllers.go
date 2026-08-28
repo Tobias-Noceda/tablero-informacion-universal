@@ -3,19 +3,19 @@ package boards
 import (
 	"net/http"
 
-	srv "github.com/Secreto31126/tesis/common/services/boards"
+	p_srv "github.com/Secreto31126/tesis/common/services/boards"
+	r_srv "github.com/Secreto31126/tesis/common/services/realtime"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type Controller struct {
-	service *srv.BoardService
+	service  *p_srv.BoardService
+	realtime *r_srv.RealTimeService
 }
 
-func NewController(service *srv.BoardService) *Controller {
-	return &Controller{
-		service: service,
-	}
+func NewController(boards *p_srv.BoardService, realtime *r_srv.RealTimeService) *Controller {
+	return &Controller{boards, realtime}
 }
 
 func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
@@ -35,6 +35,9 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 		boardGroup.DELETE("/:id/strands/:strand", ctrl.DisconnectPostIts)
 
 		boardGroup.PATCH("/:id/name", ctrl.UpdateBoardName)
+
+		boardGroup.PUT("/:id/online", ctrl.ConnectClient)
+		boardGroup.DELETE("/:id/online", ctrl.DisconnectClient)
 	}
 }
 
@@ -396,6 +399,68 @@ func (ctrl *Controller) DisconnectPostIts(c *gin.Context) {
 	}
 
 	err = ctrl.service.DisconnectPostIts(id, strand)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+func (ctrl *Controller) ConnectClient(c *gin.Context) {
+	idParam := c.Param("id")
+	clientParam := c.Query("peer")
+
+	id, err := uuid.Parse(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid uuid",
+		})
+		return
+	}
+
+	client, err := uuid.Parse(clientParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid uuid",
+		})
+		return
+	}
+
+	list, err := ctrl.realtime.AddClientOnline(id, client)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, list)
+}
+
+func (ctrl *Controller) DisconnectClient(c *gin.Context) {
+	idParam := c.Param("id")
+	clientParam := c.Query("peer")
+
+	id, err := uuid.Parse(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid uuid",
+		})
+		return
+	}
+
+	client, err := uuid.Parse(clientParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid uuid",
+		})
+		return
+	}
+
+	err = ctrl.realtime.RemoveClientOnline(id, client)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
