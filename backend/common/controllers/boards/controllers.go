@@ -48,12 +48,13 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 // @Produce      json
 // @Param        cognito_id  path      string  true  "AWS Cognito User ID"
 // @Success      200         {array}   models.Board
+// @Failure      400         {object}  map[string]string{"error": "string"}
 // @Failure      500         {object}  map[string]string{"error": "string"}
 // @Router       /boards/user/{cognito_id} [get]
 func (ctrl *Controller) GetUserBoards(c *gin.Context) {
 	cognitoID, exists := c.GetQuery("cognito_id")
 	if !exists {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Missing cognito_id",
 		})
 		return
