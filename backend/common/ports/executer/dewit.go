@@ -8,6 +8,7 @@ import (
 	"net/url"
 
 	"github.com/Secreto31126/tesis/common/models"
+	"github.com/Secreto31126/tesis/common/ports/safehttp"
 )
 
 type DewIt struct{}
@@ -50,7 +51,7 @@ func (e *DewIt) Execute(postit *models.PostIts) (any, error) {
 	}
 
 	defer res.Body.Close()
-	body := io.LimitReader(res.Body, MAX_PAYLOAD_SIZE)
+	body := io.LimitReader(res.Body, safehttp.MAX_PAYLOAD_SIZE)
 
 	return parser.parse(postit, body)
 }
@@ -77,7 +78,7 @@ func (*DewIt) populate(input, out map[string]string) error {
 }
 
 func (*DewIt) request(resource *url.URL, method string, queries, headers map[string]string) (*http.Response, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), REQUEST_TIMEOUT)
+	ctx, cancel := context.WithTimeout(context.Background(), safehttp.REQUEST_TIMEOUT)
 	defer cancel()
 
 	target := *resource
@@ -97,12 +98,13 @@ func (*DewIt) request(resource *url.URL, method string, queries, headers map[str
 		req.Header.Add(k, v)
 	}
 
-	res, err := httpClient().Do(req)
+	res, err := safehttp.Client().Do(req)
 	if err != nil {
 		return nil, err
 	}
 
 	if res.StatusCode != http.StatusOK {
+		res.Body.Close()
 		return nil, fmt.Errorf("Resource didn't return 200")
 	}
 

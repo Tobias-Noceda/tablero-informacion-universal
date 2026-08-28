@@ -60,5 +60,56 @@ func (db *RedisDB) FindPostItResult(id uuid.UUID) (any, error) {
 func (db *RedisDB) AddPostItResult(postit *models.PostIts, data any) error {
 	ctx, cancel := timeout()
 	defer cancel()
-	return db.client.Set(ctx, postit.Id.String(), data, time.Duration(postit.Rate)*time.Minute).Err()
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	return db.client.Set(ctx, postit.Id.String(), encoded, time.Duration(postit.Rate)*time.Second).Err()
+}
+
+func (db *RedisDB) DropPostItResult(id uuid.UUID) error {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	return db.client.Del(ctx, id.String()).Err()
+}
+
+func onlineBoardKey(board *models.Board) string {
+	return "board:" + board.Id.String() + ":online"
+}
+
+func (db *RedisDB) ConnectClientToBoard(board *models.Board, id uuid.UUID) ([]string, error) {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	key := onlineBoardKey(board)
+
+	var clients []string
+	err := db.client.Watch(ctx, func(tx *redis.Tx) error {
+		var err error
+
+		clients, err = tx.SMembers(ctx, key).Result()
+		if err != nil {
+			return err
+		}
+
+		_, err = tx.TxPipelined(ctx, func(pipe redis.Pipeliner) error {
+			pipe.SAdd(ctx, key, id.String())
+			return nil
+		})
+
+		return err
+	}, key)
+
+	return clients, err
+}
+
+func (db *RedisDB) DisconnectClientFromBoard(board *models.Board, id uuid.UUID) error {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	key := onlineBoardKey(board)
+
+	return db.client.SRem(ctx, key, id.String()).Err()
 }

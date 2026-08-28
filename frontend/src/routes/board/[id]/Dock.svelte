@@ -90,6 +90,15 @@
       {m["nodes.air_quality"]()}
     </div>
     <div
+      class="exchange_rate node"
+      ondragstart={(event) => onDragStart(event, 'exchange_rate')}
+      draggable={true}
+      role="button"
+      tabindex="0"
+    >
+      {m["nodes.exchange_rate"]()}
+    </div>
+    <div
       class="github_repo node"
       ondragstart={(event) => onDragStart(event, 'github_repo')}
       draggable={true}

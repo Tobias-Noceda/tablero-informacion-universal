@@ -9,7 +9,7 @@ pnpm-store
 
 # Build artifacts (recreated)
 build
-dist
+# dist
 .svelte-kit
 
 # Development tools
@@ -51,12 +51,12 @@ docker-compose.yml
 
 # Other
 node
-pnpm-workspace.yaml
+# pnpm-workspace.yaml
 vitest.shims.d.ts
-tsconfig.json
+# tsconfig.json
 eslint.config.js
 .prettierrc
 .prettierignore
 
 # dist files (if generated locally)
-dist
+# dist

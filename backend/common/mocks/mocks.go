@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"errors"
+	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
@@ -139,8 +140,11 @@ func (m *MockDB) UpdateBoardName(id uuid.UUID, name string) error {
 
 // MockCache is a configurable test double for infrastructure.Cache.
 type MockCache struct {
-	FindPostItResultFn func(id uuid.UUID) (any, error)
-	AddPostItResultFn  func(postit *models.PostIts, data any) error
+	FindPostItResultFn          func(id uuid.UUID) (any, error)
+	AddPostItResultFn           func(postit *models.PostIts, data any) error
+	DropPostItResultFn          func(id uuid.UUID) error
+	ConnectClientToBoardFn      func(board *models.Board, id uuid.UUID) ([]string, error)
+	DisconnectClientFromBoardFn func(board *models.Board, id uuid.UUID) error
 }
 
 var _ infrastructure.Cache = (*MockCache)(nil)
@@ -159,6 +163,27 @@ func (m *MockCache) AddPostItResult(postit *models.PostIts, data any) error {
 	return nil
 }
 
+func (m *MockCache) DropPostItResult(id uuid.UUID) error {
+	if m.DropPostItResultFn != nil {
+		return m.DropPostItResultFn(id)
+	}
+	return nil
+}
+
+func (m *MockCache) ConnectClientToBoard(board *models.Board, id uuid.UUID) ([]string, error) {
+	if m.ConnectClientToBoardFn != nil {
+		return m.ConnectClientToBoardFn(board, id)
+	}
+	return nil, ErrCacheMiss
+}
+
+func (m *MockCache) DisconnectClientFromBoard(board *models.Board, id uuid.UUID) error {
+	if m.DisconnectClientFromBoardFn != nil {
+		return m.DisconnectClientFromBoardFn(board, id)
+	}
+	return nil
+}
+
 // MockExecuter is a configurable test double for infrastructure.Executer.
 type MockExecuter struct {
 	ExecuteFn func(postit *models.PostIts) (any, error)
@@ -171,4 +196,124 @@ func (m *MockExecuter) Execute(postit *models.PostIts) (any, error) {
 		return m.ExecuteFn(postit)
 	}
 	return nil, nil
+}
+
+type MockSecretResolver struct {
+	ResolveFn func(board uuid.UUID, names []string) (map[string]string, error)
+}
+
+var _ infrastructure.SecretResolver = (*MockSecretResolver)(nil)
+
+func (m *MockSecretResolver) Resolve(board uuid.UUID, names []string) (map[string]string, error) {
+	if m.ResolveFn != nil {
+		return m.ResolveFn(board, names)
+	}
+	return nil, nil
+}
+
+type MockSecretStore struct {
+	UpsertSecretFn func(secret *models.Secret) error
+	FindSecretsFn  func(board uuid.UUID, names []string) ([]models.Secret, error)
+	ListSecretsFn  func(board uuid.UUID) ([]models.Secret, error)
+	DeleteSecretFn func(board uuid.UUID, name string) error
+}
+
+var _ infrastructure.SecretStore = (*MockSecretStore)(nil)
+
+func (m *MockSecretStore) UpsertSecret(secret *models.Secret) error {
+	if m.UpsertSecretFn != nil {
+		return m.UpsertSecretFn(secret)
+	}
+	return nil
+}
+
+func (m *MockSecretStore) FindSecrets(board uuid.UUID, names []string) ([]models.Secret, error) {
+	if m.FindSecretsFn != nil {
+		return m.FindSecretsFn(board, names)
+	}
+	return nil, nil
+}
+
+func (m *MockSecretStore) ListSecrets(board uuid.UUID) ([]models.Secret, error) {
+	if m.ListSecretsFn != nil {
+		return m.ListSecretsFn(board)
+	}
+	return nil, nil
+}
+
+func (m *MockSecretStore) DeleteSecret(board uuid.UUID, name string) error {
+	if m.DeleteSecretFn != nil {
+		return m.DeleteSecretFn(board, name)
+	}
+	return nil
+}
+
+// MockTokenClient is a configurable test double for infrastructure.TokenClient.
+type MockTokenClient struct {
+	FetchFn    func(material *models.OAuth2Material) error
+	ExchangeFn func(material *models.OAuth2Material, code, redirectURI, verifier string) error
+}
+
+var _ infrastructure.TokenClient = (*MockTokenClient)(nil)
+
+func (m *MockTokenClient) Fetch(material *models.OAuth2Material) error {
+	if m.FetchFn != nil {
+		return m.FetchFn(material)
+	}
+	return nil
+}
+
+func (m *MockTokenClient) Exchange(material *models.OAuth2Material, code, redirectURI, verifier string) error {
+	if m.ExchangeFn != nil {
+		return m.ExchangeFn(material, code, redirectURI, verifier)
+	}
+	return nil
+}
+
+// MockLocker is a configurable test double for infrastructure.Locker. It grants
+// the lock unless told otherwise.
+type MockLocker struct {
+	AcquireFn func(key string, ttl time.Duration) (string, bool, error)
+	ReleaseFn func(key, token string) error
+}
+
+var _ infrastructure.Locker = (*MockLocker)(nil)
+
+func (m *MockLocker) Acquire(key string, ttl time.Duration) (string, bool, error) {
+	if m.AcquireFn != nil {
+		return m.AcquireFn(key, ttl)
+	}
+	return "token", true, nil
+}
+
+func (m *MockLocker) Release(key, token string) error {
+	if m.ReleaseFn != nil {
+		return m.ReleaseFn(key, token)
+	}
+	return nil
+}
+
+// MockHandshakeStore is an in-memory infrastructure.HandshakeStore. Take
+// removes the entry, mirroring the single-use guarantee.
+type MockHandshakeStore struct {
+	entries map[string][]byte
+}
+
+var _ infrastructure.HandshakeStore = (*MockHandshakeStore)(nil)
+
+func (m *MockHandshakeStore) Put(key string, value []byte, ttl time.Duration) error {
+	if m.entries == nil {
+		m.entries = make(map[string][]byte)
+	}
+	m.entries[key] = value
+	return nil
+}
+
+func (m *MockHandshakeStore) Take(key string) ([]byte, error) {
+	value, ok := m.entries[key]
+	if !ok {
+		return nil, errors.New("no such handshake")
+	}
+	delete(m.entries, key)
+	return value, nil
 }
