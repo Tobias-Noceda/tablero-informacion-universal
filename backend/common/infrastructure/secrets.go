@@ -39,9 +39,13 @@ type HandshakeStore interface {
 // the same credential at once would both spend the refresh token, and a
 // provider that rotates them invalidates whichever lands second.
 type Locker interface {
-	// Acquire reports whether the caller now holds the lock.
-	Acquire(key string, ttl time.Duration) (bool, error)
-	Release(key string) error
+	// Acquire reports whether the caller now holds the lock, along with a token
+	// identifying this holder.
+	Acquire(key string, ttl time.Duration) (token string, held bool, err error)
+	// Release gives the lock back, and must be a no-op unless token still
+	// identifies the current holder. A holder that overran the TTL would
+	// otherwise delete the lock its successor is relying on.
+	Release(key, token string) error
 }
 
 type SecretStore interface {
