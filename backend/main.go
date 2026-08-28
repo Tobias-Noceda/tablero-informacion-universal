@@ -12,6 +12,7 @@ import (
 	b_srv "github.com/Secreto31126/tesis/common/services/boards"
 	p_srv "github.com/Secreto31126/tesis/common/services/postits"
 	s_srv "github.com/Secreto31126/tesis/common/services/secrets"
+	r_srv "github.com/Secreto31126/tesis/common/services/realtime"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -41,13 +42,18 @@ func main() {
 	executer := executer.New()
 	secrets := s_srv.New(db, db, sealer, oauth.New(), cache, cache)
 
+	boardService := b_srv.New(db)
+	postitService := p_srv.New(db, cache, executer)
+	realtimeService := r_srv.New(*boardService, cache)
+
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
 	router.Use(cors.Default())
 
-	boardController := boards.NewController(b_srv.New(db))
 	postitController := postits.NewController(p_srv.New(db, cache, executer, secrets))
 	secretController := s_ctrl.NewController(secrets)
+	boardController := boards.NewController(boardService, realtimeService)
+	postitController := postits.NewController(postitService)
 
 	api := router.Group("/v1")
 	boardController.RegisterRoutes(api)

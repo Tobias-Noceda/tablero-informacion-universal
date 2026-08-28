@@ -14,6 +14,7 @@
 	import type { SecretMeta } from '$types/api';
 	import { m } from '$lib/paraglide/messages';
 	import { nodesMap, parameters } from '$components/Nodes/node-map';
+	import { mouses } from '$stores/mouses.svelte';
 
 	let { nodes, edges, name, boardId }: {
 		nodes: Node[],
@@ -43,7 +44,9 @@
 		creatingParams.some((p) => p.default === undefined && !(paramValues[p.key] ?? '').trim())
 	);
 
-	const { screenToFlowPosition } = useSvelteFlow();
+	const { screenToFlowPosition, flowToScreenPosition } = useSvelteFlow();
+
+	mouses.updateMappers(screenToFlowPosition, flowToScreenPosition);
 
 	const type = useDnD();
 

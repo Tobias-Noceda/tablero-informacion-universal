@@ -1,0 +1,124 @@
+<script lang="ts">
+	import { type Snippet } from 'svelte';
+
+	import { type DataConnection, Peer } from 'peerjs';
+
+	import Cursor from '$components/Cursor/Cursor.svelte';
+
+	import { mouses, type ClientData } from '$stores/mouses.svelte';
+	import * as boardApi from '$services/board';
+
+	import { SvelteMap } from 'svelte/reactivity';
+
+	let { children, boardId }: { children: Snippet; boardId: string } = $props();
+
+	const colors = ['#FF0000', '#F0F000', '#00FF00', '#00F0F0', '#0000FF', '#F000F0'];
+
+	const connections = new SvelteMap<string, DataConnection>();
+
+	let frame: number | null = null;
+
+	function isNumber(n: unknown): n is number {
+		return Number.isFinite(n);
+	}
+
+	function setConnection(conn: DataConnection) {
+		const id = conn.peer;
+
+		conn.on('open', () => {
+			connections.set(id, conn);
+			mouses.add(id, conn.metadata);
+
+			conn.on('data', (data) => {
+				if (Array.isArray(data) && isNumber(data[0]) && isNumber(data[1])) {
+					const pos = { x: data[0], y: data[1] };
+					mouses.update(id, pos);
+				}
+			});
+		});
+
+		conn.on('close', () => {
+			connections.delete(id);
+			mouses.remove(id);
+
+			console.log('Lost', id);
+		});
+
+		conn.on('error', console.error);
+	}
+
+	$effect(() => {
+		const id = crypto.randomUUID();
+		const peer = new Peer(id);
+
+		peer.on('connection', setConnection);
+
+		peer.on('open', async (id) => {
+			console.log('My peer ID is', id);
+
+			const list = await boardApi.online(boardId, id);
+
+			const color = colors[list.length % colors.length];
+			list.forEach((p) => {
+				const conn = peer.connect(p, {
+					reliable: true,
+					metadata: {
+						username: 'Messi',
+						picture: 'TBD',
+						color
+					} satisfies ClientData
+				});
+
+				setConnection(conn);
+			});
+		});
+
+		peer.on('error', (err) => {
+			console.error(err);
+
+			// Report unreachable peers to the API
+			if (err.type === 'peer-unavailable') {
+				// boardApi.offline(boardId, id);
+			}
+		});
+
+		return async () => {
+			await boardApi.offline(boardId, id);
+
+			if (frame) cancelAnimationFrame(frame);
+
+			peer.destroy();
+			connections.clear();
+			mouses.clear();
+		};
+	});
+
+	function move(e: MouseEvent) {
+		if (frame !== null) {
+			return;
+		}
+
+		frame = requestAnimationFrame(() => {
+			frame = null;
+
+			const { x, y } = mouses.convert({ x: e.clientX, y: e.clientY });
+			const data = [x, y];
+
+			connections
+				.values()
+				.filter((c) => c.open)
+				.forEach((c) => c.send(data));
+		});
+	}
+</script>
+
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div onmousemove={move} class="contents">
+	{@render children()}
+</div>
+
+{#each mouses.data() as [id, { position, color }] (id)}
+	{#if position}
+		<Cursor {position} {color} />
+	{/if}
+{/each}
