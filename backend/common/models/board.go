@@ -16,6 +16,7 @@ type BoardPostIt struct {
 }
 
 type Strand struct {
+	Id     uuid.UUID `bson:"id" json:"id"`
 	Source uuid.UUID `bson:"source" json:"source"`
 	Target uuid.UUID `bson:"target" json:"target"`
 }

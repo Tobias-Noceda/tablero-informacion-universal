@@ -102,7 +102,7 @@ func (ctrl *Controller) GetPostIt(c *gin.Context) {
 // @Description  Permanently deletes a post-it and its contents by UUID.
 // @Tags         post-its
 // @Param        id   path      string  true  "Board UUID" format(uuid)
-// @Success      204  "No Content"
+// @Success      200  {array}   models.Strand The deleted strands
 // @Failure      400  {object}  map[string]string{"error": "string"}
 // @Failure      500  {object}  map[string]string{"error": "string"}
 // @Router       /post-its/{id} [delete]
@@ -117,7 +117,7 @@ func (ctrl *Controller) DeletePostIt(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.service.DeletePostIt(id)
+	strands, err := ctrl.service.DeletePostIt(id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -125,7 +125,7 @@ func (ctrl *Controller) DeletePostIt(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, strands)
 }
 
 // ExecutePostIt godoc

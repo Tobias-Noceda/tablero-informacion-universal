@@ -3,6 +3,7 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"time"
 
 	"github.com/Secreto31126/tesis/common/models"
@@ -22,7 +23,12 @@ type RedisDB struct {
 func New() (*RedisDB, error) {
 	db := &RedisDB{}
 
-	opt, err := redis.ParseURL(REDIS_URL)
+	url := os.Getenv("REDIS_URL")
+	if url == "" {
+		url = REDIS_URL
+	}
+
+	opt, err := redis.ParseURL(url)
 	if err != nil {
 		return nil, err
 	}

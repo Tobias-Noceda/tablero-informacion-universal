@@ -1,4 +1,4 @@
-import type { PostIt, UUID } from "$types/api";
+import type { PostIt, Strand, UUID } from "$types/api";
 
 import * as api from "$modules/api.svelte"
 
@@ -13,8 +13,9 @@ export async function create_well_known(board: UUID, well_known: string, params:
     return await res.json() as PostIt;
 }
 
-export async function del(id: UUID) {
-    await api.del(`/v1/post-its/${id}`);
+export async function del(id: UUID): Promise<Strand[]> {
+    const deletedEdges = await api.del(`/v1/post-its/${id}`).then(async (res) => await res.json() as Strand[]);
+    return deletedEdges;
 }
 
 export async function execute(id: UUID) {

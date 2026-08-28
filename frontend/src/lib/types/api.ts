@@ -56,6 +56,12 @@ export type PostIt = {
     envs: Envs[];
 }
 
+export type Strand = {
+    id: UUID;
+    source: UUID;
+    target: UUID;
+}
+
 export type SecretKind = 'api_key' | 'bearer' | 'basic' | 'oauth2';
 
 export type OAuth2Flow = 'client_credentials' | 'authorization_code';

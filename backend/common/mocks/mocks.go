@@ -18,15 +18,15 @@ type MockDB struct {
 	FindBoardPostItsFn            func(id uuid.UUID) ([]models.PostIts, error)
 	FindPostItFn                  func(id uuid.UUID) (*models.PostIts, error)
 	FindBoardFn                   func(id uuid.UUID) (*models.Board, error)
-	DeletePostItFn                func(id uuid.UUID) error
+	DeletePostItFn                func(id uuid.UUID) ([]models.Strand, error)
 	DeleteBoardFn                 func(id uuid.UUID) error
 	UpdatePostItFn                func(id uuid.UUID, set map[string]any) error
 	CreatePostItFn                func(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
 	CreateBoardFn                 func(name, owner string) (*models.Board, error)
 	AddCollaboratorToBoardFn      func(boardID uuid.UUID, cognitoID string) error
 	RemoveCollaboratorFromBoardFn func(boardID uuid.UUID, cognitoID string) error
-	DisconnectPostItsFn           func(boardID, source, target uuid.UUID) error
-	ConnectPostItsFn              func(boardID, source, target uuid.UUID) error
+	DisconnectPostItsFn           func(boardID, strandID uuid.UUID) error
+	ConnectPostItsFn              func(boardID, source, target uuid.UUID) (*models.Strand, error)
 	MovePostItFn                  func(boardID, postItID uuid.UUID, pos models.Position) error
 	UpdateBoardNameFn             func(id uuid.UUID, name string) error
 }
@@ -61,11 +61,11 @@ func (m *MockDB) FindBoard(id uuid.UUID) (*models.Board, error) {
 	return nil, nil
 }
 
-func (m *MockDB) DeletePostIt(id uuid.UUID) error {
+func (m *MockDB) DeletePostIt(id uuid.UUID) ([]models.Strand, error) {
 	if m.DeletePostItFn != nil {
 		return m.DeletePostItFn(id)
 	}
-	return nil
+	return nil, nil
 }
 
 func (m *MockDB) DeleteBoard(id uuid.UUID) error {
@@ -110,18 +110,18 @@ func (m *MockDB) RemoveCollaboratorFromBoard(boardID uuid.UUID, cognitoID string
 	return nil
 }
 
-func (m *MockDB) DisconnectPostIts(boardID, source, target uuid.UUID) error {
+func (m *MockDB) DisconnectPostIts(boardID, strandID uuid.UUID) error {
 	if m.DisconnectPostItsFn != nil {
-		return m.DisconnectPostItsFn(boardID, source, target)
+		return m.DisconnectPostItsFn(boardID, strandID)
 	}
 	return nil
 }
 
-func (m *MockDB) ConnectPostIts(boardID, source, target uuid.UUID) error {
+func (m *MockDB) ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error) {
 	if m.ConnectPostItsFn != nil {
 		return m.ConnectPostItsFn(boardID, source, target)
 	}
-	return nil
+	return nil, nil
 }
 
 func (m *MockDB) MovePostIt(boardID, postItID uuid.UUID, pos models.Position) error {

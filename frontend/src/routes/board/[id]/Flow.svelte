@@ -1,10 +1,11 @@
 <script lang="ts">
-	import { SvelteFlow, Controls, useSvelteFlow, type Node, type Edge } from '@xyflow/svelte';
+	import { SvelteFlow, Controls, useSvelteFlow, type Node, type Edge, ConnectionMode, type Connection } from '@xyflow/svelte';
 
 	import { useDnD } from './DnDProvider.svelte';
 	import Dock from './Dock.svelte';
 
 	import * as postItsApi from '$services/post-it';
+	import * as edgesApi from '$services/edge';
 	import type { Board } from '$types/api';
 	import Modal from '$components/Modal/Modal.svelte';
 	import Input from '$components/Input/Input.svelte';
@@ -14,6 +15,7 @@
 	import type { SecretMeta } from '$types/api';
 	import { m } from '$lib/paraglide/messages';
 	import { nodesMap, parameters } from '$components/Nodes/node-map';
+	import { edgesMap } from '$components/Edges/edge-map';
 	import { mouses } from '$stores/mouses.svelte';
 
 	let { nodes, edges, name, boardId }: {
@@ -23,9 +25,8 @@
 		boardId: string,
 	} = $props();
 
-	$effect(() => console.log(nodes));
-
 	let selectedNode: Node | null = $state(null);
+	let selectedEdge: Edge | null = $state(null);
 
 	let managingSecrets = $state(false);
 	let boardSecrets = $state<SecretMeta[]>([]);
@@ -50,6 +51,9 @@
 
 	const type = useDnD();
 
+	const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+	// Board handlers
 	const onDragOver = (event: DragEvent) => {
 		event.preventDefault();
 
@@ -87,6 +91,11 @@
 		};
 	};
 
+	const onBoardClick = () => {
+		selectedNode = null;
+		selectedEdge = null;
+	};
+
 	const createNode = async () => {
 		if (!creatingNode || missingRequired) return;
 
@@ -101,6 +110,106 @@
 		creatingNode = null;
 		paramValues = {};
 	};
+
+	const deleteNode = async (node: Node) => {
+		await postItsApi.del(node.id)
+			.then((deletedEdges) => {
+				edges = edges.filter((e) => !deletedEdges.map((edge) => edge.id).includes(e.id));
+			});
+		nodes = nodes.filter((n) => n.id !== node.id);
+		if (selectedNode?.id === node.id) {
+			selectedNode = null;
+		}
+	};
+
+	// Node handlers
+	const onNodeClick = async (event: { event: MouseEvent | TouchEvent, node: Node }) => {
+		event.event.preventDefault();
+		event.event.stopPropagation();
+		if (selectedNode?.id === event.node.id) {
+			selectedNode = null;
+			nodes = nodes.map((n) => { return { ...n, data: { ...n.data, isSelected: false } } });
+		} else {
+			selectedNode = event.node;
+			nodes = nodes.map((n) => { return { ...n, data: { ...n.data, isSelected: n.id === event.node.id } } });
+		}
+	};
+
+	const onNodeDragStop = async (event: { targetNode: Node | null, nodes: Node[], event: MouseEvent | TouchEvent }) => {
+		const node = event.targetNode;
+		if (!node) return;
+		await postItsApi.move(node.id, node.position.x, node.position.y);
+	};
+
+	// Edge handlers
+	const onEdgeClick = async (event: {event: MouseEvent, edge: Edge}) => {
+		event.event.preventDefault();
+		event.event.stopPropagation();
+		if (selectedEdge?.target === event.edge.target && selectedEdge?.source === event.edge.source) {
+			selectedEdge = null;
+			edges = edges.map((e) => { return { ...e, data: { ...e.data, isSelected: false } } });
+		} else {
+			selectedEdge = event.edge;
+			edges = edges.map((e) => { return { ...e, data: { ...e.data, isSelected: e.id === event.edge.id } } });
+		}
+	};
+
+	const onConnect = async (connection: Connection) => {
+		const exists = edges.find(
+			(e) => e.source === connection.source && e.target === connection.target
+		);
+		if (exists) {
+			// assert if it is a uuid
+			if (exists.id.match(uuidRegex)) {
+				console.log('Edge already exists:', exists);
+				return;
+			} else {
+				edges = edges.filter((e) => e.id !== exists.id);
+			}
+		}
+
+		const newEdge = await edgesApi.connect(boardId, connection.source, connection.target);
+		edges = [...edges, { id: newEdge.id, source: connection.source, target: connection.target }];
+}	;
+
+	// Keyboard shortcuts
+	const onKeyDown = (event: KeyboardEvent) => {
+		if (event.key === 'Delete' || event.key === 'Backspace') {
+			if (selectedEdge) {
+				edgesApi.disconnect(boardId, selectedEdge.id);
+				edges = edges.filter((e) => e.id !== selectedEdge?.id);
+				selectedEdge = null;
+			} else if (selectedNode) {
+				deleteNode(selectedNode);
+				selectedNode = null;
+			}
+		}
+	};
+
+	// Effects
+	$effect(() => {
+		window.addEventListener('keydown', onKeyDown);
+		return () => window.removeEventListener('keydown', onKeyDown);
+	});
+
+	$effect(() => {
+		if (selectedNode) {
+			selectedEdge = null;
+		}
+	});
+
+	$effect(() => {
+		if (selectedEdge) {
+			selectedNode = null;
+		}
+	});
+
+	$effect(() => {
+		if (creatingNode) {
+			selectedNode = null;
+			selectedEdge = null;
+		}
+	});
 </script>
 
 <div class="flex flex-row h-full w-full">
@@ -116,18 +225,21 @@
 				bind:nodes
 				bind:edges
 				nodeTypes={nodesMap}
+				edgeTypes={edgesMap}
+				defaultEdgeOptions={{ type: 'floating' }}
 				fitView
+				connectionMode={ConnectionMode.Loose}
 				ondragover={onDragOver}
 				ondrop={onDrop}
-				onnodeclick={(event) => {
-					if (event.node.id === selectedNode?.id) {
-						selectedNode = null;
-					} else {
-						selectedNode = event.node;
-					}
-				}}
+				onnodeclick={onNodeClick}
+				onnodedragstop={onNodeDragStop}
+				onedgeclick={onEdgeClick}
+				onconnect={onConnect}
+				onpaneclick={onBoardClick}
 				colorMode="system"
 				class="bg-transparent!"
+				title="Board Flow"
+				attributionPosition={undefined}
 			>
 				<Controls />
 			</SvelteFlow>
@@ -136,12 +248,24 @@
 	</main>
 	{#if selectedNode}
 		<div
-			class="flex flex-col gap-2 p-4 bg-tertiary border-l border-tertiary-border rounded-l-2xl w-70 text-tertiary-text"
+			class="flex flex-col p-4 bg-tertiary border-l border-tertiary-border rounded-l-2xl w-70 h-full justify-between text-tertiary-text"
 		>
-			<h2>Selected Node</h2>
-			<p>ID: {selectedNode.id}</p>
-			<p>Type: {selectedNode.type}</p>
-			<p>Position: ({selectedNode.position.x}, {selectedNode.position.y})</p>
+			<div class="flex flex-col gap-2">
+				<h2 class="text-lg font-semibold">Selected Node</h2>
+				<p>ID: {selectedNode.id}</p>
+				<p>Type: {selectedNode.type}</p>
+				<p>Position: ({selectedNode.position.x}, {selectedNode.position.y})</p>
+			</div>
+			<Button
+				variant="destructive"
+				onclick={() => {
+					if (selectedNode) {
+						deleteNode(selectedNode);
+					}
+				}}
+			>
+				Delete Node
+			</Button>
 		</div>
 	{/if}
 
@@ -200,5 +324,9 @@
 		display: flex;
 		flex-direction: column;
 		padding: 10px;
+	}
+
+	:global(.svelte-flow__attribution) {
+		display: none;
 	}
 </style>

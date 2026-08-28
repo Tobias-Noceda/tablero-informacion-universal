@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/Secreto31126/tesis/common/controllers/boards"
 	"github.com/Secreto31126/tesis/common/controllers/postits"
 	s_ctrl "github.com/Secreto31126/tesis/common/controllers/secrets"
@@ -18,7 +20,7 @@ import (
 )
 
 const (
-	ADDR = "0.0.0.0:31126"
+	PORT = "31126"
 )
 
 func corsConfig() cors.Config {
@@ -66,5 +68,10 @@ func main() {
 	postitController.RegisterRoutes(api)
 	secretController.RegisterRoutes(api)
 
-	router.Run(ADDR)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = PORT
+	}
+
+	router.Run(":" + port)
 }

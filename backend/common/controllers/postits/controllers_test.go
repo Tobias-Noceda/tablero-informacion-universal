@@ -249,21 +249,28 @@ func TestExecutePostIt_ExecError(t *testing.T) {
 }
 
 func TestDeletePostIt_OK(t *testing.T) {
+	id := uuid.New()
 	called := false
 	db := &mocks.MockDB{
-		DeletePostItFn: func(_ uuid.UUID) error {
+		DeletePostItFn: func(_ uuid.UUID) ([]models.Strand, error) {
 			called = true
-			return nil
+			return []models.Strand{{Id: id, Source: id, Target: id}}, nil
 		},
 	}
 	r := setupRouter(db, nil, nil)
 
 	w := do(r, http.MethodDelete, "/post-its/"+uuid.New().String(), "")
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204", w.Code)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", w.Code)
 	}
 	if !called {
 		t.Error("DeletePostIt was not called")
+	}
+	var got []struct{ Id uuid.UUID }
+	_ = json.Unmarshal(w.Body.Bytes(), &got)
+	if got[0].Id != id {
+		t.Errorf("id = %v, want %v", got[0].Id, id)
 	}
 }
 
@@ -277,8 +284,8 @@ func TestDeletePostIt_InvalidUUID(t *testing.T) {
 
 func TestDeletePostIt_ServiceError(t *testing.T) {
 	db := &mocks.MockDB{
-		DeletePostItFn: func(_ uuid.UUID) error {
-			return errors.New("mongo: no documents in result")
+		DeletePostItFn: func(_ uuid.UUID) ([]models.Strand, error) {
+			return nil, errors.New("mongo: no documents in result")
 		},
 	}
 	r := setupRouter(db, nil, nil)
