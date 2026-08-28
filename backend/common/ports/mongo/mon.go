@@ -2,9 +2,9 @@ package mongo
 
 import (
 	"context"
+	"os"
 	"time"
 
-	"github.com/Secreto31126/tesis/common/env"
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/google/uuid"
@@ -15,11 +15,8 @@ import (
 
 const (
 	REQUEST_TIMEOUT = 10 * time.Second
-)
-
-var (
-	MONGO_URL      = env.Get("MONGO_URL", "mongodb://user:password@mongo:27017/?authSource=admin")
-	MONGO_DATABASE = env.Get("MONGO_DATABASE", "prod")
+	MONGO_URL       = "mongodb://user:password@mongo:27017/?authSource=admin"
+	MONGO_DATABASE  = "prod"
 )
 
 type MongoDB struct {
@@ -35,7 +32,17 @@ func New() (*MongoDB, error) {
 	reg.RegisterTypeEncoder(uuidType, bson.ValueEncoderFunc(uuidEncodeValue))
 	reg.RegisterTypeDecoder(uuidType, bson.ValueDecoderFunc(uuidDecodeValue))
 
-	client, err := mongo.Connect(options.Client().ApplyURI(MONGO_URL).SetRegistry(reg).SetBSONOptions(&options.BSONOptions{
+	url := os.Getenv("MONGO_URI")
+	if url == "" {
+		url = MONGO_URL
+	}
+
+	name := os.Getenv("MONGO_DATABASE")
+	if name == "" {
+		name = MONGO_DATABASE
+	}
+
+	client, err := mongo.Connect(options.Client().ApplyURI(url).SetRegistry(reg).SetBSONOptions(&options.BSONOptions{
 		NilSliceAsEmpty: true,
 		NilMapAsEmpty:   true,
 	}))
@@ -44,9 +51,9 @@ func New() (*MongoDB, error) {
 	}
 
 	db.client = client
-	db.users = db.client.Database(MONGO_DATABASE).Collection("users")
-	db.boards = db.client.Database(MONGO_DATABASE).Collection("boards")
-	db.postit = db.client.Database(MONGO_DATABASE).Collection("postit")
+	db.users = db.client.Database(name).Collection("users")
+	db.boards = db.client.Database(name).Collection("boards")
+	db.postit = db.client.Database(name).Collection("postit")
 
 	return db, nil
 }

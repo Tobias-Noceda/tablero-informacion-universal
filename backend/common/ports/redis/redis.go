@@ -3,9 +3,9 @@ package redis
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"time"
 
-	"github.com/Secreto31126/tesis/common/env"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
@@ -13,10 +13,7 @@ import (
 
 const (
 	REQUEST_TIMEOUT = 5 * time.Second
-)
-
-var (
-	REDIS_URL = env.Get("REDIS_URL", "redis://redis:6379/")
+	REDIS_URL       = "redis://redis:6379/"
 )
 
 type RedisDB struct {
@@ -26,7 +23,12 @@ type RedisDB struct {
 func New() (*RedisDB, error) {
 	db := &RedisDB{}
 
-	opt, err := redis.ParseURL(REDIS_URL)
+	url := os.Getenv("REDIS_URL")
+	if url == "" {
+		url = REDIS_URL
+	}
+
+	opt, err := redis.ParseURL(url)
 	if err != nil {
 		return nil, err
 	}

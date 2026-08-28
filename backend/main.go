@@ -1,9 +1,10 @@
 package main
 
 import (
+	"os"
+
 	"github.com/Secreto31126/tesis/common/controllers/boards"
 	"github.com/Secreto31126/tesis/common/controllers/postits"
-	"github.com/Secreto31126/tesis/common/env"
 	"github.com/Secreto31126/tesis/common/middleware"
 	"github.com/Secreto31126/tesis/common/ports/executer"
 	"github.com/Secreto31126/tesis/common/ports/mongo"
@@ -13,8 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var (
-	ADDR = env.Get("ADDRESS", "0.0.0.0:31126")
+const (
+	PORT = "31126"
 )
 
 func main() {
@@ -43,5 +44,10 @@ func main() {
 	boardController.RegisterRoutes(api)
 	postitController.RegisterRoutes(api)
 
-	router.Run(ADDR)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = PORT
+	}
+
+	router.Run(":" + port)
 }
