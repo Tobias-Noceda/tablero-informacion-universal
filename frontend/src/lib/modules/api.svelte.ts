@@ -9,7 +9,7 @@ function resolvePath(path: `/${string}`) {
 	} catch (e) {
 		if (!(e instanceof TypeError)) throw e;
 		// Assume it's a relative path (/api/...)
-		return new SvelteURL(path, apiUrl);
+		return new SvelteURL("/api" + path, apiUrl);
 	}
 }
 

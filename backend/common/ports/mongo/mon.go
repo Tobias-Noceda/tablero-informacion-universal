@@ -43,10 +43,16 @@ func New() (*MongoDB, error) {
 		name = MONGO_DATABASE
 	}
 
-	client, err := mongo.Connect(options.Client().ApplyURI(url).SetRegistry(reg).SetBSONOptions(&options.BSONOptions{
-		NilSliceAsEmpty: true,
-		NilMapAsEmpty:   true,
-	}))
+	clientOptions := options.Client().
+		ApplyURI(url).
+		SetRegistry(reg).
+		SetBSONOptions(&options.BSONOptions{
+			NilSliceAsEmpty: true,
+			NilMapAsEmpty:   true,
+		}).
+		SetMaxConnIdleTime(30 * time.Second)
+
+	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		return nil, err
 	}
