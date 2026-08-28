@@ -1,18 +1,12 @@
 <script lang="ts">
-	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
-	import * as postitAPI from '$services/post-it';
+	import { type NodeProps } from '@xyflow/svelte';
+	import NodeWrapper from '../NodeWrapper.svelte';
 
-	let { id }: NodeProps = $props();
-
-	const request = $derived(postitAPI.execute(id));
+	let props: NodeProps = $props();
 </script>
 
-<div class="bg-main p-4 rounded-lg">
-	<Handle type="target" position={Position.Bottom} isConnectable />
-	{#await request then data}
+<NodeWrapper {...props}>
+	{#snippet children(data)}
 		<h3>Dog fact: {data.body}</h3>
-	{:catch}
-		An error has occurred
-	{/await}
-	<Handle type="source" position={Position.Top} isConnectable />
-</div>
+	{/snippet}
+</NodeWrapper>

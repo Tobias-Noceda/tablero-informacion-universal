@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
@@ -32,7 +33,17 @@ func New() (*MongoDB, error) {
 	reg.RegisterTypeEncoder(uuidType, bson.ValueEncoderFunc(uuidEncodeValue))
 	reg.RegisterTypeDecoder(uuidType, bson.ValueDecoderFunc(uuidDecodeValue))
 
-	client, err := mongo.Connect(options.Client().ApplyURI(MONGO_URL).SetRegistry(reg).SetBSONOptions(&options.BSONOptions{
+	url := os.Getenv("MONGO_URI")
+	if url == "" {
+		url = MONGO_URL
+	}
+
+	name := os.Getenv("MONGO_DATABASE")
+	if name == "" {
+		name = MONGO_DATABASE
+	}
+
+	client, err := mongo.Connect(options.Client().ApplyURI(url).SetRegistry(reg).SetBSONOptions(&options.BSONOptions{
 		NilSliceAsEmpty: true,
 		NilMapAsEmpty:   true,
 	}))
@@ -41,10 +52,10 @@ func New() (*MongoDB, error) {
 	}
 
 	db.client = client
-	db.users = db.client.Database(MONGO_DATABASE).Collection("users")
-	db.boards = db.client.Database(MONGO_DATABASE).Collection("boards")
-	db.postit = db.client.Database(MONGO_DATABASE).Collection("postit")
-	db.secrets = db.client.Database(MONGO_DATABASE).Collection("secrets")
+	db.users = db.client.Database(name).Collection("users")
+	db.boards = db.client.Database(name).Collection("boards")
+	db.postit = db.client.Database(name).Collection("postit")
+	db.secrets = db.client.Database(name).Collection("secrets")
 
 	return db, nil
 }
@@ -147,18 +158,17 @@ func (db *MongoDB) FindBoard(id uuid.UUID) (*models.Board, error) {
 	return board, nil
 }
 
-func (db *MongoDB) DeletePostIt(id uuid.UUID) error {
+func (db *MongoDB) DeletePostIt(id uuid.UUID) (strands []models.Strand, err error) {
 	ctx, cancel := timeout()
 	defer cancel()
 
 	postIt := &models.PostIts{}
-
-	err := db.postit.FindOneAndDelete(ctx, bson.M{"_id": id}).Decode(postIt)
-	if err != nil {
-		return err
+	if err := db.postit.FindOneAndDelete(ctx, bson.M{"_id": id}).Decode(postIt); err != nil {
+		return nil, err
 	}
 
-	_, err = db.boards.UpdateOne(
+	board := &models.Board{}
+	if err := db.boards.FindOneAndUpdate(
 		ctx,
 		bson.M{"_id": postIt.Board},
 		bson.M{
@@ -172,9 +182,18 @@ func (db *MongoDB) DeletePostIt(id uuid.UUID) error {
 				},
 			},
 		},
-	)
+		options.FindOneAndUpdate().SetReturnDocument(options.Before),
+	).Decode(board); err != nil {
+		return nil, err
+	}
 
-	return err
+	for _, s := range board.Strands {
+		if s.Source == id || s.Target == id {
+			strands = append(strands, s)
+		}
+	}
+
+	return strands, nil
 }
 
 func (db *MongoDB) DeleteBoard(id uuid.UUID) error {
@@ -276,27 +295,31 @@ func (db *MongoDB) MovePostIt(boardID, postItID uuid.UUID, pos models.Position) 
 	)
 }
 
-func (db *MongoDB) ConnectPostIts(boardID, source, target uuid.UUID) error {
-	return db.updateBoard(
+func (db *MongoDB) ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error) {
+	strand := models.Strand{Id: uuid.New(), Source: source, Target: target}
+
+	err := db.updateBoard(
 		bson.M{
 			"_id": boardID,
 			"postits.id": bson.M{
 				"$all": []uuid.UUID{source, target},
 			},
 		},
-		bson.M{"$addToSet": bson.M{
-			"strands": models.Strand{Source: source, Target: target},
-		}},
+		bson.M{"$addToSet": bson.M{"strands": strand}},
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &strand, nil
 }
 
-func (db *MongoDB) DisconnectPostIts(boardID, source, target uuid.UUID) error {
+func (db *MongoDB) DisconnectPostIts(boardID, strandID uuid.UUID) error {
 	return db.updateBoard(
 		bson.M{"_id": boardID},
 		bson.M{"$pull": bson.M{
 			"strands": bson.M{
-				"source": source,
-				"target": target,
+				"id": strandID,
 			},
 		}},
 	)

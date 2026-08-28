@@ -34,14 +34,14 @@ func TestConnectPostIts_Delegates(t *testing.T) {
 	board, src, tgt := uuid.New(), uuid.New(), uuid.New()
 	var gb, gs, gt uuid.UUID
 	db := &mocks.MockDB{
-		ConnectPostItsFn: func(b, s, t uuid.UUID) error {
+		ConnectPostItsFn: func(b, s, t uuid.UUID) (*models.Strand, error) {
 			gb, gs, gt = b, s, t
-			return nil
+			return &models.Strand{Id: uuid.New(), Source: s, Target: t}, nil
 		},
 	}
 
 	svc := New(db)
-	if err := svc.ConnectPostIts(board, src, tgt); err != nil {
+	if _, err := svc.ConnectPostIts(board, src, tgt); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gb != board || gs != src || gt != tgt {
@@ -50,21 +50,21 @@ func TestConnectPostIts_Delegates(t *testing.T) {
 }
 
 func TestDisconnectPostIts_Delegates(t *testing.T) {
-	board, src, tgt := uuid.New(), uuid.New(), uuid.New()
-	var gb, gs, gt uuid.UUID
+	board, strand := uuid.New(), uuid.New()
+	var gb, gs uuid.UUID
 	db := &mocks.MockDB{
-		DisconnectPostItsFn: func(b, s, t uuid.UUID) error {
-			gb, gs, gt = b, s, t
+		DisconnectPostItsFn: func(b, s uuid.UUID) error {
+			gb, gs = b, s
 			return nil
 		},
 	}
 
 	svc := New(db)
-	if err := svc.DisconnectPostIts(board, src, tgt); err != nil {
+	if err := svc.DisconnectPostIts(board, strand); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gb != board || gs != src || gt != tgt {
-		t.Errorf("disconnected (%v,%v,%v), want (%v,%v,%v)", gb, gs, gt, board, src, tgt)
+	if gb != board || gs != strand {
+		t.Errorf("disconnected (%v,%v), want (%v,%v)", gb, gs, board, strand)
 	}
 }
 
