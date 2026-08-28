@@ -60,7 +60,19 @@ func (db *RedisDB) FindPostItResult(id uuid.UUID) (any, error) {
 func (db *RedisDB) AddPostItResult(postit *models.PostIts, data any) error {
 	ctx, cancel := timeout()
 	defer cancel()
-	return db.client.Set(ctx, postit.Id.String(), data, time.Duration(postit.Rate)*time.Minute).Err()
+	encoded, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	return db.client.Set(ctx, postit.Id.String(), encoded, time.Duration(postit.Rate)*time.Second).Err()
+}
+
+func (db *RedisDB) DropPostItResult(id uuid.UUID) error {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	return db.client.Del(ctx, id.String()).Err()
 }
 
 func onlineBoardKey(board *models.Board) string {

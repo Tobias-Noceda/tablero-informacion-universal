@@ -1,21 +1,47 @@
 package redis
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
-func (db *RedisDB) Acquire(key string, ttl time.Duration) (bool, error) {
-	ctx, cancel := timeout()
-	defer cancel()
+var releaseScript = redis.NewScript(`
+	if redis.call("get", KEYS[1]) == ARGV[1] then
+		return redis.call("del", KEYS[1])
+	end
+	return 0
+`)
 
-	return db.client.SetNX(ctx, "lock:"+key, "1", ttl).Result()
+func lockKey(key string) string {
+	return "lock:" + key
 }
 
-func (db *RedisDB) Release(key string) error {
+func (db *RedisDB) Acquire(key string, ttl time.Duration) (string, bool, error) {
 	ctx, cancel := timeout()
 	defer cancel()
 
-	return db.client.Del(ctx, "lock:"+key).Err()
+	buf := make([]byte, 16)
+	if _, err := rand.Read(buf); err != nil {
+		return "", false, err
+	}
+	token := base64.RawURLEncoding.EncodeToString(buf)
+
+	held, err := db.client.SetNX(ctx, lockKey(key), token, ttl).Result()
+	if err != nil || !held {
+		return "", false, err
+	}
+
+	return token, true, nil
+}
+
+func (db *RedisDB) Release(key, token string) error {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	return releaseScript.Run(ctx, db.client, []string{lockKey(key)}, token).Err()
 }
 
 // Put stores an in-flight handshake under a TTL.
