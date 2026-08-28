@@ -104,6 +104,7 @@ func (*DewIt) request(resource *url.URL, method string, queries, headers map[str
 	}
 
 	if res.StatusCode != http.StatusOK {
+		res.Body.Close()
 		return nil, fmt.Errorf("Resource didn't return 200")
 	}
 
