@@ -79,7 +79,7 @@ func TestLiveDuende(t *testing.T) {
 
 	// A locked-out worker must not spend a second request.
 	locked := oauthService(t, store, nil, &mocks.MockLocker{
-		AcquireFn: func(string, time.Duration) (bool, error) { return false, nil },
+		AcquireFn: func(string, time.Duration) (string, bool, error) { return "", false, nil },
 	})
 	locked.tokens = oauth.New()
 	if _, err := locked.Resolve(board, []string{"DUENDE"}); err != nil {

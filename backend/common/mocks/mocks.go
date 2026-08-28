@@ -142,6 +142,7 @@ func (m *MockDB) UpdateBoardName(id uuid.UUID, name string) error {
 type MockCache struct {
 	FindPostItResultFn          func(id uuid.UUID) (any, error)
 	AddPostItResultFn           func(postit *models.PostIts, data any) error
+	DropPostItResultFn          func(id uuid.UUID) error
 	ConnectClientToBoardFn      func(board *models.Board, id uuid.UUID) ([]string, error)
 	DisconnectClientFromBoardFn func(board *models.Board, id uuid.UUID) error
 }
@@ -158,6 +159,13 @@ func (m *MockCache) FindPostItResult(id uuid.UUID) (any, error) {
 func (m *MockCache) AddPostItResult(postit *models.PostIts, data any) error {
 	if m.AddPostItResultFn != nil {
 		return m.AddPostItResultFn(postit, data)
+	}
+	return nil
+}
+
+func (m *MockCache) DropPostItResult(id uuid.UUID) error {
+	if m.DropPostItResultFn != nil {
+		return m.DropPostItResultFn(id)
 	}
 	return nil
 }
@@ -265,22 +273,22 @@ func (m *MockTokenClient) Exchange(material *models.OAuth2Material, code, redire
 // MockLocker is a configurable test double for infrastructure.Locker. It grants
 // the lock unless told otherwise.
 type MockLocker struct {
-	AcquireFn func(key string, ttl time.Duration) (bool, error)
-	ReleaseFn func(key string) error
+	AcquireFn func(key string, ttl time.Duration) (string, bool, error)
+	ReleaseFn func(key, token string) error
 }
 
 var _ infrastructure.Locker = (*MockLocker)(nil)
 
-func (m *MockLocker) Acquire(key string, ttl time.Duration) (bool, error) {
+func (m *MockLocker) Acquire(key string, ttl time.Duration) (string, bool, error) {
 	if m.AcquireFn != nil {
 		return m.AcquireFn(key, ttl)
 	}
-	return true, nil
+	return "token", true, nil
 }
 
-func (m *MockLocker) Release(key string) error {
+func (m *MockLocker) Release(key, token string) error {
 	if m.ReleaseFn != nil {
-		return m.ReleaseFn(key)
+		return m.ReleaseFn(key, token)
 	}
 	return nil
 }

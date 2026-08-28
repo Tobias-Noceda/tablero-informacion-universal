@@ -265,7 +265,7 @@ func TestResolve_OAuth2DoesNotRefreshWithoutTheLock(t *testing.T) {
 		},
 	}
 	locks := &mocks.MockLocker{
-		AcquireFn: func(string, time.Duration) (bool, error) { return false, nil },
+		AcquireFn: func(string, time.Duration) (string, bool, error) { return "", false, nil },
 	}
 	srv := oauthService(t, store, tokens, locks)
 	board := uuid.New()
@@ -326,7 +326,7 @@ func TestResolve_OAuth2LoserPicksUpTheWinnersToken(t *testing.T) {
 			return nil
 		},
 	}, &mocks.MockLocker{
-		AcquireFn: func(string, time.Duration) (bool, error) { return false, nil },
+		AcquireFn: func(string, time.Duration) (string, bool, error) { return "", false, nil },
 	})
 
 	resolved, err := loser.Resolve(board, []string{"SPOTIFY"})

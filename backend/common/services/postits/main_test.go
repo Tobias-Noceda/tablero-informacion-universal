@@ -2,6 +2,7 @@ package postits
 
 import (
 	"errors"
+	"net/url"
 	"slices"
 	"testing"
 
@@ -311,8 +312,9 @@ func TestSecretRefs_OnlyMatchesUpperCaseNames(t *testing.T) {
 func TestExecutePostIt_DoesNotLeakSecretsOntoTheCaller(t *testing.T) {
 	board := uuid.New()
 	postit := &models.PostIts{
-		Id:    uuid.New(),
-		Board: board,
+		Id:       uuid.New(),
+		Board:    board,
+		Resource: &url.URL{Scheme: "https", Host: "example.com"},
 		Request: models.Request{
 			Method:  "GET",
 			Headers: map[string]string{"Authorization": "$API_KEY"},
@@ -351,5 +353,98 @@ func TestExecutePostIt_DoesNotLeakSecretsOntoTheCaller(t *testing.T) {
 	}
 	if postit.Request.Headers["Authorization"] != "$API_KEY" {
 		t.Errorf("the caller's headers were mutated to %q", postit.Request.Headers["Authorization"])
+	}
+}
+
+// A post-it with no resource makes no outbound request, so it has no use for a
+// secret. It also hands its params straight back to the caller, so resolving
+// one would publish the plaintext. See the static_card well-known.
+func TestExecutePostIt_ResourcelessPostItNeverResolvesSecrets(t *testing.T) {
+	postit := &models.PostIts{
+		Id:        uuid.New(),
+		Board:     uuid.New(),
+		WellKnown: "static_card",
+		Params:    map[string]string{"text": "$API_KEY"},
+		Resource:  nil,
+	}
+
+	resolved := false
+	resolver := &mocks.MockSecretResolver{
+		ResolveFn: func(_ uuid.UUID, _ []string) (map[string]string, error) {
+			resolved = true
+			return map[string]string{"$API_KEY": "super-secret"}, nil
+		},
+	}
+
+	run := &mocks.MockExecuter{
+		ExecuteFn: func(p *models.PostIts) (any, error) {
+			// What DewIt.Execute does when Resource is nil.
+			return p.Params, nil
+		},
+	}
+
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver)
+
+	out, err := svc.ExecutePostIt(postit)
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+
+	if resolved {
+		t.Error("secrets were resolved for a post-it that makes no request")
+	}
+
+	params, ok := out.(map[string]string)
+	if !ok {
+		t.Fatalf("expected params map, got %T", out)
+	}
+	for key, value := range params {
+		if value == "super-secret" {
+			t.Errorf("decrypted secret returned to the caller under key %q", key)
+		}
+	}
+	if params["text"] != "$API_KEY" {
+		t.Errorf("text = %q, want the unresolved reference", params["text"])
+	}
+}
+
+func TestUpdatePostIt_DropsTheCachedResult(t *testing.T) {
+	id := uuid.New()
+
+	var dropped uuid.UUID
+	cache := &mocks.MockCache{
+		DropPostItResultFn: func(got uuid.UUID) error {
+			dropped = got
+			return nil
+		},
+	}
+
+	svc := New(&mocks.MockDB{}, cache, &mocks.MockExecuter{}, &mocks.MockSecretResolver{})
+
+	if err := svc.UpdatePostIt(id, map[string]any{"rate": 60}); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+
+	if dropped != id {
+		t.Errorf("dropped %v, want the edited post-it %v", dropped, id)
+	}
+}
+
+func TestUpdatePostIt_KeepsCacheWhenTheWriteFails(t *testing.T) {
+	db := &mocks.MockDB{
+		UpdatePostItFn: func(uuid.UUID, map[string]any) error { return errors.New("boom") },
+	}
+
+	cache := &mocks.MockCache{
+		DropPostItResultFn: func(uuid.UUID) error {
+			t.Error("cache was dropped even though the update failed")
+			return nil
+		},
+	}
+
+	svc := New(db, cache, &mocks.MockExecuter{}, &mocks.MockSecretResolver{})
+
+	if err := svc.UpdatePostIt(uuid.New(), map[string]any{"rate": 60}); err == nil {
+		t.Fatal("expected the write error to surface")
 	}
 }
