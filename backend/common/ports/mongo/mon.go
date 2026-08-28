@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	REQUEST_TIMEOUT = 10 * time.Second
 	MONGO_URL       = "mongodb://user:password@mongo:27017/?authSource=admin"
 	MONGO_DATABASE  = "prod"
+	REQUEST_TIMEOUT = 10 * time.Second
 )
 
 type MongoDB struct {

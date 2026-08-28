@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	REQUEST_TIMEOUT = 5 * time.Second
 	REDIS_URL       = "redis://redis:6379/"
+	REQUEST_TIMEOUT = 5 * time.Second
 )
 
 type RedisDB struct {
