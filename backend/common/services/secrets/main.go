@@ -212,7 +212,7 @@ func (srv *SecretsService) unseal(s *models.Secret) ([]byte, error) {
 func (srv *SecretsService) refresh(s *models.Secret, material *models.OAuth2Material) error {
 	key := "oauth-refresh:" + s.Board.String() + ":" + s.Name
 
-	held, err := srv.locks.Acquire(key, REFRESH_LOCK_TTL)
+	token, held, err := srv.locks.Acquire(key, REFRESH_LOCK_TTL)
 	if err != nil {
 		return err
 	}
@@ -240,7 +240,7 @@ func (srv *SecretsService) refresh(s *models.Secret, material *models.OAuth2Mate
 		return nil
 	}
 
-	defer srv.locks.Release(key)
+	defer srv.locks.Release(key, token)
 
 	if err := srv.tokens.Fetch(material); err != nil {
 		return err

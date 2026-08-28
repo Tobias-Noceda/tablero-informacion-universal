@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -23,7 +24,20 @@ var IsSafeIP = func(ip net.IP) bool {
 		ip.IsUnspecified())
 }
 
+var (
+	clientOnce   sync.Once
+	sharedClient *http.Client
+)
+
 func Client() *http.Client {
+	clientOnce.Do(func() {
+		sharedClient = newClient()
+	})
+
+	return sharedClient
+}
+
+func newClient() *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {

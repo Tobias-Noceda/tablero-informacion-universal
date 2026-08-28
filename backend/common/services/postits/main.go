@@ -1,6 +1,7 @@
 package postits
 
 import (
+	"log"
 	"maps"
 	"strings"
 
@@ -43,7 +44,10 @@ func (srv *PostItsService) UpdatePostIt(id uuid.UUID, set map[string]any) error 
 		return nil
 	}
 
-	return srv.db.UpdatePostIt(id, set)
+	if err := srv.db.UpdatePostIt(id, set); err != nil {
+		return err
+	}
+	return srv.cache.DropPostItResult(id)
 }
 
 func (srv *PostItsService) MovePostIt(id uuid.UUID, pos models.Position) error {
@@ -113,9 +117,12 @@ func (srv *PostItsService) ExecutePostIt(postit *models.PostIts) (any, error) {
 		return cached, nil
 	}
 
-	prepared, err := srv.prepare(postit)
-	if err != nil {
-		return nil, err
+	prepared := postit
+	if postit.Resource != nil {
+		prepared, err = srv.prepare(postit)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	data, err := srv.run.Execute(prepared)
@@ -123,6 +130,11 @@ func (srv *PostItsService) ExecutePostIt(postit *models.PostIts) (any, error) {
 		return nil, err
 	}
 
-	go srv.cache.AddPostItResult(postit, data)
+	go func() {
+		if err := srv.cache.AddPostItResult(postit, data); err != nil {
+			log.Printf("post-it %s: caching result failed: %v", postit.Id, err)
+		}
+	}()
+
 	return data, nil
 }
