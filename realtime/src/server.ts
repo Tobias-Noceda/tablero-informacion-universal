@@ -1,0 +1,85 @@
+import mongo from "./mongo.js";
+import redis from "./redis.js";
+
+import { Server } from "socket.io";
+
+import { createServer } from "node:http";
+
+const server = createServer();
+
+const io = new Server(server, {
+    path: "/ws",
+    connectionStateRecovery: {
+        maxDisconnectionDuration: 2 * 60 * 1000,
+    },
+});
+
+const cache = await redis.connect();
+await using docs = await mongo.connect();
+
+io.on("connection", async (socket) => {
+    if (socket.recovered) {
+        return;
+    }
+
+    const { peer, board } = socket.handshake.query;
+
+    if (
+        typeof peer !== "string" ||
+        typeof board !== "string" ||
+        board.trim() === "" ||
+        peer.trim() === ""
+    ) {
+        socket.disconnect(true);
+        return;
+    }
+
+    const key = `board:${board}:online`;
+
+    try {
+        const [peers] = await cache
+            .multi()
+            .sMembers(key)
+            .sAdd(key, peer)
+            .exec();
+
+        socket.emit("peers", peers);
+    } catch (e) {
+        console.error(e);
+        socket.disconnect(true);
+        return;
+    }
+
+    socket.join(board);
+
+    socket.on("disconnect", (reason) => {
+        console.error(reason);
+        cache.sRem(key, peer);
+    });
+});
+
+const boards = docs.db("prod").collection<{ _id: string }>("boards");
+const stream = boards.watch([{ $match: { operationType: "update" } }], {
+    fullDocument: "whenAvailable",
+});
+
+stream
+    .on("change", (event) => {
+        const change = event as typeof event & { operationType: "update" };
+        const board = change.fullDocument;
+
+        if (!board) return;
+
+        io.to(board._id).emit("update", {
+            board,
+            ts: Date.now(),
+        });
+    })
+    .once("error", console.error);
+
+if (import.meta.main) {
+    const port = process.env.PORT ?? 3000;
+    server.listen(port);
+}
+
+export default server;
