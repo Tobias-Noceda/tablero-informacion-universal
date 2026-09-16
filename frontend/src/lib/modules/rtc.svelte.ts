@@ -36,6 +36,7 @@ export class RTC {
 					} satisfies ClientData
 				});
 
+				// TODO: use external peer metadata
 				this.setPeerConnection(conn);
 			})
 		);
@@ -54,12 +55,12 @@ export class RTC {
 		mouses.clear();
 	}
 
-	private setPeerConnection(conn: DataConnection) {
+	private setPeerConnection(conn: DataConnection, data?: ClientData) {
 		const id = conn.peer;
 
 		conn.on('open', () => {
 			this.connections.set(id, conn);
-			mouses.add(id, conn.metadata);
+			mouses.add(id, data ?? conn.metadata);
 
 			conn.on('data', (data) => {
 				if (Array.isArray(data) && RTC.isNumber(data[0]) && RTC.isNumber(data[1])) {
