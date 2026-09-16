@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, type Snippet } from 'svelte';
+	import { onDestroy, untrack, type Snippet } from 'svelte';
 
 	import Cursor from '$components/Cursor/Cursor.svelte';
 
@@ -15,7 +15,7 @@
 	let { children, boardId, boardUpdate }: Props = $props();
 
 	const rt = $derived.by(() => {
-		rt?.then((r) => r.close());
+		untrack(() => rt)?.then((r) => r.close());
 		return realtime.connect(boardId, boardUpdate);
 	});
 
