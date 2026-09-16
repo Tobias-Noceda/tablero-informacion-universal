@@ -15,7 +15,7 @@
 	let { children, boardId, boardUpdate }: Props = $props();
 
 	let frame: number | null = null;
-	let connection: Promise<realtime.Connection> | null = $state(null);
+	let connection: Promise<realtime.Connection>;
 
 	// https://github.com/sveltejs/svelte/issues/13249#issuecomment-2351801858
 	$effect.pre(() => {
@@ -35,7 +35,7 @@
 		frame = requestAnimationFrame(() => {
 			frame = null;
 			const { x, y } = mouses.convert({ x: e.clientX, y: e.clientY });
-			connection?.then((r) => r.update([x, y]));
+			connection.then((r) => r.update([x, y]));
 		});
 	}
 </script>
