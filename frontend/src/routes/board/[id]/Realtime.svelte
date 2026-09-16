@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onDestroy, untrack, type Snippet } from 'svelte';
+	import type { Snippet } from 'svelte';
 
 	import Cursor from '$components/Cursor/Cursor.svelte';
 
@@ -14,16 +14,17 @@
 
 	let { children, boardId, boardUpdate }: Props = $props();
 
-	const rt = $derived.by(() => {
-		untrack(() => rt)?.then((r) => r.close());
-		return realtime.connect(boardId, boardUpdate);
-	});
-
 	let frame: number | null = null;
+	let connection: Promise<realtime.Connection> | null = $state(null);
 
-	onDestroy(() => {
-		if (frame) cancelAnimationFrame(frame);
-		rt.then((r) => r.close());
+	// https://github.com/sveltejs/svelte/issues/13249#issuecomment-2351801858
+	$effect.pre(() => {
+		connection = realtime.connect(boardId, boardUpdate);
+
+		return async () => {
+			if (frame) cancelAnimationFrame(frame);
+			(await connection)?.close();
+		};
 	});
 
 	function move(e: MouseEvent) {
@@ -34,7 +35,7 @@
 		frame = requestAnimationFrame(() => {
 			frame = null;
 			const { x, y } = mouses.convert({ x: e.clientX, y: e.clientY });
-			rt.then((r) => r.update([x, y]));
+			connection?.then((r) => r.update([x, y]));
 		});
 	}
 </script>
