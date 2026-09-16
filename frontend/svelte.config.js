@@ -31,10 +31,10 @@ const config = {
 			$modules: 'src/lib/modules',
 			$services: 'src/lib/services',
 			$stores: 'src/lib/stores',
-			$types: 'src/lib/types',
+			$types: 'src/lib/types'
 		},
 		version: {
-			name: process.env.BUILD_VERSION ?? '1',
+			name: process.env.BUILD_VERSION ?? '1'
 		}
 	}
 };
