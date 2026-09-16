@@ -213,6 +213,9 @@ func (ctrl *Controller) EditPostIt(c *gin.Context) {
 	if req.Rate != nil {
 		set["rate"] = *req.Rate
 	}
+	if req.Title != nil {
+		set["title"] = req.Title
+	}
 
 	if len(set) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
