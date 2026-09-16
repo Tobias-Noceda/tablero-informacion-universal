@@ -17,6 +17,8 @@ export async function socket(board: string, peer: string, update: (data: Update)
 		}
 	);
 
+	// TODO: eventually, this string[] could also include peer data,
+	// such as the color picked, username and pfp url.
 	const peers = await new Promise<string[]>((resolve, reject) => {
 		socket.on('connect_error', reject);
 		socket.once('peers', resolve);
