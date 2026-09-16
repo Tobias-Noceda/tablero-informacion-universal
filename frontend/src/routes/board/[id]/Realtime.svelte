@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type Snippet } from 'svelte';
+	import { onDestroy, type Snippet } from 'svelte';
 
 	import Cursor from '$components/Cursor/Cursor.svelte';
 
@@ -14,15 +14,16 @@
 
 	let { children, boardId, boardUpdate }: Props = $props();
 
+	const rt = $derived.by(() => {
+		rt?.then((r) => r.close());
+		return realtime.connect(boardId, boardUpdate);
+	});
+
 	let frame: number | null = null;
 
-	$effect(() => {
-		const connections = realtime.connect(boardId, boardUpdate);
-
-		return () => {
-			if (frame) cancelAnimationFrame(frame);
-			connections.then((off) => off());
-		};
+	onDestroy(() => {
+		if (frame) cancelAnimationFrame(frame);
+		rt.then((r) => r.close());
 	});
 
 	function move(e: MouseEvent) {
@@ -33,7 +34,7 @@
 		frame = requestAnimationFrame(() => {
 			frame = null;
 			const { x, y } = mouses.convert({ x: e.clientX, y: e.clientY });
-			realtime.update([x, y]);
+			rt.then((r) => r.update([x, y]));
 		});
 	}
 </script>
