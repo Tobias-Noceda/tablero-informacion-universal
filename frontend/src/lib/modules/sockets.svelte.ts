@@ -5,14 +5,17 @@ import { io } from 'socket.io-client';
 export type Update = { board: Board; ts: Date };
 
 export async function socket(board: string, peer: string, update: (data: Update) => void) {
-	const socket = io('http://localhost:3000', {
-		path: '/ws',
-		transports: ['websocket'],
-		query: {
-			peer,
-			board
+	const socket = io(
+		import.meta.env.VITE_API_URL || window?.location.href || 'http://localhost:62113',
+		{
+			path: '/ws',
+			transports: ['websocket'],
+			query: {
+				peer,
+				board
+			}
 		}
-	});
+	);
 
 	const peers = await new Promise<string[]>((resolve, reject) => {
 		socket.on('connect_error', reject);
