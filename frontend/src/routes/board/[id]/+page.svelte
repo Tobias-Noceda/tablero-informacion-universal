@@ -5,7 +5,7 @@
 
 	import Flow from './Flow.svelte';
 	import DnDProvider from './DnDProvider.svelte';
-	import MouseTracker from './MouseTracker.svelte';
+	import Realtime from './Realtime.svelte';
 
 	import { page } from '$app/state';
 	import type { Node, Edge } from '@xyflow/svelte';
@@ -27,7 +27,7 @@
 </script>
 
 <DnDProvider>
-	<MouseTracker boardId={id} {boardUpdate}>
+	<Realtime boardId={id} {boardUpdate}>
 		<Flow {name} {nodes} {edges} boardId={id} />
-	</MouseTracker>
+	</Realtime>
 </DnDProvider>
