@@ -14,8 +14,8 @@ type Request struct {
 }
 
 type Title struct {
-	Text string   `bson:"text" json:"text"`
-	Vars []string `bson:"vars" json:"vars"`
+	Text string `bson:"text" json:"text"`
+	Vars bool   `bson:"vars" json:"vars"`
 }
 
 type PostIts struct {

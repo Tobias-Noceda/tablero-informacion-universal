@@ -65,8 +65,8 @@ var configuredPostIts = map[string]models.PostIts{
 	"static_card": {
 		WellKnown: "static_card",
 		Title: models.Title{
-			Text: "{{}}",
-			Vars: []string{"text"},
+			Text: "{{text}}",
+			Vars: true,
 		},
 		Params: map[string]string{
 			"text": "",
@@ -77,8 +77,8 @@ var configuredPostIts = map[string]models.PostIts{
 	"temperature": {
 		WellKnown: "temperature",
 		Title: models.Title{
-			Text: "Today's temps are between {{}}°C and {{}}°C",
-			Vars: []string{"min", "max"},
+			Text: "Today's temps are between {{min}}°C and {{max}}°C",
+			Vars: true,
 		},
 		Params: map[string]string{
 			"$latitude":   "-34.6131",
@@ -110,8 +110,8 @@ var configuredPostIts = map[string]models.PostIts{
 	"events_search": {
 		WellKnown: "events_search",
 		Title: models.Title{
-			Text: "{{}}: {{}}",
-			Vars: []string{"sales", "name"},
+			Text: "{{sales}}: {{name}}",
+			Vars: true,
 		},
 		Params: map[string]string{
 			"$keyword":    "",
@@ -140,8 +140,8 @@ var configuredPostIts = map[string]models.PostIts{
 	"dog_facts": {
 		WellKnown: "dog_facts",
 		Title: models.Title{
-			Text: "{{}}",
-			Vars: []string{"body"},
+			Text: "{{body}}",
+			Vars: true,
 		},
 		Resource: getURL("https://dogapi.dog/api/v2/facts"),
 		Request: models.Request{
@@ -156,8 +156,8 @@ var configuredPostIts = map[string]models.PostIts{
 	"dolar_oficial": {
 		WellKnown: "dolar_oficial",
 		Title: models.Title{
-			Text: "Dolar at {{}}",
-			Vars: []string{"compra"},
+			Text: "Dolar at {{compra}}",
+			Vars: true,
 		},
 		Resource: getURL("https://dolarapi.com/v1/dolares/oficial"),
 		Request: models.Request{
@@ -173,8 +173,8 @@ var configuredPostIts = map[string]models.PostIts{
 	"exchange_rate": {
 		WellKnown: "exchange_rate",
 		Title: models.Title{
-			Text: "{{}} at {{}}",
-			Vars: []string{"code", "value"},
+			Text: "{{code}} at {{value}}",
+			Vars: true,
 		},
 		Params: map[string]string{
 			"$base":       "USD",
@@ -204,8 +204,8 @@ var configuredPostIts = map[string]models.PostIts{
 	"riesgo_pais": {
 		WellKnown: "riesgo_pais",
 		Title: models.Title{
-			Text: "Argentine's country risk: {{}}",
-			Vars: []string{"valor"},
+			Text: "Argentine's country risk: {{valor}}",
+			Vars: true,
 		},
 		Resource: getURL("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo"),
 		Request: models.Request{
@@ -224,8 +224,8 @@ var configuredPostIts = map[string]models.PostIts{
 	"crypto_price": {
 		WellKnown: "crypto_price",
 		Title: models.Title{
-			Text: "Let's go gambling! {{}} at {{}}",
-			Vars: []string{"coin", "price"},
+			Text: "Let's go gambling! {{coin}} at {{price}}",
+			Vars: true,
 		},
 		Params: map[string]string{
 			"$coin":     "bitcoin",
@@ -254,8 +254,8 @@ var configuredPostIts = map[string]models.PostIts{
 	"air_quality": {
 		WellKnown: "air_quality",
 		Title: models.Title{
-			Text: "Today's air is {{}}",
-			Vars: []string{"pm25"},
+			Text: "Today's air is {{pm25}}",
+			Vars: true,
 		},
 		Params: map[string]string{
 			"$latitude":  "-34.6131",
@@ -284,8 +284,8 @@ var configuredPostIts = map[string]models.PostIts{
 	"github_repo": {
 		WellKnown: "github_repo",
 		Title: models.Title{
-			Text: "The repo {{}} has {{}} stars and {{}} open issues",
-			Vars: []string{"name", "stars", "issues"},
+			Text: "The repo {{name}} has {{stars}} stars and {{issues}} open issues",
+			Vars: true,
 		},
 		Params: map[string]string{
 			"$query": "",
