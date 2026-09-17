@@ -14,9 +14,7 @@ const stream = boards.watch([{ $match: { operationType: "update" } }], {
 export type Callback = (id: string, board: unknown) => void;
 
 let callback: Callback = () => {};
-export function setStreamCallback(cb: Callback) {
-    callback = cb;
-}
+export const setStreamCallback = (cb: Callback) => (callback = cb);
 
 export async function close() {
     await stream.close();
