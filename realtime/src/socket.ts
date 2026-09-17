@@ -6,22 +6,22 @@ import { createServer } from "node:http";
 
 export const server = createServer();
 
-const io = new Server(server, {
+const wss = new Server(server, {
     path: "/ws",
 });
 
 export function notify(group: string, data: unknown) {
-    io.to(group).emit("update", {
+    wss.to(group).emit("update", {
         data,
         ts: Date.now(),
     });
 }
 
 export function close() {
-    return Promise.allSettled([io.close(), cache.close()]);
+    return Promise.allSettled([wss.close(), cache.close()]);
 }
 
-io.on("connection", async (socket) => {
+wss.on("connection", async (socket) => {
     if (socket.recovered) {
         return;
     }
