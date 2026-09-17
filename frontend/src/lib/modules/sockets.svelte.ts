@@ -5,17 +5,14 @@ import { io } from 'socket.io-client';
 export type Update = { board: Board; ts: Date };
 
 export async function socket(board: string, peer: string, update: (data: Update) => void) {
-	const socket = io(
-		import.meta.env.VITE_API_URL || window?.location.origin || 'http://localhost:62113',
-		{
-			path: '/ws',
-			transports: ['websocket'],
-			query: {
-				peer,
-				board
-			}
+	const socket = io(window?.location.origin || 'http://localhost:3000', {
+		path: '/ws',
+		transports: ['websocket'],
+		query: {
+			peer,
+			board
 		}
-	);
+	});
 
 	// TODO: eventually, this string[] could also include peer data,
 	// such as the color picked, username and pfp url.
