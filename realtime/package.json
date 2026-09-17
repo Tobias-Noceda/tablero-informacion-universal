@@ -5,8 +5,8 @@
   "type": "module",
   "module": "dist/server.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/server.js"
+    "build:dev": "tsc",
+    "start:dev": "node dist/server.js"
   },
   "keywords": [],
   "author": "",
