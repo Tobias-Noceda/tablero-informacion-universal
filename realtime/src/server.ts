@@ -1,5 +1,5 @@
 import mongo from "./mongo.js";
-import redis from "./redis.js";
+import * as cache from "./redis.js";
 
 import { Server } from "socket.io";
 
@@ -14,7 +14,6 @@ const io = new Server(server, {
     },
 });
 
-const cache = await redis.connect();
 const docs = await mongo.connect();
 
 io.on("connection", async (socket) => {
@@ -34,15 +33,8 @@ io.on("connection", async (socket) => {
         return;
     }
 
-    const key = `board:${board}:online`;
-
     try {
-        const [peers] = await cache
-            .multi()
-            .sMembers(key)
-            .sAdd(key, peer)
-            .exec();
-
+        const peers = cache.getAndInsert(board, peer);
         socket.emit("peers", peers);
     } catch (e) {
         console.error("Failed to register peer", e);
@@ -54,7 +46,7 @@ io.on("connection", async (socket) => {
 
     socket.on("disconnect", (reason) => {
         console.error("Client disconnected:", reason);
-        cache.sRem(key, peer);
+        cache.remove(board, peer);
     });
 });
 
