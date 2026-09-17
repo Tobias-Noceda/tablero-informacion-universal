@@ -1,12 +1,5 @@
-import { MongoClient, type MongoClientOptions } from "mongodb";
-// import { attachDatabasePool } from "@vercel/functions";
+import { MongoClient } from "mongodb";
 
-const options: MongoClientOptions = {
+export default new MongoClient(process.env.MONGODB_URI!, {
     appName: "tesis.vercel.integration",
-    // maxIdleTimeMS: 5000,
-};
-
-const client = new MongoClient(process.env.MONGODB_URI!, options);
-// attachDatabasePool(client);
-
-export default client;
+});
