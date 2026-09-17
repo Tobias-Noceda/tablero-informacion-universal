@@ -12,6 +12,7 @@ type Position struct {
 type BoardPostIt struct {
 	Id       uuid.UUID `bson:"id" json:"id"`
 	Type     string    `bson:"type" json:"type"` // Reserved for future use
+	Title    Title     `bson:"title" json:"title"`
 	Position Position  `bson:"position" json:"position"`
 }
 
