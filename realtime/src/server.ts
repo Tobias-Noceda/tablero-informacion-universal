@@ -15,7 +15,7 @@ const io = new Server(server, {
 });
 
 const cache = await redis.connect();
-await using docs = await mongo.connect();
+const docs = await mongo.connect();
 
 io.on("connection", async (socket) => {
     if (socket.recovered) {
@@ -81,5 +81,10 @@ if (import.meta.main) {
     const port = process.env.PORT ?? 3000;
     server.listen(port);
 }
+
+process.on("SIGTERM", async () => {
+    await stream.close();
+    await Promise.allSettled([io, cache, docs].map((r) => r.close()));
+});
 
 export default server;
