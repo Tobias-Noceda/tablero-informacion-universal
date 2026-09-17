@@ -1,5 +1,36 @@
-import { MongoClient } from "mongodb";
+import { MongoClient, type Document } from "mongodb";
 
-export default new MongoClient(process.env.MONGODB_URI!, {
+const mongo = new MongoClient(process.env.MONGODB_URI!, {
     appName: "tesis.vercel.integration",
 });
+
+const docs = await mongo.connect();
+
+const boards = docs.db("prod").collection("boards");
+const stream = boards.watch([{ $match: { operationType: "update" } }], {
+    fullDocument: "updateLookup",
+});
+
+export type Callback = (id: string, board: Document) => void;
+
+let callback: Callback = () => {};
+export function setStreamCallback(cb: Callback) {
+    callback = cb;
+}
+
+export async function close() {
+    await stream.close();
+    return docs.close();
+}
+
+stream
+    .on("change", (event) => {
+        const change = event as typeof event & { operationType: "update" };
+
+        const board = change.fullDocument;
+        const id = change.documentKey._id;
+
+        if (!board) return;
+        callback(id.toString(), board);
+    })
+    .once("error", console.error);
