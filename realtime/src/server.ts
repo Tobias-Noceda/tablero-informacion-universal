@@ -45,7 +45,7 @@ io.on("connection", async (socket) => {
 
         socket.emit("peers", peers);
     } catch (e) {
-        console.error(e);
+        console.error("Failed to register peer", e);
         socket.disconnect(true);
         return;
     }
@@ -53,7 +53,7 @@ io.on("connection", async (socket) => {
     socket.join(board);
 
     socket.on("disconnect", (reason) => {
-        console.error(reason);
+        console.error("Client disconnected:", reason);
         cache.sRem(key, peer);
     });
 });
