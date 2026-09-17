@@ -1,4 +1,4 @@
-import { MongoClient, type Document } from "mongodb";
+import { MongoClient } from "mongodb";
 
 const mongo = new MongoClient(process.env.MONGODB_URI!, {
     appName: "tesis.vercel.integration",
@@ -11,7 +11,7 @@ const stream = boards.watch([{ $match: { operationType: "update" } }], {
     fullDocument: "updateLookup",
 });
 
-export type Callback = (id: string, board: Document) => void;
+export type Callback = (id: string, board: unknown) => void;
 
 let callback: Callback = () => {};
 export function setStreamCallback(cb: Callback) {
