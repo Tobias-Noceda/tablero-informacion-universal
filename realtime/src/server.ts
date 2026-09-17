@@ -66,11 +66,13 @@ const stream = boards.watch([{ $match: { operationType: "update" } }], {
 stream
     .on("change", (event) => {
         const change = event as typeof event & { operationType: "update" };
+
         const board = change.fullDocument;
+        const id = change.documentKey._id;
 
         if (!board) return;
 
-        io.to(board._id).emit("update", {
+        io.to(id.toString()).emit("update", {
             board,
             ts: Date.now(),
         });
