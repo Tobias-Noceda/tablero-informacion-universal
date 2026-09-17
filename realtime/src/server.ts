@@ -60,7 +60,7 @@ io.on("connection", async (socket) => {
 
 const boards = docs.db("prod").collection<{ _id: string }>("boards");
 const stream = boards.watch([{ $match: { operationType: "update" } }], {
-    fullDocument: "whenAvailable",
+    fullDocument: "updateLookup",
 });
 
 stream
