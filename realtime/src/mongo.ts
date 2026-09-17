@@ -3,7 +3,7 @@ import { MongoClient, type MongoClientOptions } from "mongodb";
 
 const options: MongoClientOptions = {
     appName: "tesis.vercel.integration",
-    maxIdleTimeMS: 5000,
+    // maxIdleTimeMS: 5000,
 };
 
 const client = new MongoClient(process.env.MONGODB_URI!, options);
