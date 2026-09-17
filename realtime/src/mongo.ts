@@ -1,5 +1,5 @@
 import { MongoClient, type MongoClientOptions } from "mongodb";
-import { attachDatabasePool } from "@vercel/functions";
+// import { attachDatabasePool } from "@vercel/functions";
 
 const options: MongoClientOptions = {
     appName: "tesis.vercel.integration",
@@ -7,6 +7,6 @@ const options: MongoClientOptions = {
 };
 
 const client = new MongoClient(process.env.MONGODB_URI!, options);
-attachDatabasePool(client);
+// attachDatabasePool(client);
 
 export default client;
