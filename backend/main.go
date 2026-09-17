@@ -63,7 +63,7 @@ func main() {
 	postitController := postits.NewController(postitService)
 	secretController := s_ctrl.NewController(secrets)
 
-	api := router.Group("/v1")
+	api := router.Group("/api/v1")
 	boardController.RegisterRoutes(api)
 	postitController.RegisterRoutes(api)
 	secretController.RegisterRoutes(api)
