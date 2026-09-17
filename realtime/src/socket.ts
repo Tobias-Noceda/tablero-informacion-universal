@@ -10,9 +10,9 @@ const wss = new Server(server, {
     path: "/ws",
 });
 
-export function notify(group: string, data: unknown) {
+export function notify(group: string, board: unknown) {
     wss.to(group).emit("update", {
-        data,
+        board,
         ts: Date.now(),
     });
 }
