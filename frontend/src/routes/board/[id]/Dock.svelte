@@ -107,6 +107,24 @@
     >
       {m["nodes.github_repo"]()}
     </div>
+    <div
+      class="gmail_inbox node"
+      ondragstart={(event) => onDragStart(event, 'gmail_inbox')}
+      draggable={true}
+      role="button"
+      tabindex="0"
+    >
+      {m["nodes.gmail_inbox"]()}
+    </div>
+    <div
+      class="google_calendar node"
+      ondragstart={(event) => onDragStart(event, 'google_calendar')}
+      draggable={true}
+      role="button"
+      tabindex="0"
+    >
+      {m["nodes.google_calendar"]()}
+    </div>
   </div>
 </aside>
 
