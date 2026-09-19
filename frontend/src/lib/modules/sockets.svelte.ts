@@ -6,7 +6,10 @@ export type Update = { board: Board; ts: Date };
 
 export async function socket(board: string, peer: string, update: (data: Update) => void) {
 	const socket = io(
-		import.meta.env.VITE_API_URL || window?.location.origin || 'http://localhost:3000',
+		import.meta.env.VITE_REALTIME_URL ||
+			import.meta.env.VITE_API_URL ||
+			window?.location.origin ||
+			'http://localhost:3000',
 		{
 			path: '/ws',
 			transports: ['websocket'],

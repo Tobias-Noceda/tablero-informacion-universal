@@ -1,3 +1,5 @@
+import { uuid } from '$lib/utils';
+
 import { RTC } from './rtc.svelte';
 import { socket, type Update } from './sockets.svelte';
 
@@ -12,7 +14,7 @@ export async function connect(
 	board: string,
 	onChange: (data: Update) => void
 ): Promise<Connection> {
-	const id = crypto.randomUUID();
+	const id = uuid();
 	const peers = await socket(board, id, onChange);
 	return new RTC(id, peers);
 }

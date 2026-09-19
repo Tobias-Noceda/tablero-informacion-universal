@@ -6,7 +6,7 @@ const mongo = new MongoClient(process.env.MONGODB_URI!, {
 
 const docs = await mongo.connect();
 
-const boards = docs.db("prod").collection("boards");
+const boards = docs.db(process.env.MONGO_DATABASE || "prod").collection("boards");
 const stream = boards.watch([{ $match: { operationType: "update" } }], {
     fullDocument: "updateLookup",
 });
