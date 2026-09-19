@@ -37,6 +37,10 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := db.EnsureIndexes(); err != nil {
+		panic(err)
+	}
+
 	cache, err := redis.New()
 	if err != nil {
 		panic(err)
@@ -49,7 +53,7 @@ func main() {
 	}
 
 	executer := executer.New()
-	secrets := s_srv.New(db, db, sealer, oauth.New(), cache, cache)
+	secrets := s_srv.New(db, s_srv.NewPolicy(db), sealer, oauth.New(), cache, cache)
 
 	boardService := b_srv.New(db)
 	postitService := p_srv.New(db, cache, executer, secrets)

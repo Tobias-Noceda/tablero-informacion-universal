@@ -70,6 +70,12 @@ func (db *MongoDB) Close() error {
 	return db.client.Disconnect(context.Background())
 }
 
+// EnsureIndexes creates the indexes the stores rely on for uniqueness. Safe
+// to call on every boot: Mongo ignores an index that already exists.
+func (db *MongoDB) EnsureIndexes() error {
+	return db.ensureSecretIndexes()
+}
+
 func timeout() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), REQUEST_TIMEOUT)
 }

@@ -2,16 +2,33 @@ package mongo
 
 import (
 	"github.com/Secreto31126/tesis/common/models"
-	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
+
+func scopeFilter(scope models.SecretScope) bson.M {
+	return bson.M{"scope.kind": scope.Kind, "scope.owner": scope.Owner}
+}
+
+func (db *MongoDB) ensureSecretIndexes() error {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	_, err := db.secrets.Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys:    bson.D{{Key: "scope.kind", Value: 1}, {Key: "scope.owner", Value: 1}, {Key: "name", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	})
+
+	return err
+}
 
 func (db *MongoDB) UpsertSecret(secret *models.Secret) error {
 	ctx, cancel := timeout()
 	defer cancel()
 
-	filter := bson.M{"board": secret.Board, "name": secret.Name}
+	filter := scopeFilter(secret.Scope)
+	filter["name"] = secret.Name
 
 	_, err := db.secrets.UpdateOne(ctx, filter, bson.M{
 		"$set": bson.M{
@@ -25,7 +42,7 @@ func (db *MongoDB) UpsertSecret(secret *models.Secret) error {
 		},
 		"$setOnInsert": bson.M{
 			"_id":       secret.Id,
-			"board":     secret.Board,
+			"scope":     secret.Scope,
 			"name":      secret.Name,
 			"createdat": secret.CreatedAt,
 		},
@@ -34,14 +51,14 @@ func (db *MongoDB) UpsertSecret(secret *models.Secret) error {
 	return err
 }
 
-func (db *MongoDB) FindSecrets(board uuid.UUID, names []string) ([]models.Secret, error) {
+func (db *MongoDB) FindSecrets(scope models.SecretScope, names []string) ([]models.Secret, error) {
 	ctx, cancel := timeout()
 	defer cancel()
 
-	cursor, err := db.secrets.Find(ctx, bson.M{
-		"board": board,
-		"name":  bson.M{"$in": names},
-	})
+	filter := scopeFilter(scope)
+	filter["name"] = bson.M{"$in": names}
+
+	cursor, err := db.secrets.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -54,11 +71,11 @@ func (db *MongoDB) FindSecrets(board uuid.UUID, names []string) ([]models.Secret
 	return secrets, nil
 }
 
-func (db *MongoDB) ListSecrets(board uuid.UUID) ([]models.Secret, error) {
+func (db *MongoDB) ListSecrets(scope models.SecretScope) ([]models.Secret, error) {
 	ctx, cancel := timeout()
 	defer cancel()
 
-	cursor, err := db.secrets.Find(ctx, bson.M{"board": board})
+	cursor, err := db.secrets.Find(ctx, scopeFilter(scope))
 	if err != nil {
 		return nil, err
 	}
@@ -71,10 +88,13 @@ func (db *MongoDB) ListSecrets(board uuid.UUID) ([]models.Secret, error) {
 	return secrets, nil
 }
 
-func (db *MongoDB) DeleteSecret(board uuid.UUID, name string) error {
+func (db *MongoDB) DeleteSecret(scope models.SecretScope, name string) error {
 	ctx, cancel := timeout()
 	defer cancel()
 
-	_, err := db.secrets.DeleteOne(ctx, bson.M{"board": board, "name": name})
+	filter := scopeFilter(scope)
+	filter["name"] = name
+
+	_, err := db.secrets.DeleteOne(ctx, filter)
 	return err
 }

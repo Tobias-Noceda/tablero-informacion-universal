@@ -35,7 +35,7 @@ func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(store, boards, sealer, &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})).RegisterRoutes(r)
+	NewController(srv.New(store, srv.NewPolicy(boards), sealer, &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})).RegisterRoutes(r)
 	return r
 }
 
@@ -137,9 +137,9 @@ func TestPutSecret_InvalidBoard(t *testing.T) {
 func TestListSecrets_ReturnsMetadataOnly(t *testing.T) {
 	board := uuid.New()
 	store := &mocks.MockSecretStore{
-		ListSecretsFn: func(_ uuid.UUID) ([]models.Secret, error) {
+		ListSecretsFn: func(scope models.SecretScope) ([]models.Secret, error) {
 			return []models.Secret{{
-				Board:      board,
+				Scope:      scope,
 				Name:       "API_KEY",
 				Kind:       models.SecretApiKey,
 				Ciphertext: []byte("ciphertext-bytes"),
@@ -177,7 +177,7 @@ func TestListSecrets_MissingCognitoID(t *testing.T) {
 func TestDeleteSecret_OK(t *testing.T) {
 	var gotName string
 	store := &mocks.MockSecretStore{
-		DeleteSecretFn: func(_ uuid.UUID, name string) error {
+		DeleteSecretFn: func(_ models.SecretScope, name string) error {
 			gotName = name
 			return nil
 		},
@@ -196,7 +196,7 @@ func TestDeleteSecret_OK(t *testing.T) {
 func TestDeleteSecret_NonOwner(t *testing.T) {
 	deleted := false
 	store := &mocks.MockSecretStore{
-		DeleteSecretFn: func(_ uuid.UUID, _ string) error {
+		DeleteSecretFn: func(models.SecretScope, string) error {
 			deleted = true
 			return nil
 		},

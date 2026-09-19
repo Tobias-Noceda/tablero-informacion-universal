@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Secreto31126/tesis/common/models"
 	srv "github.com/Secreto31126/tesis/common/services/secrets"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -19,236 +20,293 @@ func NewController(service *srv.SecretsService) *Controller {
 	}
 }
 
-func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
-	boardGroup := router.Group("/boards")
-	{
-		boardGroup.GET("/:id/secrets", ctrl.ListSecrets)
-		boardGroup.PUT("/:id/secrets", ctrl.PutSecret)
-		boardGroup.DELETE("/:id/secrets/:name", ctrl.DeleteSecret)
-
-		boardGroup.PUT("/:id/oauth2", ctrl.PutOAuth2)
-		boardGroup.GET("/:id/oauth2/authorize", ctrl.Authorize)
-	}
-
-	router.GET("/oauth2/callback", ctrl.Callback)
+// scoping tells a handler which scope a route addresses and whether the
+// caller has to identify itself. Replacing cognito_id with an authenticated
+// subject means changing principal() and nothing else here.
+type scoping struct {
+	scope             func(*gin.Context) (models.SecretScope, bool)
+	principalRequired bool
 }
 
-func boardID(c *gin.Context) (uuid.UUID, bool) {
+func (s scoping) principal(c *gin.Context, cognitoID string) (models.Principal, bool) {
+	if cognitoID == "" && s.principalRequired {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Missing cognito_id",
+		})
+		return models.Principal{}, false
+	}
+
+	return models.Principal{ID: cognitoID}, true
+}
+
+func boardScope(c *gin.Context) (models.SecretScope, bool) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "invalid uuid",
 		})
-		return uuid.Nil, false
+		return models.SecretScope{}, false
 	}
 
-	return id, true
+	return models.BoardScope(id), true
+}
+
+func userScope(c *gin.Context) (models.SecretScope, bool) {
+	return models.UserScope(c.Param("id")), true
+}
+
+func systemScope(*gin.Context) (models.SecretScope, bool) {
+	return models.SystemScope, true
+}
+
+func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
+	ctrl.registerScoped(router.Group("/boards/:id"), scoping{scope: boardScope, principalRequired: true})
+	ctrl.registerScoped(router.Group("/users/:id"), scoping{scope: userScope, principalRequired: true})
+
+	system := scoping{scope: systemScope}
+	systemGroup := router.Group("/system")
+	{
+		systemGroup.GET("/secrets", ctrl.ListSystemSecrets)
+		systemGroup.PUT("/secrets", ctrl.PutSecret(system))
+		systemGroup.DELETE("/secrets/:name", ctrl.DeleteSecret(system))
+		systemGroup.PUT("/oauth2", ctrl.PutOAuth2(system))
+	}
+
+	router.GET("/oauth2/callback", ctrl.Callback)
+}
+
+func (ctrl *Controller) registerScoped(group *gin.RouterGroup, s scoping) {
+	group.GET("/secrets", ctrl.ListSecrets(s))
+	group.PUT("/secrets", ctrl.PutSecret(s))
+	group.DELETE("/secrets/:name", ctrl.DeleteSecret(s))
+
+	group.PUT("/oauth2", ctrl.PutOAuth2(s))
+	group.GET("/oauth2/authorize", ctrl.Authorize(s))
 }
 
 func fail(c *gin.Context, err error) {
 	if errors.Is(err, srv.ErrForbidden) {
 		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Board not found",
+			"error": "Not found",
 		})
 		return
 	}
 
-	c.JSON(http.StatusInternalServerError, gin.H{
+	// Validation failures are the caller's fault, not the server's.
+	c.JSON(http.StatusBadRequest, gin.H{
 		"error": err.Error(),
 	})
 }
 
 // ListSecrets godoc
-// @Summary      List a board's secret names
+// @Summary      List the secret names of a scope
 // @Description  Returns metadata only. Secret values are never returned by this API.
 // @Tags         secrets
 // @Produce      json
-// @Param        id          path      string  true  "Board UUID"
+// @Param        id          path      string  true  "Board UUID or user id"
 // @Param        cognito_id  query     string  true  "AWS Cognito User ID"
 // @Success      200         {array}   models.SecretMeta
 // @Failure      400         {object}  map[string]string
 // @Failure      404         {object}  map[string]string
 // @Router       /boards/{id}/secrets [get]
-func (ctrl *Controller) ListSecrets(c *gin.Context) {
-	id, ok := boardID(c)
-	if !ok {
-		return
-	}
+// @Router       /users/{id}/secrets [get]
+func (ctrl *Controller) ListSecrets(s scoping) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scope, ok := s.scope(c)
+		if !ok {
+			return
+		}
 
-	cognitoID, exists := c.GetQuery("cognito_id")
-	if !exists {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Missing cognito_id",
-		})
-		return
-	}
+		principal, ok := s.principal(c, c.Query("cognito_id"))
+		if !ok {
+			return
+		}
 
-	metas, err := ctrl.service.List(id, cognitoID)
+		metas, err := ctrl.service.List(scope, principal)
+		if err != nil {
+			fail(c, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, metas)
+	}
+}
+
+// ListSystemSecrets godoc
+// @Summary      List the platform's secrets against what the code expects
+// @Description  Every name the code references, flagged as configured or not, plus any stored extra.
+// @Tags         secrets
+// @Produce      json
+// @Success      200  {array}  models.SystemSecretStatus
+// @Router       /system/secrets [get]
+func (ctrl *Controller) ListSystemSecrets(c *gin.Context) {
+	statuses, err := ctrl.service.ListSystem(models.Principal{ID: c.Query("cognito_id")})
 	if err != nil {
 		fail(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, metas)
+	c.JSON(http.StatusOK, statuses)
 }
 
 // PutSecret godoc
-// @Summary      Create or replace a board secret
-// @Description  Owner only. The value is encrypted before storage and cannot be read back.
+// @Summary      Create or replace a secret
+// @Description  Managers only. The value is encrypted before storage and cannot be read back.
 // @Tags         secrets
 // @Accept       json
-// @Param        id       path  string            true  "Board UUID"
+// @Param        id       path  string            true  "Board UUID or user id"
 // @Param        request  body  PutSecretRequest  true  "Secret payload"
 // @Success      204
 // @Failure      400      {object}  map[string]string
 // @Failure      404      {object}  map[string]string
 // @Router       /boards/{id}/secrets [put]
-func (ctrl *Controller) PutSecret(c *gin.Context) {
-	id, ok := boardID(c)
-	if !ok {
-		return
-	}
+// @Router       /users/{id}/secrets [put]
+// @Router       /system/secrets [put]
+func (ctrl *Controller) PutSecret(s scoping) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scope, ok := s.scope(c)
+		if !ok {
+			return
+		}
 
-	var req PutSecretRequest
+		var req PutSecretRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
+		principal, ok := s.principal(c, req.CognitoID)
+		if !ok {
+			return
+		}
 
-	if err := ctrl.service.Put(id, req.CognitoID, req.Name, req.Kind, req.Value); err != nil {
-		if errors.Is(err, srv.ErrForbidden) {
+		if err := ctrl.service.Put(scope, principal, req.Name, req.Kind, req.Value); err != nil {
 			fail(c, err)
 			return
 		}
 
-		// Validation failures are the caller's fault, not the server's.
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
-		return
+		c.Status(http.StatusNoContent)
 	}
-
-	c.Status(http.StatusNoContent)
 }
 
 // DeleteSecret godoc
-// @Summary      Delete a board secret
-// @Description  Owner only.
+// @Summary      Delete a secret
+// @Description  Managers only.
 // @Tags         secrets
-// @Param        id          path   string  true  "Board UUID"
+// @Param        id          path   string  true  "Board UUID or user id"
 // @Param        name        path   string  true  "Secret name"
 // @Param        cognito_id  query  string  true  "AWS Cognito User ID"
 // @Success      204
 // @Failure      400         {object}  map[string]string
 // @Failure      404         {object}  map[string]string
 // @Router       /boards/{id}/secrets/{name} [delete]
-func (ctrl *Controller) DeleteSecret(c *gin.Context) {
-	id, ok := boardID(c)
-	if !ok {
-		return
-	}
+// @Router       /users/{id}/secrets/{name} [delete]
+// @Router       /system/secrets/{name} [delete]
+func (ctrl *Controller) DeleteSecret(s scoping) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scope, ok := s.scope(c)
+		if !ok {
+			return
+		}
 
-	cognitoID, exists := c.GetQuery("cognito_id")
-	if !exists {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Missing cognito_id",
-		})
-		return
-	}
+		principal, ok := s.principal(c, c.Query("cognito_id"))
+		if !ok {
+			return
+		}
 
-	if err := ctrl.service.Delete(id, cognitoID, c.Param("name")); err != nil {
-		fail(c, err)
-		return
-	}
-
-	c.Status(http.StatusNoContent)
-}
-
-// PutOAuth2 godoc
-// @Summary      Create or replace an OAuth2 credential
-// @Description  Owner only. Tokens are never accepted from the caller.
-// @Tags         secrets
-// @Accept       json
-// @Param        id       path  string            true  "Board UUID"
-// @Param        request  body  PutOAuth2Request  true  "OAuth2 configuration"
-// @Success      204
-// @Router       /boards/{id}/oauth2 [put]
-func (ctrl *Controller) PutOAuth2(c *gin.Context) {
-	id, ok := boardID(c)
-	if !ok {
-		return
-	}
-
-	var req PutOAuth2Request
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
-		return
-	}
-
-	if err := ctrl.service.PutOAuth2(id, req.CognitoID, req.Name, req.Material()); err != nil {
-		if errors.Is(err, srv.ErrForbidden) {
+		if err := ctrl.service.Delete(scope, principal, c.Param("name")); err != nil {
 			fail(c, err)
 			return
 		}
 
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
-		return
+		c.Status(http.StatusNoContent)
 	}
+}
 
-	c.Status(http.StatusNoContent)
+// PutOAuth2 godoc
+// @Summary      Create or replace an OAuth2 credential
+// @Description  Managers only. Tokens are never accepted from the caller.
+// @Tags         secrets
+// @Accept       json
+// @Param        id       path  string            true  "Board UUID or user id"
+// @Param        request  body  PutOAuth2Request  true  "OAuth2 configuration"
+// @Success      204
+// @Router       /boards/{id}/oauth2 [put]
+// @Router       /users/{id}/oauth2 [put]
+// @Router       /system/oauth2 [put]
+func (ctrl *Controller) PutOAuth2(s scoping) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scope, ok := s.scope(c)
+		if !ok {
+			return
+		}
+
+		var req PutOAuth2Request
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		principal, ok := s.principal(c, req.CognitoID)
+		if !ok {
+			return
+		}
+
+		if err := ctrl.service.PutOAuth2(scope, principal, req.Name, req.Material()); err != nil {
+			fail(c, err)
+			return
+		}
+
+		c.Status(http.StatusNoContent)
+	}
 }
 
 // Authorize godoc
 // @Summary      Start an OAuth2 authorization code handshake
-// @Description  Owner only. Responds with the provider URL to send the user to.
+// @Description  Managers only. Responds with the provider URL to send the user to.
 // @Tags         secrets
 // @Produce      json
-// @Param        id           path   string  true  "Board UUID"
+// @Param        id           path   string  true  "Board UUID or user id"
 // @Param        name         query  string  true  "Credential name"
 // @Param        cognito_id   query  string  true  "AWS Cognito User ID"
 // @Param        redirect_uri query  string  true  "Callback URL registered with the provider"
 // @Success      200  {object}  map[string]string
 // @Router       /boards/{id}/oauth2/authorize [get]
-func (ctrl *Controller) Authorize(c *gin.Context) {
-	id, ok := boardID(c)
-	if !ok {
-		return
-	}
+// @Router       /users/{id}/oauth2/authorize [get]
+func (ctrl *Controller) Authorize(s scoping) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scope, ok := s.scope(c)
+		if !ok {
+			return
+		}
 
-	cognitoID, hasCognito := c.GetQuery("cognito_id")
-	name, hasName := c.GetQuery("name")
-	redirect, hasRedirect := c.GetQuery("redirect_uri")
+		name, hasName := c.GetQuery("name")
+		redirect, hasRedirect := c.GetQuery("redirect_uri")
+		if !hasName || !hasRedirect {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "Missing name or redirect_uri",
+			})
+			return
+		}
 
-	if !hasCognito || !hasName || !hasRedirect {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Missing cognito_id, name or redirect_uri",
-		})
-		return
-	}
+		principal, ok := s.principal(c, c.Query("cognito_id"))
+		if !ok {
+			return
+		}
 
-	target, err := ctrl.service.Authorize(id, cognitoID, name, redirect)
-	if err != nil {
-		if errors.Is(err, srv.ErrForbidden) {
+		target, err := ctrl.service.Authorize(scope, principal, name, redirect)
+		if err != nil {
 			fail(c, err)
 			return
 		}
 
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
-		return
+		// Returned rather than redirected so the caller decides how to navigate.
+		c.JSON(http.StatusOK, gin.H{"authorization_url": target})
 	}
-
-	// Returned rather than redirected so the caller decides how to navigate.
-	c.JSON(http.StatusOK, gin.H{"authorization_url": target})
 }
 
 // Callback godoc

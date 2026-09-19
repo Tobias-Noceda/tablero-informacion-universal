@@ -2,16 +2,27 @@ package secrets
 
 import "github.com/Secreto31126/tesis/common/models"
 
+// Caller identifies who is making a write. Optional on the wire because the
+// system scope has nobody to name yet; the policy decides whether an
+// anonymous caller is acceptable for the scope at hand.
+type Caller struct {
+	CognitoID string `json:"cognito_id"`
+}
+
+func (c Caller) Principal() models.Principal {
+	return models.Principal{ID: c.CognitoID}
+}
+
 type PutSecretRequest struct {
-	CognitoID string            `json:"cognito_id" binding:"required"`
-	Name      string            `json:"name" binding:"required"`
-	Kind      models.SecretKind `json:"kind" binding:"required"`
-	Value     string            `json:"value" binding:"required"`
+	Caller
+	Name  string            `json:"name" binding:"required"`
+	Kind  models.SecretKind `json:"kind" binding:"required"`
+	Value string            `json:"value" binding:"required"`
 }
 
 type PutOAuth2Request struct {
-	CognitoID string `json:"cognito_id" binding:"required"`
-	Name      string `json:"name" binding:"required"`
+	Caller
+	Name string `json:"name" binding:"required"`
 
 	Flow     string `json:"flow" binding:"required"`
 	ClientID string `json:"client_id" binding:"required"`
