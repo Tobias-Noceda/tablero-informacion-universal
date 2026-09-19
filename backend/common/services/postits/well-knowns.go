@@ -244,8 +244,6 @@ var configuredPostIts = map[string]models.PostIts{
 		},
 		Rate: 900,
 	},
-	// Both Google well-knowns expect an OAuth2 credential (authorization code)
-	// with the matching *.readonly scope; $credential resolves to "Bearer …".
 	"gmail_inbox": {
 		WellKnown: "gmail_inbox",
 		Params: map[string]string{
