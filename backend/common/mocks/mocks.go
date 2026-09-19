@@ -234,10 +234,11 @@ func (m *MockScopePolicy) CanView(principal models.Principal, scope models.Secre
 }
 
 type MockSecretStore struct {
-	UpsertSecretFn func(secret *models.Secret) error
-	FindSecretsFn  func(scope models.SecretScope, names []string) ([]models.Secret, error)
-	ListSecretsFn  func(scope models.SecretScope) ([]models.Secret, error)
-	DeleteSecretFn func(scope models.SecretScope, name string) error
+	UpsertSecretFn  func(secret *models.Secret) error
+	FindSecretsFn   func(scope models.SecretScope, names []string) ([]models.Secret, error)
+	ListSecretsFn   func(scope models.SecretScope) ([]models.Secret, error)
+	DeleteSecretFn  func(scope models.SecretScope, name string) error
+	DeleteSecretsFn func(scope models.SecretScope) error
 }
 
 var _ infrastructure.SecretStore = (*MockSecretStore)(nil)
@@ -266,6 +267,13 @@ func (m *MockSecretStore) ListSecrets(scope models.SecretScope) ([]models.Secret
 func (m *MockSecretStore) DeleteSecret(scope models.SecretScope, name string) error {
 	if m.DeleteSecretFn != nil {
 		return m.DeleteSecretFn(scope, name)
+	}
+	return nil
+}
+
+func (m *MockSecretStore) DeleteSecrets(scope models.SecretScope) error {
+	if m.DeleteSecretsFn != nil {
+		return m.DeleteSecretsFn(scope)
 	}
 	return nil
 }
@@ -338,4 +346,17 @@ func (m *MockHandshakeStore) Take(key string) ([]byte, error) {
 	}
 	delete(m.entries, key)
 	return value, nil
+}
+
+type MockScopePurger struct {
+	PurgeFn func(scope models.SecretScope) error
+}
+
+var _ infrastructure.ScopePurger = (*MockScopePurger)(nil)
+
+func (m *MockScopePurger) Purge(scope models.SecretScope) error {
+	if m.PurgeFn != nil {
+		return m.PurgeFn(scope)
+	}
+	return nil
 }

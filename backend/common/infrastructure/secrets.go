@@ -64,4 +64,6 @@ type SecretStore interface {
 	ListSecrets(scope models.SecretScope) ([]models.Secret, error)
 	// Delete a secret by name
 	DeleteSecret(scope models.SecretScope, name string) error
+	// Delete every secret of a scope
+	DeleteSecrets(scope models.SecretScope) error
 }

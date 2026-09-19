@@ -30,7 +30,7 @@ type Secret struct {
 	Kind       SecretKind  `bson:"kind" json:"kind"`
 	Ciphertext []byte      `bson:"ciphertext" json:"-"`
 	Nonce      []byte      `bson:"nonce" json:"-"`
-	KeyVersion int         `bson:"keyversion" json:"-"`
+	KeyID      uuid.UUID   `bson:"keyid" json:"-"`
 	CreatedAt  time.Time   `bson:"createdat" json:"created_at"`
 	UpdatedAt  time.Time   `bson:"updatedat" json:"updated_at"`
 
