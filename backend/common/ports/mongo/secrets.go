@@ -35,7 +35,7 @@ func (db *MongoDB) UpsertSecret(secret *models.Secret) error {
 			"kind":       secret.Kind,
 			"ciphertext": secret.Ciphertext,
 			"nonce":      secret.Nonce,
-			"keyversion": secret.KeyVersion,
+			"keyid":      secret.KeyID,
 			"updatedat":  secret.UpdatedAt,
 			"flow":       secret.Flow,
 			"authorized": secret.Authorized,
@@ -86,6 +86,14 @@ func (db *MongoDB) ListSecrets(scope models.SecretScope) ([]models.Secret, error
 	}
 
 	return secrets, nil
+}
+
+func (db *MongoDB) DeleteSecrets(scope models.SecretScope) error {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	_, err := db.secrets.DeleteMany(ctx, scopeFilter(scope))
+	return err
 }
 
 func (db *MongoDB) DeleteSecret(scope models.SecretScope, name string) error {

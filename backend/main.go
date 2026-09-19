@@ -47,15 +47,26 @@ func main() {
 	}
 	defer cache.Close()
 
-	sealer, err := crypto.New()
+	kek, err := crypto.New()
 	if err != nil {
 		panic(err)
 	}
 
 	executer := executer.New()
-	secrets := s_srv.New(db, s_srv.NewPolicy(db), sealer, oauth.New(), cache, cache)
+	secrets := s_srv.New(db, s_srv.NewPolicy(db), crypto.NewKeyring(kek, db), oauth.New(), cache, cache)
 
-	boardService := b_srv.New(db)
+	maintenance, err := parseMaintenance(os.Args[1:])
+	if err != nil {
+		panic(err)
+	}
+	if maintenance.requested() {
+		if err := maintenance.run(secrets, os.Stdout); err != nil {
+			panic(err)
+		}
+		return
+	}
+
+	boardService := b_srv.New(db, secrets)
 	postitService := p_srv.New(db, cache, executer, secrets)
 	realtimeService := r_srv.New(*boardService, cache)
 
