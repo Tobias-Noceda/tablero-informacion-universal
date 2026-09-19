@@ -41,6 +41,13 @@ services:
     networks:
       - redis
 
+  mock-oauth2:
+    image: ghcr.io/navikt/mock-oauth2-server:2.1.10
+    profiles:
+      - integration
+    ports:
+      - "8899:8080"
+
   alb:
     image: nginx:stable-alpine
     ports:
