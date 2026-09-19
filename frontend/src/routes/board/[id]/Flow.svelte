@@ -14,6 +14,7 @@
 	import * as secretsApi from '$services/secrets';
 	import type { SecretMeta } from '$types/api';
 	import { m } from '$lib/paraglide/messages';
+	import { uuid } from '$lib/utils';
 	import { nodesMap, parameters } from '$components/Nodes/node-map';
 	import { edgesMap } from '$components/Edges/edge-map';
 	import { mouses } from '$stores/mouses.svelte';
@@ -85,7 +86,7 @@
 			(parameters[type.current] ?? []).map((p) => [p.key, p.default ?? ''])
 		);
 		creatingNode = {
-			id: crypto.randomUUID(),
+			id: uuid(),
 			type: type.current,
 			position
 		};
