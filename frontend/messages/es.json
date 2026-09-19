@@ -20,7 +20,8 @@
 		"github_repo": "Repositorio GitHub",
 		"exchange_rate": "Cotización",
 		"gmail_inbox": "Bandeja de Gmail",
-		"google_calendar": "Calendario de Google"
+		"google_calendar": "Calendario de Google",
+		"nasa_apod": "Foto del Día de la NASA"
 	},
 	"secrets": {
 		"title": "Credenciales del tablero",

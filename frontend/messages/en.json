@@ -20,7 +20,8 @@
 		"github_repo": "GitHub Repository",
 		"exchange_rate": "Exchange Rate",
 		"gmail_inbox": "Gmail Inbox",
-		"google_calendar": "Google Calendar"
+		"google_calendar": "Google Calendar",
+		"nasa_apod": "NASA Picture of the Day"
 	},
 	"secrets": {
 		"title": "Board credentials",
