@@ -17,10 +17,11 @@ import (
 type memoryStore struct {
 	mocks.MockSecretStore
 	rows []models.Secret
+	keys *mocks.MemoryKeyStore
 }
 
 func newStore() *memoryStore {
-	s := &memoryStore{}
+	s := &memoryStore{keys: &mocks.MemoryKeyStore{}}
 	// Mirrors the Mongo upsert: one row per board + name, replaced in place.
 	s.UpsertSecretFn = func(secret *models.Secret) error {
 		for i, row := range s.rows {
@@ -46,8 +47,24 @@ func newStore() *memoryStore {
 		}
 		return out, nil
 	}
-	s.ListSecretsFn = func(models.SecretScope) ([]models.Secret, error) {
-		return s.rows, nil
+	s.ListSecretsFn = func(scope models.SecretScope) ([]models.Secret, error) {
+		var out []models.Secret
+		for _, row := range s.rows {
+			if row.Scope == scope {
+				out = append(out, row)
+			}
+		}
+		return out, nil
+	}
+	s.DeleteSecretsFn = func(scope models.SecretScope) error {
+		kept := s.rows[:0]
+		for _, row := range s.rows {
+			if row.Scope != scope {
+				kept = append(kept, row)
+			}
+		}
+		s.rows = kept
+		return nil
 	}
 	return s
 }
@@ -71,7 +88,7 @@ func service(t *testing.T, store *memoryStore) *SecretsService {
 			return &models.Board{Id: id, Owner: owner.ID, Collaborators: []string{collaborator.ID}}, nil
 		},
 	}
-	return New(store, NewPolicy(boards), sealer, &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})
+	return New(store, NewPolicy(boards), crypto.NewKeyring(sealer, store.keys), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})
 }
 
 func TestPut_StoresOnlyCiphertext(t *testing.T) {
@@ -90,8 +107,8 @@ func TestPut_StoresOnlyCiphertext(t *testing.T) {
 	if bytes.Contains(row.Ciphertext, []byte("kpGJZiOXIoaB")) {
 		t.Error("the plaintext is present in what was persisted")
 	}
-	if len(row.Nonce) == 0 || row.KeyVersion != 1 {
-		t.Errorf("nonce/version not recorded: %+v", row)
+	if len(row.Nonce) == 0 || row.KeyID == uuid.Nil {
+		t.Errorf("nonce/key not recorded: %+v", row)
 	}
 }
 

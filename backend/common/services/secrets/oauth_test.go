@@ -32,7 +32,7 @@ func oauthService(t *testing.T, store *memoryStore, tokens *mocks.MockTokenClien
 	if locks == nil {
 		locks = &mocks.MockLocker{}
 	}
-	return New(store, NewPolicy(boards), sealer, tokens, locks, &mocks.MockHandshakeStore{})
+	return New(store, NewPolicy(boards), crypto.NewKeyring(sealer, store.keys), tokens, locks, &mocks.MockHandshakeStore{})
 }
 
 func clientCredentials() *models.OAuth2Material {

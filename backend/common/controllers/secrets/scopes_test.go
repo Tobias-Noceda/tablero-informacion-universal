@@ -173,3 +173,33 @@ func TestSystemOAuth2_Put(t *testing.T) {
 		t.Fatalf("stored = %+v", stored)
 	}
 }
+
+func TestSystemKeys_ListsMetadataOnly(t *testing.T) {
+	store := &mocks.MockSecretStore{}
+	r := setupRouter(store)
+
+	// Writing a secret provisions the scope's key.
+	if w := do(r, http.MethodPut, "/system/secrets", `{"name":"NASA_API_KEY","kind":"api_key","value":"v"}`); w.Code != http.StatusNoContent {
+		t.Fatalf("put status = %d", w.Code)
+	}
+
+	w := do(r, http.MethodGet, "/system/keys", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	var keys []models.DataKey
+	if err := json.Unmarshal(w.Body.Bytes(), &keys); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if len(keys) != 1 || keys[0].Scope != models.SystemScope || !keys[0].Active || keys[0].KEKVersion != 1 {
+		t.Errorf("keys = %+v", keys)
+	}
+
+	body := strings.ToLower(w.Body.String())
+	for _, leak := range []string{"wrapped", "nonce"} {
+		if strings.Contains(body, leak) {
+			t.Errorf("listing exposed %q: %s", leak, body)
+		}
+	}
+}

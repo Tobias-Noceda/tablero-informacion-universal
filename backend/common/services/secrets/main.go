@@ -20,7 +20,7 @@ const REFRESH_LOCK_TTL = 30 * time.Second
 type SecretsService struct {
 	store      infrastructure.SecretStore
 	policy     infrastructure.ScopePolicy
-	sealer     *crypto.Sealer
+	keyring    *crypto.Keyring
 	tokens     infrastructure.TokenClient
 	locks      infrastructure.Locker
 	handshakes infrastructure.HandshakeStore
@@ -29,12 +29,12 @@ type SecretsService struct {
 func New(
 	store infrastructure.SecretStore,
 	policy infrastructure.ScopePolicy,
-	sealer *crypto.Sealer,
+	keyring *crypto.Keyring,
 	tokens infrastructure.TokenClient,
 	locks infrastructure.Locker,
 	handshakes infrastructure.HandshakeStore,
 ) *SecretsService {
-	return &SecretsService{store, policy, sealer, tokens, locks, handshakes}
+	return &SecretsService{store, policy, keyring, tokens, locks, handshakes}
 }
 
 // aad binds a ciphertext to the scope and name it was created under.
@@ -197,7 +197,7 @@ func (srv *SecretsService) Delete(scope models.SecretScope, principal models.Pri
 }
 
 func (srv *SecretsService) seal(scope models.SecretScope, name string, kind models.SecretKind, plaintext []byte, flow string, authorized bool) error {
-	sealed, err := srv.sealer.Seal(aad(scope, name), plaintext)
+	sealed, err := srv.keyring.Seal(scope, aad(scope, name), plaintext)
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func (srv *SecretsService) seal(scope models.SecretScope, name string, kind mode
 		Kind:       kind,
 		Ciphertext: sealed.Ciphertext,
 		Nonce:      sealed.Nonce,
-		KeyVersion: sealed.KeyVersion,
+		KeyID:      sealed.KeyID,
 		CreatedAt:  now,
 		UpdatedAt:  now,
 		Flow:       flow,
@@ -219,12 +219,18 @@ func (srv *SecretsService) seal(scope models.SecretScope, name string, kind mode
 	})
 }
 
-func (srv *SecretsService) unseal(s *models.Secret) ([]byte, error) {
-	return srv.sealer.Open(aad(s.Scope, s.Name), &crypto.Sealed{
+// open decrypts and reports whether the secret sits under a retired key.
+func (srv *SecretsService) open(s *models.Secret) (plaintext []byte, stale bool, err error) {
+	return srv.keyring.Open(s.Scope, aad(s.Scope, s.Name), &crypto.Sealed{
 		Ciphertext: s.Ciphertext,
 		Nonce:      s.Nonce,
-		KeyVersion: s.KeyVersion,
+		KeyID:      s.KeyID,
 	})
+}
+
+func (srv *SecretsService) unseal(s *models.Secret) ([]byte, error) {
+	plaintext, _, err := srv.open(s)
+	return plaintext, err
 }
 
 func (srv *SecretsService) refresh(s *models.Secret, material *models.OAuth2Material) error {
@@ -284,13 +290,16 @@ func (srv *SecretsService) Resolve(scope models.SecretScope, names []string) (ma
 
 	resolved := make(map[string]string, len(stored))
 	for _, s := range stored {
-		value, err := srv.unseal(&s)
+		value, stale, err := srv.open(&s)
 		if err != nil {
 			return nil, err
 		}
 
 		if s.Kind != models.SecretOAuth2 {
 			resolved["$"+s.Name] = models.Present(s.Kind, string(value))
+			if stale {
+				srv.migrate(&s, value)
+			}
 			continue
 		}
 
@@ -303,6 +312,8 @@ func (srv *SecretsService) Resolve(scope models.SecretScope, names []string) (ma
 			if err := srv.refresh(&s, &material); err != nil {
 				return nil, err
 			}
+		} else if stale {
+			srv.migrate(&s, value)
 		}
 
 		resolved["$"+s.Name] = material.Header()

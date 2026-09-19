@@ -35,7 +35,7 @@ func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(store, srv.NewPolicy(boards), sealer, &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})).RegisterRoutes(r)
+	NewController(srv.New(store, srv.NewPolicy(boards), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})).RegisterRoutes(r)
 	return r
 }
 
@@ -158,7 +158,7 @@ func TestListSecrets_ReturnsMetadataOnly(t *testing.T) {
 	if !strings.Contains(body, "API_KEY") {
 		t.Errorf("expected the name in the listing: %s", body)
 	}
-	for _, leak := range []string{"ciphertext", "nonce", "keyversion"} {
+	for _, leak := range []string{"ciphertext", "nonce", "keyid"} {
 		if strings.Contains(strings.ToLower(body), leak) {
 			t.Errorf("listing exposed %q: %s", leak, body)
 		}

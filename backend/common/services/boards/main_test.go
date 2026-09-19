@@ -17,7 +17,7 @@ func TestCreateBoard_Delegates(t *testing.T) {
 		},
 	}
 
-	svc := New(db)
+	svc := New(db, &purgeRecorder{})
 	board, err := svc.CreateBoard("My Board", "owner-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -40,7 +40,7 @@ func TestConnectPostIts_Delegates(t *testing.T) {
 		},
 	}
 
-	svc := New(db)
+	svc := New(db, &purgeRecorder{})
 	if _, err := svc.ConnectPostIts(board, src, tgt); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -59,7 +59,7 @@ func TestDisconnectPostIts_Delegates(t *testing.T) {
 		},
 	}
 
-	svc := New(db)
+	svc := New(db, &purgeRecorder{})
 	if err := svc.DisconnectPostIts(board, strand); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestGetUserBoards_PropagatesResult(t *testing.T) {
 		},
 	}
 
-	svc := New(db)
+	svc := New(db, &purgeRecorder{})
 	got, err := svc.GetUserBoards("user-x")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -99,7 +99,7 @@ func TestGetBoard_Delegates(t *testing.T) {
 		},
 	}
 
-	board, err := New(db).GetBoard(id)
+	board, err := New(db, &purgeRecorder{}).GetBoard(id)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestGetBoardPostIts_Delegates(t *testing.T) {
 		},
 	}
 
-	got, err := New(db).GetBoardPostIts(id)
+	got, err := New(db, &purgeRecorder{}).GetBoardPostIts(id)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestDeleteBoard_Delegates(t *testing.T) {
 		},
 	}
 
-	if err := New(db).DeleteBoard(id); err != nil {
+	if err := New(db, &purgeRecorder{}).DeleteBoard(id); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !called {
@@ -163,7 +163,7 @@ func TestCollaborators_Delegate(t *testing.T) {
 		},
 	}
 
-	svc := New(db)
+	svc := New(db, &purgeRecorder{})
 	if err := svc.AddCollaboratorToBoard(id, "c1"); err != nil {
 		t.Fatalf("add: %v", err)
 	}
@@ -184,10 +184,43 @@ func TestUpdateBoardName_Delegates(t *testing.T) {
 		},
 	}
 
-	if err := New(db).UpdateBoardName(uuid.New(), "Renamed"); err != nil {
+	if err := New(db, &purgeRecorder{}).UpdateBoardName(uuid.New(), "Renamed"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotName != "Renamed" {
 		t.Errorf("name = %q, want Renamed", gotName)
+	}
+}
+
+type purgeRecorder struct {
+	purged []models.SecretScope
+}
+
+func (p *purgeRecorder) Purge(scope models.SecretScope) error {
+	p.purged = append(p.purged, scope)
+	return nil
+}
+
+// Deleting a board must also destroy its secrets and the key that encrypted
+// them, or a dump taken later could still be decrypted.
+func TestDeleteBoard_PurgesItsSecrets(t *testing.T) {
+	id := uuid.New()
+	deleted := false
+	db := &mocks.MockDB{
+		DeleteBoardFn: func(got uuid.UUID) error {
+			deleted = got == id
+			return nil
+		},
+	}
+	purger := &purgeRecorder{}
+
+	if err := New(db, purger).DeleteBoard(id); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if !deleted {
+		t.Error("the board itself was not deleted")
+	}
+	if len(purger.purged) != 1 || purger.purged[0] != models.BoardScope(id) {
+		t.Errorf("purged %v, want the board's scope", purger.purged)
 	}
 }

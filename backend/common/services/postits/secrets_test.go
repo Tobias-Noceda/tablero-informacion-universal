@@ -118,7 +118,7 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 		},
 	}
 
-	secrets := secretsrv.New(store, secretsrv.NewPolicy(boards), sealer,
+	secrets := secretsrv.New(store, secretsrv.NewPolicy(boards), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}),
 		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})
 
 	if err := secrets.Put(models.BoardScope(board), models.Principal{ID: owner}, "CURRENCY_API_KEY", models.SecretApiKey, theKey); err != nil {

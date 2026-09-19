@@ -70,6 +70,7 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 		systemGroup.PUT("/secrets", ctrl.PutSecret(system))
 		systemGroup.DELETE("/secrets/:name", ctrl.DeleteSecret(system))
 		systemGroup.PUT("/oauth2", ctrl.PutOAuth2(system))
+		systemGroup.GET("/keys", ctrl.ListKeys)
 	}
 
 	router.GET("/oauth2/callback", ctrl.Callback)
@@ -147,6 +148,23 @@ func (ctrl *Controller) ListSystemSecrets(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, statuses)
+}
+
+// ListKeys godoc
+// @Summary      List data keys
+// @Description  One entry per key, active or retired, with the master key version that wraps it. Never key material.
+// @Tags         secrets
+// @Produce      json
+// @Success      200  {array}  models.DataKey
+// @Router       /system/keys [get]
+func (ctrl *Controller) ListKeys(c *gin.Context) {
+	keys, err := ctrl.service.ListKeys(models.Principal{ID: c.Query("cognito_id")})
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, keys)
 }
 
 // PutSecret godoc

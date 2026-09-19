@@ -29,7 +29,7 @@ func setupRouter(db *mocks.MockDB, cache *mocks.MockCache) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 
 	r := gin.New()
-	bs := b_srv.New(db)
+	bs := b_srv.New(db, &mocks.MockScopePurger{})
 	rs := r_srv.New(*bs, cache)
 
 	NewController(bs, rs).RegisterRoutes(r)

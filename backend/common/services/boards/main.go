@@ -7,11 +7,12 @@ import (
 )
 
 type BoardService struct {
-	db infrastructure.Database
+	db      infrastructure.Database
+	secrets infrastructure.ScopePurger
 }
 
-func New(db infrastructure.Database) *BoardService {
-	return &BoardService{db}
+func New(db infrastructure.Database, secrets infrastructure.ScopePurger) *BoardService {
+	return &BoardService{db, secrets}
 }
 
 func (srv *BoardService) GetUserBoards(cognito_id string) ([]models.Board, error) {
@@ -27,7 +28,11 @@ func (srv *BoardService) CreateBoard(name, owner string) (*models.Board, error) 
 }
 
 func (srv *BoardService) DeleteBoard(id uuid.UUID) error {
-	return srv.db.DeleteBoard(id)
+	if err := srv.db.DeleteBoard(id); err != nil {
+		return err
+	}
+
+	return srv.secrets.Purge(models.BoardScope(id))
 }
 
 func (srv *BoardService) GetBoardPostIts(id uuid.UUID) ([]models.PostIts, error) {
