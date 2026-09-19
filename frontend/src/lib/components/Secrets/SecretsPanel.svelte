@@ -3,7 +3,7 @@
 	import Input from '$components/Input/Input.svelte';
 	import Modal from '$components/Modal/Modal.svelte';
 	import * as secretsApi from '$services/secrets';
-	import type { OAuth2Flow, SecretMeta, UUID } from '$types/api';
+	import type { OAuth2Flow, OAuthProvider, OAuthProviderStatus, SecretMeta, UUID } from '$types/api';
 
 	type StaticKind = 'api_key' | 'bearer' | 'basic';
 	import { m } from '$lib/paraglide/messages';
@@ -11,11 +11,13 @@
 	let { board, onclose }: { board: UUID; onclose: () => void } = $props();
 
 	let secrets = $state<SecretMeta[]>([]);
+	let providers = $state<OAuthProviderStatus[]>([]);
 	let loading = $state(true);
 	let error = $state('');
 
-	type Draft = 'static' | 'oauth2';
+	type Draft = 'static' | 'oauth2' | 'connect';
 	let drafting = $state<Draft | null>(null);
+	let provider = $state<OAuthProvider>('google');
 
 	let name = $state('');
 	let value = $state('');
@@ -39,18 +41,23 @@
 		drafting === 'static'
 			? nameLooksValid &&
 					(kind === 'basic' ? basicUser !== '' && basicPassword !== '' : value.trim() !== '')
-			: nameLooksValid &&
+			: drafting === 'connect'
+				? nameLooksValid
+				: nameLooksValid &&
 					clientId.trim() !== '' &&
 					clientSecret.trim() !== '' &&
 					tokenUrl.trim() !== '' &&
 					(flow === 'client_credentials' || authUrl.trim() !== '')
 	);
 
+	// Only providers the platform has an application for can be offered.
+	const connectable = $derived(providers.filter((p) => p.configured));
+
 	async function refresh() {
 		loading = true;
 		error = '';
 		try {
-			secrets = await secretsApi.list(board);
+			[secrets, providers] = await Promise.all([secretsApi.list(board), secretsApi.providers()]);
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -78,6 +85,12 @@
 		try {
 			if (drafting === 'static') {
 				await secretsApi.put(board, name, kind, staticValue);
+			} else if (drafting === 'connect') {
+				// The grant is created server-side and the user is sent to consent;
+				// the panel is left behind, so there is nothing to refresh here.
+				const redirect = `${window.location.origin}/oauth2/callback`;
+				window.location.href = await secretsApi.connect(board, provider, name, redirect);
+				return;
 			} else {
 				await secretsApi.put_oauth2(board, {
 					name,
@@ -140,7 +153,7 @@
 					<div class="flex flex-col">
 						<code class="text-sm">${secret.name}</code>
 						<span class="text-xs opacity-60">
-							{secret.kind}{secret.flow ? ` · ${secret.flow}` : ''}
+							{secret.provider ?? secret.kind}{secret.flow && !secret.provider ? ` · ${secret.flow}` : ''}
 							{#if secret.flow === 'authorization_code'}
 								· {secret.authorized ? m['secrets.authorized']() : m['secrets.pending']()}
 							{/if}
@@ -171,6 +184,11 @@
 			<Button variant="secondary" onclick={() => (drafting = 'oauth2')}>
 				{m['secrets.add_oauth2']()}
 			</Button>
+			{#if connectable.length > 0}
+				<Button variant="secondary" onclick={() => (drafting = 'connect')}>
+					{m['secrets.connect_account']()}
+				</Button>
+			{/if}
 		</div>
 	{:else}
 		<div class="flex flex-col gap-2 border-t border-main-border pt-3">
@@ -196,6 +214,16 @@
 				{:else}
 					<Input label={m['secrets.value']()} type="password" bind:value required />
 				{/if}
+			{:else if drafting === 'connect'}
+				<label class="flex flex-col gap-1 text-sm">
+					{m['secrets.provider']()}
+					<select class="bg-background border border-main-border rounded-md px-2 py-1" bind:value={provider}>
+						{#each connectable as p (p.provider)}
+							<option value={p.provider}>{p.provider}</option>
+						{/each}
+					</select>
+				</label>
+				<p class="text-xs opacity-70">{m['secrets.connect_hint']()}</p>
 			{:else}
 				<label class="flex flex-col gap-1 text-sm">
 					{m['secrets.flow']()}
@@ -213,10 +241,14 @@
 				<Input label={m['secrets.scopes']()} placeholder="read write" bind:value={scopes} />
 			{/if}
 
-			<p class="text-xs opacity-70">{m['secrets.write_only']()}</p>
+			{#if drafting !== 'connect'}
+				<p class="text-xs opacity-70">{m['secrets.write_only']()}</p>
+			{/if}
 
 			<div class="flex gap-2">
-				<Button variant="primary" disabled={!canSave} onclick={save}>{m['secrets.save']()}</Button>
+				<Button variant="primary" disabled={!canSave} onclick={save}>
+					{drafting === 'connect' ? m['secrets.connect']() : m['secrets.save']()}
+				</Button>
 				<Button variant="gray" onclick={resetDraft}>{m['secrets.cancel']()}</Button>
 			</div>
 		</div>

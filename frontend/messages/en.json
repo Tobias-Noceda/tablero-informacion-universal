@@ -59,6 +59,10 @@
 		"username": "Username",
 		"password": "Password",
 		"pick_credential": "Pick a credential",
-		"no_credentials": "This board has no credentials yet. Add one first."
+		"no_credentials": "This board has no credentials yet. Add one first.",
+		"connect_account": "Connect an account",
+		"provider": "Provider",
+		"connect": "Connect",
+		"connect_hint": "You will be sent to the provider to sign in and approve access. Only tokens are stored; the application credential is the platform's."
 	}
 }

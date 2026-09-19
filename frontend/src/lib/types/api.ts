@@ -66,6 +66,15 @@ export type SecretKind = 'api_key' | 'bearer' | 'basic' | 'oauth2';
 
 export type OAuth2Flow = 'client_credentials' | 'authorization_code';
 
+// A service the platform has registered its own application with. Users
+// consent to it instead of bringing their own client.
+export type OAuthProvider = 'google' | 'discord';
+
+export type OAuthProviderStatus = {
+    provider: OAuthProvider;
+    configured: boolean;
+}
+
 // What listing a board's secrets returns. The value is never part of it.
 export type SecretMeta = {
     name: string;
@@ -73,6 +82,8 @@ export type SecretMeta = {
     // Only present for OAuth2 credentials.
     flow?: OAuth2Flow;
     authorized: boolean;
+    // Set when the grant was obtained with the platform's application.
+    provider?: OAuthProvider;
     created_at: string;
     updated_at: string;
 }

@@ -1,4 +1,4 @@
-import type { OAuth2Config, SecretKind, SecretMeta, UUID } from "$types/api";
+import type { OAuth2Config, OAuthProvider, OAuthProviderStatus, SecretKind, SecretMeta, UUID } from "$types/api";
 
 import * as api from "$modules/api.svelte"
 
@@ -25,6 +25,23 @@ export async function del(board: UUID, name: string, cognito_id = DEFAULT_COGNIT
 
 export async function put_oauth2(board: UUID, config: OAuth2Config, cognito_id = DEFAULT_COGNITO_ID) {
     await api.put(`/v1/boards/${board}/oauth2`, { cognito_id, ...config });
+}
+
+export async function providers() {
+    const res = await api.get(`/v1/oauth2/providers`);
+    return await res.json() as OAuthProviderStatus[];
+}
+
+export async function connect(
+    board: UUID,
+    provider: OAuthProvider,
+    name: string,
+    redirect_uri: string,
+    cognito_id = DEFAULT_COGNITO_ID,
+) {
+    const res = await api.post(`/v1/boards/${board}/oauth2/connect`, { cognito_id, provider, name, redirect_uri });
+    const { authorization_url } = await res.json() as { authorization_url: string };
+    return authorization_url;
 }
 
 export async function authorize(

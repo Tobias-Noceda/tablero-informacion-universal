@@ -59,6 +59,10 @@
 		"username": "Usuario",
 		"password": "Contraseña",
 		"pick_credential": "Elegí una credencial",
-		"no_credentials": "El tablero no tiene credenciales. Cargá una primero."
+		"no_credentials": "El tablero no tiene credenciales. Cargá una primero.",
+		"connect_account": "Conectar una cuenta",
+		"provider": "Proveedor",
+		"connect": "Conectar",
+		"connect_hint": "Te vamos a enviar al proveedor para iniciar sesión y aprobar el acceso. Solo se guardan tokens; la credencial de aplicación es de la plataforma."
 	}
 }
