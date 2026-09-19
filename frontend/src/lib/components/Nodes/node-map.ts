@@ -5,6 +5,8 @@ import DogFactsNode from "./DogFacts/DogFacts.svelte";
 import DolarOficialNode from "./DolarOficial/DolarOficial.svelte";
 import EventsSearchNode from "./EventsSearch/EventsSearch.svelte";
 import GithubRepoNode from "./GithubRepo/GithubRepo.svelte";
+import GmailInboxNode from "./GmailInbox/GmailInbox.svelte";
+import GoogleCalendarNode from "./GoogleCalendar/GoogleCalendar.svelte";
 import RiesgoPaisNode from "./RiesgoPais/RiesgoPais.svelte";
 import StaticCardNode from "./StaticCard/StaticCard.svelte";
 import TemperatureNode from "./Temperature/Temperature.svelte";
@@ -19,7 +21,9 @@ export const nodesMap = {
     "crypto_price": CryptoPriceNode,
     "air_quality": AirQualityNode,
     "github_repo": GithubRepoNode,
-    "exchange_rate": ExchangeRateNode
+    "exchange_rate": ExchangeRateNode,
+    "gmail_inbox": GmailInboxNode,
+    "google_calendar": GoogleCalendarNode
 };
 
 export type NodeParameter = {
@@ -65,5 +69,12 @@ export const parameters: Record<string, NodeParameter[]> = {
         { key: "$base", label: "Base currency", type: "string", placeholder: "USD", default: "USD" },
         { key: "$currency", label: "Quote currency", type: "string", placeholder: "ARS", default: "ARS" },
         { key: "$credential", label: "Credential", type: "secret" }
+    ],
+    "gmail_inbox": [
+        { key: "$credential", label: "Google account", type: "secret" }
+    ],
+    "google_calendar": [
+        { key: "$time_min", label: "From", type: "string", placeholder: "2026-01-01T00:00:00Z" },
+        { key: "$credential", label: "Google account", type: "secret" }
     ]
 };

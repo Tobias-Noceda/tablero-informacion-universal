@@ -18,7 +18,9 @@
 		"crypto_price": "Precio Cripto",
 		"air_quality": "Calidad del Aire",
 		"github_repo": "Repositorio GitHub",
-		"exchange_rate": "Cotización"
+		"exchange_rate": "Cotización",
+		"gmail_inbox": "Bandeja de Gmail",
+		"google_calendar": "Calendario de Google"
 	},
 	"secrets": {
 		"title": "Credenciales del tablero",

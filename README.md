@@ -100,6 +100,14 @@ Tests + coverage:
 .\run_backend_coverage.ps1       # Windows
 ```
 
+Integration tests (`//go:build integration`, not part of `go test ./...`) run against a mock OAuth2 provider on `localhost:8899`. The scripts start it via the `integration` compose profile, run the tests, and stop it (`--keep` / `-Keep` leaves it up). `TestLiveDuende` also needs internet access.
+
+```bash
+./run_backend_integration.sh                                 # macOS / Linux
+./run_backend_integration.sh -run TestLiveAuthorizationCode  # just the mock-backed one
+.un_backend_integration.ps1                                # Windows
+```
+
 ### Frontend (SvelteKit)
 
 ```bash
