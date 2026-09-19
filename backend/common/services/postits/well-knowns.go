@@ -285,8 +285,6 @@ var configuredPostIts = map[string]models.PostIts{
 			},
 		},
 		Response: "json",
-		// timeMin only bounds the fetch; the query drops whatever already
-		// started so the card keeps pointing at the next event as time passes.
 		Query: map[string]string{
 			"summary": "[.items[] | select((.start.dateTime // .start.date) >= (now | todate))] | first | .summary",
 			"start":   "[.items[] | select((.start.dateTime // .start.date) >= (now | todate))] | first | .start.dateTime // .start.date",
