@@ -33,6 +33,20 @@ type PutOAuth2Request struct {
 	Scopes       string `json:"scopes"`
 }
 
+type PutOAuth2ClientRequest struct {
+	Provider models.OAuthProvider `json:"provider" binding:"required"`
+	ClientID string               `json:"client_id" binding:"required"`
+	// Write-only, like any other secret value.
+	ClientSecret string `json:"client_secret" binding:"required"`
+}
+
+type ConnectRequest struct {
+	Caller
+	Provider    models.OAuthProvider `json:"provider" binding:"required"`
+	Name        string               `json:"name" binding:"required"`
+	RedirectURI string               `json:"redirect_uri" binding:"required"`
+}
+
 func (r *PutOAuth2Request) Material() *models.OAuth2Material {
 	return &models.OAuth2Material{
 		Flow:         r.Flow,

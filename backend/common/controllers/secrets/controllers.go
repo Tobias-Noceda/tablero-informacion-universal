@@ -70,10 +70,12 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 		systemGroup.PUT("/secrets", ctrl.PutSecret(system))
 		systemGroup.DELETE("/secrets/:name", ctrl.DeleteSecret(system))
 		systemGroup.PUT("/oauth2", ctrl.PutOAuth2(system))
+		systemGroup.PUT("/oauth2/clients", ctrl.PutOAuth2Client)
 		systemGroup.GET("/keys", ctrl.ListKeys)
 	}
 
 	router.GET("/oauth2/callback", ctrl.Callback)
+	router.GET("/oauth2/providers", ctrl.Providers)
 }
 
 func (ctrl *Controller) registerScoped(group *gin.RouterGroup, s scoping) {
@@ -83,12 +85,20 @@ func (ctrl *Controller) registerScoped(group *gin.RouterGroup, s scoping) {
 
 	group.PUT("/oauth2", ctrl.PutOAuth2(s))
 	group.GET("/oauth2/authorize", ctrl.Authorize(s))
+	group.POST("/oauth2/connect", ctrl.Connect(s))
 }
 
 func fail(c *gin.Context, err error) {
 	if errors.Is(err, srv.ErrForbidden) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Not found",
+		})
+		return
+	}
+
+	if errors.Is(err, srv.ErrProviderNotConfigured) {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"error": err.Error(),
 		})
 		return
 	}
@@ -325,6 +335,89 @@ func (ctrl *Controller) Authorize(s scoping) gin.HandlerFunc {
 		// Returned rather than redirected so the caller decides how to navigate.
 		c.JSON(http.StatusOK, gin.H{"authorization_url": target})
 	}
+}
+
+// Connect godoc
+// @Summary      Connect a provider account using the platform's own application
+// @Description  Managers only. Stores an empty grant and responds with the provider URL to send the user to.
+// @Tags         secrets
+// @Accept       json
+// @Produce      json
+// @Param        id       path  string          true  "Board UUID or user id"
+// @Param        request  body  ConnectRequest  true  "Provider, grant name and callback URL"
+// @Success      200  {object}  map[string]string
+// @Router       /boards/{id}/oauth2/connect [post]
+// @Router       /users/{id}/oauth2/connect [post]
+func (ctrl *Controller) Connect(s scoping) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scope, ok := s.scope(c)
+		if !ok {
+			return
+		}
+
+		var req ConnectRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		principal, ok := s.principal(c, req.CognitoID)
+		if !ok {
+			return
+		}
+
+		target, err := ctrl.service.Connect(scope, principal, req.Provider, req.Name, req.RedirectURI)
+		if err != nil {
+			fail(c, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"authorization_url": target})
+	}
+}
+
+// PutOAuth2Client godoc
+// @Summary      Register the platform's application at a provider
+// @Description  The client id and secret are stored encrypted in the system scope and never returned.
+// @Tags         secrets
+// @Accept       json
+// @Param        request  body  PutOAuth2ClientRequest  true  "Provider application credential"
+// @Success      204
+// @Router       /system/oauth2/clients [put]
+func (ctrl *Controller) PutOAuth2Client(c *gin.Context) {
+	var req PutOAuth2ClientRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	if err := ctrl.service.PutOAuth2Client(models.Principal{ID: c.Query("cognito_id")}, req.Provider, req.ClientID, req.ClientSecret); err != nil {
+		fail(c, err)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+// Providers godoc
+// @Summary      List the providers users can connect to
+// @Description  Every provider the platform knows, flagged by whether its application credential is provisioned.
+// @Tags         secrets
+// @Produce      json
+// @Success      200  {array}  models.OAuthProviderStatus
+// @Router       /oauth2/providers [get]
+func (ctrl *Controller) Providers(c *gin.Context) {
+	statuses, err := ctrl.service.Providers()
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, statuses)
 }
 
 // Callback godoc

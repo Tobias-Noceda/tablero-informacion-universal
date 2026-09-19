@@ -3,12 +3,37 @@ package secrets
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
+	"github.com/google/uuid"
 )
+
+// rememberingStore keeps rows so a handler can read back what another wrote.
+func rememberingStore() *mocks.MockSecretStore {
+	var rows []models.Secret
+	return &mocks.MockSecretStore{
+		UpsertSecretFn: func(secret *models.Secret) error {
+			rows = slices.DeleteFunc(rows, func(row models.Secret) bool {
+				return row.Scope == secret.Scope && row.Name == secret.Name
+			})
+			rows = append(rows, *secret)
+			return nil
+		},
+		FindSecretsFn: func(scope models.SecretScope, names []string) ([]models.Secret, error) {
+			var out []models.Secret
+			for _, row := range rows {
+				if row.Scope == scope && slices.Contains(names, row.Name) {
+					out = append(out, row)
+				}
+			}
+			return out, nil
+		},
+	}
+}
 
 func TestUserSecrets_OwnerManagesTheirOwn(t *testing.T) {
 	var stored *models.Secret
@@ -201,5 +226,99 @@ func TestSystemKeys_ListsMetadataOnly(t *testing.T) {
 		if strings.Contains(body, leak) {
 			t.Errorf("listing exposed %q: %s", leak, body)
 		}
+	}
+}
+
+func withPlatformGoogle(t *testing.T, r http.Handler) {
+	t.Helper()
+	w := do(r, http.MethodPut, "/system/oauth2/clients", `{"provider":"google","client_id":"pid","client_secret":"psecret"}`)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("put client status = %d (body: %s)", w.Code, w.Body.String())
+	}
+}
+
+func TestPlatformClient_ResponseCarriesNothing(t *testing.T) {
+	r := setupRouter(rememberingStore())
+
+	w := do(r, http.MethodPut, "/system/oauth2/clients", `{"provider":"google","client_id":"pid","client_secret":"psecret"}`)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("status = %d (body: %s)", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "psecret") {
+		t.Error("the response echoed the client secret")
+	}
+
+	w = do(r, http.MethodPut, "/system/oauth2/clients", `{"provider":"myspace","client_id":"pid","client_secret":"psecret"}`)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("unknown provider status = %d, want 400", w.Code)
+	}
+}
+
+func TestConnect_BoardAndUserScopes(t *testing.T) {
+	r := setupRouter(rememberingStore())
+	withPlatformGoogle(t, r)
+	board := uuid.New()
+
+	for _, path := range []string{"/boards/" + board.String() + "/oauth2/connect", "/users/" + owner + "/oauth2/connect"} {
+		w := do(r, http.MethodPost, path,
+			`{"cognito_id":"`+owner+`","provider":"google","name":"GOOGLE","redirect_uri":"https://tablero.example/oauth2/callback"}`)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: status = %d (body: %s)", path, w.Code, w.Body.String())
+		}
+
+		var body map[string]string
+		if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if !strings.HasPrefix(body["authorization_url"], "https://accounts.google.com/") {
+			t.Errorf("%s: authorization_url = %q", path, body["authorization_url"])
+		}
+		if len(body) != 1 {
+			t.Errorf("%s: response carries more than the url: %v", path, body)
+		}
+		if strings.Contains(w.Body.String(), "psecret") {
+			t.Error("the client secret went to the client")
+		}
+	}
+}
+
+func TestConnect_StrangerIsNotFound(t *testing.T) {
+	r := setupRouter(rememberingStore())
+	withPlatformGoogle(t, r)
+
+	w := do(r, http.MethodPost, "/boards/"+uuid.New().String()+"/oauth2/connect",
+		`{"cognito_id":"stranger","provider":"google","name":"GOOGLE","redirect_uri":"https://tablero.example/oauth2/callback"}`)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", w.Code)
+	}
+}
+
+func TestConnect_UnprovisionedProviderIsServiceUnavailable(t *testing.T) {
+	r := setupRouter(rememberingStore())
+
+	w := do(r, http.MethodPost, "/boards/"+uuid.New().String()+"/oauth2/connect",
+		`{"cognito_id":"`+owner+`","provider":"google","name":"GOOGLE","redirect_uri":"https://tablero.example/oauth2/callback"}`)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Errorf("status = %d, want 503 (body: %s)", w.Code, w.Body.String())
+	}
+}
+
+func TestProviders_ListsConfiguredFlag(t *testing.T) {
+	r := setupRouter(rememberingStore())
+	withPlatformGoogle(t, r)
+
+	w := do(r, http.MethodGet, "/oauth2/providers", "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d", w.Code)
+	}
+
+	var statuses []models.OAuthProviderStatus
+	_ = json.Unmarshal(w.Body.Bytes(), &statuses)
+	byName := map[models.OAuthProvider]bool{}
+	for _, s := range statuses {
+		byName[s.Provider] = s.Configured
+	}
+	if !byName[models.ProviderGoogle] || byName[models.ProviderDiscord] {
+		t.Errorf("statuses = %+v", statuses)
 	}
 }
