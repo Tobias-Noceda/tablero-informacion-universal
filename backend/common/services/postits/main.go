@@ -1,6 +1,7 @@
 package postits
 
 import (
+	"errors"
 	"log"
 	"maps"
 	"strings"
@@ -9,6 +10,10 @@ import (
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/google/uuid"
 )
+
+// ErrSystemSecretMissing is deliberately vague: which platform credential a
+// card needs is not the user's business, so the name only goes to the log.
+var ErrSystemSecretMissing = errors.New("This card is temporarily unavailable")
 
 type PostItsService struct {
 	db      infrastructure.Database
@@ -85,8 +90,44 @@ func secretRefs(postit *models.PostIts) []string {
 	return names
 }
 
+// systemParams resolves the platform credentials a well-known declares, keyed
+// by the placeholder its template uses.
+func (srv *PostItsService) systemParams(postit *models.PostIts) (map[string]string, error) {
+	def, ok := configuredPostIts[postit.WellKnown]
+	if !ok || len(def.systemSecrets) == 0 {
+		return nil, nil
+	}
+
+	names := make([]string, 0, len(def.systemSecrets))
+	for _, name := range def.systemSecrets {
+		names = append(names, string(name))
+	}
+
+	resolved, err := srv.secrets.Resolve(models.SystemScope, names)
+	if err != nil {
+		return nil, err
+	}
+
+	params := make(map[string]string, len(def.systemSecrets))
+	for placeholder, name := range def.systemSecrets {
+		value, ok := resolved["$"+string(name)]
+		if !ok {
+			log.Printf("well-known %s: system secret %s is not configured", postit.WellKnown, name)
+			return nil, ErrSystemSecretMissing
+		}
+		params[placeholder] = value
+	}
+
+	return params, nil
+}
+
 func (srv *PostItsService) prepare(postit *models.PostIts) (*models.PostIts, error) {
 	resolved, err := srv.secrets.Resolve(models.BoardScope(postit.Board), secretRefs(postit))
+	if err != nil {
+		return nil, err
+	}
+
+	system, err := srv.systemParams(postit)
 	if err != nil {
 		return nil, err
 	}
@@ -107,6 +148,8 @@ func (srv *PostItsService) prepare(postit *models.PostIts) (*models.PostIts, err
 	}
 
 	maps.Copy(clone.Params, resolved)
+	// Last, so nothing the user can edit shadows a platform credential.
+	maps.Copy(clone.Params, system)
 
 	return &clone, nil
 }

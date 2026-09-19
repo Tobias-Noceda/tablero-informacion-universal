@@ -355,3 +355,25 @@ func TestListSystem_ReportsKnownNamesAndExtras(t *testing.T) {
 		t.Errorf("EXTRA_KEY = %+v, want configured, not known, api_key", extra)
 	}
 }
+
+func TestMissingSystemSecrets_ListsWhatTheCodeExpectsButIsNotStored(t *testing.T) {
+	store := newStore()
+	srv := service(t, store)
+
+	missing, err := srv.MissingSystemSecrets()
+	if err != nil {
+		t.Fatalf("missing: %v", err)
+	}
+	if len(missing) != len(models.KnownSystemSecrets) {
+		t.Fatalf("missing = %v, want every known secret before any is provisioned", missing)
+	}
+
+	_ = srv.Put(models.SystemScope, anonymous, string(models.SystemNasaApiKey), models.SecretApiKey, "v")
+
+	missing, _ = srv.MissingSystemSecrets()
+	for _, name := range missing {
+		if name == models.SystemNasaApiKey {
+			t.Error("a provisioned secret was reported missing")
+		}
+	}
+}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 
 	"github.com/Secreto31126/tesis/common/controllers/boards"
@@ -64,6 +65,12 @@ func main() {
 			panic(err)
 		}
 		return
+	}
+
+	if missing, err := secrets.MissingSystemSecrets(); err != nil {
+		log.Printf("could not check system secrets: %v", err)
+	} else if len(missing) > 0 {
+		log.Printf("system secrets not configured, well-knowns needing them will fail: %v", missing)
 	}
 
 	boardService := b_srv.New(db, secrets)

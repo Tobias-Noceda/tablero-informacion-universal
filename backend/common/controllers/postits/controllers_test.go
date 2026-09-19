@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -346,5 +347,32 @@ func TestMovePostIt_MissingCoords(t *testing.T) {
 	w := do(r, http.MethodPatch, "/post-its/"+uuid.New().String()+"/position", `{}`)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", w.Code)
+	}
+}
+
+func mustURL(raw string) *url.URL {
+	parsed, err := url.Parse(raw)
+	if err != nil {
+		panic(err)
+	}
+	return parsed
+}
+
+// A card whose platform credential is not provisioned is a service problem,
+// not a client error, and the response must not say which credential.
+func TestExecutePostIt_MissingSystemSecretIsUnavailable(t *testing.T) {
+	db := &mocks.MockDB{
+		FindPostItFn: func(_ uuid.UUID) (*models.PostIts, error) {
+			return &models.PostIts{Id: uuid.New(), WellKnown: "nasa_apod", Resource: mustURL("https://api.nasa.gov/planetary/apod")}, nil
+		},
+	}
+	r := setupRouter(db, nil, nil)
+
+	w := do(r, http.MethodGet, "/post-its/"+uuid.New().String(), "")
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503 (body: %s)", w.Code, w.Body.String())
+	}
+	if strings.Contains(w.Body.String(), "NASA") {
+		t.Errorf("the response names the missing secret: %s", w.Body.String())
 	}
 }

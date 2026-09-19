@@ -25,7 +25,7 @@ import (
 // user's choice, made per post-it from the board's stored secrets.
 func TestWellKnowns_DoNotHardcodeACredential(t *testing.T) {
 	for key, wk := range configuredPostIts {
-		for _, source := range []map[string]string{wk.Params, wk.Request.Headers, wk.Request.Queries} {
+		for _, source := range []map[string]string{wk.template.Params, wk.template.Request.Headers, wk.template.Request.Queries} {
 			for field, value := range source {
 				name, isRef := strings.CutPrefix(value, "$")
 				if isRef && models.ValidSecretName(name) {
@@ -39,7 +39,7 @@ func TestWellKnowns_DoNotHardcodeACredential(t *testing.T) {
 // A well-known that needs a credential asks for one, and wires it through a
 // param rather than naming a secret itself.
 func TestWellKnown_ExchangeRateAsksForACredential(t *testing.T) {
-	wk := configuredPostIts["exchange_rate"]
+	wk := configuredPostIts["exchange_rate"].template
 
 	if wk.Request.Headers["apikey"] != "$credential" {
 		t.Errorf("apikey header = %q, want it to defer to the user's choice", wk.Request.Headers["apikey"])

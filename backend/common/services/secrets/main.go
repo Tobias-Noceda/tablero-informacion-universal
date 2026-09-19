@@ -188,6 +188,24 @@ func (srv *SecretsService) ListSystem(principal models.Principal) ([]models.Syst
 	return statuses, nil
 }
 
+// MissingSystemSecrets names the platform credentials the code references
+// that nobody has provisioned yet. Meant for a startup warning.
+func (srv *SecretsService) MissingSystemSecrets() ([]models.SystemSecretName, error) {
+	statuses, err := srv.ListSystem(models.Principal{})
+	if err != nil {
+		return nil, err
+	}
+
+	var missing []models.SystemSecretName
+	for _, status := range statuses {
+		if status.Known && !status.Configured {
+			missing = append(missing, models.SystemSecretName(status.Name))
+		}
+	}
+
+	return missing, nil
+}
+
 func (srv *SecretsService) Delete(scope models.SecretScope, principal models.Principal, name string) error {
 	if err := srv.policy.CanManage(principal, scope); err != nil {
 		return err

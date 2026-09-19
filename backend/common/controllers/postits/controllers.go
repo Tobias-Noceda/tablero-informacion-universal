@@ -1,6 +1,7 @@
 package postits
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/Secreto31126/tesis/common/models"
@@ -159,7 +160,11 @@ func (ctrl *Controller) ExecutePostIt(c *gin.Context) {
 
 	data, err := ctrl.service.ExecutePostIt(postIt)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		status := http.StatusInternalServerError
+		if errors.Is(err, srv.ErrSystemSecretMissing) {
+			status = http.StatusServiceUnavailable
+		}
+		c.JSON(status, gin.H{
 			"error": err.Error(),
 		})
 		return
