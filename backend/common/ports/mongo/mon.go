@@ -33,7 +33,7 @@ func New() (*MongoDB, error) {
 	reg.RegisterTypeEncoder(uuidType, bson.ValueEncoderFunc(uuidEncodeValue))
 	reg.RegisterTypeDecoder(uuidType, bson.ValueDecoderFunc(uuidDecodeValue))
 
-	url := os.Getenv("MONGO_URI")
+	url := os.Getenv("MONGODB_URI")
 	if url == "" {
 		url = MONGO_URL
 	}
@@ -43,10 +43,16 @@ func New() (*MongoDB, error) {
 		name = MONGO_DATABASE
 	}
 
-	client, err := mongo.Connect(options.Client().ApplyURI(url).SetRegistry(reg).SetBSONOptions(&options.BSONOptions{
-		NilSliceAsEmpty: true,
-		NilMapAsEmpty:   true,
-	}))
+	clientOptions := options.Client().
+		ApplyURI(url).
+		SetRegistry(reg).
+		SetBSONOptions(&options.BSONOptions{
+			NilSliceAsEmpty: true,
+			NilMapAsEmpty:   true,
+		}).
+		SetMaxConnIdleTime(30 * time.Second)
+
+	client, err := mongo.Connect(clientOptions)
 	if err != nil {
 		return nil, err
 	}

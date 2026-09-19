@@ -79,8 +79,8 @@ func TestCreateBoard_MissingFields(t *testing.T) {
 func TestGetUserBoards_MissingCognitoID(t *testing.T) {
 	r := setupRouter(nil, nil)
 	w := do(r, http.MethodGet, "/boards", "")
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want 500 (missing cognito_id)", w.Code)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (missing cognito_id)", w.Code)
 	}
 }
 
