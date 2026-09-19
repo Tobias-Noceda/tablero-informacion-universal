@@ -323,7 +323,7 @@ func TestExecutePostIt_DoesNotLeakSecretsOntoTheCaller(t *testing.T) {
 	}
 
 	resolver := &mocks.MockSecretResolver{
-		ResolveFn: func(_ uuid.UUID, _ []string) (map[string]string, error) {
+		ResolveFn: func(models.SecretScope, []string) (map[string]string, error) {
 			return map[string]string{"$API_KEY": "super-secret", "$SEARCH": "also-secret"}, nil
 		},
 	}
@@ -370,7 +370,7 @@ func TestExecutePostIt_ResourcelessPostItNeverResolvesSecrets(t *testing.T) {
 
 	resolved := false
 	resolver := &mocks.MockSecretResolver{
-		ResolveFn: func(_ uuid.UUID, _ []string) (map[string]string, error) {
+		ResolveFn: func(models.SecretScope, []string) (map[string]string, error) {
 			resolved = true
 			return map[string]string{"$API_KEY": "super-secret"}, nil
 		},

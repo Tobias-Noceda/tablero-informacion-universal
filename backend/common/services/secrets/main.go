@@ -2,10 +2,8 @@ package secrets
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/url"
-	"slices"
 	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
@@ -16,14 +14,12 @@ import (
 
 const MAX_SECRET_SIZE = 8 << 10 // 8kb, generous for a token, far below a payload
 
-var ErrForbidden = errors.New("Not allowed to manage this board's secrets")
-
 // REFRESH_LOCK_TTL bounds how long a crashed refresh can block the others.
 const REFRESH_LOCK_TTL = 30 * time.Second
 
 type SecretsService struct {
 	store      infrastructure.SecretStore
-	boards     infrastructure.BoardReader
+	policy     infrastructure.ScopePolicy
 	sealer     *crypto.Sealer
 	tokens     infrastructure.TokenClient
 	locks      infrastructure.Locker
@@ -32,39 +28,22 @@ type SecretsService struct {
 
 func New(
 	store infrastructure.SecretStore,
-	boards infrastructure.BoardReader,
+	policy infrastructure.ScopePolicy,
 	sealer *crypto.Sealer,
 	tokens infrastructure.TokenClient,
 	locks infrastructure.Locker,
 	handshakes infrastructure.HandshakeStore,
 ) *SecretsService {
-	return &SecretsService{store, boards, sealer, tokens, locks, handshakes}
+	return &SecretsService{store, policy, sealer, tokens, locks, handshakes}
 }
 
-func (srv *SecretsService) authorize(board uuid.UUID, cognitoID string, ownerOnly bool) error {
-	found, err := srv.boards.FindBoard(board)
-	if err != nil {
-		return err
-	}
-
-	if found.Owner == cognitoID {
-		return nil
-	}
-
-	if !ownerOnly && slices.Contains(found.Collaborators, cognitoID) {
-		return nil
-	}
-
-	return ErrForbidden
+// aad binds a ciphertext to the scope and name it was created under.
+func aad(scope models.SecretScope, name string) string {
+	return scope.Key() + "|" + name
 }
 
-// aad binds a ciphertext to the board and name it was created under.
-func aad(board uuid.UUID, name string) string {
-	return board.String() + "|" + name
-}
-
-func (srv *SecretsService) Put(board uuid.UUID, cognitoID, name string, kind models.SecretKind, value string) error {
-	if err := srv.authorize(board, cognitoID, true); err != nil {
+func (srv *SecretsService) Put(scope models.SecretScope, principal models.Principal, name string, kind models.SecretKind, value string) error {
+	if err := srv.policy.CanManage(principal, scope); err != nil {
 		return err
 	}
 
@@ -86,11 +65,11 @@ func (srv *SecretsService) Put(board uuid.UUID, cognitoID, name string, kind mod
 		return fmt.Errorf("Unsupported secret kind")
 	}
 
-	return srv.seal(board, name, kind, []byte(value), "", false)
+	return srv.seal(scope, name, kind, []byte(value), "", false)
 }
 
-func (srv *SecretsService) PutOAuth2(board uuid.UUID, cognitoID, name string, material *models.OAuth2Material) error {
-	if err := srv.authorize(board, cognitoID, true); err != nil {
+func (srv *SecretsService) PutOAuth2(scope models.SecretScope, principal models.Principal, name string, material *models.OAuth2Material) error {
+	if err := srv.policy.CanManage(principal, scope); err != nil {
 		return err
 	}
 
@@ -128,7 +107,7 @@ func (srv *SecretsService) PutOAuth2(board uuid.UUID, cognitoID, name string, ma
 		return err
 	}
 
-	return srv.seal(board, name, models.SecretOAuth2, plaintext, material.Flow, false)
+	return srv.seal(scope, name, models.SecretOAuth2, plaintext, material.Flow, false)
 }
 
 func validEndpoint(raw string) error {
@@ -152,12 +131,12 @@ func validEndpoint(raw string) error {
 	return nil
 }
 
-func (srv *SecretsService) List(board uuid.UUID, cognitoID string) ([]models.SecretMeta, error) {
-	if err := srv.authorize(board, cognitoID, false); err != nil {
+func (srv *SecretsService) List(scope models.SecretScope, principal models.Principal) ([]models.SecretMeta, error) {
+	if err := srv.policy.CanView(principal, scope); err != nil {
 		return nil, err
 	}
 
-	stored, err := srv.store.ListSecrets(board)
+	stored, err := srv.store.ListSecrets(scope)
 	if err != nil {
 		return nil, err
 	}
@@ -170,16 +149,55 @@ func (srv *SecretsService) List(board uuid.UUID, cognitoID string) ([]models.Sec
 	return metas, nil
 }
 
-func (srv *SecretsService) Delete(board uuid.UUID, cognitoID, name string) error {
-	if err := srv.authorize(board, cognitoID, true); err != nil {
+// ListSystem reports every name the code expects alongside whatever is
+// stored, so an operator can see what is missing before a well-known fails.
+func (srv *SecretsService) ListSystem(principal models.Principal) ([]models.SystemSecretStatus, error) {
+	stored, err := srv.List(models.SystemScope, principal)
+	if err != nil {
+		return nil, err
+	}
+
+	unknown := make(map[string]models.SecretMeta, len(stored))
+	for _, meta := range stored {
+		unknown[meta.Name] = meta
+	}
+
+	statuses := make([]models.SystemSecretStatus, 0, len(models.KnownSystemSecrets)+len(stored))
+	for _, known := range models.KnownSystemSecrets {
+		meta, configured := unknown[string(known)]
+		statuses = append(statuses, models.SystemSecretStatus{
+			Name:       string(known),
+			Kind:       meta.Kind,
+			Configured: configured,
+			Known:      true,
+		})
+		delete(unknown, string(known))
+	}
+
+	for _, meta := range stored {
+		if _, extra := unknown[meta.Name]; !extra {
+			continue
+		}
+		statuses = append(statuses, models.SystemSecretStatus{
+			Name:       meta.Name,
+			Kind:       meta.Kind,
+			Configured: true,
+		})
+	}
+
+	return statuses, nil
+}
+
+func (srv *SecretsService) Delete(scope models.SecretScope, principal models.Principal, name string) error {
+	if err := srv.policy.CanManage(principal, scope); err != nil {
 		return err
 	}
 
-	return srv.store.DeleteSecret(board, name)
+	return srv.store.DeleteSecret(scope, name)
 }
 
-func (srv *SecretsService) seal(board uuid.UUID, name string, kind models.SecretKind, plaintext []byte, flow string, authorized bool) error {
-	sealed, err := srv.sealer.Seal(aad(board, name), plaintext)
+func (srv *SecretsService) seal(scope models.SecretScope, name string, kind models.SecretKind, plaintext []byte, flow string, authorized bool) error {
+	sealed, err := srv.sealer.Seal(aad(scope, name), plaintext)
 	if err != nil {
 		return err
 	}
@@ -188,7 +206,7 @@ func (srv *SecretsService) seal(board uuid.UUID, name string, kind models.Secret
 
 	return srv.store.UpsertSecret(&models.Secret{
 		Id:         uuid.New(),
-		Board:      board,
+		Scope:      scope,
 		Name:       name,
 		Kind:       kind,
 		Ciphertext: sealed.Ciphertext,
@@ -202,7 +220,7 @@ func (srv *SecretsService) seal(board uuid.UUID, name string, kind models.Secret
 }
 
 func (srv *SecretsService) unseal(s *models.Secret) ([]byte, error) {
-	return srv.sealer.Open(aad(s.Board, s.Name), &crypto.Sealed{
+	return srv.sealer.Open(aad(s.Scope, s.Name), &crypto.Sealed{
 		Ciphertext: s.Ciphertext,
 		Nonce:      s.Nonce,
 		KeyVersion: s.KeyVersion,
@@ -210,7 +228,7 @@ func (srv *SecretsService) unseal(s *models.Secret) ([]byte, error) {
 }
 
 func (srv *SecretsService) refresh(s *models.Secret, material *models.OAuth2Material) error {
-	key := "oauth-refresh:" + s.Board.String() + ":" + s.Name
+	key := "oauth-refresh:" + s.Scope.Key() + ":" + s.Name
 
 	token, held, err := srv.locks.Acquire(key, REFRESH_LOCK_TTL)
 	if err != nil {
@@ -218,7 +236,7 @@ func (srv *SecretsService) refresh(s *models.Secret, material *models.OAuth2Mate
 	}
 
 	if !held {
-		fresh, err := srv.store.FindSecrets(s.Board, []string{s.Name})
+		fresh, err := srv.store.FindSecrets(s.Scope, []string{s.Name})
 		if err != nil {
 			return err
 		}
@@ -251,15 +269,15 @@ func (srv *SecretsService) refresh(s *models.Secret, material *models.OAuth2Mate
 		return err
 	}
 
-	return srv.seal(s.Board, s.Name, models.SecretOAuth2, plaintext, s.Flow, s.Authorized)
+	return srv.seal(s.Scope, s.Name, models.SecretOAuth2, plaintext, s.Flow, s.Authorized)
 }
 
-func (srv *SecretsService) Resolve(board uuid.UUID, names []string) (map[string]string, error) {
+func (srv *SecretsService) Resolve(scope models.SecretScope, names []string) (map[string]string, error) {
 	if len(names) == 0 {
 		return nil, nil
 	}
 
-	stored, err := srv.store.FindSecrets(board, names)
+	stored, err := srv.store.FindSecrets(scope, names)
 	if err != nil {
 		return nil, err
 	}

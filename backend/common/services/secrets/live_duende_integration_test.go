@@ -20,7 +20,7 @@ func TestLiveDuende(t *testing.T) {
 	// Swap the double for the real token client.
 	srv.tokens = oauth.New()
 
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	material := &models.OAuth2Material{
 		Flow:         models.OAuth2ClientCredentials,

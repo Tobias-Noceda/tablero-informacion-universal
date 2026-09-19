@@ -31,7 +31,7 @@ func TestLiveAuthorizationCode(t *testing.T) {
 	srv := handshakeService(t, store, handshakes, nil)
 	srv.tokens = oauth.New()
 
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 	redirect := "http://localhost:9999/cb"
 
 	material := &models.OAuth2Material{

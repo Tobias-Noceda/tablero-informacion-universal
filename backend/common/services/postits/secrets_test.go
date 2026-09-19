@@ -108,7 +108,7 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 			stored = append(stored, *s)
 			return nil
 		},
-		FindSecretsFn: func(_ uuid.UUID, _ []string) ([]models.Secret, error) {
+		FindSecretsFn: func(models.SecretScope, []string) ([]models.Secret, error) {
 			return stored, nil
 		},
 	}
@@ -118,10 +118,10 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 		},
 	}
 
-	secrets := secretsrv.New(store, boards, sealer,
+	secrets := secretsrv.New(store, secretsrv.NewPolicy(boards), sealer,
 		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})
 
-	if err := secrets.Put(board, owner, "CURRENCY_API_KEY", models.SecretApiKey, theKey); err != nil {
+	if err := secrets.Put(models.BoardScope(board), models.Principal{ID: owner}, "CURRENCY_API_KEY", models.SecretApiKey, theKey); err != nil {
 		t.Fatalf("put secret: %v", err)
 	}
 	if bytes.Contains(stored[0].Ciphertext, []byte(theKey)) {

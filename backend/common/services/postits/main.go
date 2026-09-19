@@ -86,7 +86,7 @@ func secretRefs(postit *models.PostIts) []string {
 }
 
 func (srv *PostItsService) prepare(postit *models.PostIts) (*models.PostIts, error) {
-	resolved, err := srv.secrets.Resolve(postit.Board, secretRefs(postit))
+	resolved, err := srv.secrets.Resolve(models.BoardScope(postit.Board), secretRefs(postit))
 	if err != nil {
 		return nil, err
 	}
