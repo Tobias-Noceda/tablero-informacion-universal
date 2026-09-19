@@ -199,23 +199,45 @@ func (m *MockExecuter) Execute(postit *models.PostIts) (any, error) {
 }
 
 type MockSecretResolver struct {
-	ResolveFn func(board uuid.UUID, names []string) (map[string]string, error)
+	ResolveFn func(scope models.SecretScope, names []string) (map[string]string, error)
 }
 
 var _ infrastructure.SecretResolver = (*MockSecretResolver)(nil)
 
-func (m *MockSecretResolver) Resolve(board uuid.UUID, names []string) (map[string]string, error) {
+func (m *MockSecretResolver) Resolve(scope models.SecretScope, names []string) (map[string]string, error) {
 	if m.ResolveFn != nil {
-		return m.ResolveFn(board, names)
+		return m.ResolveFn(scope, names)
 	}
 	return nil, nil
 }
 
+// MockScopePolicy allows everything unless told otherwise.
+type MockScopePolicy struct {
+	CanManageFn func(principal models.Principal, scope models.SecretScope) error
+	CanViewFn   func(principal models.Principal, scope models.SecretScope) error
+}
+
+var _ infrastructure.ScopePolicy = (*MockScopePolicy)(nil)
+
+func (m *MockScopePolicy) CanManage(principal models.Principal, scope models.SecretScope) error {
+	if m.CanManageFn != nil {
+		return m.CanManageFn(principal, scope)
+	}
+	return nil
+}
+
+func (m *MockScopePolicy) CanView(principal models.Principal, scope models.SecretScope) error {
+	if m.CanViewFn != nil {
+		return m.CanViewFn(principal, scope)
+	}
+	return nil
+}
+
 type MockSecretStore struct {
 	UpsertSecretFn func(secret *models.Secret) error
-	FindSecretsFn  func(board uuid.UUID, names []string) ([]models.Secret, error)
-	ListSecretsFn  func(board uuid.UUID) ([]models.Secret, error)
-	DeleteSecretFn func(board uuid.UUID, name string) error
+	FindSecretsFn  func(scope models.SecretScope, names []string) ([]models.Secret, error)
+	ListSecretsFn  func(scope models.SecretScope) ([]models.Secret, error)
+	DeleteSecretFn func(scope models.SecretScope, name string) error
 }
 
 var _ infrastructure.SecretStore = (*MockSecretStore)(nil)
@@ -227,23 +249,23 @@ func (m *MockSecretStore) UpsertSecret(secret *models.Secret) error {
 	return nil
 }
 
-func (m *MockSecretStore) FindSecrets(board uuid.UUID, names []string) ([]models.Secret, error) {
+func (m *MockSecretStore) FindSecrets(scope models.SecretScope, names []string) ([]models.Secret, error) {
 	if m.FindSecretsFn != nil {
-		return m.FindSecretsFn(board, names)
+		return m.FindSecretsFn(scope, names)
 	}
 	return nil, nil
 }
 
-func (m *MockSecretStore) ListSecrets(board uuid.UUID) ([]models.Secret, error) {
+func (m *MockSecretStore) ListSecrets(scope models.SecretScope) ([]models.Secret, error) {
 	if m.ListSecretsFn != nil {
-		return m.ListSecretsFn(board)
+		return m.ListSecretsFn(scope)
 	}
 	return nil, nil
 }
 
-func (m *MockSecretStore) DeleteSecret(board uuid.UUID, name string) error {
+func (m *MockSecretStore) DeleteSecret(scope models.SecretScope, name string) error {
 	if m.DeleteSecretFn != nil {
-		return m.DeleteSecretFn(board, name)
+		return m.DeleteSecretFn(scope, name)
 	}
 	return nil
 }

@@ -10,11 +10,18 @@ import (
 // SecretResolver is the only way a decrypted value reaches an execution. Kept
 // narrow so the post-it service cannot reach the write or list operations.
 type SecretResolver interface {
-	Resolve(board uuid.UUID, names []string) (map[string]string, error)
+	Resolve(scope models.SecretScope, names []string) (map[string]string, error)
 }
 
-// BoardReader is the slice of Database the secrets service needs to answer
-// "may this caller manage this board's credentials".
+// ScopePolicy decides who may see or change the secrets of a scope. It is the
+// single seam authentication plugs into.
+type ScopePolicy interface {
+	CanManage(principal models.Principal, scope models.SecretScope) error
+	CanView(principal models.Principal, scope models.SecretScope) error
+}
+
+// BoardReader is the slice of Database the policy needs to answer "may this
+// caller manage this board's credentials".
 type BoardReader interface {
 	FindBoard(id uuid.UUID) (*models.Board, error)
 }
@@ -49,12 +56,12 @@ type Locker interface {
 }
 
 type SecretStore interface {
-	// Creates or replaces a board secret, keyed by board + name
+	// Creates or replaces a secret, keyed by scope + name
 	UpsertSecret(secret *models.Secret) error
-	// Find the named secrets of a board. Missing names are simply absent.
-	FindSecrets(board uuid.UUID, names []string) ([]models.Secret, error)
-	// Find every secret of a board
-	ListSecrets(board uuid.UUID) ([]models.Secret, error)
-	// Delete a board secret by name
-	DeleteSecret(board uuid.UUID, name string) error
+	// Find the named secrets of a scope. Missing names are simply absent.
+	FindSecrets(scope models.SecretScope, names []string) ([]models.Secret, error)
+	// Find every secret of a scope
+	ListSecrets(scope models.SecretScope) ([]models.Secret, error)
+	// Delete a secret by name
+	DeleteSecret(scope models.SecretScope, name string) error
 }
