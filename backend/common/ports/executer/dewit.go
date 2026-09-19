@@ -45,11 +45,14 @@ func (e *DewIt) Execute(postit *models.PostIts) (any, error) {
 		}
 	}
 
-	res, err := e.request(postit.Resource, postit.Request.Method, postit.Request.Queries, postit.Request.Headers)
+	res, cancel, err := e.request(postit.Resource, postit.Request.Method, postit.Request.Queries, postit.Request.Headers)
 	if err != nil {
 		return nil, err
 	}
 
+	// The request context must outlive the body read below, so the parser
+	// sees the whole payload rather than a "context canceled" mid-stream.
+	defer cancel()
 	defer res.Body.Close()
 	body := io.LimitReader(res.Body, safehttp.MAX_PAYLOAD_SIZE)
 
@@ -77,9 +80,8 @@ func (*DewIt) populate(input, out map[string]string) error {
 	return nil
 }
 
-func (*DewIt) request(resource *url.URL, method string, queries, headers map[string]string) (*http.Response, error) {
+func (*DewIt) request(resource *url.URL, method string, queries, headers map[string]string) (*http.Response, context.CancelFunc, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), safehttp.REQUEST_TIMEOUT)
-	defer cancel()
 
 	target := *resource
 
@@ -91,7 +93,8 @@ func (*DewIt) request(resource *url.URL, method string, queries, headers map[str
 
 	req, err := http.NewRequestWithContext(ctx, method, target.String(), nil)
 	if err != nil {
-		return nil, err
+		cancel()
+		return nil, nil, err
 	}
 
 	for k, v := range headers {
@@ -100,13 +103,15 @@ func (*DewIt) request(resource *url.URL, method string, queries, headers map[str
 
 	res, err := safehttp.Client().Do(req)
 	if err != nil {
-		return nil, err
+		cancel()
+		return nil, nil, err
 	}
 
 	if res.StatusCode != http.StatusOK {
 		res.Body.Close()
-		return nil, fmt.Errorf("Resource didn't return 200")
+		cancel()
+		return nil, nil, fmt.Errorf("Resource returned %d", res.StatusCode)
 	}
 
-	return res, nil
+	return res, cancel, nil
 }
