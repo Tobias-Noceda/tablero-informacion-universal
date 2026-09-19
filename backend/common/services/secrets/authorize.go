@@ -42,6 +42,10 @@ func (srv *SecretsService) Authorize(scope models.SecretScope, principal models.
 		return "", err
 	}
 
+	if err := srv.hydrate(material); err != nil {
+		return "", err
+	}
+
 	if material.Flow != models.OAuth2AuthorizationCode {
 		return "", fmt.Errorf("Credential does not use the authorization code flow")
 	}
@@ -120,16 +124,15 @@ func (srv *SecretsService) Callback(state, code string) error {
 		return err
 	}
 
+	if err := srv.hydrate(material); err != nil {
+		return err
+	}
+
 	if err := srv.tokens.Exchange(material, code, handshake.Redirect, handshake.Verifier); err != nil {
 		return err
 	}
 
-	plaintext, err := json.Marshal(material)
-	if err != nil {
-		return err
-	}
-
-	return srv.seal(secret.Scope, secret.Name, models.SecretOAuth2, plaintext, secret.Flow, true)
+	return srv.sealMaterial(secret.Scope, secret.Name, material, true)
 }
 
 func handshakeKey(state string) string {

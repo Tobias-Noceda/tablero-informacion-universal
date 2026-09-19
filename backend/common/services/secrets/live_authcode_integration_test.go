@@ -108,8 +108,7 @@ func TestLiveAuthorizationCode(t *testing.T) {
 	firstRefresh := stored.RefreshToken
 
 	stored.ExpiresAt = time.Now().Add(-time.Minute)
-	expired, _ := json.Marshal(&stored)
-	if err := srv.seal(board, "MOCKPROVIDER", models.SecretOAuth2, expired, string(models.OAuth2AuthorizationCode), true); err != nil {
+	if err := srv.sealMaterial(board, "MOCKPROVIDER", &stored, true); err != nil {
 		t.Fatalf("reseal: %v", err)
 	}
 

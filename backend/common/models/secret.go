@@ -21,6 +21,8 @@ const (
 	SecretBearer SecretKind = "bearer"
 	SecretBasic  SecretKind = "basic"
 	SecretOAuth2 SecretKind = "oauth2"
+	// The platform's own application at a provider. System scope only.
+	SecretOAuth2Client SecretKind = "oauth2_client"
 )
 
 type Secret struct {
@@ -37,18 +39,20 @@ type Secret struct {
 	// Which OAuth2 flow this credential uses, and whether a user has already
 	// consented. Both are configuration rather than secrets, so they live in
 	// the clear and a listing does not have to decrypt anything.
-	Flow       string `bson:"flow" json:"flow,omitempty"`
-	Authorized bool   `bson:"authorized" json:"authorized,omitempty"`
+	Flow       string        `bson:"flow" json:"flow,omitempty"`
+	Authorized bool          `bson:"authorized" json:"authorized,omitempty"`
+	Provider   OAuthProvider `bson:"provider" json:"provider,omitempty"`
 }
 
 type SecretMeta struct {
-	Scope      SecretScope `json:"scope"`
-	Name       string      `json:"name"`
-	Kind       SecretKind  `json:"kind"`
-	Flow       string      `json:"flow,omitempty"`
-	Authorized bool        `json:"authorized"`
-	CreatedAt  time.Time   `json:"created_at"`
-	UpdatedAt  time.Time   `json:"updated_at"`
+	Scope      SecretScope   `json:"scope"`
+	Name       string        `json:"name"`
+	Kind       SecretKind    `json:"kind"`
+	Flow       string        `json:"flow,omitempty"`
+	Authorized bool          `json:"authorized"`
+	Provider   OAuthProvider `json:"provider,omitempty"`
+	CreatedAt  time.Time     `json:"created_at"`
+	UpdatedAt  time.Time     `json:"updated_at"`
 }
 
 func Present(kind SecretKind, value string) string {
@@ -70,6 +74,7 @@ func (s *Secret) Meta() SecretMeta {
 		Kind:       s.Kind,
 		Flow:       s.Flow,
 		Authorized: s.Authorized,
+		Provider:   s.Provider,
 		CreatedAt:  s.CreatedAt,
 		UpdatedAt:  s.UpdatedAt,
 	}

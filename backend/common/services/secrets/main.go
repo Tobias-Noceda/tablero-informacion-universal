@@ -65,7 +65,7 @@ func (srv *SecretsService) Put(scope models.SecretScope, principal models.Princi
 		return fmt.Errorf("Unsupported secret kind")
 	}
 
-	return srv.seal(scope, name, kind, []byte(value), "", false)
+	return srv.seal(scope, name, kind, []byte(value), clear{})
 }
 
 func (srv *SecretsService) PutOAuth2(scope models.SecretScope, principal models.Principal, name string, material *models.OAuth2Material) error {
@@ -81,6 +81,10 @@ func (srv *SecretsService) PutOAuth2(scope models.SecretScope, principal models.
 	case models.OAuth2ClientCredentials, models.OAuth2AuthorizationCode:
 	default:
 		return fmt.Errorf("Unsupported OAuth2 flow")
+	}
+
+	if scope.Kind == models.ScopeSystem && material.Flow != models.OAuth2ClientCredentials {
+		return fmt.Errorf("The platform itself cannot consent to a provider")
 	}
 
 	if material.ClientID == "" || material.ClientSecret == "" {
@@ -101,13 +105,9 @@ func (srv *SecretsService) PutOAuth2(scope models.SecretScope, principal models.
 	material.RefreshToken = ""
 	material.TokenType = ""
 	material.ExpiresAt = time.Time{}
+	material.Provider = ""
 
-	plaintext, err := json.Marshal(material)
-	if err != nil {
-		return err
-	}
-
-	return srv.seal(scope, name, models.SecretOAuth2, plaintext, material.Flow, false)
+	return srv.sealMaterial(scope, name, material, false)
 }
 
 func validEndpoint(raw string) error {
@@ -214,7 +214,32 @@ func (srv *SecretsService) Delete(scope models.SecretScope, principal models.Pri
 	return srv.store.DeleteSecret(scope, name)
 }
 
-func (srv *SecretsService) seal(scope models.SecretScope, name string, kind models.SecretKind, plaintext []byte, flow string, authorized bool) error {
+// clear is the metadata stored next to the ciphertext: configuration a
+// listing may show without decrypting anything.
+type clear struct {
+	flow       string
+	authorized bool
+	provider   models.OAuthProvider
+}
+
+func clearOf(s *models.Secret) clear {
+	return clear{flow: s.Flow, authorized: s.Authorized, provider: s.Provider}
+}
+
+func (srv *SecretsService) sealMaterial(scope models.SecretScope, name string, material *models.OAuth2Material, authorized bool) error {
+	plaintext, err := json.Marshal(material.Persistable())
+	if err != nil {
+		return err
+	}
+
+	return srv.seal(scope, name, models.SecretOAuth2, plaintext, clear{
+		flow:       material.Flow,
+		authorized: authorized,
+		provider:   material.Provider,
+	})
+}
+
+func (srv *SecretsService) seal(scope models.SecretScope, name string, kind models.SecretKind, plaintext []byte, meta clear) error {
 	sealed, err := srv.keyring.Seal(scope, aad(scope, name), plaintext)
 	if err != nil {
 		return err
@@ -232,8 +257,9 @@ func (srv *SecretsService) seal(scope models.SecretScope, name string, kind mode
 		KeyID:      sealed.KeyID,
 		CreatedAt:  now,
 		UpdatedAt:  now,
-		Flow:       flow,
-		Authorized: authorized,
+		Flow:       meta.flow,
+		Authorized: meta.authorized,
+		Provider:   meta.provider,
 	})
 }
 
@@ -284,16 +310,15 @@ func (srv *SecretsService) refresh(s *models.Secret, material *models.OAuth2Mate
 
 	defer srv.locks.Release(key, token)
 
+	if err := srv.hydrate(material); err != nil {
+		return err
+	}
+
 	if err := srv.tokens.Fetch(material); err != nil {
 		return err
 	}
 
-	plaintext, err := json.Marshal(material)
-	if err != nil {
-		return err
-	}
-
-	return srv.seal(s.Scope, s.Name, models.SecretOAuth2, plaintext, s.Flow, s.Authorized)
+	return srv.sealMaterial(s.Scope, s.Name, material, s.Authorized)
 }
 
 func (srv *SecretsService) Resolve(scope models.SecretScope, names []string) (map[string]string, error) {

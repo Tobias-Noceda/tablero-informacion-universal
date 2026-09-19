@@ -6,11 +6,15 @@ package models
 type SystemSecretName string
 
 const (
-	SystemNasaApiKey SystemSecretName = "NASA_API_KEY"
+	SystemNasaApiKey         SystemSecretName = "NASA_API_KEY"
+	SystemGoogleOAuthClient  SystemSecretName = "GOOGLE_OAUTH_CLIENT"
+	SystemDiscordOAuthClient SystemSecretName = "DISCORD_OAUTH_CLIENT"
 )
 
 var KnownSystemSecrets = []SystemSecretName{
 	SystemNasaApiKey,
+	SystemGoogleOAuthClient,
+	SystemDiscordOAuthClient,
 }
 
 // SystemSecretStatus is what an operator sees: whether each name the code

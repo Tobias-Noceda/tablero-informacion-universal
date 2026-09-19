@@ -24,7 +24,7 @@ func (srv *SecretsService) migrate(s *models.Secret, plaintext []byte) {
 	}
 	defer srv.locks.Release(key, token)
 
-	if err := srv.seal(s.Scope, s.Name, s.Kind, plaintext, s.Flow, s.Authorized); err != nil {
+	if err := srv.seal(s.Scope, s.Name, s.Kind, plaintext, clearOf(s)); err != nil {
 		log.Printf("secret %s/%s: migrating to the active key failed: %v", s.Scope.Key(), s.Name, err)
 	}
 }
@@ -47,7 +47,7 @@ func (srv *SecretsService) Reseal(scope models.SecretScope) (int, error) {
 			continue
 		}
 
-		if err := srv.seal(s.Scope, s.Name, s.Kind, plaintext, s.Flow, s.Authorized); err != nil {
+		if err := srv.seal(s.Scope, s.Name, s.Kind, plaintext, clearOf(&s)); err != nil {
 			return resealed, err
 		}
 		resealed++
