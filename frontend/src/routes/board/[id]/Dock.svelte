@@ -138,6 +138,8 @@
     align-items: stretch;
     overflow-x: auto;
     overflow-y: hidden;
+    z-index: 100;
+    background: var(--color-background);
     padding: 10px;
   }
 
@@ -145,8 +147,6 @@
     display: flex;
     flex-direction: row;
     gap: 1rem;
-    z-index: 100;
-    background: var(--color-background);
     /* "safe" keeps centering when it fits, but starts at the left edge when it overflows */
     justify-content: safe center;
     width: max-content;
