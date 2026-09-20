@@ -12,7 +12,7 @@
 
 	const id = page.params.id!;
 
-	const { data } = $props();
+	let { data } = $props();
 	const { nodes, edges, name } = $derived(data) as {
 		nodes: Node[];
 		edges: Edge[];
@@ -20,9 +20,12 @@
 	};
 
 	function boardUpdate(update: Update) {
-		data.nodes = update.board.postits;
-		data.edges = update.board.strands;
-		data.name = update.board.name;
+		data = {
+			...data,
+			nodes: update.board.postits ?? data.nodes,
+			edges: update.board.strands ?? data.edges,
+			name: update.board.name ?? data.name
+		};
 	}
 </script>
 

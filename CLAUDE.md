@@ -63,7 +63,7 @@ cd frontend
 pnpm install
 pnpm dev                # Vite dev server
 ```
-`pnpm dev` is not behind the ALB, so `/api` and `/ws` do not exist on the dev origin. Set `VITE_API_URL=http://localhost:31126` to reach the backend and `VITE_REALTIME_URL=http://localhost:3000` for realtime (websocket-only transport, so no CORS is needed on the realtime service).
+`pnpm dev` is not behind the ALB, so `/api` and `/ws` do not exist on the dev origin. To use the Docker stack as the API, set `VITE_API_URL=http://localhost` in `frontend/.env` (the ALB on port 80 routes `/api` and `/ws`; leave `VITE_REALTIME_URL` empty). Docker does not publish the backend (31126) or realtime (3000) ports. If you run those services yourself instead, use `VITE_API_URL=http://localhost:31126` and `VITE_REALTIME_URL=http://localhost:3000` (websocket-only transport, so no CORS is needed on realtime). Use `pnpm dev --host` and your LAN IP to open the dev server from another machine.
 
 ## Environment variables
 
