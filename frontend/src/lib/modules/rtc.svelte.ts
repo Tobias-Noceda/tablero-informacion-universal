@@ -17,17 +17,17 @@ export class RTC {
 	private readonly connections = new SvelteMap<string, DataConnection>();
 	private readonly peer: Peer;
 
-	constructor(id: string, peers: string[]) {
+	constructor(id: string, clients: Record<string, string>) {
 		this.peer = new Peer(id);
 
-		const color = RTC.COLORS[peers.length % RTC.COLORS.length];
+		const color = RTC.getColor(Object.keys(clients).length);
 
 		this.peer.on('connection', this.setPeerConnection.bind(this));
 		this.peer.on('error', console.error);
 
 		this.peer.on('open', () =>
-			peers.forEach((p) => {
-				const conn = this.peer.connect(p, {
+			Object.entries(clients).forEach(([user, peer], i) => {
+				const conn = this.peer.connect(peer, {
 					reliable: true,
 					metadata: {
 						username: 'Messi',
@@ -37,7 +37,11 @@ export class RTC {
 				});
 
 				// TODO: use external peer metadata
-				this.setPeerConnection(conn);
+				this.setPeerConnection(conn, {
+					username: 'Not messi',
+					picture: user,
+					color: RTC.getColor(i)
+				});
 			})
 		);
 	}
@@ -82,5 +86,9 @@ export class RTC {
 
 	private static isNumber(n: unknown): n is number {
 		return Number.isFinite(n);
+	}
+
+	private static getColor(i: number) {
+		return RTC.COLORS[i % RTC.COLORS.length];
 	}
 }

@@ -13,10 +13,11 @@
 	const id = page.params.id!;
 
 	let { data } = $props();
-	const { nodes, edges, name } = $derived(data) as {
+	const { nodes, edges, name, userId } = $derived(data) as {
 		nodes: Node[];
 		edges: Edge[];
 		name: string;
+		userId: string;
 	};
 
 	function boardUpdate(update: Update) {
@@ -31,6 +32,6 @@
 
 <DnDProvider>
 	<!-- <Realtime boardId={id} {boardUpdate}> -->
-	<Flow {name} {nodes} {edges} boardId={id} {boardUpdate} />
+	<Flow {name} {nodes} {edges} boardId={id} {userId} {boardUpdate} />
 	<!-- </Realtime> -->
 </DnDProvider>

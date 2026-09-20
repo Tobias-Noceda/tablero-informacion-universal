@@ -9,17 +9,18 @@
 	type Props = {
 		children: Snippet;
 		boardId: string;
+		userId: string;
 		boardUpdate: (update: realtime.Update) => void;
 	};
 
-	let { children, boardId, boardUpdate }: Props = $props();
+	let { children, boardId, userId, boardUpdate }: Props = $props();
 
 	let frame: number | null = null;
 	let connection: Promise<realtime.Connection>;
 
 	// https://github.com/sveltejs/svelte/issues/13249#issuecomment-2351801858
 	$effect.pre(() => {
-		connection = realtime.connect(boardId, boardUpdate);
+		connection = realtime.connect(boardId, userId, boardUpdate);
 
 		return async () => {
 			if (frame) cancelAnimationFrame(frame);
