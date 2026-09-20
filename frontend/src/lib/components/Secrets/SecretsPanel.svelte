@@ -3,12 +3,22 @@
 	import Input from '$components/Input/Input.svelte';
 	import Modal from '$components/Modal/Modal.svelte';
 	import * as secretsApi from '$services/secrets';
+	import { CURRENT_USER } from '$modules/api.svelte';
 	import type { OAuth2Flow, OAuthProvider, OAuthProviderStatus, SecretMeta, UUID } from '$types/api';
 
 	type StaticKind = 'api_key' | 'bearer' | 'basic';
 	import { m } from '$lib/paraglide/messages';
+	import { cn } from '$lib/utils';
 
 	let { board, onclose }: { board: UUID; onclose: () => void } = $props();
+
+	// "board": shared with every member. "mine": what this user keeps here
+	// for themselves; nobody else on the board can see or bind it.
+	type Tab = 'board' | 'mine';
+	let tab = $state<Tab>('board');
+	const scope = $derived(
+		tab === 'board' ? secretsApi.boardScope(board) : secretsApi.memberScope(board, CURRENT_USER)
+	);
 
 	let secrets = $state<SecretMeta[]>([]);
 	let providers = $state<OAuthProviderStatus[]>([]);
@@ -57,7 +67,7 @@
 		loading = true;
 		error = '';
 		try {
-			[secrets, providers] = await Promise.all([secretsApi.list(board), secretsApi.providers()]);
+			[secrets, providers] = await Promise.all([secretsApi.list(scope), secretsApi.providers()]);
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -84,15 +94,15 @@
 		error = '';
 		try {
 			if (drafting === 'static') {
-				await secretsApi.put(board, name, kind, staticValue);
+				await secretsApi.put(scope, name, kind, staticValue);
 			} else if (drafting === 'connect') {
 				// The grant is created server-side and the user is sent to consent;
 				// the panel is left behind, so there is nothing to refresh here.
 				const redirect = `${window.location.origin}/oauth2/callback`;
-				window.location.href = await secretsApi.connect(board, provider, name, redirect);
+				window.location.href = await secretsApi.connect(scope, provider, name, redirect);
 				return;
 			} else {
-				await secretsApi.put_oauth2(board, {
+				await secretsApi.put_oauth2(scope, {
 					name,
 					flow,
 					client_id: clientId.trim(),
@@ -112,7 +122,7 @@
 	async function remove(secret: SecretMeta) {
 		error = '';
 		try {
-			await secretsApi.del(board, secret.name);
+			await secretsApi.del(scope, secret.name);
 			await refresh();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -123,20 +133,47 @@
 		error = '';
 		try {
 			const redirect = `${window.location.origin}/oauth2/callback`;
-			const target = await secretsApi.authorize(board, secret.name, redirect);
+			const target = await secretsApi.authorize(scope, secret.name, redirect);
 			window.location.href = target;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		}
 	}
 
+	function show(next: Tab) {
+		tab = next;
+		resetDraft();
+	}
+
+	// Re-runs when the tab changes, since the scope is derived from it.
 	$effect(() => {
+		void scope;
 		refresh();
 	});
 </script>
 
 <Modal onclose={onclose} onaccept={onclose} acceptText={m['secrets.close']()}>
 	<h2 class="text-lg font-semibold">{m['secrets.title']()}</h2>
+
+	<div class="flex gap-1 border-b border-main-border" role="tablist">
+		{#each [['board', m['secrets.tab_board']()], ['mine', m['secrets.tab_mine']()]] as [key, label] (key)}
+			<button
+				type="button"
+				role="tab"
+				aria-selected={tab === key}
+				class={cn(
+					'px-3 py-1 text-sm border-b-2 -mb-px',
+					tab === key ? 'border-primary font-semibold' : 'border-transparent opacity-70'
+				)}
+				onclick={() => show(key as Tab)}
+			>
+				{label}
+			</button>
+		{/each}
+	</div>
+	{#if tab === 'mine'}
+		<p class="text-xs opacity-70">{m['secrets.mine_hint']()}</p>
+	{/if}
 
 	{#if error}
 		<p class="text-sm text-destructive">{error}</p>
@@ -145,7 +182,7 @@
 	{#if loading}
 		<p class="text-sm opacity-70">{m['secrets.loading']()}</p>
 	{:else if secrets.length === 0}
-		<p class="text-sm opacity-70">{m['secrets.empty']()}</p>
+		<p class="text-sm opacity-70">{tab === 'mine' ? m['secrets.empty_mine']() : m['secrets.empty']()}</p>
 	{:else}
 		<ul class="flex flex-col gap-2">
 			{#each secrets as secret (secret.name)}

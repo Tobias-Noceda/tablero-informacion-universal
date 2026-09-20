@@ -12,6 +12,9 @@
 	import Button from '$components/Button/Button.svelte';
 	import SecretsPanel from '$components/Secrets/SecretsPanel.svelte';
 	import * as secretsApi from '$services/secrets';
+	import { CURRENT_USER } from '$modules/api.svelte';
+	import { groupByOrigin } from '$lib/secrets/origin';
+	import { bindingsFor, refKey } from '$lib/secrets/binding';
 	import type { SecretMeta } from '$types/api';
 	import { m } from '$lib/paraglide/messages';
 	import { nodesMap, parameters } from '$components/Nodes/node-map';
@@ -29,20 +32,28 @@
 	let selectedEdge: Edge | null = $state(null);
 
 	let managingSecrets = $state(false);
-	let boardSecrets = $state<SecretMeta[]>([]);
+	// Everything this user may bind on this board, wherever it lives.
+	let usableSecrets = $state<SecretMeta[]>([]);
+	const pickable = $derived(groupByOrigin(usableSecrets, boardId, CURRENT_USER));
+	const byKey = $derived(new Map(usableSecrets.map((s) => [refKey(s), s])));
 
 	// Refreshed whenever the panel closes, so a credential added there is
 	// immediately pickable when creating a node.
 	$effect(() => {
 		if (managingSecrets) return;
-		secretsApi.list(boardId).then((s) => (boardSecrets = s)).catch(() => (boardSecrets = []));
+		secretsApi.usable(boardId).then((s) => (usableSecrets = s)).catch(() => (usableSecrets = []));
 	});
 	let creatingNode = $state<Board['postits'][number] | null>(null);
 	let paramValues = $state<Record<string, string>>({});
+	// A secret parameter holds the picked secret's key, not its name.
+	let pickedKeys = $state<Record<string, string>>({});
 
 	const creatingParams = $derived(creatingNode ? (parameters[creatingNode.type!] ?? []) : []);
 	const missingRequired = $derived(
-		creatingParams.some((p) => p.default === undefined && !(paramValues[p.key] ?? '').trim())
+		creatingParams.some((p) => {
+			const value = p.type === 'secret' ? pickedKeys[p.key] : paramValues[p.key];
+			return p.default === undefined && !(value ?? '').trim();
+		})
 	);
 
 	const { screenToFlowPosition, flowToScreenPosition } = useSvelteFlow();
@@ -99,16 +110,29 @@
 	const createNode = async () => {
 		if (!creatingNode || missingRequired) return;
 
-		const params = Object.fromEntries(
-			creatingParams.map((p) => [p.key, (paramValues[p.key] ?? '').trim()])
+		const picked = Object.fromEntries(
+			creatingParams
+				.filter((p) => p.type === 'secret' && byKey.has(pickedKeys[p.key]))
+				.map((p) => [p.key, byKey.get(pickedKeys[p.key])!])
 		);
+		const secrets = bindingsFor(picked, boardId);
 
-		const newPostIt = await postItsApi.create_well_known(boardId, creatingNode.type!, params);
+		const params = {
+			...Object.fromEntries(
+				creatingParams
+					.filter((p) => p.type !== 'secret')
+					.map((p) => [p.key, (paramValues[p.key] ?? '').trim()])
+			),
+			...secrets.params
+		};
+
+		const newPostIt = await postItsApi.create_well_known(boardId, creatingNode.type!, params, secrets.bindings);
 		await postItsApi.move(newPostIt.id, creatingNode.position.x, creatingNode.position.y);
 
 		nodes = [...nodes, { ...creatingNode, id: newPostIt.id, data: params }];
 		creatingNode = null;
 		paramValues = {};
+		pickedKeys = {};
 	};
 
 	const deleteNode = async (node: Node) => {
@@ -287,20 +311,22 @@
 			<h2 class="text-lg font-semibold">Create Node</h2>
 			{#each creatingParams as param (param.key)}
 				{#if param.type === 'secret'}
-					<!-- The value stored is the secret's name, prefixed, so the
-					     backend resolves it against this board at run time. -->
 					<label class="flex flex-col gap-1 text-sm">
 						{param.label}
-						{#if boardSecrets.length === 0}
+						{#if pickable.length === 0}
 							<span class="text-xs text-destructive">{m['secrets.no_credentials']()}</span>
 						{:else}
 							<select
 								class="bg-background border border-main-border rounded-md px-2 py-1"
-								bind:value={paramValues[param.key]}
+								bind:value={pickedKeys[param.key]}
 							>
 								<option value="">{m['secrets.pick_credential']()}</option>
-								{#each boardSecrets as secret (secret.name)}
-									<option value={`$${secret.name}`}>{secret.name} ({secret.kind})</option>
+								{#each pickable as group (group.origin)}
+									<optgroup label={m[`secrets.origin_${group.origin}`]()}>
+										{#each group.secrets as secret (refKey(secret))}
+											<option value={refKey(secret)}>{secret.name} ({secret.provider ?? secret.kind})</option>
+										{/each}
+									</optgroup>
 								{/each}
 							</select>
 						{/if}
