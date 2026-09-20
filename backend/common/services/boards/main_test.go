@@ -1,6 +1,7 @@
 package boards
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/Secreto31126/tesis/common/mocks"
@@ -132,6 +133,9 @@ func TestDeleteBoard_Delegates(t *testing.T) {
 	id := uuid.New()
 	called := false
 	db := &mocks.MockDB{
+		FindBoardFn: func(got uuid.UUID) (*models.Board, error) {
+			return &models.Board{Id: got, Owner: "owner"}, nil
+		},
 		DeleteBoardFn: func(b uuid.UUID) error {
 			if b != id {
 				t.Errorf("board = %v, want %v", b, id)
@@ -202,11 +206,15 @@ func (p *purgeRecorder) Purge(scope models.SecretScope) error {
 }
 
 // Deleting a board must also destroy its secrets and the key that encrypted
-// them, or a dump taken later could still be decrypted.
+// them, or a dump taken later could still be decrypted. What each member kept
+// there for themselves goes with it.
 func TestDeleteBoard_PurgesItsSecrets(t *testing.T) {
 	id := uuid.New()
 	deleted := false
 	db := &mocks.MockDB{
+		FindBoardFn: func(got uuid.UUID) (*models.Board, error) {
+			return &models.Board{Id: got, Owner: "owner", Collaborators: []string{"ana", "bob"}}, nil
+		},
 		DeleteBoardFn: func(got uuid.UUID) error {
 			deleted = got == id
 			return nil
@@ -220,7 +228,43 @@ func TestDeleteBoard_PurgesItsSecrets(t *testing.T) {
 	if !deleted {
 		t.Error("the board itself was not deleted")
 	}
-	if len(purger.purged) != 1 || purger.purged[0] != models.BoardScope(id) {
-		t.Errorf("purged %v, want the board's scope", purger.purged)
+
+	want := []models.SecretScope{
+		models.BoardScope(id),
+		models.MemberScope(id, "owner"),
+		models.MemberScope(id, "ana"),
+		models.MemberScope(id, "bob"),
+	}
+	if len(purger.purged) != len(want) {
+		t.Fatalf("purged %v, want %v", purger.purged, want)
+	}
+	for _, scope := range want {
+		if !slices.Contains(purger.purged, scope) {
+			t.Errorf("%s was not purged", scope.Key())
+		}
+	}
+}
+
+// A collaborator who leaves takes nothing with them: what they kept on the
+// board is destroyed, not left for the next person with the same id.
+func TestRemoveCollaborator_PurgesWhatTheyKeptOnTheBoard(t *testing.T) {
+	id := uuid.New()
+	removed := false
+	db := &mocks.MockDB{
+		RemoveCollaboratorFromBoardFn: func(got uuid.UUID, user string) error {
+			removed = got == id && user == "ana"
+			return nil
+		},
+	}
+	purger := &purgeRecorder{}
+
+	if err := New(db, purger).RemoveCollaboratorFromBoard(id, "ana"); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	if !removed {
+		t.Error("the collaborator was not removed")
+	}
+	if len(purger.purged) != 1 || purger.purged[0] != models.MemberScope(id, "ana") {
+		t.Errorf("purged %v, want the member scope", purger.purged)
 	}
 }

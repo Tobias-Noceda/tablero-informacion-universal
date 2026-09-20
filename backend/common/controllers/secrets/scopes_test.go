@@ -32,6 +32,97 @@ func rememberingStore() *mocks.MockSecretStore {
 			}
 			return out, nil
 		},
+		ListSecretsFn: func(scope models.SecretScope) ([]models.Secret, error) {
+			var out []models.Secret
+			for _, row := range rows {
+				if row.Scope == scope {
+					out = append(out, row)
+				}
+			}
+			return out, nil
+		},
+	}
+}
+
+func TestMemberSecrets_OnlyThatMemberSeesThem(t *testing.T) {
+	store := rememberingStore()
+	r := setupRouter(store)
+	board := uuid.New()
+	path := "/boards/" + board.String() + "/members/" + collaborator + "/secrets"
+
+	w := do(r, http.MethodPut, path, `{"cognito_id":"`+collaborator+`","name":"MINE","kind":"api_key","value":"v"}`)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("PUT status = %d, want 204 (body: %s)", w.Code, w.Body.String())
+	}
+
+	w = do(r, http.MethodGet, path+"?cognito_id="+collaborator, "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"MINE"`) {
+		t.Errorf("GET by the member: status = %d, body = %s", w.Code, w.Body.String())
+	}
+
+	for _, caller := range []string{owner, "stranger"} {
+		w = do(r, http.MethodGet, path+"?cognito_id="+caller, "")
+		if w.Code != http.StatusNotFound {
+			t.Errorf("GET by %s: status = %d, want 404", caller, w.Code)
+		}
+		w = do(r, http.MethodPut, path, `{"cognito_id":"`+caller+`","name":"MINE","kind":"api_key","value":"x"}`)
+		if w.Code != http.StatusNotFound {
+			t.Errorf("PUT by %s: status = %d, want 404", caller, w.Code)
+		}
+	}
+
+	w = do(r, http.MethodPut, "/boards/"+board.String()+"/members/stranger/secrets", `{"cognito_id":"stranger","name":"MINE","kind":"api_key","value":"x"}`)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("a non-member got a member scope: status = %d, want 404", w.Code)
+	}
+}
+
+func TestUsableSecrets_ListsWhatTheCallerCanBind(t *testing.T) {
+	store := rememberingStore()
+	r := setupRouter(store)
+	board := uuid.New()
+
+	put := func(path, caller, name string) {
+		t.Helper()
+		w := do(r, http.MethodPut, path, `{"cognito_id":"`+caller+`","name":"`+name+`","kind":"api_key","value":"v"}`)
+		if w.Code != http.StatusNoContent {
+			t.Fatalf("PUT %s: status = %d (body: %s)", path, w.Code, w.Body.String())
+		}
+	}
+	put("/boards/"+board.String()+"/secrets", owner, "SHARED")
+	put("/boards/"+board.String()+"/members/"+collaborator+"/secrets", collaborator, "MINE")
+	put("/boards/"+board.String()+"/members/"+owner+"/secrets", owner, "OWNERS")
+	put("/users/"+collaborator+"/secrets", collaborator, "PROFILE")
+
+	w := do(r, http.MethodGet, "/boards/"+board.String()+"/secrets/usable?cognito_id="+collaborator, "")
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body: %s)", w.Code, w.Body.String())
+	}
+
+	var usable []models.SecretMeta
+	if err := json.Unmarshal(w.Body.Bytes(), &usable); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	got := map[string]models.ScopeKind{}
+	for _, meta := range usable {
+		got[meta.Name] = meta.Scope.Kind
+	}
+	want := map[string]models.ScopeKind{"SHARED": models.ScopeBoard, "MINE": models.ScopeMember, "PROFILE": models.ScopeUser}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for name, kind := range want {
+		if got[name] != kind {
+			t.Errorf("%s: kind %q, want %q", name, got[name], kind)
+		}
+	}
+	if strings.Contains(w.Body.String(), `"v"`) || strings.Contains(w.Body.String(), "ciphertext") {
+		t.Error("the listing carries secret material")
+	}
+
+	w = do(r, http.MethodGet, "/boards/"+board.String()+"/secrets/usable?cognito_id=stranger", "")
+	if w.Code != http.StatusNotFound {
+		t.Errorf("stranger: status = %d, want 404", w.Code)
 	}
 }
 

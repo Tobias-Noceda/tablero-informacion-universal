@@ -55,12 +55,24 @@ func userScope(c *gin.Context) (models.SecretScope, bool) {
 	return models.UserScope(c.Param("id")), true
 }
 
+func memberScope(c *gin.Context) (models.SecretScope, bool) {
+	board, ok := boardScope(c)
+	if !ok {
+		return models.SecretScope{}, false
+	}
+
+	return models.MemberScope(uuid.MustParse(board.Owner), c.Param("user")), true
+}
+
 func systemScope(*gin.Context) (models.SecretScope, bool) {
 	return models.SystemScope, true
 }
 
 func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
-	ctrl.registerScoped(router.Group("/boards/:id"), scoping{scope: boardScope, principalRequired: true})
+	boards := scoping{scope: boardScope, principalRequired: true}
+	ctrl.registerScoped(router.Group("/boards/:id"), boards)
+	router.GET("/boards/:id/secrets/usable", ctrl.ListUsable(boards))
+	ctrl.registerScoped(router.Group("/boards/:id/members/:user"), scoping{scope: memberScope, principalRequired: true})
 	ctrl.registerScoped(router.Group("/users/:id"), scoping{scope: userScope, principalRequired: true})
 
 	system := scoping{scope: systemScope}
@@ -134,6 +146,39 @@ func (ctrl *Controller) ListSecrets(s scoping) gin.HandlerFunc {
 		}
 
 		metas, err := ctrl.service.List(scope, principal)
+		if err != nil {
+			fail(c, err)
+			return
+		}
+
+		c.JSON(http.StatusOK, metas)
+	}
+}
+
+// ListUsable godoc
+// @Summary      List every credential the caller may bind into a card on this board
+// @Description  The board's own secrets, the caller's private ones on it and the caller's profile. Metadata only.
+// @Tags         secrets
+// @Produce      json
+// @Param        id          path      string  true  "Board UUID"
+// @Param        cognito_id  query     string  true  "AWS Cognito User ID"
+// @Success      200         {array}   models.SecretMeta
+// @Failure      400         {object}  map[string]string
+// @Failure      404         {object}  map[string]string
+// @Router       /boards/{id}/secrets/usable [get]
+func (ctrl *Controller) ListUsable(s scoping) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scope, ok := s.scope(c)
+		if !ok {
+			return
+		}
+
+		principal, ok := s.principal(c, c.Query("cognito_id"))
+		if !ok {
+			return
+		}
+
+		metas, err := ctrl.service.ListUsable(principal, uuid.MustParse(scope.Owner))
 		if err != nil {
 			fail(c, err)
 			return

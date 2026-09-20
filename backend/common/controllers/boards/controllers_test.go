@@ -191,6 +191,9 @@ func TestAddCollaborator_OK(t *testing.T) {
 func TestDeleteBoard_OK(t *testing.T) {
 	called := false
 	db := &mocks.MockDB{
+		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
+			return &models.Board{Id: id, Owner: "owner"}, nil
+		},
 		DeleteBoardFn: func(_ uuid.UUID) error {
 			called = true
 			return nil

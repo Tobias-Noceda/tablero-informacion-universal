@@ -35,6 +35,7 @@ type stack struct {
 	t         *testing.T
 	app       *app
 	db        *mongo.MongoDB
+	cache     *redis.RedisDB
 	responses []*httptest.ResponseRecorder
 }
 
@@ -65,7 +66,7 @@ func newStack(t *testing.T) *stack {
 		_ = db.Close()
 	})
 
-	return &stack{t: t, app: newApp(db, cache, kek), db: db}
+	return &stack{t: t, app: newApp(db, cache, kek), db: db, cache: cache}
 }
 
 func (s *stack) do(method, path string, body any) *httptest.ResponseRecorder {
@@ -139,7 +140,7 @@ func TestEndToEnd_SystemSecretReachesTheProviderAndNoClient(t *testing.T) {
 
 	var postit models.PostIts
 	s.mustJSON(s.do(http.MethodPost, "/api/v1/post-its",
-		map[string]any{"board": board.Id, "well_known": "nasa_apod"}), http.StatusCreated, &postit)
+		map[string]any{"cognito_id": testOwner, "board": board.Id, "well_known": "nasa_apod"}), http.StatusCreated, &postit)
 
 	if postit.Request.Queries["api_key"] != "$api_key" {
 		t.Fatalf("stored query = %q, want the placeholder", postit.Request.Queries["api_key"])
@@ -207,7 +208,7 @@ func TestEndToEnd_MissingSystemSecretIsUnavailable(t *testing.T) {
 
 	var postit models.PostIts
 	s.mustJSON(s.do(http.MethodPost, "/api/v1/post-its",
-		map[string]any{"board": board.Id, "well_known": "nasa_apod"}), http.StatusCreated, &postit)
+		map[string]any{"cognito_id": testOwner, "board": board.Id, "well_known": "nasa_apod"}), http.StatusCreated, &postit)
 
 	w := s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil)
 	if w.Code != http.StatusServiceUnavailable {
@@ -242,4 +243,105 @@ func TestEndToEnd_BoardSecretsAreWriteOnly(t *testing.T) {
 	}
 
 	s.assertNoResponseContains("board-secret-value")
+}
+
+// A credential a member keeps for themselves on one board: the other members
+// cannot list it, cannot bind it, and it dies with the membership.
+func TestEndToEnd_MemberSecretIsOnlyBindableByItsOwner(t *testing.T) {
+	original := safehttp.IsSafeIP
+	safehttp.IsSafeIP = func(net.IP) bool { return true }
+	t.Cleanup(func() { safehttp.IsSafeIP = original })
+
+	const (
+		ana     = "it-ana"
+		anasKey = "cur_live_ONLY_ANAS_CARD_MAY_SEND_THIS"
+		keyName = "ANAS_CURRENCY_KEY"
+	)
+
+	var seenKeys []string
+	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenKeys = append(seenKeys, r.Header.Get("apikey"))
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"meta":{"last_updated_at":"2026-09-20T00:00:00Z"},"data":{"ARS":{"code":"ARS","value":1465.5}}}`)
+	}))
+	defer stub.Close()
+
+	s := newStack(t)
+
+	var board models.Board
+	s.mustJSON(s.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": "it", "owner": testOwner}), http.StatusCreated, &board)
+	defer s.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
+	base := "/api/v1/boards/" + board.Id.String()
+	s.mustJSON(s.do(http.MethodPost, base+"/collaborators", map[string]string{"cognito_id": ana}), http.StatusNoContent, nil)
+
+	// Ana keeps her key on this board, for herself.
+	mine := base + "/members/" + ana + "/secrets"
+	s.mustJSON(s.do(http.MethodPut, mine,
+		map[string]string{"cognito_id": ana, "name": keyName, "kind": "api_key", "value": anasKey}), http.StatusNoContent, nil)
+
+	if w := s.do(http.MethodGet, mine+"?cognito_id="+testOwner, nil); w.Code != http.StatusNotFound {
+		t.Errorf("the board owner listed Ana's secrets: %d", w.Code)
+	}
+
+	var usable []models.SecretMeta
+	s.mustJSON(s.do(http.MethodGet, base+"/secrets/usable?cognito_id="+ana, nil), http.StatusOK, &usable)
+	if len(usable) != 1 || usable[0].Name != keyName || usable[0].Scope != models.MemberScope(board.Id, ana) {
+		t.Errorf("Ana's usable secrets = %+v", usable)
+	}
+	s.mustJSON(s.do(http.MethodGet, base+"/secrets/usable?cognito_id="+testOwner, nil), http.StatusOK, &usable)
+	if len(usable) != 0 {
+		t.Errorf("the owner's usable secrets include Ana's: %+v", usable)
+	}
+
+	binding := map[string]any{"scope": models.MemberScope(board.Id, ana), "name": keyName}
+	card := func(caller string) map[string]any {
+		return map[string]any{
+			"cognito_id": caller,
+			"board":      board.Id,
+			"well_known": "exchange_rate",
+			"params":     map[string]string{"$credential": "$" + keyName},
+			"bindings":   map[string]any{keyName: binding},
+		}
+	}
+
+	if w := s.do(http.MethodPost, "/api/v1/post-its", card(testOwner)); w.Code != http.StatusForbidden {
+		t.Errorf("the owner bound Ana's secret: %d %s", w.Code, w.Body.String())
+	}
+
+	var postit models.PostIts
+	s.mustJSON(s.do(http.MethodPost, "/api/v1/post-its", card(ana)), http.StatusCreated, &postit)
+	if postit.RunAs != ana {
+		t.Errorf("run_as = %q, want Ana", postit.RunAs)
+	}
+
+	resource, _ := url.Parse(stub.URL)
+	if err := s.db.UpdatePostIt(postit.Id, map[string]any{"resource": resource}); err != nil {
+		t.Fatalf("retarget: %v", err)
+	}
+
+	var result map[string]any
+	s.mustJSON(s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil), http.StatusOK, &result)
+	if len(seenKeys) != 1 || seenKeys[0] != anasKey {
+		t.Errorf("provider saw %v, want Ana's key once", seenKeys)
+	}
+
+	// The owner edits the card: it now runs as them, and Ana's key is out of reach.
+	if w := s.do(http.MethodPatch, "/api/v1/post-its/"+postit.Id.String()+"/settings",
+		map[string]any{"cognito_id": testOwner, "params": map[string]string{"$base": "EUR"}}); w.Code != http.StatusForbidden {
+		t.Errorf("the owner rebound the card to Ana's secret: %d %s", w.Code, w.Body.String())
+	}
+
+	// Ana leaves: her scope is destroyed and her card stops.
+	s.mustJSON(s.do(http.MethodDelete, base+"/collaborators", map[string]string{"cognito_id": ana}), http.StatusNoContent, nil)
+	if _, err := s.db.FindActiveKey(models.MemberScope(board.Id, ana)); err == nil {
+		t.Error("Ana's data key survived her removal")
+	}
+	if err := s.cache.DropPostItResult(postit.Id); err != nil {
+		t.Fatalf("drop cache: %v", err)
+	}
+	if w := s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil); w.Code != http.StatusForbidden {
+		t.Errorf("the card still runs after Ana left: %d %s", w.Code, w.Body.String())
+	}
+
+	s.assertNoResponseContains(anasKey)
 }

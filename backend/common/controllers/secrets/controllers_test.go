@@ -17,7 +17,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const owner = "owner-id"
+const (
+	owner        = "owner-id"
+	collaborator = "collab-id"
+)
 
 func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 	if store == nil {
@@ -29,7 +32,7 @@ func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 
 	boards := &mocks.MockDB{
 		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
-			return &models.Board{Id: id, Owner: owner}, nil
+			return &models.Board{Id: id, Owner: owner, Collaborators: []string{collaborator}}, nil
 		},
 	}
 

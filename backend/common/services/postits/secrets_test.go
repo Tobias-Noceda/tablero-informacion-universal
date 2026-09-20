@@ -133,6 +133,7 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 	postit := &models.PostIts{
 		Id:       uuid.New(),
 		Board:    board,
+		RunAs:    owner,
 		Resource: resource,
 		Params:   map[string]string{"$base": "USD", "$currency": "ARS", "$credential": "$CURRENCY_API_KEY"},
 		Request: models.Request{
@@ -200,6 +201,7 @@ func TestExecutePostIt_MissingSecretIsNotSubstituted(t *testing.T) {
 	postit := &models.PostIts{
 		Id:       uuid.New(),
 		Board:    uuid.New(),
+		RunAs:    boardOwner.ID,
 		Resource: resource,
 		Request: models.Request{
 			Method:  http.MethodGet,

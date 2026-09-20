@@ -2,14 +2,16 @@ import type { PostIt, Strand, UUID } from "$types/api";
 
 import * as api from "$modules/api.svelte"
 
+const DEFAULT_COGNITO_ID = "Messi";
+
 // TODO: support custom post its
-export async function create_custom(board: UUID) {
-    const res = await api.post("/v1/post-its", { board });
+export async function create_custom(board: UUID, cognito_id = DEFAULT_COGNITO_ID) {
+    const res = await api.post("/v1/post-its", { cognito_id, board });
     return await res.json() as PostIt;
 }
 
-export async function create_well_known(board: UUID, well_known: string, params: Record<string, string>) {
-    const res = await api.post("/v1/post-its", { board, well_known, params });
+export async function create_well_known(board: UUID, well_known: string, params: Record<string, string>, cognito_id = DEFAULT_COGNITO_ID) {
+    const res = await api.post("/v1/post-its", { cognito_id, board, well_known, params });
     return await res.json() as PostIt;
 }
 
@@ -29,8 +31,8 @@ export async function get_settings(id: UUID) {
 }
 
 // TODO
-export async function update_settings(id: UUID, params: Record<string, string>) {
-    await api.patch(`/v1/post-its/${id}/settings`, { params });
+export async function update_settings(id: UUID, params: Record<string, string>, cognito_id = DEFAULT_COGNITO_ID) {
+    await api.patch(`/v1/post-its/${id}/settings`, { cognito_id, params });
 }
 
 export async function move(id: UUID, x: number, y: number) {
