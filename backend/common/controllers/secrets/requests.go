@@ -57,3 +57,8 @@ func (r *PutOAuth2Request) Material() *models.OAuth2Material {
 		Scopes:       r.Scopes,
 	}
 }
+
+type SetGrantsRequest struct {
+	Caller
+	Grants []models.Grant `json:"grants"`
+}

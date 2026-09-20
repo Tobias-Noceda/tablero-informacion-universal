@@ -228,3 +228,44 @@ func TestPolicy_CanUse_RemovedCollaboratorLosesAccess(t *testing.T) {
 		}
 	}
 }
+
+func TestPolicy_CanUse_Grants(t *testing.T) {
+	p := testPolicy()
+	board := uuid.New()
+	otherBoard := uuid.New()
+	alicesKey := models.UserScope("alice")
+
+	grant := func(to models.Audience, restrictedTo string) *models.Secret {
+		return &models.Secret{Scope: alicesKey, Name: "KEY", Grants: []models.Grant{{To: to, Board: restrictedTo}}}
+	}
+	user := func(id string) models.Audience { return models.Audience{Kind: models.AudienceUser, ID: id} }
+
+	cases := []struct {
+		label  string
+		caller models.Principal
+		board  uuid.UUID
+		secret *models.Secret
+		want   bool
+	}{
+		{"granted user anywhere", collaborator, otherBoard, grant(user(collaborator.ID), ""), true},
+		{"granted user on that board", collaborator, board, grant(user(collaborator.ID), board.String()), true},
+		{"granted user on another board", collaborator, otherBoard, grant(user(collaborator.ID), board.String()), false},
+		{"someone else", stranger, board, grant(user(collaborator.ID), ""), false},
+		{"granted group member", collaborator, board, grant(models.Audience{Kind: models.AudienceGroup, ID: opsGroup.Id.String()}, ""), true},
+		{"granted group outsider", stranger, board, grant(models.Audience{Kind: models.AudienceGroup, ID: opsGroup.Id.String()}, ""), false},
+		{"granted board members, a member", collaborator, board, grant(models.Audience{Kind: models.AudienceBoard, ID: board.String()}, ""), true},
+		{"granted board members, from another board", collaborator, otherBoard, grant(models.Audience{Kind: models.AudienceBoard, ID: board.String()}, ""), false},
+		{"granted board members, a stranger", stranger, board, grant(models.Audience{Kind: models.AudienceBoard, ID: board.String()}, ""), false},
+		{"the owner still can", models.Principal{ID: "alice"}, board, grant(user(collaborator.ID), ""), true},
+		{"no grants", collaborator, board, &models.Secret{Scope: alicesKey, Name: "KEY"}, false},
+		{"a grant on a system secret is ignored", collaborator, board, &models.Secret{Scope: models.SystemScope, Name: "KEY", Grants: []models.Grant{{To: user(collaborator.ID)}}}, false},
+		{"anonymous", anonymous, board, grant(user(""), ""), false},
+	}
+
+	for _, c := range cases {
+		err := p.CanUse(c.caller, c.board, c.secret)
+		if got := err == nil; got != c.want {
+			t.Errorf("%s: CanUse = %v, want allowed=%v", c.label, err, c.want)
+		}
+	}
+}

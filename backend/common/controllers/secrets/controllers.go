@@ -107,6 +107,7 @@ func (ctrl *Controller) registerScoped(group *gin.RouterGroup, s scoping) {
 	group.GET("/secrets", ctrl.ListSecrets(s))
 	group.PUT("/secrets", ctrl.PutSecret(s))
 	group.DELETE("/secrets/:name", ctrl.DeleteSecret(s))
+	group.PUT("/secrets/:name/grants", ctrl.SetGrants(s))
 
 	group.PUT("/oauth2", ctrl.PutOAuth2(s))
 	group.GET("/oauth2/authorize", ctrl.Authorize(s))
@@ -303,6 +304,49 @@ func (ctrl *Controller) DeleteSecret(s scoping) gin.HandlerFunc {
 		}
 
 		if err := ctrl.service.Delete(scope, principal, c.Param("name")); err != nil {
+			fail(c, err)
+			return
+		}
+
+		c.Status(http.StatusNoContent)
+	}
+}
+
+// SetGrants godoc
+// @Summary      Replace who else may bind a secret
+// @Description  Managers only. Each grant names a user, a group or a board's members, optionally restricted to one board.
+// @Tags         secrets
+// @Accept       json
+// @Param        id       path  string            true  "Board UUID, user id or group UUID"
+// @Param        name     path  string            true  "Secret name"
+// @Param        request  body  SetGrantsRequest  true  "The full list of grants"
+// @Success      204
+// @Failure      400      {object}  map[string]string
+// @Failure      404      {object}  map[string]string
+// @Router       /boards/{id}/secrets/{name}/grants [put]
+// @Router       /users/{id}/secrets/{name}/grants [put]
+// @Router       /groups/{id}/secrets/{name}/grants [put]
+func (ctrl *Controller) SetGrants(s scoping) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		scope, ok := s.scope(c)
+		if !ok {
+			return
+		}
+
+		var req SetGrantsRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+
+		principal, ok := s.principal(c, req.CognitoID)
+		if !ok {
+			return
+		}
+
+		if err := ctrl.service.SetGrants(scope, principal, c.Param("name"), req.Grants); err != nil {
 			fail(c, err)
 			return
 		}

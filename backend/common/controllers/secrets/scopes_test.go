@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"encoding/json"
+	"github.com/Secreto31126/tesis/common/infrastructure"
 	"net/http"
 	"slices"
 	"strings"
@@ -41,6 +42,76 @@ func rememberingStore() *mocks.MockSecretStore {
 			}
 			return out, nil
 		},
+		SetGrantsFn: func(scope models.SecretScope, name string, grants []models.Grant) error {
+			for i, row := range rows {
+				if row.Scope == scope && row.Name == name {
+					rows[i].Grants = grants
+					return nil
+				}
+			}
+			return infrastructure.ErrUnknownCredential
+		},
+		FindGrantedFn: func(audiences []models.Audience) ([]models.Secret, error) {
+			var out []models.Secret
+			for _, row := range rows {
+				for _, grant := range row.Grants {
+					if slices.Contains(audiences, grant.To) {
+						out = append(out, row)
+						break
+					}
+				}
+			}
+			return out, nil
+		},
+	}
+}
+
+func TestGrants_OwnerSharesAndTheListingShowsIt(t *testing.T) {
+	store := rememberingStore()
+	r := setupRouter(store)
+	board := uuid.New()
+	path := "/users/alice/secrets"
+
+	w := do(r, http.MethodPut, path, `{"cognito_id":"alice","name":"KEY","kind":"api_key","value":"v"}`)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("PUT: status = %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	body := `{"cognito_id":"alice","grants":[{"to":{"kind":"user","id":"` + collaborator + `"},"board":"` + board.String() + `"}]}`
+	w = do(r, http.MethodPut, path+"/KEY/grants", body)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("PUT grants: status = %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	var metas []models.SecretMeta
+	w = do(r, http.MethodGet, path+"?cognito_id=alice", "")
+	if err := json.Unmarshal(w.Body.Bytes(), &metas); err != nil || len(metas) != 1 {
+		t.Fatalf("list: status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if len(metas[0].Grants) != 1 || metas[0].Grants[0].To.ID != collaborator || metas[0].Grants[0].Board != board.String() {
+		t.Errorf("grants in the listing = %+v", metas[0].Grants)
+	}
+
+	w = do(r, http.MethodGet, "/boards/"+board.String()+"/secrets/usable?cognito_id="+collaborator, "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"KEY"`) {
+		t.Errorf("usable for the grantee: status = %d, body = %s", w.Code, w.Body.String())
+	}
+	w = do(r, http.MethodGet, "/boards/"+uuid.New().String()+"/secrets/usable?cognito_id="+collaborator, "")
+	if strings.Contains(w.Body.String(), `"KEY"`) {
+		t.Errorf("the grant leaked onto another board: %s", w.Body.String())
+	}
+
+	if w = do(r, http.MethodPut, path+"/KEY/grants", `{"cognito_id":"bob","grants":[]}`); w.Code != http.StatusNotFound {
+		t.Errorf("someone else changed the grants: status = %d, want 404", w.Code)
+	}
+	if w = do(r, http.MethodPut, path+"/NOPE/grants", `{"cognito_id":"alice","grants":[]}`); w.Code != http.StatusBadRequest {
+		t.Errorf("granting a missing secret: status = %d, want 400", w.Code)
+	}
+	if w = do(r, http.MethodPut, path+"/KEY/grants", `{"cognito_id":"alice","grants":[{"to":{"kind":"org","id":"x"}}]}`); w.Code != http.StatusBadRequest {
+		t.Errorf("an invalid grant: status = %d, want 400", w.Code)
+	}
+	if w = do(r, http.MethodPut, "/system/secrets/KEY/grants", `{"grants":[]}`); w.Code != http.StatusNotFound {
+		t.Errorf("system secrets have a grants route: status = %d, want 404", w.Code)
 	}
 }
 

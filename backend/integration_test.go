@@ -429,3 +429,97 @@ func TestEndToEnd_GroupSecretFollowsItsMembers(t *testing.T) {
 
 	s.assertNoResponseContains(opsKey)
 }
+
+// A profile secret shared with one user on one board: usable there and
+// nowhere else, and gone the moment the share is withdrawn.
+func TestEndToEnd_SharedSecretStopsWhenRevoked(t *testing.T) {
+	original := safehttp.IsSafeIP
+	safehttp.IsSafeIP = func(net.IP) bool { return true }
+	t.Cleanup(func() { safehttp.IsSafeIP = original })
+
+	const (
+		alice     = "it-alice"
+		bob       = "it-bob"
+		alicesKey = "cur_live_ALICE_SHARED_THIS_WITH_BOB_ONLY"
+		keyName   = "ALICES_CURRENCY_KEY"
+	)
+
+	var seenKeys []string
+	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenKeys = append(seenKeys, r.Header.Get("apikey"))
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"meta":{"last_updated_at":"2026-09-20T00:00:00Z"},"data":{"ARS":{"code":"ARS","value":1465.5}}}`)
+	}))
+	defer stub.Close()
+
+	s := newStack(t)
+
+	var shared, other models.Board
+	s.mustJSON(s.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": "shared", "owner": bob}), http.StatusCreated, &shared)
+	s.mustJSON(s.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": "other", "owner": bob}), http.StatusCreated, &other)
+	defer s.do(http.MethodDelete, "/api/v1/boards/"+shared.Id.String(), nil)
+	defer s.do(http.MethodDelete, "/api/v1/boards/"+other.Id.String(), nil)
+
+	profile := "/api/v1/users/" + alice + "/secrets"
+	s.mustJSON(s.do(http.MethodPut, profile,
+		map[string]string{"cognito_id": alice, "name": keyName, "kind": "api_key", "value": alicesKey}), http.StatusNoContent, nil)
+	defer s.do(http.MethodDelete, profile+"/"+keyName+"?cognito_id="+alice, nil)
+
+	grant := models.Grant{To: models.Audience{Kind: models.AudienceUser, ID: bob}, Board: shared.Id.String()}
+	s.mustJSON(s.do(http.MethodPut, profile+"/"+keyName+"/grants",
+		map[string]any{"cognito_id": alice, "grants": []models.Grant{grant}}), http.StatusNoContent, nil)
+
+	usableOn := func(board models.Board) []models.SecretMeta {
+		var usable []models.SecretMeta
+		s.mustJSON(s.do(http.MethodGet, "/api/v1/boards/"+board.Id.String()+"/secrets/usable?cognito_id="+bob, nil), http.StatusOK, &usable)
+		return usable
+	}
+	if usable := usableOn(shared); len(usable) != 1 || usable[0].Name != keyName || usable[0].Scope != models.UserScope(alice) {
+		t.Errorf("Bob's usable secrets on the shared board = %+v", usable)
+	}
+	if usable := usableOn(other); len(usable) != 0 {
+		t.Errorf("Bob's usable secrets on the other board = %+v, want nothing", usable)
+	}
+
+	card := func(board models.Board) map[string]any {
+		return map[string]any{
+			"cognito_id": bob,
+			"board":      board.Id,
+			"well_known": "exchange_rate",
+			"params":     map[string]string{"$credential": "$" + keyName},
+			"bindings":   map[string]any{keyName: map[string]any{"scope": models.UserScope(alice), "name": keyName}},
+		}
+	}
+	if w := s.do(http.MethodPost, "/api/v1/post-its", card(other)); w.Code != http.StatusForbidden {
+		t.Errorf("Bob bound the key on the other board: %d %s", w.Code, w.Body.String())
+	}
+
+	var postit models.PostIts
+	s.mustJSON(s.do(http.MethodPost, "/api/v1/post-its", card(shared)), http.StatusCreated, &postit)
+
+	resource, _ := url.Parse(stub.URL)
+	if err := s.db.UpdatePostIt(postit.Id, map[string]any{"resource": resource}); err != nil {
+		t.Fatalf("retarget: %v", err)
+	}
+
+	var result map[string]any
+	s.mustJSON(s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil), http.StatusOK, &result)
+	if len(seenKeys) != 1 || seenKeys[0] != alicesKey {
+		t.Errorf("provider saw %v, want Alice's key once", seenKeys)
+	}
+
+	// Alice withdraws the share: Bob's card stops, Alice's own use is untouched.
+	s.mustJSON(s.do(http.MethodPut, profile+"/"+keyName+"/grants",
+		map[string]any{"cognito_id": alice, "grants": []models.Grant{}}), http.StatusNoContent, nil)
+	if err := s.cache.DropPostItResult(postit.Id); err != nil {
+		t.Fatalf("drop cache: %v", err)
+	}
+	if w := s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil); w.Code != http.StatusForbidden {
+		t.Errorf("Bob's card still runs after the share was withdrawn: %d %s", w.Code, w.Body.String())
+	}
+	if usable := usableOn(shared); len(usable) != 0 {
+		t.Errorf("Bob still sees %+v after the share was withdrawn", usable)
+	}
+
+	s.assertNoResponseContains(alicesKey)
+}

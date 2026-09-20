@@ -93,34 +93,74 @@ func (p *policy) checkGroup(principal models.Principal, scope models.SecretScope
 	return nil
 }
 
-// CanUse decides whether principal may bind secret into a card on board. It
-// is evaluated again on every execution, so losing access stops the card.
+// CanUse decides whether principal may bind secret into a card on board:
+// either the scope itself admits them, or a grant does. It is evaluated
+// again on every execution, so losing access stops the card.
 func (p *policy) CanUse(principal models.Principal, boardID uuid.UUID, secret *models.Secret) error {
-	if !secret.Scope.Valid() {
+	if !secret.Scope.Valid() || principal.Anonymous() || secret.Scope.Kind == models.ScopeSystem {
 		return ErrForbidden
 	}
 
-	switch secret.Scope.Kind {
+	if p.owns(principal, boardID, secret.Scope) == nil {
+		return nil
+	}
+
+	for _, grant := range secret.Grants {
+		if grant.AppliesTo(boardID) && p.reaches(principal, boardID, grant.To) == nil {
+			return nil
+		}
+	}
+
+	return ErrForbidden
+}
+
+func (p *policy) owns(principal models.Principal, boardID uuid.UUID, scope models.SecretScope) error {
+	switch scope.Kind {
 	case models.ScopeBoard:
-		if secret.Scope.Owner != boardID.String() {
+		if scope.Owner != boardID.String() {
 			return ErrForbidden
 		}
 		_, err := p.board(principal, boardID)
 		return err
 	case models.ScopeMember:
-		memberBoard, userID, _ := secret.Scope.Member()
+		memberBoard, userID, _ := scope.Member()
 		if memberBoard != boardID || principal.ID != userID {
 			return ErrForbidden
 		}
 		_, err := p.board(principal, boardID)
 		return err
 	case models.ScopeUser:
-		if principal.Anonymous() || principal.ID != secret.Scope.Owner {
+		if principal.ID != scope.Owner {
 			return ErrForbidden
 		}
 		return nil
 	case models.ScopeGroup:
-		_, err := p.group(principal, uuid.MustParse(secret.Scope.Owner))
+		_, err := p.group(principal, uuid.MustParse(scope.Owner))
+		return err
+	default:
+		return ErrForbidden
+	}
+}
+
+func (p *policy) reaches(principal models.Principal, boardID uuid.UUID, audience models.Audience) error {
+	switch audience.Kind {
+	case models.AudienceUser:
+		if principal.ID != audience.ID {
+			return ErrForbidden
+		}
+		return nil
+	case models.AudienceGroup:
+		id, err := uuid.Parse(audience.ID)
+		if err != nil {
+			return ErrForbidden
+		}
+		_, err = p.group(principal, id)
+		return err
+	case models.AudienceBoard:
+		if audience.ID != boardID.String() {
+			return ErrForbidden
+		}
+		_, err := p.board(principal, boardID)
 		return err
 	default:
 		return ErrForbidden

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"github.com/Secreto31126/tesis/common/infrastructure"
+	"slices"
 	"strings"
 	"testing"
 
@@ -23,16 +25,40 @@ type memoryStore struct {
 
 func newStore() *memoryStore {
 	s := &memoryStore{keys: &mocks.MemoryKeyStore{}, groups: &mocks.MemoryGroupStore{}}
-	// Mirrors the Mongo upsert: one row per board + name, replaced in place.
+	// Mirrors the Mongo upsert: one row per board + name, replaced in place,
+	// grants untouched.
 	s.UpsertSecretFn = func(secret *models.Secret) error {
 		for i, row := range s.rows {
 			if row.Scope == secret.Scope && row.Name == secret.Name {
+				grants := row.Grants
 				s.rows[i] = *secret
+				s.rows[i].Grants = grants
 				return nil
 			}
 		}
 		s.rows = append(s.rows, *secret)
 		return nil
+	}
+	s.SetGrantsFn = func(scope models.SecretScope, name string, grants []models.Grant) error {
+		for i, row := range s.rows {
+			if row.Scope == scope && row.Name == name {
+				s.rows[i].Grants = grants
+				return nil
+			}
+		}
+		return infrastructure.ErrUnknownCredential
+	}
+	s.FindGrantedFn = func(audiences []models.Audience) ([]models.Secret, error) {
+		var out []models.Secret
+		for _, row := range s.rows {
+			for _, grant := range row.Grants {
+				if slices.Contains(audiences, grant.To) {
+					out = append(out, row)
+					break
+				}
+			}
+		}
+		return out, nil
 	}
 	s.FindSecretsFn = func(scope models.SecretScope, names []string) ([]models.Secret, error) {
 		var out []models.Secret
