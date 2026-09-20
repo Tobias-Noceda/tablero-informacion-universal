@@ -54,6 +54,13 @@ export type PostIt = {
     rate?: number; // A rate-less post-it should only be updated on creation
     // Board + Post-it defined env variables
     envs: Envs[];
+
+    // Whose credentials the card runs with: whoever last saved its params
+    // or bindings. Empty on cards from before this existed (board owner).
+    run_as?: string;
+    // "$TOKEN"s the card uses that do not live in the board's own scope,
+    // keyed by the token name without the dollar sign.
+    bindings?: Record<string, SecretRef>;
 }
 
 export type Strand = {
@@ -75,10 +82,38 @@ export type OAuthProviderStatus = {
     configured: boolean;
 }
 
-// What listing a board's secrets returns. The value is never part of it.
+export type ScopeKind = 'board' | 'member' | 'user' | 'group' | 'system';
+
+// Who a secret belongs to. member owners are "<board id>:<user id>".
+export type SecretScope = {
+    kind: ScopeKind;
+    owner?: string;
+}
+
+export type SecretRef = {
+    scope: SecretScope;
+    name: string;
+}
+
+export type AudienceKind = 'user' | 'group' | 'board';
+
+export type Audience = {
+    kind: AudienceKind;
+    id: string;
+}
+
+// Lets an audience outside the scope bind the secret, everywhere or on one board.
+export type Grant = {
+    to: Audience;
+    board?: UUID;
+}
+
+// What listing a scope's secrets returns. The value is never part of it.
 export type SecretMeta = {
+    scope: SecretScope;
     name: string;
     kind: SecretKind;
+    grants: Grant[];
     // Only present for OAuth2 credentials.
     flow?: OAuth2Flow;
     authorized: boolean;
