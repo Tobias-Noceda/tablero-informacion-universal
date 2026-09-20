@@ -14,7 +14,7 @@ type Request struct {
 }
 
 type Title struct {
-	Text string `bson:"text" json:"text"`
+	Text string `bson:"text" json:"text" binding:"required"`
 	Vars bool   `bson:"vars" json:"vars"`
 }
 

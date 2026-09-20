@@ -55,6 +55,13 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		Board:     req.Board,
 		WellKnown: req.WellKnown,
 		Params:    req.Params,
+		Title:     req.Title,
+		Resource:  req.Resource,
+		Request:   req.Request,
+		Response:  req.Response,
+		Query:     req.Query,
+		Rate:      req.Rate,
+		Envs:      req.Envs,
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
