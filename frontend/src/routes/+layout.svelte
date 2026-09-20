@@ -37,7 +37,7 @@
 
 <SvelteFlowProvider>
 	<div class="flex flex-col h-screen w-screen">
-		<div class="flex flex-row bg-main justify-between border-b border-main-border px-2 py-1">
+		<div class="flex flex-row bg-main justify-between border-b border-main-border px-2 py-1 z-100!">
 			<div class="flex flex-row items-center gap-4">
 				<button onclick={() => toggleSidebar()} class={buttonClass}>
 					<Icon name="menu" class="w-5 h-5 text-white" />
@@ -51,14 +51,14 @@
 			</div>
 		</div>
 		<div class="flex flex-row h-full w-screen">
-			<div class="flex flex-col bg-sidebar! border-r border-sidebar-border transition-transform duration-300 h-full p-2 gap-3 w-14 max-w-14">
+			<div class="flex flex-col bg-sidebar! border-r border-sidebar-border transition-transform duration-300 h-full p-2 gap-3 w-14 max-w-14 z-100!">
 				<div class="flex flex-row items-center rounded-md bg-sidebar-hover cursor-pointer p-2">
 					<Icon name="graph" class="w-6 h-6 text-white!" />
 					<!-- <span class="text-white text-sm font-medium">Home</span> -->
 				</div>
 			</div>
 			{#if $isSidebarOpen}
-				<div class="flex flex-col bg-sidebar-hover p-2 w-50 gap-1 overflow-y-auto">
+				<div class="flex flex-col bg-sidebar-hover p-2 w-50 gap-1 overflow-y-auto z-100!">
 					{#each $boardList as board (board.id)}
 						<a
 							href={resolve(`/board/${board.id}`)}

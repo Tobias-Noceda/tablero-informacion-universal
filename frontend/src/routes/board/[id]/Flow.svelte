@@ -18,12 +18,15 @@
 	import { nodesMap, parameters } from '$components/Nodes/node-map';
 	import { edgesMap } from '$components/Edges/edge-map';
 	import { mouses } from '$stores/mouses.svelte';
+	import Realtime from './Realtime.svelte';
+	import type { Update } from '$modules/sockets.svelte';
 
-	let { nodes, edges, name, boardId }: {
+	let { nodes, edges, name, boardId, boardUpdate }: {
 		nodes: Node[],
 		edges: Edge[],
 		name: string,
 		boardId: string,
+		boardUpdate: (update: Update) => void
 	} = $props();
 
 	let selectedNode: Node | null = $state(null);
@@ -215,40 +218,42 @@
 
 <div class="flex flex-row h-full w-full">
 	<main class="dndflow">
-		<div class="flex flex-row items-center justify-between mb-4 ml-3 mr-3">
-			<h1 class="text-2xl font-bold">{name}</h1>
-			<Button variant="secondary" onclick={() => (managingSecrets = true)}>
-				{m['secrets.title']()}
-			</Button>
-		</div>
-		<div class="reactflow-wrapper">
-			<SvelteFlow
-				bind:nodes
-				bind:edges
-				nodeTypes={nodesMap}
-				edgeTypes={edgesMap}
-				defaultEdgeOptions={{ type: 'floating' }}
-				fitView
-				connectionMode={ConnectionMode.Loose}
-				ondragover={onDragOver}
-				ondrop={onDrop}
-				onnodeclick={onNodeClick}
-				onnodedragstop={onNodeDragStop}
-				onedgeclick={onEdgeClick}
-				onconnect={onConnect}
-				onpaneclick={onBoardClick}
-				colorMode="system"
-				class="bg-transparent!"
-				attributionPosition={undefined}
-			>
-				<Controls />
-			</SvelteFlow>
-		</div>
+		<Realtime boardId={boardId} {boardUpdate}>
+			<div class="reactflow-wrapper">
+				<SvelteFlow
+					bind:nodes
+					bind:edges
+					nodeTypes={nodesMap}
+					edgeTypes={edgesMap}
+					defaultEdgeOptions={{ type: 'floating' }}
+					fitView
+					connectionMode={ConnectionMode.Loose}
+					ondragover={onDragOver}
+					ondrop={onDrop}
+					onnodeclick={onNodeClick}
+					onnodedragstop={onNodeDragStop}
+					onedgeclick={onEdgeClick}
+					onconnect={onConnect}
+					onpaneclick={onBoardClick}
+					colorMode="system"
+					class="bg-transparent!"
+					attributionPosition={undefined}
+				>
+					<Controls />
+					<div class="absolute top-0 inset-x-0 flex flex-row items-center justify-between p-3 z-100! bg-transparent pointer-events-none">
+						<h1 class="text-2xl font-bold">{name}</h1>
+						<Button class="pointer-events-auto" variant="secondary" onclick={() => (managingSecrets = true)}>
+							{m['secrets.title']()}
+						</Button>
+					</div>
+				</SvelteFlow>
+			</div>
+		</Realtime>
 		<Dock />
 	</main>
 	{#if selectedNode}
 		<div
-			class="flex flex-col p-4 bg-tertiary border-l border-tertiary-border rounded-l-2xl w-70 h-full justify-between text-tertiary-text"
+			class="flex flex-col p-4 bg-tertiary border-l border-tertiary-border rounded-l-2xl w-70 h-full justify-between text-tertiary-text z-100!"
 		>
 			<div class="flex flex-col gap-2">
 				<h2 class="text-lg font-semibold">Selected Node</h2>
@@ -323,7 +328,9 @@
 	main.dndflow {
 		display: flex;
 		flex-direction: column;
-		padding: 10px;
+		/* min-width: 0 lets the flex item shrink below its content, so a wide dock scrolls instead of stretching it */
+		flex: 1 1 0;
+		min-width: 0;
 	}
 
 	:global(.svelte-flow__attribution) {
