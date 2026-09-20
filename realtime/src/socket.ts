@@ -55,6 +55,6 @@ wss.on("connection", async (socket) => {
 
     socket.on("disconnect", (reason) => {
         console.error("Client disconnected:", reason);
-        cache.remove(board, peer);
+        cache.remove(board, user);
     });
 });
