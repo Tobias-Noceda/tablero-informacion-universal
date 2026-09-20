@@ -21,11 +21,12 @@
 	import Realtime from './Realtime.svelte';
 	import type { Update } from '$modules/sockets.svelte';
 
-	let { nodes, edges, name, boardId, boardUpdate }: {
+	let { nodes, edges, name, boardId, userId, boardUpdate }: {
 		nodes: Node[],
 		edges: Edge[],
 		name: string,
 		boardId: string,
+		userId: string,
 		boardUpdate: (update: Update) => void
 	} = $props();
 
@@ -218,7 +219,7 @@
 
 <div class="flex flex-row h-full w-full">
 	<main class="dndflow">
-		<Realtime boardId={boardId} {boardUpdate}>
+		<Realtime {boardId} {userId} {boardUpdate}>
 			<div class="reactflow-wrapper">
 				<SvelteFlow
 					bind:nodes

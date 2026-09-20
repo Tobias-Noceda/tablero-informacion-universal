@@ -12,9 +12,10 @@ export interface Connection {
 
 export async function connect(
 	board: string,
+	user: string,
 	onChange: (data: Update) => void
 ): Promise<Connection> {
 	const id = uuid();
-	const peers = await socket(board, id, onChange);
-	return new RTC(id, peers);
+	const clients = await socket(board, user, id, onChange);
+	return new RTC(id, clients);
 }

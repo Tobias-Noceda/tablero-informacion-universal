@@ -3,8 +3,14 @@ import type { Board } from '$types/api';
 import { io } from 'socket.io-client';
 
 export type Update = { board: Board; ts: Date };
+export type Clients = Record<string, string>;
 
-export async function socket(board: string, peer: string, update: (data: Update) => void) {
+export async function socket(
+	board: string,
+	user: string,
+	peer: string,
+	update: (data: Update) => void
+) {
 	const socket = io(
 		import.meta.env.VITE_REALTIME_URL ||
 			import.meta.env.VITE_API_URL ||
@@ -14,20 +20,19 @@ export async function socket(board: string, peer: string, update: (data: Update)
 			path: '/ws',
 			transports: ['websocket'],
 			query: {
-				peer,
-				board
+				board,
+				user,
+				peer
 			}
 		}
 	);
 
-	// TODO: eventually, this string[] could also include peer data,
-	// such as the color picked, username and pfp url.
-	const peers = await new Promise<string[]>((resolve, reject) => {
+	const clients = await new Promise<Clients>((resolve, reject) => {
 		socket.on('connect_error', reject);
 		socket.once('peers', resolve);
 	});
 
 	socket.on('update', update);
 
-	return peers;
+	return clients;
 }

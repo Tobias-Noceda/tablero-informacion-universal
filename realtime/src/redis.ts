@@ -4,21 +4,28 @@ const redis = createClient({ url: process.env.REDIS_URL! });
 const cache = await redis.connect();
 
 function onlineKey(board: string) {
-    return `board:${board}:online`;
+    return `board:${board.toLowerCase()}:online`;
 }
 
-export async function getAndInsert(
-    board: string,
-    peer: string,
-): Promise<unknown> {
+export async function getAndInsert(board: string, user: string, peer: string) {
     const key = onlineKey(board);
-    const [peers] = await cache.multi().sMembers(key).sAdd(key, peer).exec();
-    return peers;
+
+    const [peers] = await cache
+        .multi()
+        .hGetAll(key)
+        .hSetEx(
+            key,
+            { [user.toLowerCase()]: peer.toLowerCase() },
+            { expiration: { type: "EX", value: 20 * 60 } },
+        )
+        .exec();
+
+    return peers as unknown as Record<string, string>;
 }
 
-export async function remove(board: string, peer: string) {
+export async function remove(board: string, user: string) {
     const key = onlineKey(board);
-    cache.sRem(key, peer);
+    await cache.hDel(key, user.toLowerCase());
 }
 
 export function close() {
