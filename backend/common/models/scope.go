@@ -12,6 +12,7 @@ const (
 	ScopeBoard  ScopeKind = "board"
 	ScopeUser   ScopeKind = "user"
 	ScopeMember ScopeKind = "member"
+	ScopeGroup  ScopeKind = "group"
 	ScopeSystem ScopeKind = "system"
 )
 
@@ -38,6 +39,10 @@ func UserScope(userID string) SecretScope {
 // membership, and nobody else on the board can see or bind it.
 func MemberScope(board uuid.UUID, userID string) SecretScope {
 	return SecretScope{Kind: ScopeMember, Owner: board.String() + memberOwnerSeparator + userID}
+}
+
+func GroupScope(id uuid.UUID) SecretScope {
+	return SecretScope{Kind: ScopeGroup, Owner: id.String()}
 }
 
 func (s SecretScope) Member() (board uuid.UUID, userID string, ok bool) {
@@ -68,7 +73,7 @@ func (s SecretScope) Key() string {
 
 func (s SecretScope) Valid() bool {
 	switch s.Kind {
-	case ScopeBoard:
+	case ScopeBoard, ScopeGroup:
 		_, err := uuid.Parse(s.Owner)
 		return err == nil
 	case ScopeUser:

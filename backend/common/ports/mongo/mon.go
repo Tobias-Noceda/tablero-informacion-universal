@@ -26,6 +26,7 @@ type MongoDB struct {
 	postit   *mongo.Collection
 	secrets  *mongo.Collection
 	dataKeys *mongo.Collection
+	groups   *mongo.Collection
 }
 
 func New() (*MongoDB, error) {
@@ -64,6 +65,7 @@ func New() (*MongoDB, error) {
 	db.postit = db.client.Database(name).Collection("postit")
 	db.secrets = db.client.Database(name).Collection("secrets")
 	db.dataKeys = db.client.Database(name).Collection("data_keys")
+	db.groups = db.client.Database(name).Collection("groups")
 
 	return db, nil
 }
@@ -79,7 +81,11 @@ func (db *MongoDB) EnsureIndexes() error {
 		return err
 	}
 
-	return db.ensureDataKeyIndexes()
+	if err := db.ensureDataKeyIndexes(); err != nil {
+		return err
+	}
+
+	return db.ensureGroupIndexes()
 }
 
 func timeout() (context.Context, context.CancelFunc) {

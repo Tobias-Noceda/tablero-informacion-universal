@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
@@ -383,4 +384,68 @@ func (m *MockScopePurger) Purge(scope models.SecretScope) error {
 		return m.PurgeFn(scope)
 	}
 	return nil
+}
+
+// MemoryGroupStore is a GroupStore over a slice, enough for a service test.
+type MemoryGroupStore struct {
+	Groups []models.Group
+}
+
+var _ infrastructure.GroupStore = (*MemoryGroupStore)(nil)
+
+func (m *MemoryGroupStore) CreateGroup(group *models.Group) error {
+	m.Groups = append(m.Groups, *group)
+	return nil
+}
+
+func (m *MemoryGroupStore) FindGroup(id uuid.UUID) (*models.Group, error) {
+	for i := range m.Groups {
+		if m.Groups[i].Id == id {
+			group := m.Groups[i]
+			return &group, nil
+		}
+	}
+	return nil, infrastructure.ErrGroupNotFound
+}
+
+func (m *MemoryGroupStore) FindUserGroups(userID string) ([]models.Group, error) {
+	var out []models.Group
+	for _, group := range m.Groups {
+		if group.IsMember(userID) {
+			out = append(out, group)
+		}
+	}
+	return out, nil
+}
+
+func (m *MemoryGroupStore) DeleteGroup(id uuid.UUID) error {
+	for i := range m.Groups {
+		if m.Groups[i].Id == id {
+			m.Groups = append(m.Groups[:i], m.Groups[i+1:]...)
+			return nil
+		}
+	}
+	return infrastructure.ErrGroupNotFound
+}
+
+func (m *MemoryGroupStore) AddGroupMember(id uuid.UUID, userID string) error {
+	for i := range m.Groups {
+		if m.Groups[i].Id == id {
+			if !slices.Contains(m.Groups[i].Members, userID) {
+				m.Groups[i].Members = append(m.Groups[i].Members, userID)
+			}
+			return nil
+		}
+	}
+	return infrastructure.ErrGroupNotFound
+}
+
+func (m *MemoryGroupStore) RemoveGroupMember(id uuid.UUID, userID string) error {
+	for i := range m.Groups {
+		if m.Groups[i].Id == id {
+			m.Groups[i].Members = slices.DeleteFunc(m.Groups[i].Members, func(u string) bool { return u == userID })
+			return nil
+		}
+	}
+	return infrastructure.ErrGroupNotFound
 }

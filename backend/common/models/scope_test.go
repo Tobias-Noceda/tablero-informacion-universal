@@ -16,6 +16,7 @@ func TestScopeKey(t *testing.T) {
 		{BoardScope(board), "board:6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"},
 		{UserScope("cognito-123"), "user:cognito-123"},
 		{MemberScope(board, "cognito-123"), "member:6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d:cognito-123"},
+		{GroupScope(board), "group:6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"},
 		{SystemScope, "system"},
 	}
 
@@ -46,6 +47,8 @@ func TestScopeValid(t *testing.T) {
 		{"user", UserScope("cognito-123"), true},
 		{"system", SystemScope, true},
 		{"member", MemberScope(uuid.New(), "cognito-123"), true},
+		{"group", GroupScope(uuid.New()), true},
+		{"group with non uuid owner", SecretScope{Kind: ScopeGroup, Owner: "nope"}, false},
 		{"member without user", SecretScope{Kind: ScopeMember, Owner: uuid.New().String() + ":"}, false},
 		{"member with non uuid board", SecretScope{Kind: ScopeMember, Owner: "nope:cognito-123"}, false},
 		{"member without separator", SecretScope{Kind: ScopeMember, Owner: uuid.New().String()}, false},
