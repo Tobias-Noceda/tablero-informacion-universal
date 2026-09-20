@@ -29,7 +29,9 @@ docker compose up --build
 cd backend
 go run main.go          # listens on 0.0.0.0:31126
 ```
-Requires MongoDB and Redis reachable (see `backend/common/models/envs.go` for env var names).
+Requires MongoDB and Redis reachable (`MONGODB_URI`, `MONGO_DATABASE`, `REDIS_URL`) and `SECRETS_MASTER_KEYS` (`1:<base64 of 32 random bytes>`; see `.env.example`).
+
+Maintenance (one-shot, exits afterwards): `go run . -rewrap-keys`, `go run . -rotate-key <kind>:<owner>`, `go run . -rotate-all-keys`.
 
 ### Frontend only
 ```bash
@@ -58,7 +60,8 @@ Vitest has three sub-projects: `client` (Playwright/Chromium, `*.svelte.spec.ts`
 
 ```bash
 go build ./...
-go test ./...
+go test ./...                      # unit tests, no services needed
+../run_backend_integration.sh      # or .ps1 — real Mongo + Redis + mock OAuth2 via docker compose
 ```
 
 ## Architecture: Backend
@@ -66,25 +69,36 @@ go test ./...
 Layered Go hexagonal structure:
 
 ```
-main.go                           wire-up only
+main.go                           bootstrap, maintenance flags, Run
+app.go                            newApp(): the whole service graph (shared with integration tests)
+maintenance.go                    -rewrap-keys / -rotate-key / -rotate-all-keys
 common/
-  models/          domain types (Board, PostIts, Position, Envs)
-  infrastructure/  port interfaces (Database, Cache, Executer)
+  models/          domain types (Board, PostIts, Secret, SecretScope, DataKey, OAuth2Material, SystemSecretName)
+  infrastructure/  port interfaces (Database, Cache, Executer, SecretStore, KeyStore, ScopePolicy, ...)
   ports/
-    mongo/         Database impl
-    redis/         Cache impl
+    mongo/         Database, SecretStore and KeyStore impls (collections: boards, postit, secrets, data_keys)
+    redis/         Cache, Locker and HandshakeStore impls
+    crypto/        Sealer (master key ring = KEK) and Keyring (one wrapped data key per scope)
+    oauth/         OAuth2 token endpoint client
     executer/      DewIt — HTTP fetch + gojq transform
+    safehttp/      SSRF-safe HTTP client
   services/
-    boards/        board CRUD
-    postits/       post-it CRUD + execution + caching
+    boards/        board CRUD (+ purges the board's secrets and data key on delete)
+    postits/       post-it CRUD + execution + caching + secret injection; well-known definitions
+    secrets/       vault: put/list/delete per scope, policy, OAuth2 handshakes, platform providers, key rotation
   controllers/
     boards/        Gin routes /v1/boards
     postits/       Gin routes /v1/post-its
+    secrets/       Gin routes /v1/{boards,users}/:id/{secrets,oauth2}, /v1/system/*, /v1/oauth2/*
 ```
 
-**Post-it execution flow**: `ExecutePostIt` → check Redis cache → `DewIt.Execute` (HTTP GET to `Resource`, apply query params/headers from `Params`, parse JSON, run `gojq` query) → store result in Redis for `Rate` seconds.
+**Post-it execution flow**: `ExecutePostIt` → check Redis cache → `prepare` (resolve `$UPPER_NAME` references against the board's secrets, then inject the well-known's **system secrets** last, into a clone) → `DewIt.Execute` (HTTP GET to `Resource`, apply query params/headers from `Params`, parse JSON, run `gojq` query) → store result in Redis for `Rate` seconds.
 
-**Well-Knowns** (`services/postits/well-knowns.go`): pre-configured post-it templates (e.g. `temperature`, `dolar_oficial`, `dog_facts`). Creating with `WellKnown` key fills in resource/query/rate automatically; `Params` provides variable overrides.
+**Well-Knowns** (`services/postits/well-knowns.go`): `wellKnown{template, systemSecrets}` definitions (e.g. `temperature`, `dolar_oficial`, `nasa_apod`). Creating with `WellKnown` fills in resource/query/rate from the template; `Params` provides variable overrides. Placeholders are lowercase (`$credential`, `$api_key`); user secret names are uppercase (`$MY_KEY`). `systemSecrets` maps a placeholder to a `models.SystemSecretName` that is resolved from the system scope at execution time and never stored on the post-it.
+
+**Secrets vault** (`services/secrets`): a secret is `(scope, name)` where `SecretScope{Kind: board|user|system, Owner}`. Values are AES-GCM sealed with the scope's data key (`crypto.Keyring`), which is itself wrapped by the versioned master key ring in `SECRETS_MASTER_KEYS`. `ScopePolicy` (`policy.go`) is the only authorization seam; the controller's `scoping.principal` is the only place `cognito_id` is read. System-scope routes are open until authentication exists. OAuth2 grants can be self-managed (user brings a client) or obtained through a platform **provider** (`models.OAuthProviders`; client id/secret stored as a system secret of kind `oauth2_client`, hydrated into the grant in memory only). Never return a secret value, a client secret or a token from any handler.
+
+Adding a system secret, a provider or a well-known that needs one: see `.claude/tesis/operations.md` (local notes, not versioned).
 
 ## Architecture: Frontend
 
@@ -103,11 +117,16 @@ SvelteKit SPA (static adapter, `index.html` fallback). Svelte 5 **runes mode enf
 
 **Key modules**:
 
-- `$modules/api.svelte.ts` — All HTTP helpers (`get`, `getAuth`, `post`, `postAuth`, `put`, `patch`, `del`, `deleteAuth`, `fetchWithAuth`). Manages JWT access/refresh tokens in `localStorage` via `$state` rune. Token auto-selects access if not expired, falls back to refresh. `login()` / `logout()` / `refreshToken()` here.
+- `$modules/api.svelte.ts` — HTTP helpers (`get`, `post`, `put`, `patch`, `del`) against `PUBLIC_API_ORIGIN`. There is no authentication yet: `cognito_id` is passed explicitly (the UI uses the placeholder `Messi`).
 - `$modules/statefull.svelte.ts` — Preserves and restores arbitrary route state across navigation (`preserve` / `restore`), keyed by `[fromRoute][toRoute]`.
-- `$stores/user.ts` — `user` (JWT payload) and `userData` (full Doctor/Patient from API) writable stores.
-- `$stores/sidebar.ts` — Sidebar open/close state.
-- `$types/api.ts` — All API types (`Doctor`, `Patient`, `Appointment`, `Study`, `Paginated<T>`, `UriTemplate`, `Session`, etc.).
+- `$services/{board,post-it,secrets,edge}.ts` — Typed API calls per resource. `secrets.ts` covers the vault: list/put/delete, self-managed OAuth2 (`put_oauth2`, `authorize`), platform providers (`providers`, `connect`).
+- `$stores/boards.ts`, `$stores/sidebar.ts`, `$stores/mouses.svelte.ts` — Board list, sidebar open/close, live cursors.
+- `$types/api.ts` — API types (`Board`, `PostIt`, `Strand`, `SecretMeta`, `OAuth2Config`, `OAuthProvider`, ...).
+- `$components/Nodes/node-map.ts` — Well-known key → Svelte node component, plus the parameter form each one needs (`type: "secret"` renders a picker over the board's credentials). A well-known whose credential is the platform's declares no parameter.
+- `$components/Secrets/SecretsPanel.svelte` — Board credentials modal (API keys, self-managed OAuth2, "Connect an account").
+- `routes/oauth2/callback` — Provider redirect target; forwards `state`/`code` to the backend.
+
+After editing `messages/{en,es}.json` outside the Vite dev server, regenerate with `npx paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide` before `pnpm check`.
 
 **i18n**: Paraglide. Source messages in `frontend/messages/{en,es}.json`. Generated output in `src/lib/paraglide/`. Import messages as `import { m } from '$lib/paraglide/messages'`.
 
