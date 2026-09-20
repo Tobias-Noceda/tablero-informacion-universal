@@ -264,6 +264,8 @@ type MockSecretStore struct {
 	ListSecretsFn   func(scope models.SecretScope) ([]models.Secret, error)
 	DeleteSecretFn  func(scope models.SecretScope, name string) error
 	DeleteSecretsFn func(scope models.SecretScope) error
+	SetGrantsFn     func(scope models.SecretScope, name string, grants []models.Grant) error
+	FindGrantedFn   func(audiences []models.Audience) ([]models.Secret, error)
 }
 
 var _ infrastructure.SecretStore = (*MockSecretStore)(nil)
@@ -301,6 +303,20 @@ func (m *MockSecretStore) DeleteSecrets(scope models.SecretScope) error {
 		return m.DeleteSecretsFn(scope)
 	}
 	return nil
+}
+
+func (m *MockSecretStore) SetGrants(scope models.SecretScope, name string, grants []models.Grant) error {
+	if m.SetGrantsFn != nil {
+		return m.SetGrantsFn(scope, name, grants)
+	}
+	return nil
+}
+
+func (m *MockSecretStore) FindGranted(audiences []models.Audience) ([]models.Secret, error) {
+	if m.FindGrantedFn != nil {
+		return m.FindGrantedFn(audiences)
+	}
+	return nil, nil
 }
 
 // MockTokenClient is a configurable test double for infrastructure.TokenClient.

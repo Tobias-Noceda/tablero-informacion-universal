@@ -82,4 +82,9 @@ type SecretStore interface {
 	DeleteSecret(scope models.SecretScope, name string) error
 	// Delete every secret of a scope
 	DeleteSecrets(scope models.SecretScope) error
+	// SetGrants replaces who else may bind a secret. ErrUnknownCredential if
+	// the secret does not exist.
+	SetGrants(scope models.SecretScope, name string, grants []models.Grant) error
+	// FindGranted returns every secret with a grant for any of the audiences.
+	FindGranted(audiences []models.Audience) ([]models.Secret, error)
 }

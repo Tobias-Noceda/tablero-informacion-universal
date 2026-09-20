@@ -42,6 +42,9 @@ type Secret struct {
 	Flow       string        `bson:"flow" json:"flow,omitempty"`
 	Authorized bool          `bson:"authorized" json:"authorized,omitempty"`
 	Provider   OAuthProvider `bson:"provider" json:"provider,omitempty"`
+
+	// Who else may bind it. Survives a value rewrite and a reseal.
+	Grants []Grant `bson:"grants" json:"grants,omitempty"`
 }
 
 // SecretRef is how a post-it names a secret outside its board: the pair the
@@ -58,6 +61,7 @@ type SecretMeta struct {
 	Flow       string        `json:"flow,omitempty"`
 	Authorized bool          `json:"authorized"`
 	Provider   OAuthProvider `json:"provider,omitempty"`
+	Grants     []Grant       `json:"grants"`
 	CreatedAt  time.Time     `json:"created_at"`
 	UpdatedAt  time.Time     `json:"updated_at"`
 }
@@ -82,6 +86,7 @@ func (s *Secret) Meta() SecretMeta {
 		Flow:       s.Flow,
 		Authorized: s.Authorized,
 		Provider:   s.Provider,
+		Grants:     s.Grants,
 		CreatedAt:  s.CreatedAt,
 		UpdatedAt:  s.UpdatedAt,
 	}
