@@ -100,13 +100,24 @@ Tests + coverage:
 .\run_backend_coverage.ps1       # Windows
 ```
 
-Integration tests (`//go:build integration`, not part of `go test ./...`) run against a mock OAuth2 provider on `localhost:8899`. The scripts start it via the `integration` compose profile, run the tests, and stop it (`--keep` / `-Keep` leaves it up). `TestLiveDuende` also needs internet access.
+Integration tests (`//go:build integration`, not part of `go test ./...`) run against real
+Mongo and Redis plus a mock OAuth2 provider on `localhost:8899`, all from docker-compose. The
+scripts read the Mongo credentials from `.env`, start the three containers, point the tests at
+them through the environment (an ephemeral `it_<timestamp>` database and Redis db `1`, a random
+`SECRETS_MASTER_KEYS`), run every tagged test in the module and drop the database afterwards
+(`--keep` / `-Keep` leaves the mock provider up). `TestLiveDuende` also needs internet access.
 
 ```bash
-./run_backend_integration.sh                                 # macOS / Linux
-./run_backend_integration.sh -run TestLiveAuthorizationCode  # just the mock-backed one
-.un_backend_integration.ps1                                # Windows
+./run_backend_integration.sh                       # macOS / Linux
+./run_backend_integration.sh -run TestEndToEnd     # just the HTTP end-to-end ones
+.\run_backend_integration.ps1                      # Windows
 ```
+
+What they cover: the Mongo secret and data-key stores (unique indexes, the first-key race, key
+rotation, purge), the OAuth2 handshakes (self-managed and platform client), and an end-to-end
+pass over the HTTP API with the real wiring (`backend/app.go`): a system secret is provisioned,
+a well-known card is created and executed, the stub provider receives the key, Redis serves the
+second execution, deleting the board shreds its key, and no response ever carries the value.
 
 ### Frontend (SvelteKit)
 
