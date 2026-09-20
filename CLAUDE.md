@@ -27,7 +27,7 @@ docker compose up --build
 ### Backend only
 ```bash
 cd backend
-go run main.go          # listens on 0.0.0.0:31126
+go run .                # listens on 0.0.0.0:31126
 ```
 Requires MongoDB and Redis reachable (`MONGODB_URI`, `MONGO_DATABASE`, `REDIS_URL`) and `SECRETS_MASTER_KEYS` (`1:<base64 of 32 random bytes>`; see `.env.example`).
 

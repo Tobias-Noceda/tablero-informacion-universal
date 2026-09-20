@@ -82,7 +82,7 @@ Use these when you want hot reload or to iterate on one side without rebuilding 
 
 ```bash
 cd backend
-go run main.go                  # listens on 0.0.0.0:31126
+go run .                        # listens on 0.0.0.0:31126
 ```
 
 The server expects Mongo at `mongo:27017` and Redis at `redis:6379` (hostnames are hardcoded in `backend/common/ports/mongo/mon.go` and `backend/common/ports/redis/redis.go`). The simplest setup:
@@ -202,4 +202,4 @@ scope's data key and reseals its secrets.
 - **`docker compose up` errors about missing Mongo env vars** — you forgot the `.env` file (step 2).
 - **Frontend loads but API calls 404 / CORS-fail in dev** — you're hitting Vite directly (`:5173`), which doesn't proxy `/v1/*`. Use the edge proxy at `http://localhost/` or set up a Vite proxy.
 - **`Cannot read properties of undefined (reading 'data')` on the production build** — usually a stale browser cache. Hard-reload (Cmd-Shift-R) or open in incognito.
-- **Mongo/Redis "connection refused" when running `go run main.go` directly** — the URLs are hardcoded to the docker hostnames; see the backend dev setup above.
+- **Mongo/Redis "connection refused" when running `go run .` directly** — the URLs are hardcoded to the docker hostnames; see the backend dev setup above.
