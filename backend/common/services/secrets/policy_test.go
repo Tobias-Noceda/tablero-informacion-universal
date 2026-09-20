@@ -9,12 +9,43 @@ import (
 	"github.com/google/uuid"
 )
 
+var opsGroup = models.Group{Id: uuid.New(), Name: "ops", Owner: owner.ID, Members: []string{collaborator.ID}}
+
 func testPolicy() *policy {
 	return NewPolicy(&mocks.MockDB{
 		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
 			return &models.Board{Id: id, Owner: owner.ID, Collaborators: []string{collaborator.ID}}, nil
 		},
-	})
+	}, &mocks.MemoryGroupStore{Groups: []models.Group{opsGroup}})
+}
+
+func TestPolicy_Group(t *testing.T) {
+	p := testPolicy()
+	scope := models.GroupScope(opsGroup.Id)
+
+	cases := []struct {
+		caller    models.Principal
+		canManage bool
+		canView   bool
+	}{
+		{owner, true, true},
+		{collaborator, false, true},
+		{stranger, false, false},
+		{anonymous, false, false},
+	}
+
+	for _, c := range cases {
+		if got := p.CanManage(c.caller, scope) == nil; got != c.canManage {
+			t.Errorf("caller %q: CanManage = %v, want %v", c.caller.ID, got, c.canManage)
+		}
+		if got := p.CanView(c.caller, scope) == nil; got != c.canView {
+			t.Errorf("caller %q: CanView = %v, want %v", c.caller.ID, got, c.canView)
+		}
+	}
+
+	if err := p.CanView(owner, models.GroupScope(uuid.New())); !errors.Is(err, ErrForbidden) {
+		t.Errorf("an unknown group answered %v, want ErrForbidden", err)
+	}
 }
 
 func TestPolicy_Board(t *testing.T) {
@@ -104,7 +135,7 @@ func TestPolicy_UnknownBoardIsForbidden(t *testing.T) {
 		FindBoardFn: func(uuid.UUID) (*models.Board, error) {
 			return nil, errors.New("no documents")
 		},
-	})
+	}, &mocks.MemoryGroupStore{})
 
 	if err := p.CanView(owner, models.BoardScope(uuid.New())); !errors.Is(err, ErrForbidden) {
 		t.Errorf("got %v, want ErrForbidden", err)
@@ -158,6 +189,10 @@ func TestPolicy_CanUse(t *testing.T) {
 		{"member secret on another board", collaborator, otherBoard, models.MemberScope(board, collaborator.ID), false},
 		{"user secret by its user", stranger, board, models.UserScope(stranger.ID), true},
 		{"user secret by someone else", owner, board, models.UserScope(stranger.ID), false},
+		{"group secret by a group member on any board", collaborator, otherBoard, models.GroupScope(opsGroup.Id), true},
+		{"group secret by the group owner", owner, board, models.GroupScope(opsGroup.Id), true},
+		{"group secret by an outsider", stranger, board, models.GroupScope(opsGroup.Id), false},
+		{"secret of an unknown group", owner, board, models.GroupScope(uuid.New()), false},
 		{"system secret", owner, board, models.SystemScope, false},
 		{"anonymous", anonymous, board, models.BoardScope(board), false},
 		{"invalid scope", owner, board, models.SecretScope{Kind: "team", Owner: "x"}, false},
@@ -181,7 +216,7 @@ func TestPolicy_CanUse_RemovedCollaboratorLosesAccess(t *testing.T) {
 		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
 			return &models.Board{Id: id, Owner: owner.ID}, nil
 		},
-	})
+	}, &mocks.MemoryGroupStore{})
 	board := uuid.New()
 
 	for _, scope := range []models.SecretScope{

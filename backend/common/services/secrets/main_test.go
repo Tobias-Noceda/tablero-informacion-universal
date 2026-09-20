@@ -16,12 +16,13 @@ import (
 // memoryStore keeps whatever Put wrote so Resolve can read it back.
 type memoryStore struct {
 	mocks.MockSecretStore
-	rows []models.Secret
-	keys *mocks.MemoryKeyStore
+	rows   []models.Secret
+	keys   *mocks.MemoryKeyStore
+	groups *mocks.MemoryGroupStore
 }
 
 func newStore() *memoryStore {
-	s := &memoryStore{keys: &mocks.MemoryKeyStore{}}
+	s := &memoryStore{keys: &mocks.MemoryKeyStore{}, groups: &mocks.MemoryGroupStore{}}
 	// Mirrors the Mongo upsert: one row per board + name, replaced in place.
 	s.UpsertSecretFn = func(secret *models.Secret) error {
 		for i, row := range s.rows {
@@ -88,7 +89,7 @@ func service(t *testing.T, store *memoryStore) *SecretsService {
 			return &models.Board{Id: id, Owner: owner.ID, Collaborators: []string{collaborator.ID}}, nil
 		},
 	}
-	return New(store, NewPolicy(boards), crypto.NewKeyring(sealer, store.keys), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})
+	return New(store, NewPolicy(boards, store.groups), crypto.NewKeyring(sealer, store.keys), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, store.groups)
 }
 
 func TestPut_StoresOnlyCiphertext(t *testing.T) {

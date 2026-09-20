@@ -345,3 +345,87 @@ func TestEndToEnd_MemberSecretIsOnlyBindableByItsOwner(t *testing.T) {
 
 	s.assertNoResponseContains(anasKey)
 }
+
+// A group's secret follows its members: usable on any board they belong to,
+// gone for them the moment they leave, gone for everyone when the group is.
+func TestEndToEnd_GroupSecretFollowsItsMembers(t *testing.T) {
+	original := safehttp.IsSafeIP
+	safehttp.IsSafeIP = func(net.IP) bool { return true }
+	t.Cleanup(func() { safehttp.IsSafeIP = original })
+
+	const (
+		ana     = "it-ana"
+		opsKey  = "cur_live_ONLY_THE_OPS_GROUP_MAY_SEND_THIS"
+		keyName = "OPS_CURRENCY_KEY"
+	)
+
+	var seenKeys []string
+	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenKeys = append(seenKeys, r.Header.Get("apikey"))
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"meta":{"last_updated_at":"2026-09-20T00:00:00Z"},"data":{"ARS":{"code":"ARS","value":1465.5}}}`)
+	}))
+	defer stub.Close()
+
+	s := newStack(t)
+
+	var group models.Group
+	s.mustJSON(s.do(http.MethodPost, "/api/v1/groups", map[string]string{"cognito_id": testOwner, "name": "ops"}), http.StatusCreated, &group)
+	groupBase := "/api/v1/groups/" + group.Id.String()
+	defer s.do(http.MethodDelete, groupBase+"?cognito_id="+testOwner, nil)
+
+	s.mustJSON(s.do(http.MethodPut, groupBase+"/secrets",
+		map[string]string{"cognito_id": testOwner, "name": keyName, "kind": "api_key", "value": opsKey}), http.StatusNoContent, nil)
+	s.mustJSON(s.do(http.MethodPost, groupBase+"/members", map[string]string{"cognito_id": testOwner, "member": ana}), http.StatusNoContent, nil)
+
+	// Ana's own board: the owner of the group is not on it, the key still is.
+	var board models.Board
+	s.mustJSON(s.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": "anas", "owner": ana}), http.StatusCreated, &board)
+	defer s.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
+
+	var usable []models.SecretMeta
+	s.mustJSON(s.do(http.MethodGet, "/api/v1/boards/"+board.Id.String()+"/secrets/usable?cognito_id="+ana, nil), http.StatusOK, &usable)
+	if len(usable) != 1 || usable[0].Name != keyName || usable[0].Scope != models.GroupScope(group.Id) {
+		t.Errorf("Ana's usable secrets = %+v", usable)
+	}
+
+	var postit models.PostIts
+	s.mustJSON(s.do(http.MethodPost, "/api/v1/post-its", map[string]any{
+		"cognito_id": ana,
+		"board":      board.Id,
+		"well_known": "exchange_rate",
+		"params":     map[string]string{"$credential": "$" + keyName},
+		"bindings":   map[string]any{keyName: map[string]any{"scope": models.GroupScope(group.Id), "name": keyName}},
+	}), http.StatusCreated, &postit)
+
+	resource, _ := url.Parse(stub.URL)
+	if err := s.db.UpdatePostIt(postit.Id, map[string]any{"resource": resource}); err != nil {
+		t.Fatalf("retarget: %v", err)
+	}
+
+	var result map[string]any
+	s.mustJSON(s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil), http.StatusOK, &result)
+	if len(seenKeys) != 1 || seenKeys[0] != opsKey {
+		t.Errorf("provider saw %v, want the group's key once", seenKeys)
+	}
+
+	// Ana leaves the group: the card stops, the secret stays with the group.
+	s.mustJSON(s.do(http.MethodDelete, groupBase+"/members", map[string]string{"cognito_id": testOwner, "member": ana}), http.StatusNoContent, nil)
+	if err := s.cache.DropPostItResult(postit.Id); err != nil {
+		t.Fatalf("drop cache: %v", err)
+	}
+	if w := s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil); w.Code != http.StatusForbidden {
+		t.Errorf("the card still runs after Ana left the group: %d %s", w.Code, w.Body.String())
+	}
+	if _, err := s.db.FindActiveKey(models.GroupScope(group.Id)); err != nil {
+		t.Errorf("the group's data key is gone: %v", err)
+	}
+
+	// Deleting the group is crypto-shredding for everything it owned.
+	s.mustJSON(s.do(http.MethodDelete, groupBase+"?cognito_id="+testOwner, nil), http.StatusNoContent, nil)
+	if _, err := s.db.FindActiveKey(models.GroupScope(group.Id)); err == nil {
+		t.Error("the group's data key survived the delete")
+	}
+
+	s.assertNoResponseContains(opsKey)
+}

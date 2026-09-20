@@ -131,3 +131,24 @@ func TestListUsable_RequiresMembership(t *testing.T) {
 		t.Errorf("got %v, want ErrForbidden", err)
 	}
 }
+
+func TestListUsable_IncludesTheGroupsThePrincipalBelongsTo(t *testing.T) {
+	store := newStore()
+	srv := service(t, store)
+	board := uuid.New()
+
+	ops := models.Group{Id: uuid.New(), Name: "ops", Owner: owner.ID, Members: []string{collaborator.ID}}
+	private := models.Group{Id: uuid.New(), Name: "private", Owner: owner.ID}
+	store.groups.Groups = []models.Group{ops, private}
+
+	put(t, srv, models.GroupScope(ops.Id), owner, "OPS_KEY", "v")
+	put(t, srv, models.GroupScope(private.Id), owner, "PRIVATE_KEY", "v")
+
+	usable, err := srv.ListUsable(collaborator, board)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(usable) != 1 || usable[0].Name != "OPS_KEY" || usable[0].Scope != models.GroupScope(ops.Id) {
+		t.Errorf("usable = %+v, want only the ops key", usable)
+	}
+}

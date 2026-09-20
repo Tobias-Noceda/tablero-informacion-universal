@@ -60,7 +60,7 @@ func realSecrets(t *testing.T) *secretsrv.SecretsService {
 	}
 
 	return secretsrv.New(store, &mocks.MockScopePolicy{}, crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}),
-		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})
+		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, &mocks.MemoryGroupStore{})
 }
 
 // nasaStub stands in for api.nasa.gov and records the api_key it was sent.

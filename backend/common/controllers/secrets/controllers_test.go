@@ -22,6 +22,8 @@ const (
 	collaborator = "collab-id"
 )
 
+var opsGroup = models.Group{Id: uuid.New(), Name: "ops", Owner: owner, Members: []string{collaborator}}
+
 func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 	if store == nil {
 		store = &mocks.MockSecretStore{}
@@ -38,7 +40,8 @@ func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(store, srv.NewPolicy(boards), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})).RegisterRoutes(r)
+	groups := &mocks.MemoryGroupStore{Groups: []models.Group{opsGroup}}
+	NewController(srv.New(store, srv.NewPolicy(boards, groups), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, groups)).RegisterRoutes(r)
 	return r
 }
 

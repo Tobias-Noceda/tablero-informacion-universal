@@ -10,12 +10,13 @@ var ErrForbidden = infrastructure.ErrForbidden
 
 type policy struct {
 	boards infrastructure.BoardReader
+	groups infrastructure.GroupReader
 }
 
 var _ infrastructure.ScopePolicy = (*policy)(nil)
 
-func NewPolicy(boards infrastructure.BoardReader) *policy {
-	return &policy{boards}
+func NewPolicy(boards infrastructure.BoardReader, groups infrastructure.GroupReader) *policy {
+	return &policy{boards, groups}
 }
 
 func (p *policy) CanManage(principal models.Principal, scope models.SecretScope) error {
@@ -36,6 +37,8 @@ func (p *policy) check(principal models.Principal, scope models.SecretScope, man
 		return p.checkBoard(principal, scope, manage)
 	case models.ScopeMember:
 		return p.checkMember(principal, scope)
+	case models.ScopeGroup:
+		return p.checkGroup(principal, scope, manage)
 	case models.ScopeUser:
 		if principal.Anonymous() || principal.ID != scope.Owner {
 			return ErrForbidden
@@ -77,6 +80,19 @@ func (p *policy) checkMember(principal models.Principal, scope models.SecretScop
 	return err
 }
 
+func (p *policy) checkGroup(principal models.Principal, scope models.SecretScope, manage bool) error {
+	group, err := p.group(principal, uuid.MustParse(scope.Owner))
+	if err != nil {
+		return err
+	}
+
+	if manage && group.Owner != principal.ID {
+		return ErrForbidden
+	}
+
+	return nil
+}
+
 // CanUse decides whether principal may bind secret into a card on board. It
 // is evaluated again on every execution, so losing access stops the card.
 func (p *policy) CanUse(principal models.Principal, boardID uuid.UUID, secret *models.Secret) error {
@@ -103,6 +119,9 @@ func (p *policy) CanUse(principal models.Principal, boardID uuid.UUID, secret *m
 			return ErrForbidden
 		}
 		return nil
+	case models.ScopeGroup:
+		_, err := p.group(principal, uuid.MustParse(secret.Scope.Owner))
+		return err
 	default:
 		return ErrForbidden
 	}
@@ -121,4 +140,18 @@ func (p *policy) board(principal models.Principal, id uuid.UUID) (*models.Board,
 	}
 
 	return board, nil
+}
+
+// group loads a group the principal belongs to, with the same rule as board.
+func (p *policy) group(principal models.Principal, id uuid.UUID) (*models.Group, error) {
+	if principal.Anonymous() {
+		return nil, ErrForbidden
+	}
+
+	group, err := p.groups.FindGroup(id)
+	if err != nil || !group.IsMember(principal.ID) {
+		return nil, ErrForbidden
+	}
+
+	return group, nil
 }

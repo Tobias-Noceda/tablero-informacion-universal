@@ -413,3 +413,34 @@ func TestProviders_ListsConfiguredFlag(t *testing.T) {
 		t.Errorf("statuses = %+v", statuses)
 	}
 }
+
+func TestGroupSecrets_OwnerManagesMembersView(t *testing.T) {
+	store := rememberingStore()
+	r := setupRouter(store)
+	path := "/groups/" + opsGroup.Id.String() + "/secrets"
+
+	w := do(r, http.MethodPut, path, `{"cognito_id":"`+owner+`","name":"OPS_KEY","kind":"api_key","value":"v"}`)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("PUT by the owner: status = %d (body: %s)", w.Code, w.Body.String())
+	}
+
+	w = do(r, http.MethodPut, path, `{"cognito_id":"`+collaborator+`","name":"OPS_KEY","kind":"api_key","value":"x"}`)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("PUT by a member: status = %d, want 404", w.Code)
+	}
+
+	for _, caller := range []string{owner, collaborator} {
+		w = do(r, http.MethodGet, path+"?cognito_id="+caller, "")
+		if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"OPS_KEY"`) {
+			t.Errorf("GET by %s: status = %d, body = %s", caller, w.Code, w.Body.String())
+		}
+	}
+	if w = do(r, http.MethodGet, path+"?cognito_id=stranger", ""); w.Code != http.StatusNotFound {
+		t.Errorf("GET by a stranger: status = %d, want 404", w.Code)
+	}
+
+	w = do(r, http.MethodGet, "/boards/"+uuid.New().String()+"/secrets/usable?cognito_id="+collaborator, "")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"OPS_KEY"`) {
+		t.Errorf("usable for a member: status = %d, body = %s", w.Code, w.Body.String())
+	}
+}

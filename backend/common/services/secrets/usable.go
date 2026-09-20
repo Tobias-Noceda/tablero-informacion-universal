@@ -60,18 +60,29 @@ func (srv *SecretsService) CanBind(principal models.Principal, board uuid.UUID, 
 }
 
 // ListUsable is everything principal could bind into a card on board: what
-// the board shares, what they keep there for themselves and their own profile.
+// the board shares, what they keep there for themselves, their own profile
+// and the groups they belong to.
 func (srv *SecretsService) ListUsable(principal models.Principal, board uuid.UUID) ([]models.SecretMeta, error) {
 	if err := srv.policy.CanView(principal, models.BoardScope(board)); err != nil {
 		return nil, err
 	}
 
-	usable := make([]models.SecretMeta, 0)
-	for _, scope := range []models.SecretScope{
+	scopes := []models.SecretScope{
 		models.BoardScope(board),
 		models.MemberScope(board, principal.ID),
 		models.UserScope(principal.ID),
-	} {
+	}
+
+	groups, err := srv.groups.FindUserGroups(principal.ID)
+	if err != nil {
+		return nil, err
+	}
+	for _, group := range groups {
+		scopes = append(scopes, models.GroupScope(group.Id))
+	}
+
+	usable := make([]models.SecretMeta, 0)
+	for _, scope := range scopes {
 		stored, err := srv.store.ListSecrets(scope)
 		if err != nil {
 			return nil, err

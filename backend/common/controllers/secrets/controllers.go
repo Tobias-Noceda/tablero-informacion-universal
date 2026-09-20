@@ -64,6 +64,18 @@ func memberScope(c *gin.Context) (models.SecretScope, bool) {
 	return models.MemberScope(uuid.MustParse(board.Owner), c.Param("user")), true
 }
 
+func groupScope(c *gin.Context) (models.SecretScope, bool) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid uuid",
+		})
+		return models.SecretScope{}, false
+	}
+
+	return models.GroupScope(id), true
+}
+
 func systemScope(*gin.Context) (models.SecretScope, bool) {
 	return models.SystemScope, true
 }
@@ -74,6 +86,7 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 	router.GET("/boards/:id/secrets/usable", ctrl.ListUsable(boards))
 	ctrl.registerScoped(router.Group("/boards/:id/members/:user"), scoping{scope: memberScope, principalRequired: true})
 	ctrl.registerScoped(router.Group("/users/:id"), scoping{scope: userScope, principalRequired: true})
+	ctrl.registerScoped(router.Group("/groups/:id"), scoping{scope: groupScope, principalRequired: true})
 
 	system := scoping{scope: systemScope}
 	systemGroup := router.Group("/system")

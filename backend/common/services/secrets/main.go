@@ -24,6 +24,7 @@ type SecretsService struct {
 	tokens     infrastructure.TokenClient
 	locks      infrastructure.Locker
 	handshakes infrastructure.HandshakeStore
+	groups     infrastructure.GroupReader
 }
 
 func New(
@@ -33,8 +34,9 @@ func New(
 	tokens infrastructure.TokenClient,
 	locks infrastructure.Locker,
 	handshakes infrastructure.HandshakeStore,
+	groups infrastructure.GroupReader,
 ) *SecretsService {
-	return &SecretsService{store, policy, keyring, tokens, locks, handshakes}
+	return &SecretsService{store, policy, keyring, tokens, locks, handshakes, groups}
 }
 
 // aad binds a ciphertext to the scope and name it was created under.
