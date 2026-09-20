@@ -110,3 +110,86 @@ func TestPolicy_UnknownBoardIsForbidden(t *testing.T) {
 		t.Errorf("got %v, want ErrForbidden", err)
 	}
 }
+
+func TestPolicy_Member(t *testing.T) {
+	p := testPolicy()
+	board := uuid.New()
+	scope := models.MemberScope(board, collaborator.ID)
+
+	if err := p.CanManage(collaborator, scope); err != nil {
+		t.Errorf("a member cannot manage their own board credentials: %v", err)
+	}
+	if err := p.CanView(collaborator, scope); err != nil {
+		t.Errorf("a member cannot view their own board credentials: %v", err)
+	}
+
+	for _, caller := range []models.Principal{owner, stranger, anonymous} {
+		if err := p.CanManage(caller, scope); !errors.Is(err, ErrForbidden) {
+			t.Errorf("caller %q managed another member's credentials: %v", caller.ID, err)
+		}
+		if err := p.CanView(caller, scope); !errors.Is(err, ErrForbidden) {
+			t.Errorf("caller %q viewed another member's credentials: %v", caller.ID, err)
+		}
+	}
+
+	if err := p.CanManage(stranger, models.MemberScope(board, stranger.ID)); !errors.Is(err, ErrForbidden) {
+		t.Errorf("someone who is not on the board got a member scope there: %v", err)
+	}
+}
+
+func TestPolicy_CanUse(t *testing.T) {
+	p := testPolicy()
+	board := uuid.New()
+	otherBoard := uuid.New()
+
+	cases := []struct {
+		label  string
+		caller models.Principal
+		board  uuid.UUID
+		scope  models.SecretScope
+		want   bool
+	}{
+		{"board secret by owner", owner, board, models.BoardScope(board), true},
+		{"board secret by collaborator", collaborator, board, models.BoardScope(board), true},
+		{"board secret by stranger", stranger, board, models.BoardScope(board), false},
+		{"board secret from another board", owner, otherBoard, models.BoardScope(board), false},
+		{"member secret by its user", collaborator, board, models.MemberScope(board, collaborator.ID), true},
+		{"member secret by the board owner", owner, board, models.MemberScope(board, collaborator.ID), false},
+		{"member secret on another board", collaborator, otherBoard, models.MemberScope(board, collaborator.ID), false},
+		{"user secret by its user", stranger, board, models.UserScope(stranger.ID), true},
+		{"user secret by someone else", owner, board, models.UserScope(stranger.ID), false},
+		{"system secret", owner, board, models.SystemScope, false},
+		{"anonymous", anonymous, board, models.BoardScope(board), false},
+		{"invalid scope", owner, board, models.SecretScope{Kind: "team", Owner: "x"}, false},
+	}
+
+	for _, c := range cases {
+		err := p.CanUse(c.caller, c.board, &models.Secret{Scope: c.scope, Name: "KEY"})
+		if got := err == nil; got != c.want {
+			t.Errorf("%s: CanUse = %v, want allowed=%v", c.label, err, c.want)
+		}
+		if err != nil && !errors.Is(err, ErrForbidden) {
+			t.Errorf("%s: got %v, want ErrForbidden", c.label, err)
+		}
+	}
+}
+
+// Leaving the board revokes what the membership granted, even for a secret
+// that lives in the member scope itself.
+func TestPolicy_CanUse_RemovedCollaboratorLosesAccess(t *testing.T) {
+	p := NewPolicy(&mocks.MockDB{
+		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
+			return &models.Board{Id: id, Owner: owner.ID}, nil
+		},
+	})
+	board := uuid.New()
+
+	for _, scope := range []models.SecretScope{
+		models.BoardScope(board),
+		models.MemberScope(board, collaborator.ID),
+	} {
+		if err := p.CanUse(collaborator, board, &models.Secret{Scope: scope, Name: "KEY"}); !errors.Is(err, ErrForbidden) {
+			t.Errorf("%s: got %v, want ErrForbidden", scope.Key(), err)
+		}
+	}
+}

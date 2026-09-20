@@ -333,34 +333,43 @@ func (srv *SecretsService) Resolve(scope models.SecretScope, names []string) (ma
 
 	resolved := make(map[string]string, len(stored))
 	for _, s := range stored {
-		value, stale, err := srv.open(&s)
+		value, err := srv.present(&s)
 		if err != nil {
 			return nil, err
 		}
-
-		if s.Kind != models.SecretOAuth2 {
-			resolved["$"+s.Name] = models.Present(s.Kind, string(value))
-			if stale {
-				srv.migrate(&s, value)
-			}
-			continue
-		}
-
-		var material models.OAuth2Material
-		if err := json.Unmarshal(value, &material); err != nil {
-			return nil, err
-		}
-
-		if material.NeedsRefresh() {
-			if err := srv.refresh(&s, &material); err != nil {
-				return nil, err
-			}
-		} else if stale {
-			srv.migrate(&s, value)
-		}
-
-		resolved["$"+s.Name] = material.Header()
+		resolved["$"+s.Name] = value
 	}
 
 	return resolved, nil
+}
+
+// present decrypts a secret into the form the outgoing request carries,
+// refreshing an OAuth2 token first when it is about to expire.
+func (srv *SecretsService) present(s *models.Secret) (string, error) {
+	value, stale, err := srv.open(s)
+	if err != nil {
+		return "", err
+	}
+
+	if s.Kind != models.SecretOAuth2 {
+		if stale {
+			srv.migrate(s, value)
+		}
+		return models.Present(s.Kind, string(value)), nil
+	}
+
+	var material models.OAuth2Material
+	if err := json.Unmarshal(value, &material); err != nil {
+		return "", err
+	}
+
+	if material.NeedsRefresh() {
+		if err := srv.refresh(s, &material); err != nil {
+			return "", err
+		}
+	} else if stale {
+		srv.migrate(s, value)
+	}
+
+	return material.Header(), nil
 }

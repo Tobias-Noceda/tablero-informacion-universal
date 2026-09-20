@@ -1,6 +1,8 @@
 package models
 
 import (
+	"slices"
+
 	"github.com/google/uuid"
 )
 
@@ -29,4 +31,8 @@ type Board struct {
 	PostIts       []BoardPostIt `bson:"postits" json:"postits"`
 	Strands       []Strand      `bson:"strands" json:"strands"`
 	Envs          []Envs        `bson:"envs" json:"envs"`
+}
+
+func (b *Board) IsMember(userID string) bool {
+	return userID != "" && (b.Owner == userID || slices.Contains(b.Collaborators, userID))
 }

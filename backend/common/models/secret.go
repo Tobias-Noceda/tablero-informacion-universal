@@ -44,6 +44,13 @@ type Secret struct {
 	Provider   OAuthProvider `bson:"provider" json:"provider,omitempty"`
 }
 
+// SecretRef is how a post-it names a secret outside its board: the pair the
+// store keys on, never the value.
+type SecretRef struct {
+	Scope SecretScope `bson:"scope" json:"scope"`
+	Name  string      `bson:"name" json:"name"`
+}
+
 type SecretMeta struct {
 	Scope      SecretScope   `json:"scope"`
 	Name       string        `json:"name"`

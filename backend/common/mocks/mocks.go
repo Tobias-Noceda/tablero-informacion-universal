@@ -199,7 +199,9 @@ func (m *MockExecuter) Execute(postit *models.PostIts) (any, error) {
 }
 
 type MockSecretResolver struct {
-	ResolveFn func(scope models.SecretScope, names []string) (map[string]string, error)
+	ResolveFn   func(scope models.SecretScope, names []string) (map[string]string, error)
+	ResolveAsFn func(principal models.Principal, board uuid.UUID, refs []models.SecretRef) (map[models.SecretRef]string, error)
+	CanBindFn   func(principal models.Principal, board uuid.UUID, refs []models.SecretRef) error
 }
 
 var _ infrastructure.SecretResolver = (*MockSecretResolver)(nil)
@@ -211,10 +213,25 @@ func (m *MockSecretResolver) Resolve(scope models.SecretScope, names []string) (
 	return nil, nil
 }
 
+func (m *MockSecretResolver) ResolveAs(principal models.Principal, board uuid.UUID, refs []models.SecretRef) (map[models.SecretRef]string, error) {
+	if m.ResolveAsFn != nil {
+		return m.ResolveAsFn(principal, board, refs)
+	}
+	return nil, nil
+}
+
+func (m *MockSecretResolver) CanBind(principal models.Principal, board uuid.UUID, refs []models.SecretRef) error {
+	if m.CanBindFn != nil {
+		return m.CanBindFn(principal, board, refs)
+	}
+	return nil
+}
+
 // MockScopePolicy allows everything unless told otherwise.
 type MockScopePolicy struct {
 	CanManageFn func(principal models.Principal, scope models.SecretScope) error
 	CanViewFn   func(principal models.Principal, scope models.SecretScope) error
+	CanUseFn    func(principal models.Principal, board uuid.UUID, secret *models.Secret) error
 }
 
 var _ infrastructure.ScopePolicy = (*MockScopePolicy)(nil)
@@ -229,6 +246,13 @@ func (m *MockScopePolicy) CanManage(principal models.Principal, scope models.Sec
 func (m *MockScopePolicy) CanView(principal models.Principal, scope models.SecretScope) error {
 	if m.CanViewFn != nil {
 		return m.CanViewFn(principal, scope)
+	}
+	return nil
+}
+
+func (m *MockScopePolicy) CanUse(principal models.Principal, board uuid.UUID, secret *models.Secret) error {
+	if m.CanUseFn != nil {
+		return m.CanUseFn(principal, board, secret)
 	}
 	return nil
 }

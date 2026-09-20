@@ -15,6 +15,7 @@ func TestScopeKey(t *testing.T) {
 	}{
 		{BoardScope(board), "board:6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"},
 		{UserScope("cognito-123"), "user:cognito-123"},
+		{MemberScope(board, "cognito-123"), "member:6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d:cognito-123"},
 		{SystemScope, "system"},
 	}
 
@@ -44,6 +45,10 @@ func TestScopeValid(t *testing.T) {
 		{"board", BoardScope(uuid.New()), true},
 		{"user", UserScope("cognito-123"), true},
 		{"system", SystemScope, true},
+		{"member", MemberScope(uuid.New(), "cognito-123"), true},
+		{"member without user", SecretScope{Kind: ScopeMember, Owner: uuid.New().String() + ":"}, false},
+		{"member with non uuid board", SecretScope{Kind: ScopeMember, Owner: "nope:cognito-123"}, false},
+		{"member without separator", SecretScope{Kind: ScopeMember, Owner: uuid.New().String()}, false},
 		{"board without owner", SecretScope{Kind: ScopeBoard}, false},
 		{"board with non uuid owner", SecretScope{Kind: ScopeBoard, Owner: "nope"}, false},
 		{"user without owner", SecretScope{Kind: ScopeUser}, false},
@@ -55,5 +60,18 @@ func TestScopeValid(t *testing.T) {
 		if got := c.scope.Valid(); got != c.want {
 			t.Errorf("%s: Valid() = %v, want %v", c.label, got, c.want)
 		}
+	}
+}
+
+func TestMemberScope_Member(t *testing.T) {
+	board := uuid.New()
+
+	gotBoard, gotUser, ok := MemberScope(board, "cognito-123").Member()
+	if !ok || gotBoard != board || gotUser != "cognito-123" {
+		t.Errorf("Member() = (%v, %q, %v), want (%v, %q, true)", gotBoard, gotUser, ok, board, "cognito-123")
+	}
+
+	if _, _, ok := BoardScope(board).Member(); ok {
+		t.Error("a board scope reported itself as a member scope")
 	}
 }
