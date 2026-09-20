@@ -239,7 +239,6 @@
 				onpaneclick={onBoardClick}
 				colorMode="system"
 				class="bg-transparent!"
-				title="Board Flow"
 				attributionPosition={undefined}
 			>
 				<Controls />
