@@ -35,6 +35,9 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      - name: Vet (integration tag)
+        run: go vet -tags integration ./...
+
       - name: Test
         run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
@@ -57,3 +60,36 @@ jobs:
           name: go-coverage
           path: backend/coverage.out
           if-no-files-found: ignore
+
+  integration:
+    name: integration (mock OAuth2)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      mock-oauth2:
+        image: ghcr.io/navikt/mock-oauth2-server:2.1.10
+        ports:
+          - 8899:8080
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Wait for mock OAuth2 provider
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf -o /dev/null http://localhost:8899/default/.well-known/openid-configuration && exit 0
+            sleep 1
+          done
+          echo "mock-oauth2 did not come up" >&2
+          exit 1
+
+      - name: Test
+        run: go test -race -tags integration -run TestLiveAuthorizationCode -v ./common/services/secrets/

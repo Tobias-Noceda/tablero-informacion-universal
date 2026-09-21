@@ -20,7 +20,7 @@ func TestLiveDuende(t *testing.T) {
 	// Swap the double for the real token client.
 	srv.tokens = oauth.New()
 
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	material := &models.OAuth2Material{
 		Flow:         models.OAuth2ClientCredentials,
@@ -38,7 +38,7 @@ func TestLiveDuende(t *testing.T) {
 	if strings.Contains(string(row.Ciphertext), "secret") {
 		t.Error("the client secret is readable in the stored row")
 	}
-	t.Logf("stored   : kind=%s keyversion=%d ciphertext=%d bytes", row.Kind, row.KeyVersion, len(row.Ciphertext))
+	t.Logf("stored   : kind=%s key=%s ciphertext=%d bytes", row.Kind, row.KeyID, len(row.Ciphertext))
 
 	resolved, err := srv.Resolve(board, []string{"DUENDE"})
 	if err != nil {

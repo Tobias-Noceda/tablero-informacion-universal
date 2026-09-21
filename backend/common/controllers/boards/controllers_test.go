@@ -29,7 +29,7 @@ func setupRouter(db *mocks.MockDB, cache *mocks.MockCache) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 
 	r := gin.New()
-	bs := b_srv.New(db)
+	bs := b_srv.New(db, &mocks.MockScopePurger{})
 	rs := r_srv.New(*bs, cache)
 
 	NewController(bs, rs).RegisterRoutes(r)
@@ -79,8 +79,8 @@ func TestCreateBoard_MissingFields(t *testing.T) {
 func TestGetUserBoards_MissingCognitoID(t *testing.T) {
 	r := setupRouter(nil, nil)
 	w := do(r, http.MethodGet, "/boards", "")
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want 500 (missing cognito_id)", w.Code)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (missing cognito_id)", w.Code)
 	}
 }
 
@@ -191,6 +191,9 @@ func TestAddCollaborator_OK(t *testing.T) {
 func TestDeleteBoard_OK(t *testing.T) {
 	called := false
 	db := &mocks.MockDB{
+		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
+			return &models.Board{Id: id, Owner: "owner"}, nil
+		},
 		DeleteBoardFn: func(_ uuid.UUID) error {
 			called = true
 			return nil

@@ -21,6 +21,9 @@ RUN pnpm install --frozen-lockfile
 # Copy source code
 COPY . .
 
+# Build the SPA as static files for nginx (the default adapter targets Vercel)
+ENV ADAPTER=static
+
 # Build the SPA
 # The adapter-static will output to 'build' directory by default
 RUN pnpm run build

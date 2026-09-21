@@ -40,7 +40,7 @@ func TestAuthorize_BuildsProviderURL(t *testing.T) {
 	store := newStore()
 	handshakes := &mocks.MockHandshakeStore{}
 	srv := handshakeService(t, store, handshakes, nil)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	if err := srv.PutOAuth2(board, owner, "SPOTIFY", authCode()); err != nil {
 		t.Fatalf("put: %v", err)
@@ -91,7 +91,7 @@ func TestAuthorize_ChallengeMatchesStoredVerifier(t *testing.T) {
 	store := newStore()
 	handshakes := &mocks.MockHandshakeStore{}
 	srv := handshakeService(t, store, handshakes, nil)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	_ = srv.PutOAuth2(board, owner, "SPOTIFY", authCode())
 	target, err := srv.Authorize(board, owner, "SPOTIFY", redirectURI)
@@ -125,7 +125,7 @@ func TestAuthorize_ChallengeMatchesStoredVerifier(t *testing.T) {
 func TestAuthorize_Rejects(t *testing.T) {
 	store := newStore()
 	srv := handshakeService(t, store, &mocks.MockHandshakeStore{}, nil)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	// A client_credentials credential has nothing to consent to.
 	_ = srv.PutOAuth2(board, owner, "MACHINE", clientCredentials())
@@ -135,7 +135,7 @@ func TestAuthorize_Rejects(t *testing.T) {
 
 	_ = srv.PutOAuth2(board, owner, "SPOTIFY", authCode())
 
-	if _, err := srv.Authorize(board, "stranger", "SPOTIFY", redirectURI); err == nil {
+	if _, err := srv.Authorize(board, stranger, "SPOTIFY", redirectURI); err == nil {
 		t.Error("a stranger started a handshake")
 	}
 	if _, err := srv.Authorize(board, owner, "SPOTIFY", "javascript:alert(1)"); err == nil {
@@ -162,7 +162,7 @@ func TestCallback_ExchangesAndStoresTokens(t *testing.T) {
 	}
 
 	srv := handshakeService(t, store, handshakes, tokens)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 	_ = srv.PutOAuth2(board, owner, "SPOTIFY", authCode())
 
 	target, err := srv.Authorize(board, owner, "SPOTIFY", redirectURI)
@@ -206,7 +206,7 @@ func TestCallback_StateIsSingleUse(t *testing.T) {
 	}
 
 	srv := handshakeService(t, store, handshakes, tokens)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 	_ = srv.PutOAuth2(board, owner, "SPOTIFY", authCode())
 
 	target, _ := srv.Authorize(board, owner, "SPOTIFY", redirectURI)

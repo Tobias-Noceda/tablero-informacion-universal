@@ -25,7 +25,7 @@ import (
 // user's choice, made per post-it from the board's stored secrets.
 func TestWellKnowns_DoNotHardcodeACredential(t *testing.T) {
 	for key, wk := range configuredPostIts {
-		for _, source := range []map[string]string{wk.Params, wk.Request.Headers, wk.Request.Queries} {
+		for _, source := range []map[string]string{wk.template.Params, wk.template.Request.Headers, wk.template.Request.Queries} {
 			for field, value := range source {
 				name, isRef := strings.CutPrefix(value, "$")
 				if isRef && models.ValidSecretName(name) {
@@ -39,7 +39,7 @@ func TestWellKnowns_DoNotHardcodeACredential(t *testing.T) {
 // A well-known that needs a credential asks for one, and wires it through a
 // param rather than naming a secret itself.
 func TestWellKnown_ExchangeRateAsksForACredential(t *testing.T) {
-	wk := configuredPostIts["exchange_rate"]
+	wk := configuredPostIts["exchange_rate"].template
 
 	if wk.Request.Headers["apikey"] != "$credential" {
 		t.Errorf("apikey header = %q, want it to defer to the user's choice", wk.Request.Headers["apikey"])
@@ -108,7 +108,7 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 			stored = append(stored, *s)
 			return nil
 		},
-		FindSecretsFn: func(_ uuid.UUID, _ []string) ([]models.Secret, error) {
+		FindSecretsFn: func(models.SecretScope, []string) ([]models.Secret, error) {
 			return stored, nil
 		},
 	}
@@ -118,10 +118,11 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 		},
 	}
 
-	secrets := secretsrv.New(store, boards, sealer,
-		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})
+	groups := &mocks.MemoryGroupStore{}
+	secrets := secretsrv.New(store, secretsrv.NewPolicy(boards, groups), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}),
+		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, groups)
 
-	if err := secrets.Put(board, owner, "CURRENCY_API_KEY", models.SecretApiKey, theKey); err != nil {
+	if err := secrets.Put(models.BoardScope(board), models.Principal{ID: owner}, "CURRENCY_API_KEY", models.SecretApiKey, theKey); err != nil {
 		t.Fatalf("put secret: %v", err)
 	}
 	if bytes.Contains(stored[0].Ciphertext, []byte(theKey)) {
@@ -133,6 +134,7 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 	postit := &models.PostIts{
 		Id:       uuid.New(),
 		Board:    board,
+		RunAs:    owner,
 		Resource: resource,
 		Params:   map[string]string{"$base": "USD", "$currency": "ARS", "$credential": "$CURRENCY_API_KEY"},
 		Request: models.Request{
@@ -200,6 +202,7 @@ func TestExecutePostIt_MissingSecretIsNotSubstituted(t *testing.T) {
 	postit := &models.PostIts{
 		Id:       uuid.New(),
 		Board:    uuid.New(),
+		RunAs:    boardOwner.ID,
 		Resource: resource,
 		Request: models.Request{
 			Method:  http.MethodGet,

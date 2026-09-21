@@ -17,7 +17,12 @@ import (
 	"github.com/google/uuid"
 )
 
-const owner = "owner-id"
+const (
+	owner        = "owner-id"
+	collaborator = "collab-id"
+)
+
+var opsGroup = models.Group{Id: uuid.New(), Name: "ops", Owner: owner, Members: []string{collaborator}}
 
 func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 	if store == nil {
@@ -29,13 +34,14 @@ func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 
 	boards := &mocks.MockDB{
 		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
-			return &models.Board{Id: id, Owner: owner}, nil
+			return &models.Board{Id: id, Owner: owner, Collaborators: []string{collaborator}}, nil
 		},
 	}
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(store, boards, sealer, &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{})).RegisterRoutes(r)
+	groups := &mocks.MemoryGroupStore{Groups: []models.Group{opsGroup}}
+	NewController(srv.New(store, srv.NewPolicy(boards, groups), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, groups)).RegisterRoutes(r)
 	return r
 }
 
@@ -137,9 +143,9 @@ func TestPutSecret_InvalidBoard(t *testing.T) {
 func TestListSecrets_ReturnsMetadataOnly(t *testing.T) {
 	board := uuid.New()
 	store := &mocks.MockSecretStore{
-		ListSecretsFn: func(_ uuid.UUID) ([]models.Secret, error) {
+		ListSecretsFn: func(scope models.SecretScope) ([]models.Secret, error) {
 			return []models.Secret{{
-				Board:      board,
+				Scope:      scope,
 				Name:       "API_KEY",
 				Kind:       models.SecretApiKey,
 				Ciphertext: []byte("ciphertext-bytes"),
@@ -158,7 +164,7 @@ func TestListSecrets_ReturnsMetadataOnly(t *testing.T) {
 	if !strings.Contains(body, "API_KEY") {
 		t.Errorf("expected the name in the listing: %s", body)
 	}
-	for _, leak := range []string{"ciphertext", "nonce", "keyversion"} {
+	for _, leak := range []string{"ciphertext", "nonce", "keyid"} {
 		if strings.Contains(strings.ToLower(body), leak) {
 			t.Errorf("listing exposed %q: %s", leak, body)
 		}
@@ -177,7 +183,7 @@ func TestListSecrets_MissingCognitoID(t *testing.T) {
 func TestDeleteSecret_OK(t *testing.T) {
 	var gotName string
 	store := &mocks.MockSecretStore{
-		DeleteSecretFn: func(_ uuid.UUID, name string) error {
+		DeleteSecretFn: func(_ models.SecretScope, name string) error {
 			gotName = name
 			return nil
 		},
@@ -196,7 +202,7 @@ func TestDeleteSecret_OK(t *testing.T) {
 func TestDeleteSecret_NonOwner(t *testing.T) {
 	deleted := false
 	store := &mocks.MockSecretStore{
-		DeleteSecretFn: func(_ uuid.UUID, _ string) error {
+		DeleteSecretFn: func(models.SecretScope, string) error {
 			deleted = true
 			return nil
 		},

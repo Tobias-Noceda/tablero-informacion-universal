@@ -1,4 +1,5 @@
 import calendar from '$assets/icons/calendar.svg';
+import cursor from '$assets/icons/cursor.svg';
 import download from '$assets/icons/download.svg';
 import edit from '$assets/icons/edit.svg';
 import eye from '$assets/icons/eye.svg';
@@ -14,6 +15,7 @@ import trash from '$assets/icons/trash.svg';
 
 export const iconMap: Record<string, string> = {
     calendar: calendar,
+    cursor: cursor,
     download: download,
     edit: edit,
     eye: eye,

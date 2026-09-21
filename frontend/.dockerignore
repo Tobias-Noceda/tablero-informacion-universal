@@ -31,9 +31,11 @@ coverage
 .storybook
 src/stories
 
+# Local env files. VITE_* must not be baked into the docker image
+.env
+.env.*
+
 # Temporary files
-.env.local
-.env.*.local
 *.log
 npm-debug.log
 pnpm-debug.log

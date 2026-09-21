@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/ports/safehttp"
@@ -182,6 +183,58 @@ func TestExecute_EndToEnd(t *testing.T) {
 	}
 	if m["compra"] != 1000.0 || m["venta"] != 1050.0 {
 		t.Errorf("got %v, want compra=1000 venta=1050", m)
+	}
+}
+
+// A body that arrives in several chunks (any payload past the first read)
+// must be readable in full: the request context has to stay alive until the
+// parser is done, not just until the headers came back.
+func TestExecute_ReadsChunkedBodyAfterRequestReturns(t *testing.T) {
+	allowLoopback(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"items":[`)
+		w.(http.Flusher).Flush()
+		time.Sleep(50 * time.Millisecond)
+		fmt.Fprint(w, `{"summary":"Next"}]}`)
+	}))
+	defer srv.Close()
+
+	resource, _ := url.Parse(srv.URL)
+	e := New()
+	postit := &models.PostIts{
+		Resource: resource,
+		Request:  models.Request{Method: http.MethodGet},
+		Response: "json",
+		Query:    map[string]string{"summary": ".items[0].summary"},
+	}
+
+	res, err := e.Execute(postit)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if m := res.(map[string]any); m["summary"] != "Next" {
+		t.Errorf("got %v, want summary=Next", m)
+	}
+}
+
+func TestExecute_ReportsUpstreamStatus(t *testing.T) {
+	allowLoopback(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	}))
+	defer srv.Close()
+
+	resource, _ := url.Parse(srv.URL)
+	postit := &models.PostIts{
+		Resource: resource,
+		Request:  models.Request{Method: http.MethodGet},
+		Response: "json",
+	}
+
+	_, err := New().Execute(postit)
+	if err == nil || !strings.Contains(err.Error(), "403") {
+		t.Errorf("err = %v, want the upstream 403 to be named", err)
 	}
 }
 

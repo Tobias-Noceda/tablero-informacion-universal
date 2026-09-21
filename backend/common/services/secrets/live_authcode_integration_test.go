@@ -31,7 +31,7 @@ func TestLiveAuthorizationCode(t *testing.T) {
 	srv := handshakeService(t, store, handshakes, nil)
 	srv.tokens = oauth.New()
 
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 	redirect := "http://localhost:9999/cb"
 
 	material := &models.OAuth2Material{
@@ -108,8 +108,7 @@ func TestLiveAuthorizationCode(t *testing.T) {
 	firstRefresh := stored.RefreshToken
 
 	stored.ExpiresAt = time.Now().Add(-time.Minute)
-	expired, _ := json.Marshal(&stored)
-	if err := srv.seal(board, "MOCKPROVIDER", models.SecretOAuth2, expired); err != nil {
+	if err := srv.sealMaterial(board, "MOCKPROVIDER", &stored, true); err != nil {
 		t.Fatalf("reseal: %v", err)
 	}
 

@@ -1,6 +1,10 @@
 import { error } from '@sveltejs/kit';
 import { SvelteURL } from 'svelte/reactivity';
 
+// There is no authentication yet: every request identifies itself as this
+// placeholder, the same one boards are created with.
+export const CURRENT_USER = 'Messi';
+
 function resolvePath(path: `/${string}`) {
 	const apiUrl = import.meta.env.VITE_API_URL || window?.location.href || 'http://localhost:31126'; // Default to localhost if API_URL is not set
 	try {

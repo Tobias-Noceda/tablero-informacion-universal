@@ -13,7 +13,7 @@ import (
 
 const MASTER_KEYS_ENV = "SECRETS_MASTER_KEYS"
 
-type Sealed struct {
+type Wrapped struct {
 	Ciphertext []byte
 	Nonce      []byte
 	KeyVersion int
@@ -78,7 +78,7 @@ func NewFromKeys(raw string) (*Sealer, error) {
 	return s, nil
 }
 
-func (s *Sealer) Seal(aad string, plaintext []byte) (*Sealed, error) {
+func (s *Sealer) Seal(aad string, plaintext []byte) (*Wrapped, error) {
 	aead, ok := s.keys[s.current]
 	if !ok {
 		return nil, fmt.Errorf("no key available to seal with")
@@ -89,14 +89,14 @@ func (s *Sealer) Seal(aad string, plaintext []byte) (*Sealed, error) {
 		return nil, err
 	}
 
-	return &Sealed{
+	return &Wrapped{
 		Ciphertext: aead.Seal(nil, nonce, plaintext, []byte(aad)),
 		Nonce:      nonce,
 		KeyVersion: s.current,
 	}, nil
 }
 
-func (s *Sealer) Open(aad string, sealed *Sealed) ([]byte, error) {
+func (s *Sealer) Open(aad string, sealed *Wrapped) ([]byte, error) {
 	aead, ok := s.keys[sealed.KeyVersion]
 	if !ok {
 		return nil, fmt.Errorf("no key for version %d, cannot decrypt", sealed.KeyVersion)
@@ -110,6 +110,6 @@ func (s *Sealer) Open(aad string, sealed *Sealed) ([]byte, error) {
 	return plaintext, nil
 }
 
-func (s *Sealer) NeedsRotation(sealed *Sealed) bool {
+func (s *Sealer) NeedsRotation(sealed *Wrapped) bool {
 	return sealed.KeyVersion < s.current
 }
