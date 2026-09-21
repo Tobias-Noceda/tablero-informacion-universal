@@ -6,12 +6,22 @@
             "framework": "go",
             "entrypoint": "main.go"
         },
+        "realtime": {
+            "root": "realtime/",
+            "framework": "node"
+        },
         "frontend": {
             "root": "frontend/",
             "framework": "sveltekit"
         }
     },
     "rewrites": [
+        {
+            "source": "/ws/(.*)",
+            "destination": {
+                "service": "realtime"
+            }
+        },
         {
             "source": "/api/(.*)",
             "destination": {
