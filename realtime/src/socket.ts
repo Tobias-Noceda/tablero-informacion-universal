@@ -16,6 +16,8 @@ const wss = new Server(server, {
 });
 
 export function notify(group: string, board: unknown) {
+    console.log(group, board);
+
     wss.to(group.toLowerCase()).emit("update", {
         board,
         ts: Date.now(),
