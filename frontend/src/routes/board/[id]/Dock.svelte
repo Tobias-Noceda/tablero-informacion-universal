@@ -140,19 +140,31 @@
 <style>
   aside {
     width: 100%;
+    min-width: 0;
     font-size: 12px;
     display: flex;
     flex-direction: column;
     align-items: stretch;
+    overflow-x: auto;
+    overflow-y: hidden;
+    z-index: 100;
+    background: var(--color-background);
+    padding: 10px;
   }
 
   .nodes-container {
     display: flex;
     flex-direction: row;
     gap: 1rem;
+    /* "safe" keeps centering when it fits, but starts at the left edge when it overflows */
+    justify-content: safe center;
+    width: max-content;
+    min-width: 100%;
   }
 
   .node {
+    flex-shrink: 0;
+    white-space: nowrap;
     margin: 0;
     padding: 0.5rem 1rem;
     font-weight: 700;

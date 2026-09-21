@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icon from '$components/Icon/Icon.svelte';
 	import type { Position } from '$stores/mouses.svelte';
 	import { Spring } from 'svelte/motion';
 
@@ -50,8 +51,10 @@
 	</svg> -->
 	<div
 		class="size-2 absolute"
-		style:background-color={color}
 		style:top="{y}px"
 		style:left="{x}px"
-	></div>
+		style:color="{color}"
+	>
+		<Icon name="cursor" class="w-6 h-8" />
+	</div>
 {/if}

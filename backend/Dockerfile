@@ -7,20 +7,20 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/api .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/server .
 
 FROM alpine:3.21
 
 # Import CA certificates to allow outgoing HTTPS calls from your Go code
 # COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-WORKDIR /root/
+WORKDIR /app
 
-COPY --from=builder /app/api .
+COPY --from=builder /app/server .
 
 RUN adduser -D appuser
 USER appuser
 
 EXPOSE 31126
 
-CMD ["./api"]
+CMD ["./server"]
