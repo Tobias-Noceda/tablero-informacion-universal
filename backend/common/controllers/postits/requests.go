@@ -1,6 +1,9 @@
 package postits
 
-import "github.com/google/uuid"
+import (
+	"github.com/Secreto31126/tesis/common/models"
+	"github.com/google/uuid"
+)
 
 type CreatePostItRequest struct {
 	Board     uuid.UUID         `json:"board" binding:"required"`
@@ -14,6 +17,7 @@ type MovePostItRequest struct {
 }
 
 type UpdatePostItRequest struct {
+	Title    *models.Title     `json:"title"`
 	Params   map[string]string `json:"params"`
 	Query    map[string]string `json:"query"`
 	Response *string           `json:"response"`
