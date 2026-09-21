@@ -31,7 +31,6 @@ stream
         const board = change.fullDocument;
         const id = change.documentKey._id;
 
-        console.log(id, board);
         if (board) callback(id.toString(), board);
     })
     .once("error", console.error);
