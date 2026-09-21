@@ -85,7 +85,11 @@ func (db *MongoDB) EnsureIndexes() error {
 		return err
 	}
 
-	return db.ensureGroupIndexes()
+	if err := db.ensureGroupIndexes(); err != nil {
+		return err
+	}
+
+	return db.ensureUserIndexes()
 }
 
 func timeout() (context.Context, context.CancelFunc) {
