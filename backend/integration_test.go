@@ -15,8 +15,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/ports/crypto"
+	"github.com/Secreto31126/tesis/common/ports/jwt"
 	"github.com/Secreto31126/tesis/common/ports/mongo"
 	"github.com/Secreto31126/tesis/common/ports/redis"
 	"github.com/Secreto31126/tesis/common/ports/safehttp"
@@ -36,6 +38,7 @@ type stack struct {
 	app       *app
 	db        *mongo.MongoDB
 	cache     *redis.RedisDB
+	mailer    *mocks.RecordingMailer
 	responses []*httptest.ResponseRecorder
 }
 
@@ -61,12 +64,20 @@ func newStack(t *testing.T) *stack {
 		t.Fatalf("kek: %v", err)
 	}
 
+	keys, err := jwt.NewFromKeys("it:" + base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x22}, 32)))
+	if err != nil {
+		t.Fatalf("signing keys: %v", err)
+	}
+
 	t.Cleanup(func() {
 		_ = cache.Close()
 		_ = db.Close()
 	})
 
-	return &stack{t: t, app: newApp(db, cache, kek), db: db, cache: cache}
+	cfg := config{admins: []string{"admin@it.test"}, accessTTL: DEFAULT_ACCESS_TTL, refreshTTL: DEFAULT_REFRESH_TTL}
+	mailer := &mocks.RecordingMailer{}
+
+	return &stack{t: t, app: newApp(db, cache, kek, keys, cfg, mailer), db: db, cache: cache, mailer: mailer}
 }
 
 func (s *stack) do(method, path string, body any) *httptest.ResponseRecorder {

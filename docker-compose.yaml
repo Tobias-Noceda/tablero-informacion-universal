@@ -17,6 +17,9 @@ services:
       MONGO_DATABASE: ${MONGO_DATABASE:-prod}
       REDIS_URL: *redis-url
       SECRETS_MASTER_KEYS: ${SECRETS_MASTER_KEYS:?set SECRETS_MASTER_KEYS in .env}
+      AUTH_SIGNING_KEYS: ${AUTH_SIGNING_KEYS:?set AUTH_SIGNING_KEYS in .env}
+      PLATFORM_ADMINS: ${PLATFORM_ADMINS:-}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
     networks:
       - mongo
       - redis
