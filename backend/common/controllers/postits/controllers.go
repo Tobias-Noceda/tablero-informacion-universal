@@ -1,8 +1,10 @@
 package postits
 
 import (
+	"errors"
 	"net/http"
 
+	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
 	srv "github.com/Secreto31126/tesis/common/services/postits"
 	"github.com/gin-gonic/gin"
@@ -51,13 +53,14 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		return
 	}
 
-	postIt, err := ctrl.service.CreatePostIt(&models.PostIts{
+	postIt, err := ctrl.service.CreatePostIt(models.Principal{ID: req.CognitoID}, &models.PostIts{
 		Board:     req.Board,
 		WellKnown: req.WellKnown,
 		Params:    req.Params,
+		Bindings:  req.Bindings,
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -159,7 +162,7 @@ func (ctrl *Controller) ExecutePostIt(c *gin.Context) {
 
 	data, err := ctrl.service.ExecutePostIt(postIt)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -204,6 +207,9 @@ func (ctrl *Controller) EditPostIt(c *gin.Context) {
 	if req.Params != nil {
 		set["params"] = req.Params
 	}
+	if req.Bindings != nil {
+		set["bindings"] = req.Bindings
+	}
 	if req.Query != nil {
 		set["query"] = req.Query
 	}
@@ -224,9 +230,9 @@ func (ctrl *Controller) EditPostIt(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.service.UpdatePostIt(id, set)
+	err = ctrl.service.UpdatePostIt(models.Principal{ID: req.CognitoID}, id, set)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -275,4 +281,20 @@ func (ctrl *Controller) MovePostIt(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func statusOf(err error) int {
+	switch {
+	case errors.Is(err, srv.ErrNotAMember),
+		errors.Is(err, srv.ErrCredentialUnavailable),
+		errors.Is(err, infrastructure.ErrForbidden):
+		return http.StatusForbidden
+	case errors.Is(err, srv.ErrInvalidBinding),
+		errors.Is(err, infrastructure.ErrUnknownCredential):
+		return http.StatusBadRequest
+	case errors.Is(err, srv.ErrSystemSecretMissing):
+		return http.StatusServiceUnavailable
+	default:
+		return http.StatusInternalServerError
+	}
 }

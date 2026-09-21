@@ -82,7 +82,7 @@ Use these when you want hot reload or to iterate on one side without rebuilding 
 
 ```bash
 cd backend
-go run main.go                  # listens on 0.0.0.0:31126
+go run .                        # listens on 0.0.0.0:31126
 ```
 
 The server expects Mongo at `mongo:27017` and Redis at `redis:6379` (hostnames are hardcoded in `backend/common/ports/mongo/mon.go` and `backend/common/ports/redis/redis.go`). The simplest setup:
@@ -100,13 +100,24 @@ Tests + coverage:
 .\run_backend_coverage.ps1       # Windows
 ```
 
-Integration tests (`//go:build integration`, not part of `go test ./...`) run against a mock OAuth2 provider on `localhost:8899`. The scripts start it via the `integration` compose profile, run the tests, and stop it (`--keep` / `-Keep` leaves it up). `TestLiveDuende` also needs internet access.
+Integration tests (`//go:build integration`, not part of `go test ./...`) run against real
+Mongo and Redis plus a mock OAuth2 provider on `localhost:8899`, all from docker-compose. The
+scripts read the Mongo credentials from `.env`, start the three containers, point the tests at
+them through the environment (an ephemeral `it_<timestamp>` database and Redis db `1`, a random
+`SECRETS_MASTER_KEYS`), run every tagged test in the module and drop the database afterwards
+(`--keep` / `-Keep` leaves the mock provider up). `TestLiveDuende` also needs internet access.
 
 ```bash
-./run_backend_integration.sh                                 # macOS / Linux
-./run_backend_integration.sh -run TestLiveAuthorizationCode  # just the mock-backed one
-.un_backend_integration.ps1                                # Windows
+./run_backend_integration.sh                       # macOS / Linux
+./run_backend_integration.sh -run TestEndToEnd     # just the HTTP end-to-end ones
+.\run_backend_integration.ps1                      # Windows
 ```
+
+What they cover: the Mongo secret and data-key stores (unique indexes, the first-key race, key
+rotation, purge), the OAuth2 handshakes (self-managed and platform client), and an end-to-end
+pass over the HTTP API with the real wiring (`backend/app.go`): a system secret is provisioned,
+a well-known card is created and executed, the stub provider receives the key, Redis serves the
+second execution, deleting the board shreds its key, and no response ever carries the value.
 
 ### Frontend (SvelteKit)
 
@@ -154,9 +165,41 @@ All routes are prefixed with `/v1` on the backend, or `/api/v1` through the edge
 | `PATCH`  | `/v1/post-its/:id/settings`            | Update post-it config                    |
 | `PATCH`  | `/v1/post-its/:id/position`            | Move a post-it on the canvas             |
 
+### Secrets vault
+
+Secret values are write-only: no response ever returns a value, a client secret or a token.
+Until authentication exists the caller is the `cognito_id` in the body (writes) or query string
+(reads); the system scope needs none. See `.env.example` for `SECRETS_MASTER_KEYS`.
+
+| Method   | Path                                            | Purpose                                                      |
+|----------|-------------------------------------------------|--------------------------------------------------------------|
+| `GET`    | `/v1/boards/:id/secrets?cognito_id=`            | List a board's secrets (metadata only)                       |
+| `PUT`    | `/v1/boards/:id/secrets`                        | Create or replace `{cognito_id, name, kind, value}`          |
+| `DELETE` | `/v1/boards/:id/secrets/:name?cognito_id=`      | Delete                                                       |
+| `PUT`    | `/v1/boards/:id/oauth2`                         | OAuth2 credential with the caller's own client               |
+| `GET`    | `/v1/boards/:id/oauth2/authorize?name=&redirect_uri=&cognito_id=` | Start a consent handshake → `{authorization_url}`  |
+| `POST`   | `/v1/boards/:id/oauth2/connect`                 | `{cognito_id, provider, name, redirect_uri}`: consent with the platform's application |
+| `*`      | `/v1/users/:id/...`                             | Same routes for a user's own scope (`cognito_id` must equal `:id`) |
+| `GET`    | `/v1/system/secrets`                            | Platform secrets the code expects, flagged `configured`      |
+| `PUT`    | `/v1/system/secrets`                            | `{name, kind, value}`                                        |
+| `DELETE` | `/v1/system/secrets/:name`                      | Delete                                                       |
+| `PUT`    | `/v1/system/oauth2`                             | Platform-level `client_credentials` OAuth2                   |
+| `PUT`    | `/v1/system/oauth2/clients`                     | `{provider, client_id, client_secret}`: the platform's application at a provider |
+| `GET`    | `/v1/system/keys`                               | Data keys per scope (metadata, never material)               |
+| `GET`    | `/v1/oauth2/providers`                          | Providers users can connect to, flagged `configured`         |
+| `GET`    | `/v1/oauth2/callback?state=&code=`              | Provider redirect target                                     |
+
+Secrets are referenced from a post-it as `$NAME` in headers, query parameters or params and
+substituted at execution. Well-knowns that need a platform-owned key (e.g. `nasa_apod`) get it
+injected server-side; the client never sees its name or value.
+
+Key rotation: append a new version to `SECRETS_MASTER_KEYS` and run `go run . -rewrap-keys`
+from `backend/`; `go run . -rotate-key board:<uuid>` (or `user:<id>`, `system`) rotates one
+scope's data key and reseals its secrets.
+
 ## Troubleshooting
 
 - **`docker compose up` errors about missing Mongo env vars** — you forgot the `.env` file (step 2).
 - **Frontend loads but API calls 404 / CORS-fail in dev** — you're hitting Vite directly (`:5173`), which doesn't proxy `/v1/*`. Use the edge proxy at `http://localhost/` or set up a Vite proxy.
 - **`Cannot read properties of undefined (reading 'data')` on the production build** — usually a stale browser cache. Hard-reload (Cmd-Shift-R) or open in incognito.
-- **Mongo/Redis "connection refused" when running `go run main.go` directly** — the URLs are hardcoded to the docker hostnames; see the backend dev setup above.
+- **Mongo/Redis "connection refused" when running `go run .` directly** — the URLs are hardcoded to the docker hostnames; see the backend dev setup above.

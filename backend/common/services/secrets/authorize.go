@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/Secreto31126/tesis/common/models"
-	"github.com/google/uuid"
 )
 
 // HANDSHAKE_TTL is how long a user has to finish consenting before the
@@ -18,10 +17,10 @@ import (
 const HANDSHAKE_TTL = 10 * time.Minute
 
 type pending struct {
-	Board    uuid.UUID `json:"board"`
-	Name     string    `json:"name"`
-	Verifier string    `json:"verifier"`
-	Redirect string    `json:"redirect"`
+	Scope    models.SecretScope `json:"scope"`
+	Name     string             `json:"name"`
+	Verifier string             `json:"verifier"`
+	Redirect string             `json:"redirect"`
 }
 
 func randomURLSafe(bytes int) (string, error) {
@@ -33,13 +32,17 @@ func randomURLSafe(bytes int) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
 
-func (srv *SecretsService) Authorize(board uuid.UUID, cognitoID, name, redirectURI string) (string, error) {
-	if err := srv.authorize(board, cognitoID, true); err != nil {
+func (srv *SecretsService) Authorize(scope models.SecretScope, principal models.Principal, name, redirectURI string) (string, error) {
+	if err := srv.policy.CanManage(principal, scope); err != nil {
 		return "", err
 	}
 
-	material, _, err := srv.material(board, name)
+	material, _, err := srv.material(scope, name)
 	if err != nil {
+		return "", err
+	}
+
+	if err := srv.hydrate(material); err != nil {
 		return "", err
 	}
 
@@ -66,7 +69,7 @@ func (srv *SecretsService) Authorize(board uuid.UUID, cognitoID, name, redirectU
 	}
 
 	handshake, err := json.Marshal(&pending{
-		Board:    board,
+		Scope:    scope,
 		Name:     name,
 		Verifier: verifier,
 		Redirect: redirectURI,
@@ -116,8 +119,12 @@ func (srv *SecretsService) Callback(state, code string) error {
 		return err
 	}
 
-	material, secret, err := srv.material(handshake.Board, handshake.Name)
+	material, secret, err := srv.material(handshake.Scope, handshake.Name)
 	if err != nil {
+		return err
+	}
+
+	if err := srv.hydrate(material); err != nil {
 		return err
 	}
 
@@ -125,12 +132,7 @@ func (srv *SecretsService) Callback(state, code string) error {
 		return err
 	}
 
-	plaintext, err := json.Marshal(material)
-	if err != nil {
-		return err
-	}
-
-	return srv.seal(secret.Board, secret.Name, models.SecretOAuth2, plaintext, secret.Flow, true)
+	return srv.sealMaterial(secret.Scope, secret.Name, material, true)
 }
 
 func handshakeKey(state string) string {
@@ -138,8 +140,8 @@ func handshakeKey(state string) string {
 }
 
 // material loads and decrypts an OAuth2 credential by name.
-func (srv *SecretsService) material(board uuid.UUID, name string) (*models.OAuth2Material, *models.Secret, error) {
-	stored, err := srv.store.FindSecrets(board, []string{name})
+func (srv *SecretsService) material(scope models.SecretScope, name string) (*models.OAuth2Material, *models.Secret, error) {
+	stored, err := srv.store.FindSecrets(scope, []string{name})
 	if err != nil {
 		return nil, nil, err
 	}

@@ -6,9 +6,11 @@ import (
 )
 
 type CreatePostItRequest struct {
-	Board     uuid.UUID         `json:"board" binding:"required"`
-	WellKnown string            `json:"well_known"`
-	Params    map[string]string `json:"params"`
+	CognitoID string                      `json:"cognito_id" binding:"required"`
+	Board     uuid.UUID                   `json:"board" binding:"required"`
+	WellKnown string                      `json:"well_known"`
+	Params    map[string]string           `json:"params"`
+	Bindings  map[string]models.SecretRef `json:"bindings"`
 }
 
 type MovePostItRequest struct {
@@ -17,9 +19,11 @@ type MovePostItRequest struct {
 }
 
 type UpdatePostItRequest struct {
-	Title    *models.Title     `json:"title"`
-	Params   map[string]string `json:"params"`
-	Query    map[string]string `json:"query"`
-	Response *string           `json:"response"`
-	Rate     *int              `json:"rate"`
+	CognitoID string                      `json:"cognito_id" binding:"required"`
+	Title     *models.Title               `json:"title"`
+	Params    map[string]string           `json:"params"`
+	Bindings  map[string]models.SecretRef `json:"bindings"`
+	Query     map[string]string           `json:"query"`
+	Response  *string                     `json:"response"`
+	Rate      *int                        `json:"rate"`
 }

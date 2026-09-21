@@ -10,7 +10,7 @@
 	import { page } from '$app/state';
 	import type { Node, Edge } from '@xyflow/svelte';
 
-	const id = page.params.id!;
+	const id = $derived(page.params.id!);
 
 	let { data } = $props();
 	const { nodes, edges, name, userId } = $derived(data) as {
@@ -30,8 +30,10 @@
 	}
 </script>
 
-<DnDProvider>
-	<!-- <Realtime boardId={id} {boardUpdate}> -->
-	<Flow {name} {nodes} {edges} boardId={id} {userId} {boardUpdate} />
-	<!-- </Realtime> -->
-</DnDProvider>
+{#key id}
+	<DnDProvider>
+		<!-- <Realtime boardId={id} {boardUpdate}> -->
+		<Flow {name} {nodes} {edges} boardId={id} {userId} {boardUpdate} />
+		<!-- </Realtime> -->
+	</DnDProvider>
+{/key}

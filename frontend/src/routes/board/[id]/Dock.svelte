@@ -125,6 +125,15 @@
     >
       {m["nodes.google_calendar"]()}
     </div>
+    <div
+      class="nasa_apod node"
+      ondragstart={(event) => onDragStart(event, 'nasa_apod')}
+      draggable={true}
+      role="button"
+      tabindex="0"
+    >
+      {m["nodes.nasa_apod"]()}
+    </div>
   </div>
 </aside>
 

@@ -7,6 +7,7 @@ import EventsSearchNode from "./EventsSearch/EventsSearch.svelte";
 import GithubRepoNode from "./GithubRepo/GithubRepo.svelte";
 import GmailInboxNode from "./GmailInbox/GmailInbox.svelte";
 import GoogleCalendarNode from "./GoogleCalendar/GoogleCalendar.svelte";
+import NasaApodNode from "./NasaApod/NasaApod.svelte";
 import RiesgoPaisNode from "./RiesgoPais/RiesgoPais.svelte";
 import StaticCardNode from "./StaticCard/StaticCard.svelte";
 import TemperatureNode from "./Temperature/Temperature.svelte";
@@ -23,7 +24,8 @@ export const nodesMap = {
     "github_repo": GithubRepoNode,
     "exchange_rate": ExchangeRateNode,
     "gmail_inbox": GmailInboxNode,
-    "google_calendar": GoogleCalendarNode
+    "google_calendar": GoogleCalendarNode,
+    "nasa_apod": NasaApodNode
 };
 
 export type NodeParameter = {
@@ -76,5 +78,7 @@ export const parameters: Record<string, NodeParameter[]> = {
     "google_calendar": [
         { key: "$time_min", label: "From", type: "string", placeholder: "2026-01-01T00:00:00Z" },
         { key: "$credential", label: "Google account", type: "secret" }
-    ]
+    ],
+    // The API key is the platform's own, injected server-side; nothing to ask for.
+    "nasa_apod": []
 };

@@ -20,7 +20,8 @@
 		"github_repo": "GitHub Repository",
 		"exchange_rate": "Exchange Rate",
 		"gmail_inbox": "Gmail Inbox",
-		"google_calendar": "Google Calendar"
+		"google_calendar": "Google Calendar",
+		"nasa_apod": "NASA Picture of the Day"
 	},
 	"secrets": {
 		"title": "Board credentials",
@@ -58,6 +59,19 @@
 		"username": "Username",
 		"password": "Password",
 		"pick_credential": "Pick a credential",
-		"no_credentials": "This board has no credentials yet. Add one first."
+		"no_credentials": "This board has no credentials yet. Add one first.",
+		"connect_account": "Connect an account",
+		"provider": "Provider",
+		"connect": "Connect",
+		"connect_hint": "You will be sent to the provider to sign in and approve access. Only tokens are stored; the application credential is the platform's.",
+		"tab_board": "Board",
+		"tab_mine": "Only mine",
+		"mine_hint": "Credentials you keep on this board for yourself. Nobody else on the board can see them or use them in a card; they are removed if you leave the board.",
+		"empty_mine": "You have no credentials of your own on this board.",
+		"origin_board": "Board",
+		"origin_mine": "Mine on this board",
+		"origin_profile": "My profile",
+		"origin_group": "Groups",
+		"origin_shared": "Shared with me"
 	}
 }

@@ -20,11 +20,13 @@ const (
 )
 
 type MongoDB struct {
-	client  *mongo.Client
-	users   *mongo.Collection
-	boards  *mongo.Collection
-	postit  *mongo.Collection
-	secrets *mongo.Collection
+	client   *mongo.Client
+	users    *mongo.Collection
+	boards   *mongo.Collection
+	postit   *mongo.Collection
+	secrets  *mongo.Collection
+	dataKeys *mongo.Collection
+	groups   *mongo.Collection
 }
 
 func New() (*MongoDB, error) {
@@ -62,12 +64,28 @@ func New() (*MongoDB, error) {
 	db.boards = db.client.Database(name).Collection("boards")
 	db.postit = db.client.Database(name).Collection("postit")
 	db.secrets = db.client.Database(name).Collection("secrets")
+	db.dataKeys = db.client.Database(name).Collection("data_keys")
+	db.groups = db.client.Database(name).Collection("groups")
 
 	return db, nil
 }
 
 func (db *MongoDB) Close() error {
 	return db.client.Disconnect(context.Background())
+}
+
+// EnsureIndexes creates the indexes the stores rely on for uniqueness. Safe
+// to call on every boot: Mongo ignores an index that already exists.
+func (db *MongoDB) EnsureIndexes() error {
+	if err := db.ensureSecretIndexes(); err != nil {
+		return err
+	}
+
+	if err := db.ensureDataKeyIndexes(); err != nil {
+		return err
+	}
+
+	return db.ensureGroupIndexes()
 }
 
 func timeout() (context.Context, context.CancelFunc) {

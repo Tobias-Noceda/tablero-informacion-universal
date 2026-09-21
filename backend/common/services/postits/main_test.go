@@ -15,6 +15,9 @@ func newService(db *mocks.MockDB, cache *mocks.MockCache, run *mocks.MockExecute
 	if db == nil {
 		db = &mocks.MockDB{}
 	}
+	if db.FindBoardFn == nil {
+		db.FindBoardFn = boardOf(boardOwner).FindBoardFn
+	}
 	if cache == nil {
 		cache = &mocks.MockCache{}
 	}
@@ -38,7 +41,7 @@ func TestCreatePostIt_PlainPassesThrough(t *testing.T) {
 	}
 
 	svc := newService(db, nil, nil)
-	_, err := svc.CreatePostIt(&models.PostIts{Board: board})
+	_, err := svc.CreatePostIt(boardOwner, &models.PostIts{Board: board})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -64,7 +67,7 @@ func TestCreatePostIt_ResolvesWellKnown(t *testing.T) {
 	}
 
 	svc := newService(db, nil, nil)
-	_, err := svc.CreatePostIt(&models.PostIts{Board: board, WellKnown: "dolar_oficial"})
+	_, err := svc.CreatePostIt(boardOwner, &models.PostIts{Board: board, WellKnown: "dolar_oficial"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -93,7 +96,7 @@ func TestCreatePostIt_MissingRequiredParam(t *testing.T) {
 
 	svc := newService(db, nil, nil)
 	// events_search requires a $keyword param; none provided.
-	_, err := svc.CreatePostIt(&models.PostIts{Board: uuid.New(), WellKnown: "events_search"})
+	_, err := svc.CreatePostIt(boardOwner, &models.PostIts{Board: uuid.New(), WellKnown: "events_search"})
 	if err == nil {
 		t.Fatal("expected error for missing required param, got nil")
 	}
@@ -104,7 +107,7 @@ func TestCreatePostIt_MissingRequiredParam(t *testing.T) {
 
 func TestCreatePostIt_UnknownWellKnown(t *testing.T) {
 	svc := newService(nil, nil, nil)
-	_, err := svc.CreatePostIt(&models.PostIts{Board: uuid.New(), WellKnown: "does_not_exist"})
+	_, err := svc.CreatePostIt(boardOwner, &models.PostIts{Board: uuid.New(), WellKnown: "does_not_exist"})
 	if err == nil {
 		t.Fatal("expected error for unknown well-known, got nil")
 	}
@@ -120,7 +123,7 @@ func TestUpdatePostIt_EmptySetSkipsDB(t *testing.T) {
 	}
 
 	svc := newService(db, nil, nil)
-	if err := svc.UpdatePostIt(uuid.New(), map[string]any{}); err != nil {
+	if err := svc.UpdatePostIt(boardOwner, uuid.New(), map[string]any{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if called {
@@ -134,6 +137,7 @@ func TestUpdatePostIt_ForwardsSet(t *testing.T) {
 	var gotSet map[string]any
 
 	db := &mocks.MockDB{
+		FindPostItFn: existingCard(id),
 		UpdatePostItFn: func(id uuid.UUID, set map[string]any) error {
 			gotID = id
 			gotSet = set
@@ -143,7 +147,7 @@ func TestUpdatePostIt_ForwardsSet(t *testing.T) {
 
 	svc := newService(db, nil, nil)
 	set := map[string]any{"rate": 5}
-	if err := svc.UpdatePostIt(id, set); err != nil {
+	if err := svc.UpdatePostIt(boardOwner, id, set); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotID != id {
@@ -314,6 +318,7 @@ func TestExecutePostIt_DoesNotLeakSecretsOntoTheCaller(t *testing.T) {
 	postit := &models.PostIts{
 		Id:       uuid.New(),
 		Board:    board,
+		RunAs:    boardOwner.ID,
 		Resource: &url.URL{Scheme: "https", Host: "example.com"},
 		Request: models.Request{
 			Method:  "GET",
@@ -323,8 +328,11 @@ func TestExecutePostIt_DoesNotLeakSecretsOntoTheCaller(t *testing.T) {
 	}
 
 	resolver := &mocks.MockSecretResolver{
-		ResolveFn: func(_ uuid.UUID, _ []string) (map[string]string, error) {
-			return map[string]string{"$API_KEY": "super-secret", "$SEARCH": "also-secret"}, nil
+		ResolveAsFn: func(models.Principal, uuid.UUID, []models.SecretRef) (map[models.SecretRef]string, error) {
+			return map[models.SecretRef]string{
+				{Scope: models.BoardScope(board), Name: "API_KEY"}: "super-secret",
+				{Scope: models.BoardScope(board), Name: "SEARCH"}:  "also-secret",
+			}, nil
 		},
 	}
 
@@ -370,9 +378,9 @@ func TestExecutePostIt_ResourcelessPostItNeverResolvesSecrets(t *testing.T) {
 
 	resolved := false
 	resolver := &mocks.MockSecretResolver{
-		ResolveFn: func(_ uuid.UUID, _ []string) (map[string]string, error) {
+		ResolveAsFn: func(models.Principal, uuid.UUID, []models.SecretRef) (map[models.SecretRef]string, error) {
 			resolved = true
-			return map[string]string{"$API_KEY": "super-secret"}, nil
+			return nil, nil
 		},
 	}
 
@@ -419,9 +427,9 @@ func TestUpdatePostIt_DropsTheCachedResult(t *testing.T) {
 		},
 	}
 
-	svc := New(&mocks.MockDB{}, cache, &mocks.MockExecuter{}, &mocks.MockSecretResolver{})
+	svc := newService(&mocks.MockDB{FindPostItFn: existingCard(id)}, cache, nil)
 
-	if err := svc.UpdatePostIt(id, map[string]any{"rate": 60}); err != nil {
+	if err := svc.UpdatePostIt(boardOwner, id, map[string]any{"rate": 60}); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 
@@ -431,7 +439,9 @@ func TestUpdatePostIt_DropsTheCachedResult(t *testing.T) {
 }
 
 func TestUpdatePostIt_KeepsCacheWhenTheWriteFails(t *testing.T) {
+	id := uuid.New()
 	db := &mocks.MockDB{
+		FindPostItFn:   existingCard(id),
 		UpdatePostItFn: func(uuid.UUID, map[string]any) error { return errors.New("boom") },
 	}
 
@@ -442,9 +452,15 @@ func TestUpdatePostIt_KeepsCacheWhenTheWriteFails(t *testing.T) {
 		},
 	}
 
-	svc := New(db, cache, &mocks.MockExecuter{}, &mocks.MockSecretResolver{})
+	svc := newService(db, cache, nil)
 
-	if err := svc.UpdatePostIt(uuid.New(), map[string]any{"rate": 60}); err == nil {
+	if err := svc.UpdatePostIt(boardOwner, id, map[string]any{"rate": 60}); err == nil {
 		t.Fatal("expected the write error to surface")
+	}
+}
+
+func existingCard(id uuid.UUID) func(uuid.UUID) (*models.PostIts, error) {
+	return func(uuid.UUID) (*models.PostIts, error) {
+		return &models.PostIts{Id: id, Board: uuid.New(), RunAs: boardOwner.ID}, nil
 	}
 }
