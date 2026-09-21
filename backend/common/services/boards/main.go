@@ -7,11 +7,12 @@ import (
 )
 
 type BoardService struct {
-	db infrastructure.Database
+	db      infrastructure.Database
+	secrets infrastructure.ScopePurger
 }
 
-func New(db infrastructure.Database) *BoardService {
-	return &BoardService{db}
+func New(db infrastructure.Database, secrets infrastructure.ScopePurger) *BoardService {
+	return &BoardService{db, secrets}
 }
 
 func (srv *BoardService) GetUserBoards(cognito_id string) ([]models.Board, error) {
@@ -27,7 +28,26 @@ func (srv *BoardService) CreateBoard(name, owner string) (*models.Board, error) 
 }
 
 func (srv *BoardService) DeleteBoard(id uuid.UUID) error {
-	return srv.db.DeleteBoard(id)
+	board, err := srv.db.FindBoard(id)
+	if err != nil {
+		return err
+	}
+
+	if err := srv.db.DeleteBoard(id); err != nil {
+		return err
+	}
+
+	if err := srv.secrets.Purge(models.BoardScope(id)); err != nil {
+		return err
+	}
+
+	for _, user := range append([]string{board.Owner}, board.Collaborators...) {
+		if err := srv.secrets.Purge(models.MemberScope(id, user)); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (srv *BoardService) GetBoardPostIts(id uuid.UUID) ([]models.PostIts, error) {
@@ -39,17 +59,21 @@ func (srv *BoardService) AddCollaboratorToBoard(boardID uuid.UUID, cognitoID str
 }
 
 func (srv *BoardService) RemoveCollaboratorFromBoard(boardID uuid.UUID, cognitoID string) error {
-	return srv.db.RemoveCollaboratorFromBoard(boardID, cognitoID)
+	if err := srv.db.RemoveCollaboratorFromBoard(boardID, cognitoID); err != nil {
+		return err
+	}
+
+	return srv.secrets.Purge(models.MemberScope(boardID, cognitoID))
 }
 
 func (srv *BoardService) UpdateBoardName(id uuid.UUID, name string) error {
 	return srv.db.UpdateBoardName(id, name)
 }
 
-func (srv *BoardService) ConnectPostIts(boardID, source, target uuid.UUID) error {
+func (srv *BoardService) ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error) {
 	return srv.db.ConnectPostIts(boardID, source, target)
 }
 
-func (srv *BoardService) DisconnectPostIts(boardID, source, target uuid.UUID) error {
-	return srv.db.DisconnectPostIts(boardID, source, target)
+func (srv *BoardService) DisconnectPostIts(boardID, strandID uuid.UUID) error {
+	return srv.db.DisconnectPostIts(boardID, strandID)
 }

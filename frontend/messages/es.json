@@ -18,7 +18,10 @@
 		"crypto_price": "Precio Cripto",
 		"air_quality": "Calidad del Aire",
 		"github_repo": "Repositorio GitHub",
-		"exchange_rate": "Cotización"
+		"exchange_rate": "Cotización",
+		"gmail_inbox": "Bandeja de Gmail",
+		"google_calendar": "Calendario de Google",
+		"nasa_apod": "Foto del Día de la NASA"
 	},
 	"secrets": {
 		"title": "Credenciales del tablero",
@@ -56,6 +59,19 @@
 		"username": "Usuario",
 		"password": "Contraseña",
 		"pick_credential": "Elegí una credencial",
-		"no_credentials": "El tablero no tiene credenciales. Cargá una primero."
+		"no_credentials": "El tablero no tiene credenciales. Cargá una primero.",
+		"connect_account": "Conectar una cuenta",
+		"provider": "Proveedor",
+		"connect": "Conectar",
+		"connect_hint": "Te vamos a enviar al proveedor para iniciar sesión y aprobar el acceso. Solo se guardan tokens; la credencial de aplicación es de la plataforma.",
+		"tab_board": "Del tablero",
+		"tab_mine": "Solo mías",
+		"mine_hint": "Credenciales que guardás en este tablero para vos. Nadie más del tablero puede verlas ni usarlas en una tarjeta; se eliminan si dejás el tablero.",
+		"empty_mine": "No tenés credenciales propias en este tablero.",
+		"origin_board": "Del tablero",
+		"origin_mine": "Mías en este tablero",
+		"origin_profile": "Mi perfil",
+		"origin_group": "Grupos",
+		"origin_shared": "Compartidas conmigo"
 	}
 }

@@ -45,7 +45,10 @@ func (e *DewIt) Execute(postit *models.PostIts) (any, error) {
 		}
 	}
 
-	res, err := e.request(postit.Resource, postit.Request.Method, postit.Request.Queries, postit.Request.Headers)
+	ctx, cancel := context.WithTimeout(context.Background(), safehttp.REQUEST_TIMEOUT)
+	defer cancel()
+
+	res, err := e.request(ctx, postit.Resource, postit.Request.Method, postit.Request.Queries, postit.Request.Headers)
 	if err != nil {
 		return nil, err
 	}
@@ -77,10 +80,7 @@ func (*DewIt) populate(input, out map[string]string) error {
 	return nil
 }
 
-func (*DewIt) request(resource *url.URL, method string, queries, headers map[string]string) (*http.Response, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), safehttp.REQUEST_TIMEOUT)
-	defer cancel()
-
+func (*DewIt) request(ctx context.Context, resource *url.URL, method string, queries, headers map[string]string) (*http.Response, error) {
 	target := *resource
 
 	q := target.Query()
@@ -105,7 +105,7 @@ func (*DewIt) request(resource *url.URL, method string, queries, headers map[str
 
 	if res.StatusCode != http.StatusOK {
 		res.Body.Close()
-		return nil, fmt.Errorf("Resource didn't return 200")
+		return nil, fmt.Errorf("Resource returned %d", res.StatusCode)
 	}
 
 	return res, nil

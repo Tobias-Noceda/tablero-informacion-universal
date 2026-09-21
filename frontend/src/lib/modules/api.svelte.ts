@@ -1,14 +1,19 @@
 import { error } from '@sveltejs/kit';
 import { SvelteURL } from 'svelte/reactivity';
 
+// There is no authentication yet: every request identifies itself as this
+// placeholder, the same one boards are created with.
+export const CURRENT_USER = 'Messi';
+
 function resolvePath(path: `/${string}`) {
+	const apiUrl = import.meta.env.VITE_API_URL || window?.location.href || 'http://localhost:31126'; // Default to localhost if API_URL is not set
 	try {
 		// Check if the path is a valid URL
 		return new SvelteURL(path);
 	} catch (e) {
 		if (!(e instanceof TypeError)) throw e;
 		// Assume it's a relative path (/api/...)
-		return new SvelteURL(`http://localhost:31126${path}`);
+		return new SvelteURL("/api" + path, apiUrl);
 	}
 }
 
@@ -75,7 +80,7 @@ export function patch(path: `/${string}`, body: unknown, options?: RequestInit, 
 	});
 };
 
-export function del(path: `/${string}`, options?: RequestInit, fetchFn: typeof fetch = fetch): Promise<Response> {
+export function del(path: `/${string}`, body?: unknown, options?: RequestInit, fetchFn: typeof fetch = fetch): Promise<Response> {
 	const url = resolvePath(path);
 
 	return fetchFn(new SvelteURL(url), {
@@ -83,6 +88,7 @@ export function del(path: `/${string}`, options?: RequestInit, fetchFn: typeof f
 		method: 'DELETE',
 		headers: {
 			...options?.headers,
-		}
+		},
+		body: body ? JSON.stringify(body) : undefined
 	});
 };

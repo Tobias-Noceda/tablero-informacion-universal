@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
@@ -18,15 +19,15 @@ type MockDB struct {
 	FindBoardPostItsFn            func(id uuid.UUID) ([]models.PostIts, error)
 	FindPostItFn                  func(id uuid.UUID) (*models.PostIts, error)
 	FindBoardFn                   func(id uuid.UUID) (*models.Board, error)
-	DeletePostItFn                func(id uuid.UUID) error
+	DeletePostItFn                func(id uuid.UUID) ([]models.Strand, error)
 	DeleteBoardFn                 func(id uuid.UUID) error
 	UpdatePostItFn                func(id uuid.UUID, set map[string]any) error
 	CreatePostItFn                func(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
 	CreateBoardFn                 func(name, owner string) (*models.Board, error)
 	AddCollaboratorToBoardFn      func(boardID uuid.UUID, cognitoID string) error
 	RemoveCollaboratorFromBoardFn func(boardID uuid.UUID, cognitoID string) error
-	DisconnectPostItsFn           func(boardID, source, target uuid.UUID) error
-	ConnectPostItsFn              func(boardID, source, target uuid.UUID) error
+	DisconnectPostItsFn           func(boardID, strandID uuid.UUID) error
+	ConnectPostItsFn              func(boardID, source, target uuid.UUID) (*models.Strand, error)
 	MovePostItFn                  func(boardID, postItID uuid.UUID, pos models.Position) error
 	UpdateBoardNameFn             func(id uuid.UUID, name string) error
 }
@@ -61,11 +62,11 @@ func (m *MockDB) FindBoard(id uuid.UUID) (*models.Board, error) {
 	return nil, nil
 }
 
-func (m *MockDB) DeletePostIt(id uuid.UUID) error {
+func (m *MockDB) DeletePostIt(id uuid.UUID) ([]models.Strand, error) {
 	if m.DeletePostItFn != nil {
 		return m.DeletePostItFn(id)
 	}
-	return nil
+	return nil, nil
 }
 
 func (m *MockDB) DeleteBoard(id uuid.UUID) error {
@@ -110,18 +111,18 @@ func (m *MockDB) RemoveCollaboratorFromBoard(boardID uuid.UUID, cognitoID string
 	return nil
 }
 
-func (m *MockDB) DisconnectPostIts(boardID, source, target uuid.UUID) error {
+func (m *MockDB) DisconnectPostIts(boardID, strandID uuid.UUID) error {
 	if m.DisconnectPostItsFn != nil {
-		return m.DisconnectPostItsFn(boardID, source, target)
+		return m.DisconnectPostItsFn(boardID, strandID)
 	}
 	return nil
 }
 
-func (m *MockDB) ConnectPostIts(boardID, source, target uuid.UUID) error {
+func (m *MockDB) ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error) {
 	if m.ConnectPostItsFn != nil {
 		return m.ConnectPostItsFn(boardID, source, target)
 	}
-	return nil
+	return nil, nil
 }
 
 func (m *MockDB) MovePostIt(boardID, postItID uuid.UUID, pos models.Position) error {
@@ -199,23 +200,72 @@ func (m *MockExecuter) Execute(postit *models.PostIts) (any, error) {
 }
 
 type MockSecretResolver struct {
-	ResolveFn func(board uuid.UUID, names []string) (map[string]string, error)
+	ResolveFn   func(scope models.SecretScope, names []string) (map[string]string, error)
+	ResolveAsFn func(principal models.Principal, board uuid.UUID, refs []models.SecretRef) (map[models.SecretRef]string, error)
+	CanBindFn   func(principal models.Principal, board uuid.UUID, refs []models.SecretRef) error
 }
 
 var _ infrastructure.SecretResolver = (*MockSecretResolver)(nil)
 
-func (m *MockSecretResolver) Resolve(board uuid.UUID, names []string) (map[string]string, error) {
+func (m *MockSecretResolver) Resolve(scope models.SecretScope, names []string) (map[string]string, error) {
 	if m.ResolveFn != nil {
-		return m.ResolveFn(board, names)
+		return m.ResolveFn(scope, names)
 	}
 	return nil, nil
 }
 
+func (m *MockSecretResolver) ResolveAs(principal models.Principal, board uuid.UUID, refs []models.SecretRef) (map[models.SecretRef]string, error) {
+	if m.ResolveAsFn != nil {
+		return m.ResolveAsFn(principal, board, refs)
+	}
+	return nil, nil
+}
+
+func (m *MockSecretResolver) CanBind(principal models.Principal, board uuid.UUID, refs []models.SecretRef) error {
+	if m.CanBindFn != nil {
+		return m.CanBindFn(principal, board, refs)
+	}
+	return nil
+}
+
+// MockScopePolicy allows everything unless told otherwise.
+type MockScopePolicy struct {
+	CanManageFn func(principal models.Principal, scope models.SecretScope) error
+	CanViewFn   func(principal models.Principal, scope models.SecretScope) error
+	CanUseFn    func(principal models.Principal, board uuid.UUID, secret *models.Secret) error
+}
+
+var _ infrastructure.ScopePolicy = (*MockScopePolicy)(nil)
+
+func (m *MockScopePolicy) CanManage(principal models.Principal, scope models.SecretScope) error {
+	if m.CanManageFn != nil {
+		return m.CanManageFn(principal, scope)
+	}
+	return nil
+}
+
+func (m *MockScopePolicy) CanView(principal models.Principal, scope models.SecretScope) error {
+	if m.CanViewFn != nil {
+		return m.CanViewFn(principal, scope)
+	}
+	return nil
+}
+
+func (m *MockScopePolicy) CanUse(principal models.Principal, board uuid.UUID, secret *models.Secret) error {
+	if m.CanUseFn != nil {
+		return m.CanUseFn(principal, board, secret)
+	}
+	return nil
+}
+
 type MockSecretStore struct {
-	UpsertSecretFn func(secret *models.Secret) error
-	FindSecretsFn  func(board uuid.UUID, names []string) ([]models.Secret, error)
-	ListSecretsFn  func(board uuid.UUID) ([]models.Secret, error)
-	DeleteSecretFn func(board uuid.UUID, name string) error
+	UpsertSecretFn  func(secret *models.Secret) error
+	FindSecretsFn   func(scope models.SecretScope, names []string) ([]models.Secret, error)
+	ListSecretsFn   func(scope models.SecretScope) ([]models.Secret, error)
+	DeleteSecretFn  func(scope models.SecretScope, name string) error
+	DeleteSecretsFn func(scope models.SecretScope) error
+	SetGrantsFn     func(scope models.SecretScope, name string, grants []models.Grant) error
+	FindGrantedFn   func(audiences []models.Audience) ([]models.Secret, error)
 }
 
 var _ infrastructure.SecretStore = (*MockSecretStore)(nil)
@@ -227,25 +277,46 @@ func (m *MockSecretStore) UpsertSecret(secret *models.Secret) error {
 	return nil
 }
 
-func (m *MockSecretStore) FindSecrets(board uuid.UUID, names []string) ([]models.Secret, error) {
+func (m *MockSecretStore) FindSecrets(scope models.SecretScope, names []string) ([]models.Secret, error) {
 	if m.FindSecretsFn != nil {
-		return m.FindSecretsFn(board, names)
+		return m.FindSecretsFn(scope, names)
 	}
 	return nil, nil
 }
 
-func (m *MockSecretStore) ListSecrets(board uuid.UUID) ([]models.Secret, error) {
+func (m *MockSecretStore) ListSecrets(scope models.SecretScope) ([]models.Secret, error) {
 	if m.ListSecretsFn != nil {
-		return m.ListSecretsFn(board)
+		return m.ListSecretsFn(scope)
 	}
 	return nil, nil
 }
 
-func (m *MockSecretStore) DeleteSecret(board uuid.UUID, name string) error {
+func (m *MockSecretStore) DeleteSecret(scope models.SecretScope, name string) error {
 	if m.DeleteSecretFn != nil {
-		return m.DeleteSecretFn(board, name)
+		return m.DeleteSecretFn(scope, name)
 	}
 	return nil
+}
+
+func (m *MockSecretStore) DeleteSecrets(scope models.SecretScope) error {
+	if m.DeleteSecretsFn != nil {
+		return m.DeleteSecretsFn(scope)
+	}
+	return nil
+}
+
+func (m *MockSecretStore) SetGrants(scope models.SecretScope, name string, grants []models.Grant) error {
+	if m.SetGrantsFn != nil {
+		return m.SetGrantsFn(scope, name, grants)
+	}
+	return nil
+}
+
+func (m *MockSecretStore) FindGranted(audiences []models.Audience) ([]models.Secret, error) {
+	if m.FindGrantedFn != nil {
+		return m.FindGrantedFn(audiences)
+	}
+	return nil, nil
 }
 
 // MockTokenClient is a configurable test double for infrastructure.TokenClient.
@@ -316,4 +387,81 @@ func (m *MockHandshakeStore) Take(key string) ([]byte, error) {
 	}
 	delete(m.entries, key)
 	return value, nil
+}
+
+type MockScopePurger struct {
+	PurgeFn func(scope models.SecretScope) error
+}
+
+var _ infrastructure.ScopePurger = (*MockScopePurger)(nil)
+
+func (m *MockScopePurger) Purge(scope models.SecretScope) error {
+	if m.PurgeFn != nil {
+		return m.PurgeFn(scope)
+	}
+	return nil
+}
+
+// MemoryGroupStore is a GroupStore over a slice, enough for a service test.
+type MemoryGroupStore struct {
+	Groups []models.Group
+}
+
+var _ infrastructure.GroupStore = (*MemoryGroupStore)(nil)
+
+func (m *MemoryGroupStore) CreateGroup(group *models.Group) error {
+	m.Groups = append(m.Groups, *group)
+	return nil
+}
+
+func (m *MemoryGroupStore) FindGroup(id uuid.UUID) (*models.Group, error) {
+	for i := range m.Groups {
+		if m.Groups[i].Id == id {
+			group := m.Groups[i]
+			return &group, nil
+		}
+	}
+	return nil, infrastructure.ErrGroupNotFound
+}
+
+func (m *MemoryGroupStore) FindUserGroups(userID string) ([]models.Group, error) {
+	var out []models.Group
+	for _, group := range m.Groups {
+		if group.IsMember(userID) {
+			out = append(out, group)
+		}
+	}
+	return out, nil
+}
+
+func (m *MemoryGroupStore) DeleteGroup(id uuid.UUID) error {
+	for i := range m.Groups {
+		if m.Groups[i].Id == id {
+			m.Groups = append(m.Groups[:i], m.Groups[i+1:]...)
+			return nil
+		}
+	}
+	return infrastructure.ErrGroupNotFound
+}
+
+func (m *MemoryGroupStore) AddGroupMember(id uuid.UUID, userID string) error {
+	for i := range m.Groups {
+		if m.Groups[i].Id == id {
+			if !slices.Contains(m.Groups[i].Members, userID) {
+				m.Groups[i].Members = append(m.Groups[i].Members, userID)
+			}
+			return nil
+		}
+	}
+	return infrastructure.ErrGroupNotFound
+}
+
+func (m *MemoryGroupStore) RemoveGroupMember(id uuid.UUID, userID string) error {
+	for i := range m.Groups {
+		if m.Groups[i].Id == id {
+			m.Groups[i].Members = slices.DeleteFunc(m.Groups[i].Members, func(u string) bool { return u == userID })
+			return nil
+		}
+	}
+	return infrastructure.ErrGroupNotFound
 }

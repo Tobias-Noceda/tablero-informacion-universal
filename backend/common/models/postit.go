@@ -13,10 +13,16 @@ type Request struct {
 	Body    string            `bson:"body" json:"body"`
 }
 
+type Title struct {
+	Text string `bson:"text" json:"text"`
+	Vars bool   `bson:"vars" json:"vars"`
+}
+
 type PostIts struct {
 	Id        uuid.UUID         `bson:"_id" json:"id"`
 	Board     uuid.UUID         `bson:"board" json:"board"`
-	Params    map[string]string `bson:"params" json:"params"` // Soon, I promise you will really shine
+	Title     Title             `bson:"title" json:"title"`
+	Params    map[string]string `bson:"params" json:"params"`
 	WellKnown string            `bson:"wellknown" json:"wellknown"`
 	Resource  *url.URL          `bson:"resource" json:"resource"`
 	Request   Request           `bson:"request" json:"request"`
@@ -24,4 +30,11 @@ type PostIts struct {
 	Query     map[string]string `bson:"query" json:"query"`       // An object of key:query to map to, either with jq or jquery
 	Rate      int               `bson:"rate" json:"rate"`         // A rate-less post-it should only be updated on creation
 	Envs      []Envs            `bson:"envs" json:"envs"`         // Board + Post-it defined env variables
+
+	// Whose credentials the card runs with: whoever last bound them. Empty
+	// on cards created before this existed, which run as the board owner.
+	RunAs string `bson:"runas" json:"run_as"`
+	// A "$TOKEN" the card uses that does not live in the board's own scope.
+	// Keyed by the token name without the dollar sign.
+	Bindings map[string]SecretRef `bson:"bindings" json:"bindings"`
 }

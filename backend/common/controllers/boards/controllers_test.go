@@ -29,7 +29,7 @@ func setupRouter(db *mocks.MockDB, cache *mocks.MockCache) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 
 	r := gin.New()
-	bs := b_srv.New(db)
+	bs := b_srv.New(db, &mocks.MockScopePurger{})
 	rs := r_srv.New(*bs, cache)
 
 	NewController(bs, rs).RegisterRoutes(r)
@@ -79,8 +79,8 @@ func TestCreateBoard_MissingFields(t *testing.T) {
 func TestGetUserBoards_MissingCognitoID(t *testing.T) {
 	r := setupRouter(nil, nil)
 	w := do(r, http.MethodGet, "/boards", "")
-	if w.Code != http.StatusInternalServerError {
-		t.Fatalf("status = %d, want 500 (missing cognito_id)", w.Code)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (missing cognito_id)", w.Code)
 	}
 }
 
@@ -105,17 +105,17 @@ func TestConnectPostIts_OK(t *testing.T) {
 	board, src, tgt := uuid.New(), uuid.New(), uuid.New()
 	var gb, gs, gt uuid.UUID
 	db := &mocks.MockDB{
-		ConnectPostItsFn: func(b, s, t uuid.UUID) error {
+		ConnectPostItsFn: func(b, s, t uuid.UUID) (*models.Strand, error) {
 			gb, gs, gt = b, s, t
-			return nil
+			return &models.Strand{Id: uuid.New(), Source: s, Target: t}, nil
 		},
 	}
 	r := setupRouter(db, nil)
 
 	body := `{"source":"` + src.String() + `","target":"` + tgt.String() + `"}`
 	w := do(r, http.MethodPost, "/boards/"+board.String()+"/strands", body)
-	if w.Code != http.StatusNoContent {
-		t.Fatalf("status = %d, want 204 (body: %s)", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201 (body: %s)", w.Code, w.Body.String())
 	}
 	if gb != board || gs != src || gt != tgt {
 		t.Errorf("connected (%v,%v,%v), want (%v,%v,%v)", gb, gs, gt, board, src, tgt)
@@ -131,18 +131,17 @@ func TestConnectPostIts_InvalidBoardUUID(t *testing.T) {
 }
 
 func TestDisconnectPostIts_OK(t *testing.T) {
-	board, src, tgt := uuid.New(), uuid.New(), uuid.New()
+	board, strand := uuid.New(), uuid.New()
 	called := false
 	db := &mocks.MockDB{
-		DisconnectPostItsFn: func(b, s, t uuid.UUID) error {
+		DisconnectPostItsFn: func(b, s uuid.UUID) error {
 			called = true
 			return nil
 		},
 	}
 	r := setupRouter(db, nil)
 
-	body := `{"source":"` + src.String() + `","target":"` + tgt.String() + `"}`
-	w := do(r, http.MethodDelete, "/boards/"+board.String()+"/strands", body)
+	w := do(r, http.MethodDelete, "/boards/"+board.String()+"/strands/"+strand.String(), "")
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204 (body: %s)", w.Code, w.Body.String())
 	}
@@ -192,6 +191,9 @@ func TestAddCollaborator_OK(t *testing.T) {
 func TestDeleteBoard_OK(t *testing.T) {
 	called := false
 	db := &mocks.MockDB{
+		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
+			return &models.Board{Id: id, Owner: "owner"}, nil
+		},
 		DeleteBoardFn: func(_ uuid.UUID) error {
 			called = true
 			return nil
@@ -306,8 +308,8 @@ func TestRemoveCollaborator_MissingField(t *testing.T) {
 
 func TestConnectPostIts_ServiceError(t *testing.T) {
 	db := &mocks.MockDB{
-		ConnectPostItsFn: func(_, _, _ uuid.UUID) error {
-			return errors.New("mongo: no documents in result")
+		ConnectPostItsFn: func(_, _, _ uuid.UUID) (*models.Strand, error) {
+			return nil, errors.New("mongo: no documents in result")
 		},
 	}
 	r := setupRouter(db, nil)
@@ -330,13 +332,12 @@ func errDB() *mocks.MockDB {
 		AddCollaboratorToBoardFn:      func(uuid.UUID, string) error { return boom },
 		RemoveCollaboratorFromBoardFn: func(uuid.UUID, string) error { return boom },
 		UpdateBoardNameFn:             func(uuid.UUID, string) error { return boom },
-		DisconnectPostItsFn:           func(_, _, _ uuid.UUID) error { return boom },
+		DisconnectPostItsFn:           func(_, _ uuid.UUID) error { return boom },
 	}
 }
 
 func TestBoardHandlers_ServiceErrors(t *testing.T) {
 	id := uuid.New().String()
-	strand := `{"source":"` + uuid.New().String() + `","target":"` + uuid.New().String() + `"}`
 	cases := []struct {
 		name, method, path, body string
 	}{
@@ -346,7 +347,7 @@ func TestBoardHandlers_ServiceErrors(t *testing.T) {
 		{"AddCollaborator", http.MethodPost, "/boards/" + id + "/collaborators", `{"cognito_id":"c"}`},
 		{"RemoveCollaborator", http.MethodDelete, "/boards/" + id + "/collaborators", `{"cognito_id":"c"}`},
 		{"UpdateBoardName", http.MethodPatch, "/boards/" + id + "/name", `{"name":"N"}`},
-		{"DisconnectPostIts", http.MethodDelete, "/boards/" + id + "/strands", strand},
+		{"DisconnectPostIts", http.MethodDelete, "/boards/" + id + "/strands/" + id, ""},
 	}
 
 	for _, tc := range cases {
@@ -361,6 +362,7 @@ func TestBoardHandlers_ServiceErrors(t *testing.T) {
 }
 
 func TestBoardHandlers_InvalidUUID(t *testing.T) {
+	id := uuid.New().String()
 	cases := []struct {
 		name, method, path, body string
 	}{
@@ -368,7 +370,8 @@ func TestBoardHandlers_InvalidUUID(t *testing.T) {
 		{"AddCollaborator", http.MethodPost, "/boards/nope/collaborators", `{"cognito_id":"c"}`},
 		{"RemoveCollaborator", http.MethodDelete, "/boards/nope/collaborators", `{"cognito_id":"c"}`},
 		{"UpdateBoardName", http.MethodPatch, "/boards/nope/name", `{"name":"N"}`},
-		{"DisconnectPostIts", http.MethodDelete, "/boards/nope/strands", `{"source":"` + uuid.New().String() + `","target":"` + uuid.New().String() + `"}`},
+		{"DisconnectPostIts", http.MethodDelete, "/boards/nope/strands/" + id, ""},
+		{"DisconnectPostIts", http.MethodDelete, "/boards/" + id + "/strands/jajant", ""},
 	}
 
 	for _, tc := range cases {
@@ -389,7 +392,6 @@ func TestBoardHandlers_BadBody(t *testing.T) {
 	}{
 		{"AddCollaborator", http.MethodPost, "/boards/" + id + "/collaborators"},
 		{"UpdateBoardName", http.MethodPatch, "/boards/" + id + "/name"},
-		{"DisconnectPostIts", http.MethodDelete, "/boards/" + id + "/strands"},
 	}
 
 	for _, tc := range cases {

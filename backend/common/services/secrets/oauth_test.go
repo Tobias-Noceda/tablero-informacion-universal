@@ -23,7 +23,7 @@ func oauthService(t *testing.T, store *memoryStore, tokens *mocks.MockTokenClien
 	}
 	boards := &mocks.MockDB{
 		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
-			return &models.Board{Id: id, Owner: owner}, nil
+			return &models.Board{Id: id, Owner: owner.ID}, nil
 		},
 	}
 	if tokens == nil {
@@ -32,7 +32,7 @@ func oauthService(t *testing.T, store *memoryStore, tokens *mocks.MockTokenClien
 	if locks == nil {
 		locks = &mocks.MockLocker{}
 	}
-	return New(store, boards, sealer, tokens, locks, &mocks.MockHandshakeStore{})
+	return New(store, NewPolicy(boards, store.groups), crypto.NewKeyring(sealer, store.keys), tokens, locks, &mocks.MockHandshakeStore{}, store.groups)
 }
 
 func clientCredentials() *models.OAuth2Material {
@@ -48,7 +48,7 @@ func clientCredentials() *models.OAuth2Material {
 func TestPutOAuth2_SealsTheClientSecret(t *testing.T) {
 	store := newStore()
 	srv := oauthService(t, store, nil, nil)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	if err := srv.PutOAuth2(board, owner, "SPOTIFY", clientCredentials()); err != nil {
 		t.Fatalf("put: %v", err)
@@ -70,7 +70,7 @@ func TestPutOAuth2_SealsTheClientSecret(t *testing.T) {
 func TestPutOAuth2_IgnoresCallerSuppliedTokens(t *testing.T) {
 	store := newStore()
 	srv := oauthService(t, store, nil, nil)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	material := clientCredentials()
 	material.AccessToken = "planted"
@@ -98,7 +98,7 @@ func TestPutOAuth2_IgnoresCallerSuppliedTokens(t *testing.T) {
 func TestPutOAuth2_Rejects(t *testing.T) {
 	store := newStore()
 	srv := oauthService(t, store, nil, nil)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	cases := map[string]func(*models.OAuth2Material){
 		"unknown flow":     func(m *models.OAuth2Material) { m.Flow = "implicit" },
@@ -126,7 +126,7 @@ func TestPutOAuth2_OwnerOnly(t *testing.T) {
 	store := newStore()
 	srv := oauthService(t, store, nil, nil)
 
-	if err := srv.PutOAuth2(uuid.New(), "stranger", "SPOTIFY", clientCredentials()); err == nil {
+	if err := srv.PutOAuth2(models.BoardScope(uuid.New()), stranger, "SPOTIFY", clientCredentials()); err == nil {
 		t.Error("a stranger configured an OAuth2 credential")
 	}
 }
@@ -145,7 +145,7 @@ func TestResolve_OAuth2FetchesAndReturnsBearer(t *testing.T) {
 		},
 	}
 	srv := oauthService(t, store, tokens, nil)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	if err := srv.PutOAuth2(board, owner, "SPOTIFY", clientCredentials()); err != nil {
 		t.Fatalf("put: %v", err)
@@ -176,7 +176,7 @@ func TestResolve_OAuth2CachesTheToken(t *testing.T) {
 		},
 	}
 	srv := oauthService(t, store, tokens, nil)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	_ = srv.PutOAuth2(board, owner, "SPOTIFY", clientCredentials())
 
@@ -205,7 +205,7 @@ func TestResolve_OAuth2RenewsWithinMargin(t *testing.T) {
 		},
 	}
 	srv := oauthService(t, store, tokens, nil)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	_ = srv.PutOAuth2(board, owner, "SPOTIFY", clientCredentials())
 
@@ -233,7 +233,7 @@ func TestResolve_OAuth2PersistsRotatedRefreshToken(t *testing.T) {
 		},
 	}
 	srv := oauthService(t, store, tokens, nil)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	_ = srv.PutOAuth2(board, owner, "SPOTIFY", clientCredentials())
 	if _, err := srv.Resolve(board, []string{"SPOTIFY"}); err != nil {
@@ -268,7 +268,7 @@ func TestResolve_OAuth2DoesNotRefreshWithoutTheLock(t *testing.T) {
 		AcquireFn: func(string, time.Duration) (string, bool, error) { return "", false, nil },
 	}
 	srv := oauthService(t, store, tokens, locks)
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	_ = srv.PutOAuth2(board, owner, "SPOTIFY", clientCredentials())
 
@@ -287,7 +287,7 @@ func TestResolve_OAuth2DoesNotRefreshWithoutTheLock(t *testing.T) {
 // The winner writes a usable token; the loser re-reads it instead of failing.
 func TestResolve_OAuth2LoserPicksUpTheWinnersToken(t *testing.T) {
 	store := newStore()
-	board := uuid.New()
+	board := models.BoardScope(uuid.New())
 
 	// Seed a credential that still needs a token, then let a winner refresh it
 	// into a second, usable revision.
@@ -312,7 +312,7 @@ func TestResolve_OAuth2LoserPicksUpTheWinnersToken(t *testing.T) {
 	// The loser's first read is the stale revision, so it tries to refresh;
 	// it loses the lock, re-reads, and finds what the winner stored.
 	reads := 0
-	store.FindSecretsFn = func(_ uuid.UUID, _ []string) ([]models.Secret, error) {
+	store.FindSecretsFn = func(models.SecretScope, []string) ([]models.Secret, error) {
 		reads++
 		if reads == 1 {
 			return []models.Secret{stale}, nil

@@ -1,7 +1,9 @@
 package boards
 
 import (
+	"log/slog"
 	"net/http"
+	"os"
 
 	p_srv "github.com/Secreto31126/tesis/common/services/boards"
 	r_srv "github.com/Secreto31126/tesis/common/services/realtime"
@@ -12,10 +14,12 @@ import (
 type Controller struct {
 	service  *p_srv.BoardService
 	realtime *r_srv.RealTimeService
+	logger   *slog.Logger
 }
 
 func NewController(boards *p_srv.BoardService, realtime *r_srv.RealTimeService) *Controller {
-	return &Controller{boards, realtime}
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	return &Controller{boards, realtime, logger}
 }
 
 func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
@@ -32,7 +36,7 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 		boardGroup.DELETE("/:id/collaborators", ctrl.RemoveCollaborator)
 
 		boardGroup.POST("/:id/strands", ctrl.ConnectPostIts)
-		boardGroup.DELETE("/:id/strands", ctrl.DisconnectPostIts)
+		boardGroup.DELETE("/:id/strands/:strand", ctrl.DisconnectPostIts)
 
 		boardGroup.PATCH("/:id/name", ctrl.UpdateBoardName)
 
@@ -48,12 +52,13 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 // @Produce      json
 // @Param        cognito_id  path      string  true  "AWS Cognito User ID"
 // @Success      200         {array}   models.Board
+// @Failure      400         {object}  map[string]string{"error": "string"}
 // @Failure      500         {object}  map[string]string{"error": "string"}
 // @Router       /boards/user/{cognito_id} [get]
 func (ctrl *Controller) GetUserBoards(c *gin.Context) {
 	cognitoID, exists := c.GetQuery("cognito_id")
 	if !exists {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Missing cognito_id",
 		})
 		return
@@ -61,6 +66,7 @@ func (ctrl *Controller) GetUserBoards(c *gin.Context) {
 
 	boards, err := ctrl.service.GetUserBoards(cognitoID)
 	if err != nil {
+		ctrl.logger.Error("Failed to find boards", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
 		})
@@ -330,7 +336,7 @@ func (ctrl *Controller) UpdateBoardName(c *gin.Context) {
 // @Accept       json
 // @Param        id       path      string         true  "Board UUID" format(uuid)
 // @Param        request  body      StrandRequest  true  "Strand payload"
-// @Success      204      "No Content"
+// @Success      201      {object}  models.Strand
 // @Failure      400      {object}  map[string]string{"error": "string"}
 // @Failure      500      {object}  map[string]string{"error": "string"}
 // @Router       /boards/{id}/strands [post]
@@ -354,7 +360,7 @@ func (ctrl *Controller) ConnectPostIts(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.service.ConnectPostIts(id, req.Source, req.Target)
+	strand, err := ctrl.service.ConnectPostIts(id, req.Source, req.Target)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
@@ -362,7 +368,7 @@ func (ctrl *Controller) ConnectPostIts(c *gin.Context) {
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusCreated, strand)
 }
 
 // DisconnectPostIts godoc
@@ -370,12 +376,13 @@ func (ctrl *Controller) ConnectPostIts(c *gin.Context) {
 // @Description  Removes the strand (connection) between a source and target post-it on a board.
 // @Tags         boards, strands
 // @Accept       json
-// @Param        id       path      string         true  "Board UUID" format(uuid)
+// @Param        id       path      string         true  "Board UUID"  format(uuid)
+// @Param        strand   path      string         true  "Strand UUID" format(uuid)
 // @Param        request  body      StrandRequest  true  "Strand payload"
 // @Success      204      "No Content"
 // @Failure      400      {object}  map[string]string{"error": "string"}
 // @Failure      500      {object}  map[string]string{"error": "string"}
-// @Router       /boards/{id}/strands [delete]
+// @Router       /boards/{id}/strands/{strand} [delete]
 func (ctrl *Controller) DisconnectPostIts(c *gin.Context) {
 	idParam := c.Param("id")
 
@@ -387,16 +394,17 @@ func (ctrl *Controller) DisconnectPostIts(c *gin.Context) {
 		return
 	}
 
-	var req StrandRequest
+	strandIdParam := c.Param("strand")
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	strand, err := uuid.Parse(strandIdParam)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
+			"error": "invalid uuid",
 		})
 		return
 	}
 
-	err = ctrl.service.DisconnectPostIts(id, req.Source, req.Target)
+	err = ctrl.service.DisconnectPostIts(id, strand)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),

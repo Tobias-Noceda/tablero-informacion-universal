@@ -1,6 +1,7 @@
 package boards
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/Secreto31126/tesis/common/mocks"
@@ -17,7 +18,7 @@ func TestCreateBoard_Delegates(t *testing.T) {
 		},
 	}
 
-	svc := New(db)
+	svc := New(db, &purgeRecorder{})
 	board, err := svc.CreateBoard("My Board", "owner-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -34,14 +35,14 @@ func TestConnectPostIts_Delegates(t *testing.T) {
 	board, src, tgt := uuid.New(), uuid.New(), uuid.New()
 	var gb, gs, gt uuid.UUID
 	db := &mocks.MockDB{
-		ConnectPostItsFn: func(b, s, t uuid.UUID) error {
+		ConnectPostItsFn: func(b, s, t uuid.UUID) (*models.Strand, error) {
 			gb, gs, gt = b, s, t
-			return nil
+			return &models.Strand{Id: uuid.New(), Source: s, Target: t}, nil
 		},
 	}
 
-	svc := New(db)
-	if err := svc.ConnectPostIts(board, src, tgt); err != nil {
+	svc := New(db, &purgeRecorder{})
+	if _, err := svc.ConnectPostIts(board, src, tgt); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gb != board || gs != src || gt != tgt {
@@ -50,21 +51,21 @@ func TestConnectPostIts_Delegates(t *testing.T) {
 }
 
 func TestDisconnectPostIts_Delegates(t *testing.T) {
-	board, src, tgt := uuid.New(), uuid.New(), uuid.New()
-	var gb, gs, gt uuid.UUID
+	board, strand := uuid.New(), uuid.New()
+	var gb, gs uuid.UUID
 	db := &mocks.MockDB{
-		DisconnectPostItsFn: func(b, s, t uuid.UUID) error {
-			gb, gs, gt = b, s, t
+		DisconnectPostItsFn: func(b, s uuid.UUID) error {
+			gb, gs = b, s
 			return nil
 		},
 	}
 
-	svc := New(db)
-	if err := svc.DisconnectPostIts(board, src, tgt); err != nil {
+	svc := New(db, &purgeRecorder{})
+	if err := svc.DisconnectPostIts(board, strand); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gb != board || gs != src || gt != tgt {
-		t.Errorf("disconnected (%v,%v,%v), want (%v,%v,%v)", gb, gs, gt, board, src, tgt)
+	if gb != board || gs != strand {
+		t.Errorf("disconnected (%v,%v), want (%v,%v)", gb, gs, board, strand)
 	}
 }
 
@@ -79,7 +80,7 @@ func TestGetUserBoards_PropagatesResult(t *testing.T) {
 		},
 	}
 
-	svc := New(db)
+	svc := New(db, &purgeRecorder{})
 	got, err := svc.GetUserBoards("user-x")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -99,7 +100,7 @@ func TestGetBoard_Delegates(t *testing.T) {
 		},
 	}
 
-	board, err := New(db).GetBoard(id)
+	board, err := New(db, &purgeRecorder{}).GetBoard(id)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -119,7 +120,7 @@ func TestGetBoardPostIts_Delegates(t *testing.T) {
 		},
 	}
 
-	got, err := New(db).GetBoardPostIts(id)
+	got, err := New(db, &purgeRecorder{}).GetBoardPostIts(id)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -132,6 +133,9 @@ func TestDeleteBoard_Delegates(t *testing.T) {
 	id := uuid.New()
 	called := false
 	db := &mocks.MockDB{
+		FindBoardFn: func(got uuid.UUID) (*models.Board, error) {
+			return &models.Board{Id: got, Owner: "owner"}, nil
+		},
 		DeleteBoardFn: func(b uuid.UUID) error {
 			if b != id {
 				t.Errorf("board = %v, want %v", b, id)
@@ -141,7 +145,7 @@ func TestDeleteBoard_Delegates(t *testing.T) {
 		},
 	}
 
-	if err := New(db).DeleteBoard(id); err != nil {
+	if err := New(db, &purgeRecorder{}).DeleteBoard(id); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !called {
@@ -163,7 +167,7 @@ func TestCollaborators_Delegate(t *testing.T) {
 		},
 	}
 
-	svc := New(db)
+	svc := New(db, &purgeRecorder{})
 	if err := svc.AddCollaboratorToBoard(id, "c1"); err != nil {
 		t.Fatalf("add: %v", err)
 	}
@@ -184,10 +188,83 @@ func TestUpdateBoardName_Delegates(t *testing.T) {
 		},
 	}
 
-	if err := New(db).UpdateBoardName(uuid.New(), "Renamed"); err != nil {
+	if err := New(db, &purgeRecorder{}).UpdateBoardName(uuid.New(), "Renamed"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotName != "Renamed" {
 		t.Errorf("name = %q, want Renamed", gotName)
+	}
+}
+
+type purgeRecorder struct {
+	purged []models.SecretScope
+}
+
+func (p *purgeRecorder) Purge(scope models.SecretScope) error {
+	p.purged = append(p.purged, scope)
+	return nil
+}
+
+// Deleting a board must also destroy its secrets and the key that encrypted
+// them, or a dump taken later could still be decrypted. What each member kept
+// there for themselves goes with it.
+func TestDeleteBoard_PurgesItsSecrets(t *testing.T) {
+	id := uuid.New()
+	deleted := false
+	db := &mocks.MockDB{
+		FindBoardFn: func(got uuid.UUID) (*models.Board, error) {
+			return &models.Board{Id: got, Owner: "owner", Collaborators: []string{"ana", "bob"}}, nil
+		},
+		DeleteBoardFn: func(got uuid.UUID) error {
+			deleted = got == id
+			return nil
+		},
+	}
+	purger := &purgeRecorder{}
+
+	if err := New(db, purger).DeleteBoard(id); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if !deleted {
+		t.Error("the board itself was not deleted")
+	}
+
+	want := []models.SecretScope{
+		models.BoardScope(id),
+		models.MemberScope(id, "owner"),
+		models.MemberScope(id, "ana"),
+		models.MemberScope(id, "bob"),
+	}
+	if len(purger.purged) != len(want) {
+		t.Fatalf("purged %v, want %v", purger.purged, want)
+	}
+	for _, scope := range want {
+		if !slices.Contains(purger.purged, scope) {
+			t.Errorf("%s was not purged", scope.Key())
+		}
+	}
+}
+
+// A collaborator who leaves takes nothing with them: what they kept on the
+// board is destroyed, not left for the next person with the same id.
+func TestRemoveCollaborator_PurgesWhatTheyKeptOnTheBoard(t *testing.T) {
+	id := uuid.New()
+	removed := false
+	db := &mocks.MockDB{
+		RemoveCollaboratorFromBoardFn: func(got uuid.UUID, user string) error {
+			removed = got == id && user == "ana"
+			return nil
+		},
+	}
+	purger := &purgeRecorder{}
+
+	if err := New(db, purger).RemoveCollaboratorFromBoard(id, "ana"); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	if !removed {
+		t.Error("the collaborator was not removed")
+	}
+	if len(purger.purged) != 1 || purger.purged[0] != models.MemberScope(id, "ana") {
+		t.Errorf("purged %v, want the member scope", purger.purged)
 	}
 }

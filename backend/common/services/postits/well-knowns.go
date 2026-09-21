@@ -8,23 +8,21 @@ import (
 	"github.com/Secreto31126/tesis/common/models"
 )
 
-// func objectFilter(input map[string]any, keys ...string) map[string]any {
-// 	data := make(map[string]any)
-
-// 	for _, key := range keys {
-// 		if val, ok := input[key]; ok {
-// 			data[key] = val
-// 		}
-// 	}
-
-// 	return data
-// }
+// wellKnown is a post-it template plus the platform credentials it needs.
+// Those never reach the stored post-it: the template only carries a lowercase
+// placeholder, and the secret is looked up by name when the post-it runs.
+type wellKnown struct {
+	template      models.PostIts
+	systemSecrets map[string]models.SystemSecretName
+}
 
 func findWellKnown(key string, params map[string]string) (*models.PostIts, error) {
-	wk, ok := configuredPostIts[key]
+	def, ok := configuredPostIts[key]
 	if !ok {
 		return nil, fmt.Errorf("Well Known post-it not found")
 	}
+
+	wk := def.template
 
 	if wk.Request.Queries != nil {
 		wk.Request.Queries = maps.Clone(wk.Request.Queries)
@@ -61,17 +59,51 @@ func getURL(raw string) *url.URL {
 	return res
 }
 
-var configuredPostIts = map[string]models.PostIts{
-	"static_card": {
+var configuredPostIts = map[string]wellKnown{
+	"nasa_apod": {
+		systemSecrets: map[string]models.SystemSecretName{
+			"$api_key": models.SystemNasaApiKey,
+		},
+		template: models.PostIts{
+			WellKnown: "nasa_apod",
+			Resource:  getURL("https://api.nasa.gov/planetary/apod"),
+			Request: models.Request{
+				Method: "GET",
+				Queries: map[string]string{
+					"api_key": "$api_key",
+				},
+				Headers: map[string]string{
+					"Accept": "application/json",
+				},
+			},
+			Response: "json",
+			Query: map[string]string{
+				"title":       ".title",
+				"image":       ".url",
+				"explanation": ".explanation",
+				"date":        ".date",
+			},
+			Rate: 3600,
+		},
+	},
+	"static_card": {template: models.PostIts{
 		WellKnown: "static_card",
+		Title: models.Title{
+			Text: "{{text}}",
+			Vars: true,
+		},
 		Params: map[string]string{
 			"text": "",
 		},
 		Resource: nil,
 		Rate:     0,
-	},
-	"temperature": {
+	}},
+	"temperature": {template: models.PostIts{
 		WellKnown: "temperature",
+		Title: models.Title{
+			Text: "Today's temps are between {{min}}°C and {{max}}°C",
+			Vars: true,
+		},
 		Params: map[string]string{
 			"$latitude":   "-34.6131",
 			"$longitude":  "-58.3772",
@@ -98,9 +130,13 @@ var configuredPostIts = map[string]models.PostIts{
 			"max": ".hourly.temperature_2m | max",
 		},
 		Rate: 30,
-	},
-	"events_search": {
+	}},
+	"events_search": {template: models.PostIts{
 		WellKnown: "events_search",
+		Title: models.Title{
+			Text: "{{sales}}: {{name}}",
+			Vars: true,
+		},
 		Params: map[string]string{
 			"$keyword":    "",
 			"$credential": "",
@@ -124,10 +160,14 @@ var configuredPostIts = map[string]models.PostIts{
 			"image": "._embedded.events[0].images[0].url",
 		},
 		Rate: 120,
-	},
-	"dog_facts": {
+	}},
+	"dog_facts": {template: models.PostIts{
 		WellKnown: "dog_facts",
-		Resource:  getURL("https://dogapi.dog/api/v2/facts"),
+		Title: models.Title{
+			Text: "{{body}}",
+			Vars: true,
+		},
+		Resource: getURL("https://dogapi.dog/api/v2/facts"),
 		Request: models.Request{
 			Method: "GET",
 		},
@@ -136,10 +176,14 @@ var configuredPostIts = map[string]models.PostIts{
 			"body": ".data[0].attributes.body",
 		},
 		Rate: 5,
-	},
-	"dolar_oficial": {
+	}},
+	"dolar_oficial": {template: models.PostIts{
 		WellKnown: "dolar_oficial",
-		Resource:  getURL("https://dolarapi.com/v1/dolares/oficial"),
+		Title: models.Title{
+			Text: "Dolar at {{compra}}",
+			Vars: true,
+		},
+		Resource: getURL("https://dolarapi.com/v1/dolares/oficial"),
 		Request: models.Request{
 			Method: "GET",
 		},
@@ -149,9 +193,13 @@ var configuredPostIts = map[string]models.PostIts{
 			"venta":  ".venta",
 		},
 		Rate: 120,
-	},
-	"exchange_rate": {
+	}},
+	"exchange_rate": {template: models.PostIts{
 		WellKnown: "exchange_rate",
+		Title: models.Title{
+			Text: "{{code}} at {{value}}",
+			Vars: true,
+		},
 		Params: map[string]string{
 			"$base":       "USD",
 			"$currency":   "ARS",
@@ -176,10 +224,14 @@ var configuredPostIts = map[string]models.PostIts{
 			"updated": ".meta.last_updated_at",
 		},
 		Rate: 3600,
-	},
-	"riesgo_pais": {
+	}},
+	"riesgo_pais": {template: models.PostIts{
 		WellKnown: "riesgo_pais",
-		Resource:  getURL("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo"),
+		Title: models.Title{
+			Text: "Argentine's country risk: {{valor}}",
+			Vars: true,
+		},
+		Resource: getURL("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo"),
 		Request: models.Request{
 			Method: "GET",
 			Headers: map[string]string{
@@ -192,9 +244,13 @@ var configuredPostIts = map[string]models.PostIts{
 			"fecha": ".fecha",
 		},
 		Rate: 3600,
-	},
-	"crypto_price": {
+	}},
+	"crypto_price": {template: models.PostIts{
 		WellKnown: "crypto_price",
+		Title: models.Title{
+			Text: "Let's go gambling! {{coin}} at {{price}}",
+			Vars: true,
+		},
 		Params: map[string]string{
 			"$coin":     "bitcoin",
 			"$currency": "usd",
@@ -213,13 +269,18 @@ var configuredPostIts = map[string]models.PostIts{
 		},
 		Response: "json",
 		Query: map[string]string{
+			"coin":   "keys_unsorted[0]",
 			"price":  ".[] | to_entries[] | select(.key | endswith(\"_24h_change\") | not) | .value",
 			"change": ".[] | to_entries[] | select(.key | endswith(\"_24h_change\")) | .value",
 		},
 		Rate: 60,
-	},
-	"air_quality": {
+	}},
+	"air_quality": {template: models.PostIts{
 		WellKnown: "air_quality",
+		Title: models.Title{
+			Text: "Today's air is {{pm25}}",
+			Vars: true,
+		},
 		Params: map[string]string{
 			"$latitude":  "-34.6131",
 			"$longitude": "-58.3772",
@@ -243,9 +304,60 @@ var configuredPostIts = map[string]models.PostIts{
 			"time": ".current.time",
 		},
 		Rate: 900,
-	},
-	"github_repo": {
+	}},
+	"gmail_inbox": {template: models.PostIts{
+		WellKnown: "gmail_inbox",
+		Params: map[string]string{
+			"$credential": "",
+		},
+		Resource: getURL("https://gmail.googleapis.com/gmail/v1/users/me/labels/INBOX"),
+		Request: models.Request{
+			Method: "GET",
+			Headers: map[string]string{
+				"Accept":        "application/json",
+				"Authorization": "$credential",
+			},
+		},
+		Response: "json",
+		Query: map[string]string{
+			"unread": ".messagesUnread",
+			"total":  ".messagesTotal",
+		},
+		Rate: 60,
+	}},
+	"google_calendar": {template: models.PostIts{
+		WellKnown: "google_calendar",
+		Params: map[string]string{
+			"$credential": "",
+			"$time_min":   "",
+		},
+		Resource: getURL("https://www.googleapis.com/calendar/v3/calendars/primary/events"),
+		Request: models.Request{
+			Method: "GET",
+			Queries: map[string]string{
+				"singleEvents": "true",
+				"orderBy":      "startTime",
+				"maxResults":   "50",
+				"timeMin":      "$time_min",
+			},
+			Headers: map[string]string{
+				"Accept":        "application/json",
+				"Authorization": "$credential",
+			},
+		},
+		Response: "json",
+		Query: map[string]string{
+			"summary": "[.items[] | select((.start.dateTime // .start.date) >= (now | todate))] | first | .summary",
+			"start":   "[.items[] | select((.start.dateTime // .start.date) >= (now | todate))] | first | .start.dateTime // .start.date",
+		},
+		Rate: 300,
+	}},
+	"github_repo": {template: models.PostIts{
 		WellKnown: "github_repo",
+		Title: models.Title{
+			Text: "The repo {{name}} has {{stars}} stars and {{issues}} open issues",
+			Vars: true,
+		},
 		Params: map[string]string{
 			"$query": "",
 		},
@@ -271,5 +383,5 @@ var configuredPostIts = map[string]models.PostIts{
 			"description": ".items[0].description",
 		},
 		Rate: 300,
-	},
+	}},
 }

@@ -15,7 +15,7 @@ type Database interface {
 	// Find a given board
 	FindBoard(id uuid.UUID) (*models.Board, error)
 	// Delete a given PostIt
-	DeletePostIt(id uuid.UUID) error
+	DeletePostIt(id uuid.UUID) ([]models.Strand, error)
 	// Delete a given Board
 	DeleteBoard(id uuid.UUID) error
 	// Updates a given PostIt
@@ -29,9 +29,9 @@ type Database interface {
 	// Removes collaborator from board
 	RemoveCollaboratorFromBoard(boardID uuid.UUID, cognitoID string) error
 	// Disconnects a strand
-	DisconnectPostIts(boardID, source, target uuid.UUID) error
+	DisconnectPostIts(boardID, strandID uuid.UUID) error
 	// Connects a Strand
-	ConnectPostIts(boardID, source, target uuid.UUID) error
+	ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error)
 	// Move Post It
 	MovePostIt(boardID, postItID uuid.UUID, pos models.Position) error
 	// Update board's name

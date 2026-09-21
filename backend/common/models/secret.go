@@ -21,33 +21,49 @@ const (
 	SecretBearer SecretKind = "bearer"
 	SecretBasic  SecretKind = "basic"
 	SecretOAuth2 SecretKind = "oauth2"
+	// The platform's own application at a provider. System scope only.
+	SecretOAuth2Client SecretKind = "oauth2_client"
 )
 
 type Secret struct {
-	Id         uuid.UUID  `bson:"_id" json:"id"`
-	Board      uuid.UUID  `bson:"board" json:"board"`
-	Name       string     `bson:"name" json:"name"`
-	Kind       SecretKind `bson:"kind" json:"kind"`
-	Ciphertext []byte     `bson:"ciphertext" json:"-"`
-	Nonce      []byte     `bson:"nonce" json:"-"`
-	KeyVersion int        `bson:"keyversion" json:"-"`
-	CreatedAt  time.Time  `bson:"createdat" json:"created_at"`
-	UpdatedAt  time.Time  `bson:"updatedat" json:"updated_at"`
+	Id         uuid.UUID   `bson:"_id" json:"id"`
+	Scope      SecretScope `bson:"scope" json:"scope"`
+	Name       string      `bson:"name" json:"name"`
+	Kind       SecretKind  `bson:"kind" json:"kind"`
+	Ciphertext []byte      `bson:"ciphertext" json:"-"`
+	Nonce      []byte      `bson:"nonce" json:"-"`
+	KeyID      uuid.UUID   `bson:"keyid" json:"-"`
+	CreatedAt  time.Time   `bson:"createdat" json:"created_at"`
+	UpdatedAt  time.Time   `bson:"updatedat" json:"updated_at"`
 
 	// Which OAuth2 flow this credential uses, and whether a user has already
 	// consented. Both are configuration rather than secrets, so they live in
 	// the clear and a listing does not have to decrypt anything.
-	Flow       string `bson:"flow" json:"flow,omitempty"`
-	Authorized bool   `bson:"authorized" json:"authorized,omitempty"`
+	Flow       string        `bson:"flow" json:"flow,omitempty"`
+	Authorized bool          `bson:"authorized" json:"authorized,omitempty"`
+	Provider   OAuthProvider `bson:"provider" json:"provider,omitempty"`
+
+	// Who else may bind it. Survives a value rewrite and a reseal.
+	Grants []Grant `bson:"grants" json:"grants,omitempty"`
+}
+
+// SecretRef is how a post-it names a secret outside its board: the pair the
+// store keys on, never the value.
+type SecretRef struct {
+	Scope SecretScope `bson:"scope" json:"scope"`
+	Name  string      `bson:"name" json:"name"`
 }
 
 type SecretMeta struct {
-	Name       string     `json:"name"`
-	Kind       SecretKind `json:"kind"`
-	Flow       string     `json:"flow,omitempty"`
-	Authorized bool       `json:"authorized"`
-	CreatedAt  time.Time  `json:"created_at"`
-	UpdatedAt  time.Time  `json:"updated_at"`
+	Scope      SecretScope   `json:"scope"`
+	Name       string        `json:"name"`
+	Kind       SecretKind    `json:"kind"`
+	Flow       string        `json:"flow,omitempty"`
+	Authorized bool          `json:"authorized"`
+	Provider   OAuthProvider `json:"provider,omitempty"`
+	Grants     []Grant       `json:"grants"`
+	CreatedAt  time.Time     `json:"created_at"`
+	UpdatedAt  time.Time     `json:"updated_at"`
 }
 
 func Present(kind SecretKind, value string) string {
@@ -64,10 +80,13 @@ func Present(kind SecretKind, value string) string {
 
 func (s *Secret) Meta() SecretMeta {
 	return SecretMeta{
+		Scope:      s.Scope,
 		Name:       s.Name,
 		Kind:       s.Kind,
 		Flow:       s.Flow,
 		Authorized: s.Authorized,
+		Provider:   s.Provider,
+		Grants:     s.Grants,
 		CreatedAt:  s.CreatedAt,
 		UpdatedAt:  s.UpdatedAt,
 	}

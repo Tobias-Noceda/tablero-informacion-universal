@@ -1,4 +1,4 @@
-/// <reference types="vitest/config" />
+import 'vitest/config';
 import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
@@ -12,6 +12,9 @@ const dirname =
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
+	build: {
+		sourcemap: true
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit(),
