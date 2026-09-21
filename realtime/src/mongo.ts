@@ -26,6 +26,8 @@ export async function close() {
 
 stream
     .on("change", (event) => {
+        console.log(event);
+
         const change = event as typeof event & { operationType: "update" };
 
         const board = change.fullDocument;
