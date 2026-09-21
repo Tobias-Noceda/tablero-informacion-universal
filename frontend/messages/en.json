@@ -18,7 +18,9 @@
 		"crypto_price": "Crypto Price",
 		"air_quality": "Air Quality",
 		"github_repo": "GitHub Repository",
-		"exchange_rate": "Exchange Rate"
+		"exchange_rate": "Exchange Rate",
+		"gmail_inbox": "Gmail Inbox",
+		"google_calendar": "Google Calendar"
 	},
 	"secrets": {
 		"title": "Board credentials",

@@ -1,25 +1,21 @@
-import type { Board } from '$types/api';
+import { uuid } from '$lib/utils';
 
-import { io } from 'socket.io-client';
+import { RTC } from './rtc.svelte';
+import { socket, type Update } from './sockets.svelte';
 
-export type Update = { board: Board; ts: Date };
+export type { Update } from './sockets.svelte';
 
-export async function connect(board: string, peer: string, update: (data: Update) => void) {
-	const socket = io('http://localhost:3000', {
-		path: '/ws',
-		transports: ['websocket'],
-		query: {
-			peer,
-			board
-		}
-	});
+export interface Connection {
+	update(update: [number, number]): void;
+	close(): void;
+}
 
-	const peers = await new Promise<string[]>((resolve, reject) => {
-		socket.on('connect_error', reject);
-		socket.once('peers', resolve);
-	});
-
-	socket.on('update', update);
-
-	return peers;
+export async function connect(
+	board: string,
+	user: string,
+	onChange: (data: Update) => void
+): Promise<Connection> {
+	const id = uuid();
+	const clients = await socket(board, user, id, onChange);
+	return new RTC(id, clients);
 }

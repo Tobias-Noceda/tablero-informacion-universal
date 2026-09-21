@@ -281,6 +281,53 @@ var configuredPostIts = map[string]models.PostIts{
 		},
 		Rate: 900,
 	},
+	"gmail_inbox": {
+		WellKnown: "gmail_inbox",
+		Params: map[string]string{
+			"$credential": "",
+		},
+		Resource: getURL("https://gmail.googleapis.com/gmail/v1/users/me/labels/INBOX"),
+		Request: models.Request{
+			Method: "GET",
+			Headers: map[string]string{
+				"Accept":        "application/json",
+				"Authorization": "$credential",
+			},
+		},
+		Response: "json",
+		Query: map[string]string{
+			"unread": ".messagesUnread",
+			"total":  ".messagesTotal",
+		},
+		Rate: 60,
+	},
+	"google_calendar": {
+		WellKnown: "google_calendar",
+		Params: map[string]string{
+			"$credential": "",
+			"$time_min":   "",
+		},
+		Resource: getURL("https://www.googleapis.com/calendar/v3/calendars/primary/events"),
+		Request: models.Request{
+			Method: "GET",
+			Queries: map[string]string{
+				"singleEvents": "true",
+				"orderBy":      "startTime",
+				"maxResults":   "50",
+				"timeMin":      "$time_min",
+			},
+			Headers: map[string]string{
+				"Accept":        "application/json",
+				"Authorization": "$credential",
+			},
+		},
+		Response: "json",
+		Query: map[string]string{
+			"summary": "[.items[] | select((.start.dateTime // .start.date) >= (now | todate))] | first | .summary",
+			"start":   "[.items[] | select((.start.dateTime // .start.date) >= (now | todate))] | first | .start.dateTime // .start.date",
+		},
+		Rate: 300,
+	},
 	"github_repo": {
 		WellKnown: "github_repo",
 		Title: models.Title{

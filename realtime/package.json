@@ -2,9 +2,11 @@
   "name": "realtime",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "type": "module",
+  "module": "dist/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build:dev": "tsc",
+    "start:dev": "node dist/server.js"
   },
   "keywords": [],
   "author": "",
@@ -16,7 +18,6 @@
       "onFail": "download"
     }
   },
-  "type": "module",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
@@ -25,11 +26,10 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.12.0",
     "prettier": "3.9.6",
-    "typescript": "^7.0.2",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.70.0"
   },
   "dependencies": {
-    "@vercel/functions": "^3.9.5",
     "mongodb": "^7.6.0",
     "redis": "^6.2.1",
     "socket.io": "^4.8.3"
