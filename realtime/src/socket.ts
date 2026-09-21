@@ -16,7 +16,7 @@ const wss = new Server(server, {
 });
 
 export function notify(group: string, board: unknown) {
-    wss.to(group).emit("update", {
+    wss.to(group.toLowerCase()).emit("update", {
         board,
         ts: Date.now(),
     });
@@ -51,7 +51,7 @@ wss.on("connection", async (socket) => {
         return;
     }
 
-    socket.join(board);
+    socket.join(board.toLowerCase());
 
     socket.on("disconnect", (reason) => {
         console.error("Client disconnected:", reason);
