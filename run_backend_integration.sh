@@ -38,15 +38,16 @@ set +a
 
 MONGO_USER="${MONGO_INITDB_ROOT_USERNAME:?set MONGO_INITDB_ROOT_USERNAME in .env}"
 MONGO_PASSWORD="${MONGO_INITDB_ROOT_PASSWORD:?set MONGO_INITDB_ROOT_PASSWORD in .env}"
+REDIS_PASSWORD="${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}"
 IT_DATABASE="it_$(date +%s)"
 
-export MONGODB_URI="mongodb://${MONGO_USER}:${MONGO_PASSWORD}@localhost:27017/?authSource=admin"
+export MONGODB_URI="mongodb://${MONGO_USER}:${MONGO_PASSWORD}@127.0.0.1:27017/?authSource=admin&directConnection=true"
 export MONGO_DATABASE="$IT_DATABASE"
-export REDIS_URL="redis://localhost:6379/1"
+export REDIS_URL="redis://:${REDIS_PASSWORD}@127.0.0.1:6379/1"
 export SECRETS_MASTER_KEYS="1:$(head -c 32 /dev/urandom | base64)"
 
 echo "==> Starting Mongo, Redis and the mock OAuth2 provider..."
-docker compose --profile integration up -d mongo redis mock-oauth2
+docker compose -f docker-compose.yaml -f docker-compose.integration.yaml --profile integration up -d mongo redis mock-oauth2
 
 cleanup() {
     echo "==> Dropping database $IT_DATABASE..."

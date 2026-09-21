@@ -1,0 +1,19 @@
+# Overlay for the integration test scripts: the Go tests run on the host, so
+# Mongo and Redis are bound to loopback here and nowhere else. Ports cannot be
+# published from an internal-only network, hence the extra one.
+services:
+  mongo:
+    ports:
+      - "127.0.0.1:27017:27017"
+    networks:
+      - mongo
+      - integration
+  redis:
+    ports:
+      - "127.0.0.1:6379:6379"
+    networks:
+      - redis
+      - integration
+
+networks:
+  integration: {}

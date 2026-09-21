@@ -29,8 +29,9 @@ Get-Content (Join-Path $PSScriptRoot '.env') | ForEach-Object {
 }
 $mongoUser = $dotenv['MONGO_INITDB_ROOT_USERNAME']
 $mongoPassword = $dotenv['MONGO_INITDB_ROOT_PASSWORD']
-if (-not $mongoUser -or -not $mongoPassword) {
-    Write-Host 'Set MONGO_INITDB_ROOT_USERNAME and MONGO_INITDB_ROOT_PASSWORD in .env' -ForegroundColor Red
+$redisPassword = $dotenv['REDIS_PASSWORD']
+if (-not $mongoUser -or -not $mongoPassword -or -not $redisPassword) {
+    Write-Host 'Set MONGO_INITDB_ROOT_USERNAME, MONGO_INITDB_ROOT_PASSWORD and REDIS_PASSWORD in .env' -ForegroundColor Red
     exit 1
 }
 $itDatabase = "it_$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
@@ -38,9 +39,9 @@ $itDatabase = "it_$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
 $keyBytes = [byte[]]::new(32)
 [System.Security.Cryptography.RandomNumberGenerator]::Fill($keyBytes)
 
-$env:MONGODB_URI = "mongodb://${mongoUser}:${mongoPassword}@localhost:27017/?authSource=admin"
+$env:MONGODB_URI = "mongodb://${mongoUser}:${mongoPassword}@127.0.0.1:27017/?authSource=admin&directConnection=true"
 $env:MONGO_DATABASE = $itDatabase
-$env:REDIS_URL = 'redis://localhost:6379/1'
+$env:REDIS_URL = "redis://:${redisPassword}@127.0.0.1:6379/1"
 $env:SECRETS_MASTER_KEYS = "1:$([Convert]::ToBase64String($keyBytes))"
 
 function Invoke-Mongosh([string]$Script) {
@@ -50,7 +51,7 @@ function Invoke-Mongosh([string]$Script) {
 Push-Location $PSScriptRoot
 try {
     Write-Host '==> Starting Mongo, Redis and the mock OAuth2 provider...' -ForegroundColor Cyan
-    docker compose --profile integration up -d mongo redis mock-oauth2
+    docker compose -f docker-compose.yaml -f docker-compose.integration.yaml --profile integration up -d mongo redis mock-oauth2
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     $ready = $false
