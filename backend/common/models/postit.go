@@ -13,10 +13,16 @@ type Request struct {
 	Body    string            `bson:"body" json:"body"`
 }
 
+type Title struct {
+	Text string `bson:"text" json:"text"`
+	Vars bool   `bson:"vars" json:"vars"`
+}
+
 type PostIts struct {
 	Id        uuid.UUID         `bson:"_id" json:"id"`
 	Board     uuid.UUID         `bson:"board" json:"board"`
-	Params    map[string]string `bson:"params" json:"params"` // Soon, I promise you will really shine
+	Title     Title             `bson:"title" json:"title"`
+	Params    map[string]string `bson:"params" json:"params"`
 	WellKnown string            `bson:"wellknown" json:"wellknown"`
 	Resource  *url.URL          `bson:"resource" json:"resource"`
 	Request   Request           `bson:"request" json:"request"`

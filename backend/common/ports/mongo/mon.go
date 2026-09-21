@@ -294,7 +294,7 @@ func (db *MongoDB) CreatePostIt(postIt *models.PostIts, ptype string, pos models
 		return nil, err
 	}
 
-	entry := models.BoardPostIt{Id: postIt.Id, Type: ptype, Position: pos}
+	entry := models.BoardPostIt{Id: postIt.Id, Type: ptype, Title: postIt.Title, Position: pos}
 
 	res, err := db.boards.UpdateOne(
 		ctx,
