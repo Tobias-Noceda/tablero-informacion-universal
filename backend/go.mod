@@ -4,8 +4,10 @@ go 1.27.0
 
 require (
 	github.com/PuerkitoBio/goquery v1.12.0
+	github.com/alexedwards/argon2id v1.0.0
 	github.com/gin-contrib/cors v1.7.7
 	github.com/gin-gonic/gin v1.12.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/gojq v0.12.19
 	github.com/redis/go-redis/v9 v9.20.1
