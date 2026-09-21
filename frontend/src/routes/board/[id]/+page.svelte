@@ -8,7 +8,7 @@
 	import { page } from '$app/state';
 	import type { Node, Edge } from '@xyflow/svelte';
 
-	const id = page.params.id!;
+	const id = $derived(page.params.id!);
 
 	const { data } = $props();
 	const { nodes, edges, name } = $derived(data) as {
@@ -18,8 +18,10 @@
 	};
 </script>
 
-<DnDProvider>
-	<MouseTracker boardId={id}>
-		<Flow {name} {nodes} {edges} boardId={id} />
-	</MouseTracker>
-</DnDProvider>
+{#key id}
+	<DnDProvider>
+		<MouseTracker boardId={id}>
+			<Flow {name} {nodes} {edges} boardId={id} />
+		</MouseTracker>
+	</DnDProvider>
+{/key}
