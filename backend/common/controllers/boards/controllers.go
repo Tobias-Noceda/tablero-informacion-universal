@@ -57,6 +57,8 @@ func (ctrl *Controller) fail(c *gin.Context, err error) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Board not found"})
 	case errors.Is(err, infrastructure.ErrUserNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "user_not_found"})
+	case errors.Is(err, b_srv.ErrOrgNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "org_not_found"})
 	case errors.Is(err, b_srv.ErrInvalidRole):
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_role"})
 	case errors.Is(err, b_srv.ErrOwnerRole):
@@ -86,7 +88,7 @@ func bind(c *gin.Context, req any) bool {
 
 // GetUserBoards godoc
 // @Summary      List the caller's boards
-// @Description  Every board the caller owns or collaborates on.
+// @Description  Every board the caller owns, is a member of, or reaches through an organization, each with the caller's role.
 // @Tags         boards
 // @Produce      json
 // @Success      200  {array}   models.Board
@@ -129,13 +131,14 @@ func (ctrl *Controller) GetBoard(c *gin.Context) {
 
 // CreateBoard godoc
 // @Summary      Create a new board
-// @Description  The caller becomes its owner.
+// @Description  The caller becomes its owner. With org, the board belongs to that organization (the caller must be in it).
 // @Tags         boards
 // @Accept       json
 // @Produce      json
 // @Param        request  body      CreateBoardRequest  true  "Board creation payload"
 // @Success      201      {object}  models.Board
 // @Failure      400      {object}  map[string]string{"error": "string"}
+// @Failure      404      {object}  map[string]string{"error": "string"}  "org_not_found"
 // @Router       /boards [post]
 func (ctrl *Controller) CreateBoard(c *gin.Context) {
 	var req CreateBoardRequest
@@ -143,7 +146,7 @@ func (ctrl *Controller) CreateBoard(c *gin.Context) {
 		return
 	}
 
-	board, err := ctrl.service.CreateBoard(middleware.Principal(c), req.Name)
+	board, err := ctrl.service.CreateBoard(middleware.Principal(c), req.Name, req.Org)
 	if err != nil {
 		ctrl.fail(c, err)
 		return

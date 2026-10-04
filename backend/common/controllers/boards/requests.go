@@ -7,6 +7,8 @@ import (
 
 type CreateBoardRequest struct {
 	Name string `json:"name" binding:"required"`
+	// Org puts the board in one of the caller's organizations.
+	Org *uuid.UUID `json:"org"`
 }
 
 type UpdateBoardNameRequest struct {

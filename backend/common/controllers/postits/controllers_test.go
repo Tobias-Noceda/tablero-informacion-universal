@@ -48,7 +48,7 @@ func setupRouterWith(db *mocks.MockDB, cache *mocks.MockCache, run *mocks.MockEx
 	}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(db, cache, run, secrets, access.New())).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
+	NewController(srv.New(db, cache, run, secrets, access.New(nil))).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
 	return r
 }
 

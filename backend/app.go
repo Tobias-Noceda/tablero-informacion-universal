@@ -5,6 +5,7 @@ import (
 	"github.com/Secreto31126/tesis/common/controllers/boards"
 	g_ctrl "github.com/Secreto31126/tesis/common/controllers/groups"
 	"github.com/Secreto31126/tesis/common/controllers/middleware"
+	o_ctrl "github.com/Secreto31126/tesis/common/controllers/orgs"
 	"github.com/Secreto31126/tesis/common/controllers/postits"
 	s_ctrl "github.com/Secreto31126/tesis/common/controllers/secrets"
 	u_ctrl "github.com/Secreto31126/tesis/common/controllers/users"
@@ -20,6 +21,7 @@ import (
 	a_srv "github.com/Secreto31126/tesis/common/services/auth"
 	b_srv "github.com/Secreto31126/tesis/common/services/boards"
 	g_srv "github.com/Secreto31126/tesis/common/services/groups"
+	o_srv "github.com/Secreto31126/tesis/common/services/orgs"
 	p_srv "github.com/Secreto31126/tesis/common/services/postits"
 	r_srv "github.com/Secreto31126/tesis/common/services/realtime"
 	s_srv "github.com/Secreto31126/tesis/common/services/secrets"
@@ -43,15 +45,16 @@ func corsConfig() cors.Config {
 }
 
 func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *jwt.Keyring, cfg config, mailer infrastructure.Mailer) *app {
-	resolver := access.New()
-	secrets := s_srv.New(db, s_srv.NewPolicy(db, db, resolver), crypto.NewKeyring(kek, db), oauth.New(), cache, cache, db)
+	resolver := access.New(db)
+	secrets := s_srv.New(db, s_srv.NewPolicy(db, db, resolver), crypto.NewKeyring(kek, db), oauth.New(), cache, cache, db, resolver)
 
 	authService := a_srv.New(a_srv.Config{AccessTTL: cfg.accessTTL, RefreshTTL: cfg.refreshTTL, Admins: cfg.admins},
 		db, cache, password.New(), keys, cache, cache, mailer, cfg.identityProvider())
 	userService := u_srv.New(db)
 
 	boardService := b_srv.New(db, secrets, resolver, db)
-	groupService := g_srv.New(db, secrets)
+	groupService := g_srv.New(db, secrets, resolver)
+	orgService := o_srv.New(db, db)
 	postitService := p_srv.New(db, cache, executer.New(), secrets, resolver)
 	realtimeService := r_srv.New(boardService, cache)
 
@@ -70,6 +73,7 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	postits.NewController(postitService).RegisterRoutes(private)
 	s_ctrl.NewController(secrets).RegisterRoutes(private)
 	g_ctrl.NewController(groupService).RegisterRoutes(private)
+	o_ctrl.NewController(orgService).RegisterRoutes(private)
 
 	return &app{secrets: secrets, router: router}
 }

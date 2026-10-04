@@ -27,7 +27,7 @@ func testPolicy() *policy {
 				{User: viewer.ID, Role: models.BoardViewer},
 			}}, nil
 		},
-	}, &mocks.MemoryGroupStore{Groups: []models.Group{opsGroup}}, access.New())
+	}, &mocks.MemoryGroupStore{Groups: []models.Group{opsGroup}}, access.New(nil))
 }
 
 func TestPolicy_Group(t *testing.T) {
@@ -154,7 +154,7 @@ func TestPolicy_UnknownBoardIsForbidden(t *testing.T) {
 		FindBoardFn: func(uuid.UUID) (*models.Board, error) {
 			return nil, errors.New("no documents")
 		},
-	}, &mocks.MemoryGroupStore{}, access.New())
+	}, &mocks.MemoryGroupStore{}, access.New(nil))
 
 	if err := p.CanView(owner, models.BoardScope(uuid.New())); !errors.Is(err, ErrForbidden) {
 		t.Errorf("got %v, want ErrForbidden", err)
@@ -245,7 +245,7 @@ func TestPolicy_CanUse_RemovedCollaboratorLosesAccess(t *testing.T) {
 		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
 			return &models.Board{Id: id, Owner: owner.ID}, nil
 		},
-	}, &mocks.MemoryGroupStore{}, access.New())
+	}, &mocks.MemoryGroupStore{}, access.New(nil))
 	board := uuid.New()
 
 	for _, scope := range []models.SecretScope{
@@ -297,6 +297,47 @@ func TestPolicy_CanUse_Grants(t *testing.T) {
 		err := p.CanUse(c.caller, c.board, c.secret)
 		if got := err == nil; got != c.want {
 			t.Errorf("%s: CanUse = %v, want allowed=%v", c.label, err, c.want)
+		}
+	}
+}
+
+// An organization's admins own its groups; its members only see that the
+// group exists, so neither its secrets nor what is shared with it reach them.
+func TestPolicy_OrgGroup(t *testing.T) {
+	acme := models.Org{Id: uuid.New(), Members: []models.OrgMember{
+		{User: alice.ID, Role: models.OrgRoleAdmin},
+		{User: collaborator.ID, Role: models.OrgRoleMember},
+	}}
+	group := models.Group{Id: uuid.New(), Owner: owner.ID, Members: []string{}, Org: &acme.Id}
+	board := uuid.New()
+
+	p := NewPolicy(testPolicy().boards, &mocks.MemoryGroupStore{Groups: []models.Group{group}},
+		access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}))
+
+	scope := models.GroupScope(group.Id)
+	own := &models.Secret{Scope: scope, Name: "TOKEN"}
+	shared := &models.Secret{Scope: models.UserScope(owner.ID), Name: "TOKEN",
+		Grants: []models.Grant{{To: models.Audience{Kind: models.AudienceGroup, ID: group.Id.String()}}}}
+
+	cases := []struct {
+		caller                  models.Principal
+		manage, view, use, gets bool
+	}{
+		{alice, true, true, true, true},
+		{collaborator, false, false, false, false},
+	}
+	for _, c := range cases {
+		if got := p.CanManage(c.caller, scope) == nil; got != c.manage {
+			t.Errorf("%s: CanManage = %v, want %v", c.caller.ID, got, c.manage)
+		}
+		if got := p.CanView(c.caller, scope) == nil; got != c.view {
+			t.Errorf("%s: CanView = %v, want %v", c.caller.ID, got, c.view)
+		}
+		if got := p.CanUse(c.caller, board, own) == nil; got != c.use {
+			t.Errorf("%s: CanUse(group secret) = %v, want %v", c.caller.ID, got, c.use)
+		}
+		if got := p.CanUse(c.caller, board, shared) == nil; got != c.gets {
+			t.Errorf("%s: CanUse(granted to the group) = %v, want %v", c.caller.ID, got, c.gets)
 		}
 	}
 }

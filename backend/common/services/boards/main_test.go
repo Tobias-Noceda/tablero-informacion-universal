@@ -50,19 +50,19 @@ func users() *mocks.MemoryUserStore {
 }
 
 func newService(db *mocks.MockDB, purger infrastructure.ScopePurger) *BoardService {
-	return New(db, purger, access.New(), users())
+	return New(db, purger, access.New(nil), users())
 }
 
 func TestCreateBoard_TheCallerOwnsIt(t *testing.T) {
 	var gotName, gotOwner string
 	db := &mocks.MockDB{
-		CreateBoardFn: func(name, owner string) (*models.Board, error) {
+		CreateBoardFn: func(name, owner string, org *uuid.UUID) (*models.Board, error) {
 			gotName, gotOwner = name, owner
 			return &models.Board{Id: uuid.New(), Name: name, Owner: owner}, nil
 		},
 	}
 
-	board, err := newService(db, &purgeRecorder{}).CreateBoard(ana, "My Board")
+	board, err := newService(db, &purgeRecorder{}).CreateBoard(ana, "My Board", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -75,7 +75,7 @@ func TestCreateBoard_TheCallerOwnsIt(t *testing.T) {
 }
 
 func TestCreateBoard_AnonymousIsForbidden(t *testing.T) {
-	if _, err := newService(&mocks.MockDB{}, &purgeRecorder{}).CreateBoard(models.Principal{}, "B"); !errors.Is(err, ErrForbidden) {
+	if _, err := newService(&mocks.MockDB{}, &purgeRecorder{}).CreateBoard(models.Principal{}, "B", nil); !errors.Is(err, ErrForbidden) {
 		t.Errorf("got %v, want ErrForbidden", err)
 	}
 }
@@ -84,7 +84,7 @@ func TestCreateBoard_AnonymousIsForbidden(t *testing.T) {
 func TestGetUserBoards_CarriesTheCallersRole(t *testing.T) {
 	id := uuid.New()
 	db := &mocks.MockDB{
-		FindUserBoardsFn: func(user string) ([]models.Board, error) {
+		FindUserBoardsFn: func(user string, orgs []uuid.UUID) ([]models.Board, error) {
 			if user != bob.ID {
 				t.Errorf("user = %q, want bob", user)
 			}
@@ -340,5 +340,84 @@ func TestRemoveMember_PurgesWhatTheyKeptOnTheBoard(t *testing.T) {
 	}
 	if len(purger.purged) != 1 || purger.purged[0] != models.MemberScope(id, ana.ID) {
 		t.Errorf("purged %v, want ana's member scope", purger.purged)
+	}
+}
+
+// acme has ana as admin and bob as member; the board's owner is not in it.
+func acmeService(db *mocks.MockDB) (*BoardService, models.Org) {
+	acme := models.Org{Id: uuid.New(), Members: []models.OrgMember{
+		{User: ana.ID, Role: models.OrgRoleAdmin},
+		{User: bob.ID, Role: models.OrgRoleMember},
+	}}
+	return New(db, &purgeRecorder{}, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}), users()), acme
+}
+
+func TestCreateBoard_InAnOrgTheCallerBelongsTo(t *testing.T) {
+	var gotOrg *uuid.UUID
+	srv, acme := acmeService(&mocks.MockDB{
+		CreateBoardFn: func(name, owner string, org *uuid.UUID) (*models.Board, error) {
+			gotOrg = org
+			return &models.Board{Id: uuid.New(), Name: name, Owner: owner, Org: org}, nil
+		},
+	})
+
+	for _, caller := range []models.Principal{ana, bob} {
+		gotOrg = nil
+		board, err := srv.CreateBoard(caller, "B", &acme.Id)
+		if err != nil {
+			t.Fatalf("%s: %v", caller.ID, err)
+		}
+		if gotOrg == nil || *gotOrg != acme.Id || board.Owner != caller.ID || board.Role != models.BoardOwner {
+			t.Errorf("%s: org %v, board %+v", caller.ID, gotOrg, board)
+		}
+	}
+
+	other := uuid.New()
+	for _, c := range []struct {
+		caller models.Principal
+		org    uuid.UUID
+	}{{outsider, acme.Id}, {ana, other}} {
+		if _, err := srv.CreateBoard(c.caller, "B", &c.org); !errors.Is(err, ErrOrgNotFound) {
+			t.Errorf("%s in %s: %v, want ErrOrgNotFound", c.caller.ID, c.org, err)
+		}
+	}
+}
+
+// An organization's board reaches every member without being shared: its
+// admins act as owners, its members look.
+func TestOrgBoard_RolesComeFromTheOrg(t *testing.T) {
+	id := uuid.New()
+	var acmeID uuid.UUID
+	board := func() *models.Board {
+		return &models.Board{Id: id, Owner: owner.ID, Org: &acmeID}
+	}
+	var renamed bool
+	srv, acme := acmeService(&mocks.MockDB{
+		FindBoardFn: func(uuid.UUID) (*models.Board, error) { return board(), nil },
+		FindUserBoardsFn: func(user string, orgs []uuid.UUID) ([]models.Board, error) {
+			if len(orgs) != 1 || orgs[0] != acmeID {
+				t.Errorf("%s's orgs = %v, want acme", user, orgs)
+			}
+			return []models.Board{*board()}, nil
+		},
+		UpdateBoardNameFn: func(uuid.UUID, string) error { renamed = true; return nil },
+	})
+	acmeID = acme.Id
+
+	for caller, want := range map[string]models.BoardRole{ana.ID: models.BoardOwner, bob.ID: models.BoardViewer} {
+		listed, err := srv.GetUserBoards(models.Principal{ID: caller})
+		if err != nil || len(listed) != 1 || listed[0].Role != want {
+			t.Errorf("%s lists %+v, %v, want the board as %s", caller, listed, err, want)
+		}
+	}
+
+	if err := srv.UpdateBoardName(bob, id, "x"); !errors.Is(err, ErrForbidden) || renamed {
+		t.Errorf("an org member renamed the board: %v", err)
+	}
+	if err := srv.UpdateBoardName(ana, id, "x"); err != nil || !renamed {
+		t.Errorf("an org admin could not rename the board: %v", err)
+	}
+	if _, err := srv.GetBoard(outsider, id); !errors.Is(err, ErrForbidden) {
+		t.Errorf("someone outside the org opened the board: %v", err)
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 var (
 	ErrForbidden   = infrastructure.ErrForbidden
+	ErrOrgNotFound = infrastructure.ErrOrgNotFound
 	ErrInvalidRole = errors.New("A member is an editor or a viewer")
 	ErrOwnerRole   = errors.New("The owner's role cannot change")
 )
@@ -46,7 +47,11 @@ func (srv *BoardService) GetUserBoards(principal models.Principal) ([]models.Boa
 		return nil, ErrForbidden
 	}
 
-	boards, err := srv.db.FindUserBoards(principal.ID)
+	orgs, err := srv.access.Orgs(principal)
+	if err != nil {
+		return nil, err
+	}
+	boards, err := srv.db.FindUserBoards(principal.ID, orgs)
 	if err != nil {
 		return nil, err
 	}
@@ -60,12 +65,17 @@ func (srv *BoardService) GetBoard(principal models.Principal, id uuid.UUID) (*mo
 	return srv.require(principal, id, models.BoardViewer)
 }
 
-func (srv *BoardService) CreateBoard(principal models.Principal, name string) (*models.Board, error) {
+// CreateBoard makes the caller the board's owner. A board created in an
+// organization the caller belongs to is also reachable by its members.
+func (srv *BoardService) CreateBoard(principal models.Principal, name string, org *uuid.UUID) (*models.Board, error) {
 	if principal.Anonymous() {
 		return nil, ErrForbidden
 	}
+	if org != nil && srv.access.OrgRole(principal, *org) == "" {
+		return nil, ErrOrgNotFound
+	}
 
-	board, err := srv.db.CreateBoard(name, principal.ID)
+	board, err := srv.db.CreateBoard(name, principal.ID, org)
 	if err != nil {
 		return nil, err
 	}

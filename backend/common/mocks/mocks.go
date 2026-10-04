@@ -15,7 +15,7 @@ var ErrCacheMiss = errors.New("cache miss")
 
 // MockDB is a configurable test double for infrastructure.Database.
 type MockDB struct {
-	FindUserBoardsFn    func(user string) ([]models.Board, error)
+	FindUserBoardsFn    func(user string, orgs []uuid.UUID) ([]models.Board, error)
 	FindBoardPostItsFn  func(id uuid.UUID) ([]models.PostIts, error)
 	FindPostItFn        func(id uuid.UUID) (*models.PostIts, error)
 	FindBoardFn         func(id uuid.UUID) (*models.Board, error)
@@ -23,7 +23,7 @@ type MockDB struct {
 	DeleteBoardFn       func(id uuid.UUID) error
 	UpdatePostItFn      func(id uuid.UUID, set map[string]any) error
 	CreatePostItFn      func(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
-	CreateBoardFn       func(name, owner string) (*models.Board, error)
+	CreateBoardFn       func(name, owner string, org *uuid.UUID) (*models.Board, error)
 	SetBoardMemberFn    func(boardID uuid.UUID, user string, role models.BoardRole) error
 	RemoveBoardMemberFn func(boardID uuid.UUID, user string) error
 	DisconnectPostItsFn func(boardID, strandID uuid.UUID) error
@@ -34,9 +34,9 @@ type MockDB struct {
 
 var _ infrastructure.Database = (*MockDB)(nil)
 
-func (m *MockDB) FindUserBoards(user string) ([]models.Board, error) {
+func (m *MockDB) FindUserBoards(user string, orgs []uuid.UUID) ([]models.Board, error) {
 	if m.FindUserBoardsFn != nil {
-		return m.FindUserBoardsFn(user)
+		return m.FindUserBoardsFn(user, orgs)
 	}
 	return nil, nil
 }
@@ -90,9 +90,9 @@ func (m *MockDB) CreatePostIt(postIt *models.PostIts, ptype string, pos models.P
 	return postIt, nil
 }
 
-func (m *MockDB) CreateBoard(name, owner string) (*models.Board, error) {
+func (m *MockDB) CreateBoard(name, owner string, org *uuid.UUID) (*models.Board, error) {
 	if m.CreateBoardFn != nil {
-		return m.CreateBoardFn(name, owner)
+		return m.CreateBoardFn(name, owner, org)
 	}
 	return nil, nil
 }
@@ -424,10 +424,10 @@ func (m *MemoryGroupStore) FindGroup(id uuid.UUID) (*models.Group, error) {
 	return nil, infrastructure.ErrGroupNotFound
 }
 
-func (m *MemoryGroupStore) FindUserGroups(userID string) ([]models.Group, error) {
+func (m *MemoryGroupStore) FindUserGroups(userID string, orgs []uuid.UUID) ([]models.Group, error) {
 	var out []models.Group
 	for _, group := range m.Groups {
-		if group.IsMember(userID) {
+		if group.IsMember(userID) || (group.Org != nil && slices.Contains(orgs, *group.Org)) {
 			out = append(out, group)
 		}
 	}

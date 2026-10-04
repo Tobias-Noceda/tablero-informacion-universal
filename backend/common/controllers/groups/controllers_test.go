@@ -11,6 +11,7 @@ import (
 	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
+	"github.com/Secreto31126/tesis/common/services/access"
 	srv "github.com/Secreto31126/tesis/common/services/groups"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -20,6 +21,9 @@ const (
 	owner  = "owner-id"
 	member = "member-id"
 )
+
+// acme is the organization owner is in.
+var acme = models.Org{Id: uuid.New(), Members: []models.OrgMember{{User: owner, Role: models.OrgRoleMember}}}
 
 type purgeRecorder struct {
 	purged []models.SecretScope
@@ -35,7 +39,7 @@ func setupRouter() (*gin.Engine, *mocks.MemoryGroupStore, *purgeRecorder) {
 	purger := &purgeRecorder{}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(store, purger)).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
+	NewController(srv.New(store, purger, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}))).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
 	return r, store, purger
 }
 
@@ -171,5 +175,24 @@ func TestInvalidUUID(t *testing.T) {
 		if w := do(r, owner, c.method, c.path, `{"member":"x"}`); w.Code != http.StatusBadRequest {
 			t.Errorf("%s %s: status = %d, want 400", c.method, c.path, w.Code)
 		}
+	}
+}
+
+func TestCreateGroup_InAnOrg(t *testing.T) {
+	r, _, _ := setupRouter()
+
+	w := do(r, owner, http.MethodPost, "/groups", `{"name":"ops","org":"`+acme.Id.String()+`"}`)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d (body: %s)", w.Code, w.Body.String())
+	}
+	var group models.Group
+	_ = json.Unmarshal(w.Body.Bytes(), &group)
+	if group.Org == nil || *group.Org != acme.Id || group.Role != models.GroupOwner {
+		t.Errorf("group = %+v", group)
+	}
+
+	w = do(r, member, http.MethodPost, "/groups", `{"name":"ops","org":"`+acme.Id.String()+`"}`)
+	if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "org_not_found") {
+		t.Errorf("outside the org: %d %s, want 404 org_not_found", w.Code, w.Body.String())
 	}
 }

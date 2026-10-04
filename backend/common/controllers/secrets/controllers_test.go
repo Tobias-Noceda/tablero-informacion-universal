@@ -45,7 +45,7 @@ func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	groups := &mocks.MemoryGroupStore{Groups: []models.Group{opsGroup}}
-	NewController(srv.New(store, srv.NewPolicy(boards, groups, access.New()), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, groups)).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
+	NewController(srv.New(store, srv.NewPolicy(boards, groups, access.New(nil)), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, groups, access.New(nil))).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
 	return r
 }
 

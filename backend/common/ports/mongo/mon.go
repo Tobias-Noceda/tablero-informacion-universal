@@ -27,6 +27,7 @@ type MongoDB struct {
 	secrets  *mongo.Collection
 	dataKeys *mongo.Collection
 	groups   *mongo.Collection
+	orgs     *mongo.Collection
 }
 
 func New() (*MongoDB, error) {
@@ -66,6 +67,7 @@ func New() (*MongoDB, error) {
 	db.secrets = db.client.Database(name).Collection("secrets")
 	db.dataKeys = db.client.Database(name).Collection("data_keys")
 	db.groups = db.client.Database(name).Collection("groups")
+	db.orgs = db.client.Database(name).Collection("orgs")
 
 	return db, nil
 }
@@ -93,6 +95,10 @@ func (db *MongoDB) EnsureIndexes() error {
 		return err
 	}
 
+	if err := db.ensureOrgIndexes(); err != nil {
+		return err
+	}
+
 	return db.ensureUserIndexes()
 }
 
@@ -100,14 +106,15 @@ func timeout() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), REQUEST_TIMEOUT)
 }
 
-// FindUserBoards lists every board the user belongs to, owned or shared.
-func (db *MongoDB) FindUserBoards(user string) ([]models.Board, error) {
+// FindUserBoards lists every board the user belongs to, owned, shared or
+// through one of orgs.
+func (db *MongoDB) FindUserBoards(user string, orgs []uuid.UUID) ([]models.Board, error) {
 	ctx, cancel := timeout()
 	defer cancel()
 
 	boards := []models.Board{}
 
-	filter := bson.M{"$or": bson.A{bson.M{"owner": user}, bson.M{"members.user": user}}}
+	filter := reachedBy(bson.A{bson.M{"owner": user}, bson.M{"members.user": user}}, orgs)
 
 	cursor, err := db.boards.Find(ctx, filter)
 
@@ -280,11 +287,11 @@ func (db *MongoDB) UpdateBoardName(id uuid.UUID, name string) error {
 	)
 }
 
-func (db *MongoDB) CreateBoard(name string, owner string) (*models.Board, error) {
+func (db *MongoDB) CreateBoard(name string, owner string, org *uuid.UUID) (*models.Board, error) {
 	ctx, cancel := timeout()
 	defer cancel()
 
-	board := &models.Board{Id: uuid.New(), Name: name, Owner: owner}
+	board := &models.Board{Id: uuid.New(), Name: name, Owner: owner, Org: org}
 
 	_, err := db.boards.InsertOne(ctx, board)
 	if err != nil {
@@ -365,6 +372,7 @@ func (db *MongoDB) ensureBoardIndexes() error {
 	_, err := db.boards.Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{Keys: bson.D{{Key: "owner", Value: 1}}},
 		{Keys: bson.D{{Key: "members.user", Value: 1}}},
+		{Keys: bson.D{{Key: "org", Value: 1}}},
 	})
 
 	return err

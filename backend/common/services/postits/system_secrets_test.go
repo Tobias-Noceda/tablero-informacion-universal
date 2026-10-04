@@ -61,7 +61,7 @@ func realSecrets(t *testing.T) *secretsrv.SecretsService {
 	}
 
 	return secretsrv.New(store, &mocks.MockScopePolicy{}, crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}),
-		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, &mocks.MemoryGroupStore{})
+		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, &mocks.MemoryGroupStore{}, access.New(nil))
 }
 
 // nasaStub stands in for api.nasa.gov and records the api_key it was sent.
@@ -111,7 +111,7 @@ func TestNasaApod_InjectsTheSystemKeyAtExecution(t *testing.T) {
 		t.Fatalf("put system secret: %v", err)
 	}
 
-	svc := New(boardOf(boardOwner), &mocks.MockCache{}, executer.New(), secrets, access.New())
+	svc := New(boardOf(boardOwner), &mocks.MockCache{}, executer.New(), secrets, access.New(nil))
 	postit := createNasaPostIt(t, svc, uuid.New(), provider.URL, nil)
 
 	data, err := svc.ExecutePostIt(postit)
@@ -136,7 +136,7 @@ func TestNasaApod_StoredPostItNeverNamesTheSystemSecret(t *testing.T) {
 	secrets := realSecrets(t)
 	_ = secrets.Put(models.SystemScope, models.Principal{}, string(models.SystemNasaApiKey), models.SecretApiKey, nasaKey)
 
-	svc := New(boardOf(boardOwner), &mocks.MockCache{}, executer.New(), secrets, access.New())
+	svc := New(boardOf(boardOwner), &mocks.MockCache{}, executer.New(), secrets, access.New(nil))
 	postit := createNasaPostIt(t, svc, uuid.New(), provider.URL, nil)
 
 	if _, err := svc.ExecutePostIt(postit); err != nil {
@@ -161,7 +161,7 @@ func TestNasaApod_UserParamsCannotShadowTheSystemSecret(t *testing.T) {
 	secrets := realSecrets(t)
 	_ = secrets.Put(models.SystemScope, models.Principal{}, string(models.SystemNasaApiKey), models.SecretApiKey, nasaKey)
 
-	svc := New(boardOf(boardOwner), &mocks.MockCache{}, executer.New(), secrets, access.New())
+	svc := New(boardOf(boardOwner), &mocks.MockCache{}, executer.New(), secrets, access.New(nil))
 	postit := createNasaPostIt(t, svc, uuid.New(), provider.URL, nil)
 	postit.Params = map[string]string{"$api_key": "attacker-chosen"}
 
@@ -195,7 +195,7 @@ func TestCustomPostIt_CannotReferenceASystemSecret(t *testing.T) {
 		Query:    map[string]string{"title": ".title"},
 	}
 
-	svc := New(boardOf(boardOwner), &mocks.MockCache{}, executer.New(), secrets, access.New())
+	svc := New(boardOf(boardOwner), &mocks.MockCache{}, executer.New(), secrets, access.New(nil))
 	if _, err := svc.ExecutePostIt(postit); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -212,7 +212,7 @@ func TestNasaApod_MissingSystemSecretFailsWithoutNamingIt(t *testing.T) {
 	called := false
 	provider.Config.Handler = http.HandlerFunc(func(http.ResponseWriter, *http.Request) { called = true })
 
-	svc := New(boardOf(boardOwner), &mocks.MockCache{}, executer.New(), realSecrets(t), access.New())
+	svc := New(boardOf(boardOwner), &mocks.MockCache{}, executer.New(), realSecrets(t), access.New(nil))
 	postit := createNasaPostIt(t, svc, uuid.New(), provider.URL, nil)
 
 	_, err := svc.ExecutePostIt(postit)

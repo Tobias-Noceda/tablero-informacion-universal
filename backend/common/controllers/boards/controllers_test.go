@@ -35,6 +35,9 @@ var (
 
 	boardID = uuid.New()
 	board   = "/boards/" + boardID.String()
+
+	// acme is the organization ana is in.
+	acme = models.Org{Id: uuid.New(), Members: []models.OrgMember{{User: ana, Role: models.OrgRoleMember}}}
 )
 
 // withBoard serves the shared board from FindBoard on top of db.
@@ -68,7 +71,7 @@ func setupRouter(db *mocks.MockDB, cache *mocks.MockCache) *gin.Engine {
 
 	r := gin.New()
 	users := &mocks.MemoryUserStore{Users: []models.User{ownerUser, anaUser, bobUser, eveUser}}
-	bs := b_srv.New(withBoard(db), &mocks.MockScopePurger{}, access.New(), users)
+	bs := b_srv.New(withBoard(db), &mocks.MockScopePurger{}, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}), users)
 	rs := r_srv.New(bs, cache)
 
 	NewController(bs, rs).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
@@ -94,7 +97,7 @@ func TestCreateBoard_TheCallerOwnsIt(t *testing.T) {
 	id := uuid.New()
 	var gotOwner string
 	db := &mocks.MockDB{
-		CreateBoardFn: func(name, owner string) (*models.Board, error) {
+		CreateBoardFn: func(name, owner string, org *uuid.UUID) (*models.Board, error) {
 			gotOwner = owner
 			return &models.Board{Id: id, Name: name, Owner: owner}, nil
 		},
@@ -126,7 +129,7 @@ func TestCreateBoard_MissingName(t *testing.T) {
 
 func TestGetUserBoards_ListsTheCallersBoards(t *testing.T) {
 	db := &mocks.MockDB{
-		FindUserBoardsFn: func(user string) ([]models.Board, error) {
+		FindUserBoardsFn: func(user string, orgs []uuid.UUID) ([]models.Board, error) {
 			if user != ana {
 				t.Errorf("user = %q, want the caller", user)
 			}
@@ -298,8 +301,8 @@ func TestRemoveMember_TheOwnerIsABadRequest(t *testing.T) {
 func TestBoardHandlers_ServiceErrors(t *testing.T) {
 	boom := errors.New("mongo: connection lost")
 	db := &mocks.MockDB{
-		FindUserBoardsFn:    func(string) ([]models.Board, error) { return nil, boom },
-		CreateBoardFn:       func(string, string) (*models.Board, error) { return nil, boom },
+		FindUserBoardsFn:    func(string, []uuid.UUID) ([]models.Board, error) { return nil, boom },
+		CreateBoardFn:       func(string, string, *uuid.UUID) (*models.Board, error) { return nil, boom },
 		DeleteBoardFn:       func(uuid.UUID) error { return boom },
 		SetBoardMemberFn:    func(uuid.UUID, string, models.BoardRole) error { return boom },
 		RemoveBoardMemberFn: func(uuid.UUID, string) error { return boom },
@@ -358,6 +361,35 @@ func TestBoardHandlers_BadBody(t *testing.T) {
 	} {
 		if w := do(setupRouter(nil, nil), owner, c.method, c.path, `{bad json`); w.Code != http.StatusBadRequest {
 			t.Errorf("%s %s: status = %d, want 400", c.method, c.path, w.Code)
+		}
+	}
+}
+
+func TestCreateBoard_InAnOrg(t *testing.T) {
+	var gotOrg *uuid.UUID
+	db := &mocks.MockDB{
+		CreateBoardFn: func(name, owner string, org *uuid.UUID) (*models.Board, error) {
+			gotOrg = org
+			return &models.Board{Id: uuid.New(), Name: name, Owner: owner, Org: org}, nil
+		},
+	}
+	r := setupRouter(db, nil)
+
+	w := do(r, ana, http.MethodPost, "/boards", `{"name":"B","org":"`+acme.Id.String()+`"}`)
+	if w.Code != http.StatusCreated || gotOrg == nil || *gotOrg != acme.Id {
+		t.Fatalf("status = %d, org = %v (body: %s)", w.Code, gotOrg, w.Body.String())
+	}
+	var got models.Board
+	_ = json.Unmarshal(w.Body.Bytes(), &got)
+	if got.Org == nil || *got.Org != acme.Id {
+		t.Errorf("response org = %v", got.Org)
+	}
+
+	gotOrg = nil
+	for _, c := range []struct{ caller, org string }{{bob, acme.Id.String()}, {ana, uuid.NewString()}} {
+		w := do(r, c.caller, http.MethodPost, "/boards", `{"name":"B","org":"`+c.org+`"}`)
+		if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "org_not_found") || gotOrg != nil {
+			t.Errorf("%s in %s: %d %s, want 404 org_not_found", c.caller, c.org, w.Code, w.Body.String())
 		}
 	}
 }

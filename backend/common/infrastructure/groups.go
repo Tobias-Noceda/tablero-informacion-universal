@@ -10,10 +10,12 @@ import (
 var ErrGroupNotFound = errors.New("group not found")
 
 // GroupReader is what authorization needs: who is in a group, and which
-// groups a user is in.
+// groups reach a user.
 type GroupReader interface {
 	FindGroup(id uuid.UUID) (*models.Group, error)
-	FindUserGroups(userID string) ([]models.Group, error)
+	// FindUserGroups lists the groups that list userID and every group of
+	// the given organizations.
+	FindUserGroups(userID string, orgs []uuid.UUID) ([]models.Group, error)
 }
 
 type GroupStore interface {

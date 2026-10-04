@@ -83,7 +83,11 @@ func (srv *SecretsService) ListUsable(principal models.Principal, board uuid.UUI
 		{Kind: models.AudienceBoard, ID: board.String()},
 	}
 
-	groups, err := srv.groups.FindUserGroups(principal.ID)
+	orgs, err := srv.access.Orgs(principal)
+	if err != nil {
+		return nil, err
+	}
+	groups, err := srv.groups.FindUserGroups(principal.ID, orgs)
 	if err != nil {
 		return nil, err
 	}

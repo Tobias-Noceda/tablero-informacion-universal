@@ -34,6 +34,13 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 // A group the caller may not touch answers 404: whether it exists is not
 // disclosed, the same rule the vault applies to scopes.
 func fail(c *gin.Context, err error) {
+	if errors.Is(err, srv.ErrOrgNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "org_not_found",
+		})
+		return
+	}
+
 	if errors.Is(err, srv.ErrForbidden) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Group not found",
@@ -60,7 +67,7 @@ func groupID(c *gin.Context) (uuid.UUID, bool) {
 
 // CreateGroup godoc
 // @Summary      Create a group
-// @Description  The caller becomes its owner. A group owns secrets its members may use on any board.
+// @Description  The caller becomes its owner. A group owns secrets its members may use on any board. With org, the group belongs to that organization (the caller must be in it) and its admins own it too.
 // @Tags         groups
 // @Accept       json
 // @Produce      json
@@ -77,7 +84,7 @@ func (ctrl *Controller) CreateGroup(c *gin.Context) {
 		return
 	}
 
-	group, err := ctrl.service.Create(middleware.Principal(c), req.Name)
+	group, err := ctrl.service.Create(middleware.Principal(c), req.Name, req.Org)
 	if err != nil {
 		fail(c, err)
 		return
@@ -87,7 +94,7 @@ func (ctrl *Controller) CreateGroup(c *gin.Context) {
 }
 
 // ListMine godoc
-// @Summary      List the groups the caller belongs to
+// @Summary      List the groups the caller belongs to, or sees through an organization
 // @Tags         groups
 // @Produce      json
 // @Success      200         {array}   models.Group

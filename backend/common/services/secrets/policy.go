@@ -50,8 +50,13 @@ func (p *policy) check(principal models.Principal, scope models.SecretScope, man
 		}
 		return p.onBoard(principal, boardID, models.BoardEditor)
 	case models.ScopeGroup:
-		role := p.groupRole(principal, uuid.MustParse(scope.Owner))
-		if role == "" || (manage && role != models.GroupOwner) {
+		// A group's secrets are for the people it lists; someone who only
+		// sees the group through its organization does not learn them.
+		min := models.GroupMember
+		if manage {
+			min = models.GroupOwner
+		}
+		if !p.groupRole(principal, uuid.MustParse(scope.Owner)).AtLeast(min) {
 			return ErrForbidden
 		}
 		return nil
@@ -108,7 +113,7 @@ func (p *policy) owns(principal models.Principal, boardID uuid.UUID, scope model
 	case models.ScopeUser:
 		return principal.ID == scope.Owner
 	case models.ScopeGroup:
-		return p.groupRole(principal, uuid.MustParse(scope.Owner)) != ""
+		return p.groupRole(principal, uuid.MustParse(scope.Owner)).AtLeast(models.GroupMember)
 	default:
 		return false
 	}
@@ -123,7 +128,7 @@ func (p *policy) reaches(principal models.Principal, boardID uuid.UUID, audience
 		return principal.ID == audience.ID
 	case models.AudienceGroup:
 		id, err := uuid.Parse(audience.ID)
-		return err == nil && p.groupRole(principal, id) != ""
+		return err == nil && p.groupRole(principal, id).AtLeast(models.GroupMember)
 	case models.AudienceBoard:
 		return audience.ID == boardID.String()
 	default:

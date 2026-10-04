@@ -6,8 +6,9 @@ import (
 )
 
 type Database interface {
-	// Find every board the user owns or is a member of
-	FindUserBoards(user string) ([]models.Board, error)
+	// Find every board the user owns or is a member of, and every board of
+	// the given organizations
+	FindUserBoards(user string, orgs []uuid.UUID) ([]models.Board, error)
 	// Find all the board post-its
 	FindBoardPostIts(id uuid.UUID) ([]models.PostIts, error)
 	// Find a given postIt
@@ -22,8 +23,8 @@ type Database interface {
 	UpdatePostIt(id uuid.UUID, set map[string]any) error
 	// Creates a PostIt
 	CreatePostIt(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
-	// Creates a Board
-	CreateBoard(name, owner string) (*models.Board, error)
+	// Creates a Board, in an organization when org is set
+	CreateBoard(name, owner string, org *uuid.UUID) (*models.Board, error)
 	// Adds a member to a board, or changes the role of one already on it
 	SetBoardMember(boardID uuid.UUID, user string, role models.BoardRole) error
 	// Removes a member from a board
