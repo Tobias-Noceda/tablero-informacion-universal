@@ -21,7 +21,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+  class="fixed inset-0 z-200 flex items-center justify-center bg-black/50"
   role="presentation"
   onclick={onclose}
 >

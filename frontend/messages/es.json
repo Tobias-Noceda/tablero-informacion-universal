@@ -3,12 +3,22 @@
 	"hello_world": "Hola {name} desde es!",
 	"input_loading": "Cargando...",
 	"create_board": "Crear un nuevo tablero",
+	"board_dropdown_placeholder": "Seleccionar un tablero",
 	"board_name_label": "Nombre del tablero",
 	"board_name_placeholder": "Mi tablero",
 	"cancel": "Cancelar",
 	"create": "Crear",
 	"accept": "Aceptar",
+	"user_info": {
+		"language": {
+			"title": "Idioma",
+			"en": "Inglés",
+			"es": "Español"
+		},
+		"logout": "Cerrar sesión"
+	},
 	"nodes": {
+		"title": "Tarjetas",
 		"static_card": "Nota",
 		"temperature": "Temperatura",
 		"events_search": "Búsqueda de Eventos",
@@ -21,10 +31,13 @@
 		"exchange_rate": "Cotización",
 		"gmail_inbox": "Bandeja de Gmail",
 		"google_calendar": "Calendario de Google",
-		"nasa_apod": "Foto del Día de la NASA"
+		"nasa_apod": "Foto del Día de la NASA",
+		"create": "Crear una nueva tarjeta"
 	},
 	"secrets": {
 		"title": "Credenciales del tablero",
+		"create": "Crear una nueva credencial",
+		"manage": "Administrar credenciales",
 		"close": "Cerrar",
 		"loading": "Cargando...",
 		"empty": "Este tablero no tiene credenciales.",

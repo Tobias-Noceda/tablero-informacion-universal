@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { SvelteFlow, Controls, useSvelteFlow, type Node, type Edge, ConnectionMode, type Connection } from '@xyflow/svelte';
 
-	import { useDnD } from './DnDProvider.svelte';
-	import Dock from './Dock.svelte';
+	import { useDnD } from '../../../lib/providers/DnDProvider.svelte';
 
 	import * as postItsApi from '$services/post-it';
 	import * as edgesApi from '$services/edge';
@@ -10,9 +9,8 @@
 	import Modal from '$components/Modal/Modal.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import Button from '$components/Button/Button.svelte';
-	import SecretsPanel from '$components/Secrets/SecretsPanel.svelte';
+	import SecretsPanel from '$layouts/Secrets/SecretsPanel.svelte';
 	import * as secretsApi from '$services/secrets';
-	import { CURRENT_USER } from '$modules/api.svelte';
 	import { groupByOrigin } from '$lib/secrets/origin';
 	import { bindingsFor, refKey } from '$lib/secrets/binding';
 	import type { SecretMeta } from '$types/api';
@@ -23,11 +21,13 @@
 	import { mouses } from '$stores/mouses.svelte';
 	import Realtime from './Realtime.svelte';
 	import type { Update } from '$modules/sockets.svelte';
+	import { isManagingSecrets, setManagingSecrets } from '$stores/sidebar';
 
-	let { nodes, edges, name, boardId, userId, boardUpdate }: {
+	import { getUser } from '$stores/user';
+
+	let { nodes, edges, boardId, userId, boardUpdate }: {
 		nodes: Node[],
 		edges: Edge[],
-		name: string,
 		boardId: string,
 		userId: string,
 		boardUpdate: (update: Update) => void
@@ -36,17 +36,16 @@
 	let selectedNode: Node | null = $state(null);
 	let selectedEdge: Edge | null = $state(null);
 
-	let managingSecrets = $state(false);
 	// Everything this user may bind on this board, wherever it lives.
 	let usableSecrets = $state<SecretMeta[]>([]);
-	const pickable = $derived(groupByOrigin(usableSecrets, boardId, CURRENT_USER));
+	const pickable = $derived(groupByOrigin(usableSecrets, boardId, $getUser?.id ?? ''));
 	const byKey = $derived(new Map(usableSecrets.map((s) => [refKey(s), s])));
 
 	// Refreshed whenever the panel closes, so a credential added there is
 	// immediately pickable when creating a node.
 	$effect(() => {
-		if (managingSecrets) return;
-		secretsApi.usable(boardId).then((s) => (usableSecrets = s)).catch(() => (usableSecrets = []));
+		if ($isManagingSecrets) return;
+		secretsApi.usable(boardId, $getUser?.id ?? '').then((s) => (usableSecrets = s)).catch(() => (usableSecrets = []));
 	});
 	let creatingNode = $state<Board['postits'][number] | null>(null);
 	let paramValues = $state<Record<string, string>>({});
@@ -91,7 +90,7 @@
 		});
 
 		if ((parameters[type.current] ?? []).length === 0) {
-			const newPostIt = await postItsApi.create_well_known(boardId, type.current, {});
+			const newPostIt = await postItsApi.create_well_known(boardId, type.current, {}, $getUser?.id ?? '');
 			await postItsApi.move(newPostIt.id, position.x, position.y);
 			nodes = [...nodes, { id: newPostIt.id, position, type: type.current } as Node];
 			return;
@@ -102,8 +101,10 @@
 		);
 		creatingNode = {
 			id: uuid(),
+			// title: { text: '', vars: false },
 			type: type.current,
-			position
+			position,
+			// data: {}
 		};
 	};
 
@@ -131,7 +132,7 @@
 			...secrets.params
 		};
 
-		const newPostIt = await postItsApi.create_well_known(boardId, creatingNode.type!, params, secrets.bindings);
+		const newPostIt = await postItsApi.create_well_known(boardId, creatingNode.type!, params, $getUser?.id ?? '', secrets.bindings);
 		await postItsApi.move(newPostIt.id, creatingNode.position.x, creatingNode.position.y);
 
 		nodes = [...nodes, { ...creatingNode, id: newPostIt.id, data: params }];
@@ -265,16 +266,9 @@
 					attributionPosition={undefined}
 				>
 					<Controls />
-					<div class="absolute top-0 inset-x-0 flex flex-row items-center justify-between p-3 z-100! bg-transparent pointer-events-none">
-						<h1 class="text-2xl font-bold">{name}</h1>
-						<Button class="pointer-events-auto" variant="secondary" onclick={() => (managingSecrets = true)}>
-							{m['secrets.title']()}
-						</Button>
-					</div>
 				</SvelteFlow>
 			</div>
 		</Realtime>
-		<Dock />
 	</main>
 	{#if selectedNode}
 		<div
@@ -299,8 +293,8 @@
 		</div>
 	{/if}
 
-	{#if managingSecrets}
-		<SecretsPanel board={boardId} onclose={() => (managingSecrets = false)} />
+	{#if $isManagingSecrets}
+		<SecretsPanel board={boardId} onclose={() => setManagingSecrets(false)} />
 	{/if}
 
 	{#if creatingNode}

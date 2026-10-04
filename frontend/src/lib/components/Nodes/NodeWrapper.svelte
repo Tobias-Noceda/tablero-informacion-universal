@@ -12,7 +12,7 @@
 </script>
 
 <div
-    class="bg-main hover:bg-main-hover p-4 rounded-lg customNode"
+    class="bg-main hover:bg-main-hover p-4 rounded-lg customNode text-main-text"
     style={isSelected ? 'background-color: var(--color-main-hover)' : undefined}
 >
     <Handle class="customHandle" position={Position.Left} type="source" />

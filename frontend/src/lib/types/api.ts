@@ -15,6 +15,22 @@ export type Envs = {
 //     // idk, i forgot
 // }
 
+export type Paginated<T> = {
+	_links: {
+		first?: string;
+		prev?: string;
+		next?: string;
+		last?: string;
+	};
+	_pageInfo?: {
+		currentPage?: number;
+		totalPages?: number;
+		currentDate?: Date;
+		maxDate?: Date;
+	};
+	results: T[];
+};
+
 export type Board = {
     id: UUID;
     name: string;
