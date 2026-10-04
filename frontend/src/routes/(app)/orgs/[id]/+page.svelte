@@ -27,7 +27,8 @@
 		invalid_role: m['orgs.error_invalid_role'],
 		invalid_name: m['orgs.error_invalid_name'],
 		last_admin: m['orgs.error_last_admin'],
-		org_not_empty: m['orgs.error_org_not_empty']
+		org_not_empty: m['orgs.error_org_not_empty'],
+		rate_limited: m['orgs.error_rate_limited']
 	};
 
 	function describe(err: unknown) {

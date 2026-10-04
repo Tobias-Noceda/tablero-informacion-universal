@@ -30,7 +30,8 @@
 	const errors: Record<string, () => string> = {
 		user_not_found: m['members.error_user_not_found'],
 		invalid_role: m['members.error_invalid_role'],
-		owner_role: m['members.error_owner_role']
+		owner_role: m['members.error_owner_role'],
+		rate_limited: m['members.error_rate_limited']
 	};
 
 	function describe(err: unknown) {

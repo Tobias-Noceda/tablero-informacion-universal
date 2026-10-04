@@ -126,7 +126,8 @@
 		"identities": "Sign-in methods",
 		"identity_google": "Google",
 		"identity_password": "Password",
-		"add_password_hint": "To also sign in with a password, use “Forgot your password?” on the sign-in page.",
+		"add_password_hint": "You sign in with Google only. A password lets you sign in without it; we email you a link to choose one.",
+		"add_password": "Set a password",
 		"save_failed": "The name could not be saved."
 	},
 	"header": {
@@ -150,6 +151,7 @@
 		"error_user_not_found": "Nobody is registered with that email.",
 		"error_invalid_role": "Pick editor or viewer.",
 		"error_owner_role": "The owner's role cannot change.",
+		"error_rate_limited": "You added too many people in a short time. Wait a few minutes and try again.",
 		"error_unknown": "That did not work. Try again."
 	},
 	"orgs": {
@@ -179,6 +181,7 @@
 		"error_invalid_name": "The name cannot be empty.",
 		"error_last_admin": "An organization needs an admin. Make someone else an admin first.",
 		"error_org_not_empty": "Delete its boards and groups first.",
+		"error_rate_limited": "You added too many people in a short time. Wait a few minutes and try again.",
 		"error_unknown": "That did not work. Try again."
 	}
 }

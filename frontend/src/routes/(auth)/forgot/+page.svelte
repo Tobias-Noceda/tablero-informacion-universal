@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import Button from '$components/Button/Button.svelte';
 	import Input from '$components/Input/Input.svelte';
@@ -6,7 +7,8 @@
 	import { m } from '$lib/paraglide/messages';
 	import { session } from '$modules/session.svelte';
 
-	let email = $state('');
+	// The profile sends a Google-only user here with their address filled in.
+	let email = $state(page.url.searchParams.get('email') ?? '');
 	let error = $state('');
 	let busy = $state(false);
 	let sentTo = $state('');

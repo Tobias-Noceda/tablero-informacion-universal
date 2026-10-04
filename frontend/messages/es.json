@@ -126,7 +126,8 @@
 		"identities": "Formas de ingresar",
 		"identity_google": "Google",
 		"identity_password": "Contraseña",
-		"add_password_hint": "Para ingresar también con contraseña, usá «¿Olvidaste tu contraseña?» en la pantalla de inicio de sesión.",
+		"add_password_hint": "Solo iniciás sesión con Google. Con una contraseña podés entrar sin Google; te mandamos un link por email para elegirla.",
+		"add_password": "Elegir una contraseña",
 		"save_failed": "No se pudo guardar el nombre."
 	},
 	"header": {
@@ -150,6 +151,7 @@
 		"error_user_not_found": "No hay nadie registrado con ese email.",
 		"error_invalid_role": "Elegí editor o lector.",
 		"error_owner_role": "El rol del dueño no se puede cambiar.",
+		"error_rate_limited": "Agregaste demasiadas personas en poco tiempo. Esperá unos minutos y volvé a intentar.",
 		"error_unknown": "No funcionó. Probá de nuevo."
 	},
 	"orgs": {
@@ -179,6 +181,7 @@
 		"error_invalid_name": "El nombre no puede estar vacío.",
 		"error_last_admin": "Una organización necesita un admin. Hacé admin a otra persona primero.",
 		"error_org_not_empty": "Eliminá primero sus tableros y grupos.",
+		"error_rate_limited": "Agregaste demasiadas personas en poco tiempo. Esperá unos minutos y volvé a intentar.",
 		"error_unknown": "No funcionó. Probá de nuevo."
 	}
 }

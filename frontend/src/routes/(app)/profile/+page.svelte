@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import Button from '$components/Button/Button.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -84,7 +85,12 @@
 			{/each}
 		</ul>
 		{#if !user.identities.includes('password')}
-			<p class="text-sm opacity-70">{m['profile.add_password_hint']()}</p>
+			<p class="text-sm opacity-70">
+				{m['profile.add_password_hint']()}
+				<a class="underline" href={resolve(`/forgot?email=${encodeURIComponent(user.email)}`)}>
+					{m['profile.add_password']()}
+				</a>
+			</p>
 		{/if}
 	</section>
 </main>
