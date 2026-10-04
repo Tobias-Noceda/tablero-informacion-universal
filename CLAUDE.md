@@ -65,7 +65,7 @@ cd frontend
 pnpm install
 pnpm dev                # Vite dev server
 ```
-`pnpm dev` is not behind the ALB, so `/api` and `/ws` do not exist on the dev origin. To use the Docker stack as the API, set `VITE_API_URL=http://localhost` in `frontend/.env` (the ALB on port 80 routes `/api` and `/ws`; leave `VITE_REALTIME_URL` empty). Docker does not publish the backend (31126) or realtime (3000) ports. If you run those services yourself instead, use `VITE_API_URL=http://localhost:31126` and `VITE_REALTIME_URL=http://localhost:3000` (websocket-only transport, so no CORS is needed on realtime). Use `pnpm dev --host` and your LAN IP to open the dev server from another machine.
+`pnpm dev` is not behind the ALB, so `/api` and `/ws` do not exist on the dev origin. To use the Docker stack as the API, set `VITE_API_URL=http://localhost` in `frontend/.env` (the ALB on port 80 routes `/api` and `/ws`; leave `VITE_REALTIME_URL` empty). Docker does not publish the backend (31126) or realtime (3000) ports. If you run those services yourself instead, use `VITE_API_URL=http://localhost:31126` and `VITE_REALTIME_URL=http://localhost:3000` (websocket-only transport, so no CORS is needed on realtime). Use `pnpm dev --host` and your LAN IP to open the dev server from another machine. With `VITE_API_URL` pointing at another origin the refresh cookie is not sent (fetch only sends cookies same-origin), so signing in works but a reload signs you out.
 
 ## Environment variables
 
@@ -185,17 +185,18 @@ SvelteKit SPA (`ssr = false`, `prerender = false`). Svelte 5 **runes mode enforc
 
 **Key modules**:
 
-- `$modules/api.svelte.ts` — HTTP helpers (`get`, `post`, `put`, `patch`, `del`). Resolves relative paths against the page origin (see above) and maps network errors to SvelteKit `error(503)`. There is no authentication yet: `cognito_id` is passed explicitly; `CURRENT_USER` (`Messi`) lives here.
-- `$modules/realtime.svelte.ts` — `connect(board, onChange)`: opens the socket and the PeerJS mesh; used by `routes/board/[id]/Realtime.svelte`.
+- `$modules/api.svelte.ts` — HTTP helpers (`get`, `post`, `put`, `patch`, `del`) over one `request()`. Resolves relative paths against the page origin (see above), adds the session's `Authorization: Bearer`, renews once on a `401` (never for `/v1/auth/*`) and sends an expired session to `/login?next=`; `get` maps network errors to SvelteKit `error(503)`.
+- `$modules/session.svelte.ts` — `session`: `user`, `status` (`unknown | anonymous | authenticated`), the access token in memory only. `bootstrap()` trades the httpOnly refresh cookie for a session once; `refresh()` is single-flight (Web Locks across tabs when available); `BroadcastChannel('tiu-session')` shares sign-in and sign-out between tabs. Until the backend reads the principal from the token, services still send `session.userId` as `cognito_id`.
+- `$modules/realtime.svelte.ts` — `connect(board, user, onChange)`: opens the socket and the PeerJS mesh; used by `routes/(app)/board/[id]/Realtime.svelte`.
 - `$modules/sockets.svelte.ts` / `rtc.svelte.ts` — socket.io client and PeerJS cursor sharing.
 - `$modules/statefull.svelte.ts` — Preserves and restores arbitrary route state across navigation (`preserve` / `restore`), keyed by `[fromRoute][toRoute]`.
-- `$services/{board,post-it,secrets,edge}.ts` — Typed API calls per resource. `secrets.ts` is scope-first (`boardScope`, `memberScope`, `pathOf(scope)`): list/put/delete, self-managed OAuth2 (`put_oauth2`, `authorize`), platform providers (`providers`, `connect`), and `usable(board)`. `post-it.ts` sends `cognito_id` and `bindings`.
+- `$services/{board,post-it,secrets,edge,auth,users}.ts` — Typed API calls per resource; `auth.ts` throws `AuthError` with the backend's `error` code (`$lib/auth/form.ts` turns it into a message). `secrets.ts` is scope-first (`boardScope`, `memberScope`, `pathOf(scope)`): list/put/delete, self-managed OAuth2 (`put_oauth2`, `authorize`), platform providers (`providers`, `connect`), and `usable(board)`. `post-it.ts` sends `cognito_id` and `bindings`.
 - `$lib/secrets/{origin,binding}.ts` — Pure helpers behind the credential picker: where a usable secret comes from (`board | mine | profile | group | shared`) and what a card must send for the picked ones (`$NAME` + a binding for anything outside the board scope).
 - `$stores/boards.ts`, `$stores/sidebar.ts`, `$stores/mouses.svelte.ts` — Board list, sidebar open/close, live cursors.
 - `$types/api.ts` — API types (`Board`, `PostIt`, `Strand`, `SecretMeta`, `OAuth2Config`, `OAuthProvider`, ...).
 - `$components/Nodes/node-map.ts` — Well-known key → Svelte node component, plus the parameter form each one needs (`type: "secret"` renders a picker over the board's credentials). A well-known whose credential is the platform's declares no parameter.
 - `$components/Secrets/SecretsPanel.svelte` — Board credentials modal with two tabs, "Board" (shared with every member) and "Only mine" (the caller's member scope); same forms for API keys, self-managed OAuth2 and "Connect an account".
-- Routes: `/` (board list), `/board/[id]` (canvas: `Flow`, `Dock`, `DnDProvider`, `Realtime`; the view is keyed by the board id so navigating between boards remounts it), `/oauth2/callback` (provider redirect target; forwards `state`/`code` to the backend).
+- Routes: group `(app)` (its `+layout.ts` bootstraps the session and redirects anonymous visitors to `/login?next=`; header with the user menu): `/` (board list), `/board/[id]` (canvas: `Flow`, `Dock`, `DnDProvider`, `Realtime`; the view is keyed by the board id so navigating between boards remounts it), `/profile`, `/oauth2/callback` (provider redirect target; forwards `state`/`code` to the backend). Group `(auth)`: `/login`, `/register`, `/verify?token=`, `/forgot`, `/reset?token=`, `/auth/google/callback` (Google's redirect target; posts `code`/`state` to the backend, then goes to `next`).
 
 After editing `messages/{en,es}.json` outside the Vite dev server, regenerate with `npx paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide` before `pnpm check`.
 
