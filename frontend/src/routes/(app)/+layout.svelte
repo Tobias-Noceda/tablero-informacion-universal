@@ -5,6 +5,7 @@
 	import logo from '$assets/logo.png';
 	import Icon from '$components/Icon/Icon.svelte';
 	import LocaleSwitcher from '$components/LocaleSwitcher/LocaleSwitcher.svelte';
+	import OrgSwitcher from '$components/OrgSwitcher/OrgSwitcher.svelte';
 	import UserMenu from '$components/UserMenu/UserMenu.svelte';
 
 	import { SvelteFlowProvider } from '@xyflow/svelte';
@@ -12,11 +13,15 @@
 	import { session } from '$modules/session.svelte';
 	import { isSidebarOpen, toggleSidebar } from '$stores/sidebar';
 	import { boardList, refreshBoards } from '$stores/boards';
+	import { orgs } from '$stores/org.svelte';
 	import { cn } from '$lib/utils';
 
 	onMount(() => {
 		refreshBoards().catch((err) => console.error('Failed to load boards', err));
+		orgs.refresh().catch((err) => console.error('Failed to load organizations', err));
 	});
+
+	const visibleBoards = $derived($boardList.filter((board) => orgs.shows(board)));
 
 	// Signing out in another tab, or a session that could not be renewed.
 	$effect(() => {
@@ -44,6 +49,7 @@
 				<a href={resolve('/')}><img src={logo} alt="logo" class="logo" /></a>
 			</div>
 			<div class="flex flex-row items-center gap-3">
+				<OrgSwitcher />
 				<LocaleSwitcher />
 				<UserMenu />
 			</div>
@@ -58,7 +64,7 @@
 			</div>
 			{#if $isSidebarOpen}
 				<div class="z-100! flex w-50 flex-col gap-1 overflow-y-auto bg-sidebar-hover p-2">
-					{#each $boardList as board (board.id)}
+					{#each visibleBoards as board (board.id)}
 						<a
 							href={resolve(`/board/${board.id}`)}
 							class="truncate rounded-md border border-sidebar px-2 py-1.5 text-sm text-white transition-colors hover:bg-sidebar"

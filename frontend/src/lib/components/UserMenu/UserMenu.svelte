@@ -57,6 +57,14 @@
 				>
 					{m['header.profile']()}
 				</a>
+				<a
+					role="menuitem"
+					href={resolve('/orgs')}
+					class="px-4 py-2 text-sm hover:bg-skeleton"
+					onclick={() => (open = false)}
+				>
+					{m['orgs.menu']()}
+				</a>
 				<button
 					type="button"
 					role="menuitem"

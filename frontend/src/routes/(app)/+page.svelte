@@ -7,6 +7,7 @@
 	import { m } from "$lib/paraglide/messages";
     import * as boardApi from "$services/board";
     import { refreshBoards } from "$stores/boards";
+    import { orgs } from "$stores/org.svelte";
 
 	let showModal = $state(false);
     let boardName = $state('');
@@ -14,7 +15,7 @@
 	async function handleCreate() {
         const trimmed = boardName.trim();
         if (!trimmed) return;
-        const board = await boardApi.create(trimmed);
+        const board = await boardApi.create(trimmed, orgs.current?.id);
         await refreshBoards();
         showModal = false;
         await goto(resolve(`/board/${board.id}`));
@@ -46,5 +47,8 @@
             onsubmit={handleCreate}
             required
         />
+        {#if orgs.current}
+            <p class="text-xs opacity-70">{m['orgs.board_in']({ org: orgs.current.name })}</p>
+        {/if}
     </Modal>
 {/if}

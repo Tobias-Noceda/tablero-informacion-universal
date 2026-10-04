@@ -54,11 +54,33 @@ export type BoardMemberSummary = {
     role: BoardRole;
 };
 
+// What someone is in an organization: admins own its boards and groups,
+// members look at them.
+export type OrgRole = "admin" | "member";
+
+export type Org = {
+    id: UUID;
+    name: string;
+    members: { user: UUID; role: OrgRole }[];
+    created_at: string;
+    role: OrgRole; // the caller's
+};
+
+export type OrgMemberSummary = {
+    user: UserSummary;
+    role: OrgRole;
+};
+
+export type OrgDetail = Omit<Org, "members"> & {
+    members: OrgMemberSummary[];
+};
+
 export type Board = {
     id: UUID;
     name: string;
     owner: UUID; // user id
     members: BoardMember[]; // everyone else on the board
+    org?: UUID; // the organization it belongs to; none for a personal board
     role?: BoardRole; // the caller's
     postits: {
         id: UUID;

@@ -2,12 +2,14 @@ import type { Board, BoardMember, BoardMemberSummary, PostIt, UUID } from "$type
 
 import * as api from "$modules/api.svelte"
 
-export async function create(name: string) {
-    const res = await api.post("/v1/boards", { name });
+// A board in org is reachable by everyone in that organization.
+export async function create(name: string, org?: UUID) {
+    const res = await api.post("/v1/boards", { name, org });
     return await res.json() as Board;
 }
 
-// Every board the signed-in user owns or collaborates on.
+// Every board the signed-in user owns, is a member of, or reaches through an
+// organization.
 export async function get_all() {
     const res = await api.get("/v1/boards");
     return await res.json() as Board[];

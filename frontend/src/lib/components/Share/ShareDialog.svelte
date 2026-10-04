@@ -18,6 +18,9 @@
 	const assignable: BoardMember['role'][] = ['editor', 'viewer'];
 
 	let members = $state<BoardMemberSummary[]>([]);
+	// Someone who reaches the board through its organization is not listed
+	// and has nothing to leave.
+	const listed = $derived(members.some((member) => member.user.id === session.userId));
 	let loading = $state(true);
 	let error = $state('');
 
@@ -95,7 +98,9 @@
 	{:else}
 		<ul class="flex flex-col gap-2">
 			{#each members as member (member.user.id)}
-				<li class="flex items-center justify-between gap-2 rounded-md border border-main-border px-3 py-2">
+				<li
+					class="flex items-center justify-between gap-2 rounded-md border border-main-border px-3 py-2"
+				>
 					<div class="flex min-w-0 flex-col">
 						<span class="truncate text-sm">
 							{member.user.name || member.user.email || member.user.id}
@@ -117,7 +122,9 @@
 									<option value={option}>{m[`members.role_${option}`]()}</option>
 								{/each}
 							</select>
-							<Button variant="destructive" onclick={() => remove(member)}>{m['members.remove']()}</Button>
+							<Button variant="destructive" onclick={() => remove(member)}
+								>{m['members.remove']()}</Button
+							>
 						{:else}
 							<span class="text-sm opacity-70">{m[`members.role_${member.role}`]()}</span>
 						{/if}
@@ -129,7 +136,13 @@
 
 	{#if isOwner}
 		<form class="flex flex-col gap-2 border-t border-main-border pt-3" onsubmit={add}>
-			<Input label={m['members.email']()} type="email" autocomplete="off" bind:value={email} required />
+			<Input
+				label={m['members.email']()}
+				type="email"
+				autocomplete="off"
+				bind:value={email}
+				required
+			/>
 			<div class="flex gap-2">
 				<select
 					class="rounded-md border border-main-border bg-background px-2 py-1 text-sm"
@@ -140,10 +153,12 @@
 						<option value={option}>{m[`members.role_${option}`]()}</option>
 					{/each}
 				</select>
-				<Button variant="primary" type="submit" disabled={email.trim() === ''}>{m['members.add']()}</Button>
+				<Button variant="primary" type="submit" disabled={email.trim() === ''}
+					>{m['members.add']()}</Button
+				>
 			</div>
 		</form>
-	{:else}
+	{:else if listed}
 		<Button variant="destructive" onclick={leave}>{m['members.leave']()}</Button>
 	{/if}
 </Modal>
