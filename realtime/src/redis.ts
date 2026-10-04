@@ -1,6 +1,9 @@
 import { createClient } from "redis";
 
 const redis = createClient({ url: process.env.REDIS_URL! });
+// The client reconnects on its own; without a listener the error would
+// end the process.
+redis.on("error", (err: Error) => console.error("Redis:", err.message));
 const cache = await redis.connect();
 
 // Also forgets peers that vanished without disconnecting.
