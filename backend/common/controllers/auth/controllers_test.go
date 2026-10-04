@@ -127,9 +127,9 @@ func TestRegister_ValidationErrors(t *testing.T) {
 	h := setup(t, true)
 
 	cases := map[string]string{
-		`{"email":"nope","password":"` + password + `","name":"Ana"}`: "invalid email",
-		`{"email":"a@b.co","password":"short","name":"Ana"}`:          "password must have between 8 and 128 characters",
-		`{"email":"a@b.co","password":"` + password + `","name":" "}`: "invalid name",
+		`{"email":"nope","password":"` + password + `","name":"Ana"}`: `"error":"invalid_email"`,
+		`{"email":"a@b.co","password":"short","name":"Ana"}`:          `"error":"weak_password"`,
+		`{"email":"a@b.co","password":"` + password + `","name":" "}`: `"error":"invalid_name"`,
 		`{"password":"` + password + `","name":"Ana"}`:                "",
 		`not json`: "",
 	}

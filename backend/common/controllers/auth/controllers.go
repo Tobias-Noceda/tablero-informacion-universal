@@ -236,8 +236,12 @@ func (ctrl *Controller) clearCookie(c *gin.Context) {
 
 func (ctrl *Controller) fail(c *gin.Context, err error) {
 	switch {
-	case errors.Is(err, srv.ErrInvalidEmail), errors.Is(err, srv.ErrWeakPassword), errors.Is(err, srv.ErrInvalidName):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, srv.ErrInvalidEmail):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_email"})
+	case errors.Is(err, srv.ErrWeakPassword):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "weak_password"})
+	case errors.Is(err, srv.ErrInvalidName):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_name"})
 	case errors.Is(err, srv.ErrInvalidToken):
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_token"})
 	case errors.Is(err, srv.ErrInvalidCredentials):
