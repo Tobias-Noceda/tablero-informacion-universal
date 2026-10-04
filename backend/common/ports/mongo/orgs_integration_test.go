@@ -157,6 +157,10 @@ func TestMongo_OrgBoardsAndGroups(t *testing.T) {
 		t.Errorf("bob outside the org lists %+v", groups)
 	}
 
+	if boards, err := db.FindOrgBoards(org.Id); err != nil || len(boards) != 1 || boards[0].Id != orgBoard.Id {
+		t.Errorf("org boards = %+v, %v, want the org's", boards, err)
+	}
+
 	for name, count := range map[string]func(uuid.UUID) (int64, error){"boards": db.CountOrgBoards, "groups": db.CountOrgGroups} {
 		n, err := count(org.Id)
 		if err != nil || n != 1 {

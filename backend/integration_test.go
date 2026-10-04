@@ -80,7 +80,7 @@ func newStack(t *testing.T) *stack {
 		_ = db.Close()
 	})
 
-	cfg := config{admins: []string{"admin@it.test", rootEmail}, accessTTL: DEFAULT_ACCESS_TTL, refreshTTL: DEFAULT_REFRESH_TTL,
+	cfg := config{admins: []string{"admin@it.test", rootEmail}, accessTTL: DEFAULT_ACCESS_TTL, refreshTTL: DEFAULT_REFRESH_TTL, cookieSecure: true,
 		google: oidc.Config{Issuer: googleIssuer, ClientID: googleClientID, ClientSecret: googleClientSecret}}
 	mailer := &mocks.RecordingMailer{}
 
