@@ -20,6 +20,7 @@ import (
 	"github.com/Secreto31126/tesis/common/ports/crypto"
 	"github.com/Secreto31126/tesis/common/ports/jwt"
 	"github.com/Secreto31126/tesis/common/ports/mongo"
+	"github.com/Secreto31126/tesis/common/ports/oidc"
 	"github.com/Secreto31126/tesis/common/ports/redis"
 	"github.com/Secreto31126/tesis/common/ports/safehttp"
 	"github.com/gin-gonic/gin"
@@ -74,7 +75,8 @@ func newStack(t *testing.T) *stack {
 		_ = db.Close()
 	})
 
-	cfg := config{admins: []string{"admin@it.test"}, accessTTL: DEFAULT_ACCESS_TTL, refreshTTL: DEFAULT_REFRESH_TTL}
+	cfg := config{admins: []string{"admin@it.test"}, accessTTL: DEFAULT_ACCESS_TTL, refreshTTL: DEFAULT_REFRESH_TTL,
+		google: oidc.Config{Issuer: googleIssuer, ClientID: googleClientID, ClientSecret: googleClientSecret}}
 	mailer := &mocks.RecordingMailer{}
 
 	return &stack{t: t, app: newApp(db, cache, kek, keys, cfg, mailer), db: db, cache: cache, mailer: mailer}
