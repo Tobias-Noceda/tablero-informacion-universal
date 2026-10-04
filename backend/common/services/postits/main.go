@@ -16,8 +16,10 @@ var (
 	// card needs is not the user's business, so the name only goes to the log.
 	ErrSystemSecretMissing   = errors.New("This card is temporarily unavailable")
 	ErrCredentialUnavailable = errors.New("This card's credentials are no longer available")
-	ErrNotAMember            = errors.New("Not a member of this board")
-	ErrInvalidBinding        = errors.New("Binding aliases must match [A-Z][A-Z0-9_]*")
+	// ErrNotAMember reads like a missing resource on purpose: to a stranger,
+	// a board and its cards do not exist.
+	ErrNotAMember     = errors.New("Not found")
+	ErrInvalidBinding = errors.New("Binding aliases must match [A-Z][A-Z0-9_]*")
 )
 
 type PostItsService struct {
@@ -55,8 +57,19 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, postIt *mode
 	return srv.db.CreatePostIt(postIt, postIt.WellKnown, models.Position{X: 750, Y: 350})
 }
 
-func (srv *PostItsService) GetPostIt(id uuid.UUID) (*models.PostIts, error) {
-	return srv.db.FindPostIt(id)
+// GetPostIt loads a card for a member of its board. ExecutePostIt runs what
+// it returns.
+func (srv *PostItsService) GetPostIt(principal models.Principal, id uuid.UUID) (*models.PostIts, error) {
+	postit, err := srv.db.FindPostIt(id)
+	if err != nil || postit == nil {
+		return nil, ErrNotAMember
+	}
+
+	if _, err := srv.member(principal, postit.Board); err != nil {
+		return nil, err
+	}
+
+	return postit, nil
 }
 
 func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID, set map[string]any) error {
@@ -64,12 +77,8 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 		return nil
 	}
 
-	postit, err := srv.GetPostIt(id)
+	postit, err := srv.GetPostIt(principal, id)
 	if err != nil {
-		return err
-	}
-
-	if _, err := srv.member(principal, postit.Board); err != nil {
 		return err
 	}
 
@@ -98,10 +107,7 @@ func touchesCredentials(set map[string]any) bool {
 
 func (srv *PostItsService) member(principal models.Principal, boardID uuid.UUID) (*models.Board, error) {
 	board, err := srv.db.FindBoard(boardID)
-	if err != nil {
-		return nil, err
-	}
-	if board == nil || !board.IsMember(principal.ID) {
+	if err != nil || board == nil || !board.IsMember(principal.ID) {
 		return nil, ErrNotAMember
 	}
 	return board, nil
@@ -121,8 +127,8 @@ func (srv *PostItsService) bind(principal models.Principal, boardID uuid.UUID, b
 	return srv.secrets.CanBind(principal, boardID, refs)
 }
 
-func (srv *PostItsService) MovePostIt(id uuid.UUID, pos models.Position) error {
-	postit, err := srv.GetPostIt(id)
+func (srv *PostItsService) MovePostIt(principal models.Principal, id uuid.UUID, pos models.Position) error {
+	postit, err := srv.GetPostIt(principal, id)
 	if err != nil {
 		return err
 	}
@@ -130,7 +136,11 @@ func (srv *PostItsService) MovePostIt(id uuid.UUID, pos models.Position) error {
 	return srv.db.MovePostIt(postit.Board, postit.Id, pos)
 }
 
-func (srv *PostItsService) DeletePostIt(id uuid.UUID) ([]models.Strand, error) {
+func (srv *PostItsService) DeletePostIt(principal models.Principal, id uuid.UUID) ([]models.Strand, error) {
+	if _, err := srv.GetPostIt(principal, id); err != nil {
+		return nil, err
+	}
+
 	return srv.db.DeletePostIt(id)
 }
 

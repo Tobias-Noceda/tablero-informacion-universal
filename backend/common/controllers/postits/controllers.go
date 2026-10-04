@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
 	srv "github.com/Secreto31126/tesis/common/services/postits"
@@ -53,7 +54,7 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		return
 	}
 
-	postIt, err := ctrl.service.CreatePostIt(models.Principal{ID: req.CognitoID}, &models.PostIts{
+	postIt, err := ctrl.service.CreatePostIt(middleware.Principal(c), &models.PostIts{
 		Board:     req.Board,
 		WellKnown: req.WellKnown,
 		Params:    req.Params,
@@ -89,9 +90,9 @@ func (ctrl *Controller) GetPostIt(c *gin.Context) {
 		return
 	}
 
-	postIt, err := ctrl.service.GetPostIt(id)
+	postIt, err := ctrl.service.GetPostIt(middleware.Principal(c), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -120,9 +121,9 @@ func (ctrl *Controller) DeletePostIt(c *gin.Context) {
 		return
 	}
 
-	strands, err := ctrl.service.DeletePostIt(id)
+	strands, err := ctrl.service.DeletePostIt(middleware.Principal(c), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -152,9 +153,9 @@ func (ctrl *Controller) ExecutePostIt(c *gin.Context) {
 		return
 	}
 
-	postIt, err := ctrl.service.GetPostIt(id)
+	postIt, err := ctrl.service.GetPostIt(middleware.Principal(c), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
+		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -230,7 +231,7 @@ func (ctrl *Controller) EditPostIt(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.service.UpdatePostIt(models.Principal{ID: req.CognitoID}, id, set)
+	err = ctrl.service.UpdatePostIt(middleware.Principal(c), id, set)
 	if err != nil {
 		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
@@ -272,9 +273,9 @@ func (ctrl *Controller) MovePostIt(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.service.MovePostIt(id, models.Position{X: req.X, Y: req.Y})
+	err = ctrl.service.MovePostIt(middleware.Principal(c), id, models.Position{X: req.X, Y: req.Y})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -285,8 +286,9 @@ func (ctrl *Controller) MovePostIt(c *gin.Context) {
 
 func statusOf(err error) int {
 	switch {
-	case errors.Is(err, srv.ErrNotAMember),
-		errors.Is(err, srv.ErrCredentialUnavailable),
+	case errors.Is(err, srv.ErrNotAMember):
+		return http.StatusNotFound
+	case errors.Is(err, srv.ErrCredentialUnavailable),
 		errors.Is(err, infrastructure.ErrForbidden):
 		return http.StatusForbidden
 	case errors.Is(err, srv.ErrInvalidBinding),

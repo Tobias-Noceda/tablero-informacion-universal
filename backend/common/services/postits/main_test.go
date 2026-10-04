@@ -175,7 +175,7 @@ func TestMovePostIt_UsesBoardFromPostIt(t *testing.T) {
 	}
 
 	svc := newService(db, nil, nil)
-	if err := svc.MovePostIt(id, models.Position{X: 1, Y: 2}); err != nil {
+	if err := svc.MovePostIt(boardOwner, id, models.Position{X: 1, Y: 2}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotBoard != board || gotID != id {
@@ -193,7 +193,7 @@ func TestMovePostIt_FindError(t *testing.T) {
 		},
 	}
 	svc := newService(db, nil, nil)
-	if err := svc.MovePostIt(uuid.New(), models.Position{}); err == nil {
+	if err := svc.MovePostIt(boardOwner, uuid.New(), models.Position{}); err == nil {
 		t.Fatal("expected error propagated from FindPostIt")
 	}
 }
@@ -264,7 +264,7 @@ func TestGetPostIt_Delegates(t *testing.T) {
 		},
 	}
 
-	postit, err := newService(db, nil, nil).GetPostIt(id)
+	postit, err := newService(db, nil, nil).GetPostIt(boardOwner, id)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -277,6 +277,7 @@ func TestDeletePostIt_Delegates(t *testing.T) {
 	id := uuid.New()
 	called := false
 	db := &mocks.MockDB{
+		FindPostItFn: existingCard(id),
 		DeletePostItFn: func(p uuid.UUID) (s []models.Strand, _ error) {
 			if p != id {
 				t.Errorf("id = %v, want %v", p, id)
@@ -286,11 +287,53 @@ func TestDeletePostIt_Delegates(t *testing.T) {
 		},
 	}
 
-	if _, err := newService(db, nil, nil).DeletePostIt(id); err != nil {
+	if _, err := newService(db, nil, nil).DeletePostIt(boardOwner, id); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !called {
 		t.Error("DeletePostIt was not delegated")
+	}
+}
+
+// Reading, moving and deleting a card is for the members of its board; to
+// anyone else the card does not exist.
+func TestCardRoutes_AdmitMembersOnly(t *testing.T) {
+	id := uuid.New()
+	db := &mocks.MockDB{
+		FindPostItFn:   existingCard(id),
+		MovePostItFn:   func(_, _ uuid.UUID, _ models.Position) error { return nil },
+		DeletePostItFn: func(uuid.UUID) ([]models.Strand, error) { return nil, nil },
+	}
+	svc := newService(db, nil, nil)
+
+	calls := map[string]func(models.Principal) error{
+		"get": func(p models.Principal) error {
+			_, err := svc.GetPostIt(p, id)
+			return err
+		},
+		"move": func(p models.Principal) error { return svc.MovePostIt(p, id, models.Position{}) },
+		"delete": func(p models.Principal) error {
+			_, err := svc.DeletePostIt(p, id)
+			return err
+		},
+	}
+
+	for name, call := range calls {
+		if err := call(models.Principal{ID: "eve"}); !errors.Is(err, ErrNotAMember) {
+			t.Errorf("%s as an outsider: got %v, want ErrNotAMember", name, err)
+		}
+		if err := call(boardOwner); err != nil {
+			t.Errorf("%s as the owner: %v", name, err)
+		}
+	}
+}
+
+func TestGetPostIt_MissingCardIsNotAMember(t *testing.T) {
+	db := &mocks.MockDB{
+		FindPostItFn: func(uuid.UUID) (*models.PostIts, error) { return nil, errors.New("mongo: no documents in result") },
+	}
+	if _, err := newService(db, nil, nil).GetPostIt(boardOwner, uuid.New()); !errors.Is(err, ErrNotAMember) {
+		t.Errorf("got %v, want ErrNotAMember", err)
 	}
 }
 
