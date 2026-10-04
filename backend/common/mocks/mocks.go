@@ -15,7 +15,7 @@ var ErrCacheMiss = errors.New("cache miss")
 
 // MockDB is a configurable test double for infrastructure.Database.
 type MockDB struct {
-	FindUserBoardsFn              func(cognitoID string) ([]models.Board, error)
+	FindUserBoardsFn              func(user string) ([]models.Board, error)
 	FindBoardPostItsFn            func(id uuid.UUID) ([]models.PostIts, error)
 	FindPostItFn                  func(id uuid.UUID) (*models.PostIts, error)
 	FindBoardFn                   func(id uuid.UUID) (*models.Board, error)
@@ -24,8 +24,8 @@ type MockDB struct {
 	UpdatePostItFn                func(id uuid.UUID, set map[string]any) error
 	CreatePostItFn                func(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
 	CreateBoardFn                 func(name, owner string) (*models.Board, error)
-	AddCollaboratorToBoardFn      func(boardID uuid.UUID, cognitoID string) error
-	RemoveCollaboratorFromBoardFn func(boardID uuid.UUID, cognitoID string) error
+	AddCollaboratorToBoardFn      func(boardID uuid.UUID, user string) error
+	RemoveCollaboratorFromBoardFn func(boardID uuid.UUID, user string) error
 	DisconnectPostItsFn           func(boardID, strandID uuid.UUID) error
 	ConnectPostItsFn              func(boardID, source, target uuid.UUID) (*models.Strand, error)
 	MovePostItFn                  func(boardID, postItID uuid.UUID, pos models.Position) error
@@ -34,9 +34,9 @@ type MockDB struct {
 
 var _ infrastructure.Database = (*MockDB)(nil)
 
-func (m *MockDB) FindUserBoards(cognitoID string) ([]models.Board, error) {
+func (m *MockDB) FindUserBoards(user string) ([]models.Board, error) {
 	if m.FindUserBoardsFn != nil {
-		return m.FindUserBoardsFn(cognitoID)
+		return m.FindUserBoardsFn(user)
 	}
 	return nil, nil
 }
@@ -97,16 +97,16 @@ func (m *MockDB) CreateBoard(name, owner string) (*models.Board, error) {
 	return nil, nil
 }
 
-func (m *MockDB) AddCollaboratorToBoard(boardID uuid.UUID, cognitoID string) error {
+func (m *MockDB) AddCollaboratorToBoard(boardID uuid.UUID, user string) error {
 	if m.AddCollaboratorToBoardFn != nil {
-		return m.AddCollaboratorToBoardFn(boardID, cognitoID)
+		return m.AddCollaboratorToBoardFn(boardID, user)
 	}
 	return nil
 }
 
-func (m *MockDB) RemoveCollaboratorFromBoard(boardID uuid.UUID, cognitoID string) error {
+func (m *MockDB) RemoveCollaboratorFromBoard(boardID uuid.UUID, user string) error {
 	if m.RemoveCollaboratorFromBoardFn != nil {
-		return m.RemoveCollaboratorFromBoardFn(boardID, cognitoID)
+		return m.RemoveCollaboratorFromBoardFn(boardID, user)
 	}
 	return nil
 }

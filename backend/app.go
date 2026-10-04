@@ -4,6 +4,7 @@ import (
 	a_ctrl "github.com/Secreto31126/tesis/common/controllers/auth"
 	"github.com/Secreto31126/tesis/common/controllers/boards"
 	g_ctrl "github.com/Secreto31126/tesis/common/controllers/groups"
+	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/controllers/postits"
 	s_ctrl "github.com/Secreto31126/tesis/common/controllers/secrets"
 	u_ctrl "github.com/Secreto31126/tesis/common/controllers/users"
@@ -50,7 +51,7 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	boardService := b_srv.New(db, secrets)
 	groupService := g_srv.New(db, secrets)
 	postitService := p_srv.New(db, cache, executer.New(), secrets)
-	realtimeService := r_srv.New(*boardService, cache)
+	realtimeService := r_srv.New(boardService, cache)
 
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
@@ -58,11 +59,15 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 
 	api := router.Group("/api/v1")
 	a_ctrl.NewController(authService, a_ctrl.Cookies{Secure: cfg.cookieSecure, Path: AUTH_COOKIE_PATH}).RegisterRoutes(api)
-	u_ctrl.NewController(userService, keys).RegisterRoutes(api)
-	boards.NewController(boardService, realtimeService).RegisterRoutes(api)
-	postits.NewController(postitService).RegisterRoutes(api)
-	s_ctrl.NewController(secrets).RegisterRoutes(api)
-	g_ctrl.NewController(groupService).RegisterRoutes(api)
+
+	// Everything but /auth needs a signed-in user; handlers read who it is
+	// from middleware.Principal.
+	private := api.Group("", middleware.RequireAuth(keys))
+	u_ctrl.NewController(userService).RegisterRoutes(private)
+	boards.NewController(boardService, realtimeService).RegisterRoutes(private)
+	postits.NewController(postitService).RegisterRoutes(private)
+	s_ctrl.NewController(secrets).RegisterRoutes(private)
+	g_ctrl.NewController(groupService).RegisterRoutes(private)
 
 	return &app{secrets: secrets, router: router}
 }

@@ -96,13 +96,14 @@ func timeout() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), REQUEST_TIMEOUT)
 }
 
-func (db *MongoDB) FindUserBoards(cognito_id string) ([]models.Board, error) {
+// FindUserBoards lists every board the user belongs to, owned or shared.
+func (db *MongoDB) FindUserBoards(user string) ([]models.Board, error) {
 	ctx, cancel := timeout()
 	defer cancel()
 
-	var boards []models.Board
+	boards := []models.Board{}
 
-	filter := bson.M{"owner": cognito_id}
+	filter := bson.M{"$or": bson.A{bson.M{"owner": user}, bson.M{"collaborators": user}}}
 
 	cursor, err := db.boards.Find(ctx, filter)
 
@@ -353,17 +354,17 @@ func (db *MongoDB) DisconnectPostIts(boardID, strandID uuid.UUID) error {
 	)
 }
 
-func (db *MongoDB) AddCollaboratorToBoard(boardID uuid.UUID, cognitoID string) error {
+func (db *MongoDB) AddCollaboratorToBoard(boardID uuid.UUID, user string) error {
 	return db.updateBoard(
 		bson.M{"_id": boardID},
-		bson.M{"$addToSet": bson.M{"collaborators": cognitoID}},
+		bson.M{"$addToSet": bson.M{"collaborators": user}},
 	)
 }
 
-func (db *MongoDB) RemoveCollaboratorFromBoard(boardID uuid.UUID, cognitoID string) error {
+func (db *MongoDB) RemoveCollaboratorFromBoard(boardID uuid.UUID, user string) error {
 	return db.updateBoard(
 		bson.M{"_id": boardID},
-		bson.M{"$pull": bson.M{"collaborators": cognitoID}},
+		bson.M{"$pull": bson.M{"collaborators": user}},
 	)
 }
 

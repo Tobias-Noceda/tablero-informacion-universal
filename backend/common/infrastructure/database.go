@@ -7,7 +7,7 @@ import (
 
 type Database interface {
 	// Find user's boards
-	FindUserBoards(cognitoId string) ([]models.Board, error)
+	FindUserBoards(user string) ([]models.Board, error)
 	// Find all the board post-its
 	FindBoardPostIts(id uuid.UUID) ([]models.PostIts, error)
 	// Find a given postIt
@@ -25,9 +25,9 @@ type Database interface {
 	// Creates a Board
 	CreateBoard(name, owner string) (*models.Board, error)
 	// Adds collaborator to board
-	AddCollaboratorToBoard(boardID uuid.UUID, cognitoID string) error
+	AddCollaboratorToBoard(boardID uuid.UUID, user string) error
 	// Removes collaborator from board
-	RemoveCollaboratorFromBoard(boardID uuid.UUID, cognitoID string) error
+	RemoveCollaboratorFromBoard(boardID uuid.UUID, user string) error
 	// Disconnects a strand
 	DisconnectPostIts(boardID, strandID uuid.UUID) error
 	// Connects a Strand

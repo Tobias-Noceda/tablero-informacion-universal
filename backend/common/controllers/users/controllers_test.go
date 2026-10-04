@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
@@ -26,7 +27,7 @@ func setup() *gin.Engine {
 	verifier := mocks.StaticVerifier{"ana": infrastructure.Claims{Subject: ana.Id.String()}}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(store), verifier).RegisterRoutes(r)
+	NewController(srv.New(store)).RegisterRoutes(r.Group("", middleware.RequireAuth(verifier)))
 	return r
 }
 

@@ -12,16 +12,15 @@ import (
 )
 
 type Controller struct {
-	service  *srv.UserService
-	verifier infrastructure.TokenVerifier
+	service *srv.UserService
 }
 
-func NewController(service *srv.UserService, verifier infrastructure.TokenVerifier) *Controller {
-	return &Controller{service, verifier}
+func NewController(service *srv.UserService) *Controller {
+	return &Controller{service}
 }
 
 func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
-	users := router.Group("/users", middleware.RequireAuth(ctrl.verifier))
+	users := router.Group("/users")
 	{
 		users.GET("/:id", ctrl.GetUser)
 		users.PATCH("/:id", ctrl.UpdateUser)

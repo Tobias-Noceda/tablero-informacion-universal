@@ -4,6 +4,7 @@ import (
 	"maps"
 	"net/url"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -213,6 +214,19 @@ func (v StaticVerifier) Verify(token string) (infrastructure.Claims, error) {
 		return infrastructure.Claims{}, infrastructure.ErrInvalidToken
 	}
 	return claims, nil
+}
+
+// SubjectVerifier lets a controller test name its caller directly: the
+// bearer token is the user id, and "admin:<id>" is that user as an admin.
+type SubjectVerifier struct{}
+
+var _ infrastructure.TokenVerifier = SubjectVerifier{}
+
+func (SubjectVerifier) Verify(token string) (infrastructure.Claims, error) {
+	if id, admin := strings.CutPrefix(token, "admin:"); admin {
+		return infrastructure.Claims{Subject: id, Admin: true}, nil
+	}
+	return infrastructure.Claims{Subject: token}, nil
 }
 
 // PlainHasher stores passwords in the clear so service tests stay fast.
