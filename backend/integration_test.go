@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	a_ctrl "github.com/Secreto31126/tesis/common/controllers/auth"
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/ports/crypto"
@@ -24,11 +25,15 @@ import (
 	"github.com/Secreto31126/tesis/common/ports/redis"
 	"github.com/Secreto31126/tesis/common/ports/safehttp"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 const (
-	nasaKey   = "nasa_live_ONLY_THE_PROVIDER_MAY_SEE_THIS"
-	testOwner = "it-owner"
+	nasaKey = "nasa_live_ONLY_THE_PROVIDER_MAY_SEE_THIS"
+	// rootEmail is a platform admin (see newStack) that no test registers by
+	// hand, so any test may sign in as it.
+	rootEmail  = "root@it.test"
+	itPassword = "integration password"
 )
 
 // stack wires the real application over the Mongo and Redis named by the
@@ -75,14 +80,21 @@ func newStack(t *testing.T) *stack {
 		_ = db.Close()
 	})
 
-	cfg := config{admins: []string{"admin@it.test"}, accessTTL: DEFAULT_ACCESS_TTL, refreshTTL: DEFAULT_REFRESH_TTL,
+	cfg := config{admins: []string{"admin@it.test", rootEmail}, accessTTL: DEFAULT_ACCESS_TTL, refreshTTL: DEFAULT_REFRESH_TTL,
 		google: oidc.Config{Issuer: googleIssuer, ClientID: googleClientID, ClientSecret: googleClientSecret}}
 	mailer := &mocks.RecordingMailer{}
 
 	return &stack{t: t, app: newApp(db, cache, kek, keys, cfg, mailer), db: db, cache: cache, mailer: mailer}
 }
 
-func (s *stack) do(method, path string, body any) *httptest.ResponseRecorder {
+func (s *stack) request(token, method, path string, body any) *httptest.ResponseRecorder {
+	s.t.Helper()
+	return s.requestFrom("", token, method, path, body)
+}
+
+// requestFrom sends the request from the given client address (host:port),
+// or httptest's default one when it is empty.
+func (s *stack) requestFrom(remote, token, method, path string, body any) *httptest.ResponseRecorder {
 	s.t.Helper()
 	var reader io.Reader
 	if body != nil {
@@ -91,10 +103,22 @@ func (s *stack) do(method, path string, body any) *httptest.ResponseRecorder {
 	}
 	req := httptest.NewRequest(method, path, reader)
 	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	if remote != "" {
+		req.RemoteAddr = remote
+	}
 	w := httptest.NewRecorder()
 	s.app.router.ServeHTTP(w, req)
 	s.responses = append(s.responses, w)
 	return w
+}
+
+// do calls the API anonymously.
+func (s *stack) do(method, path string, body any) *httptest.ResponseRecorder {
+	s.t.Helper()
+	return s.request("", method, path, body)
 }
 
 func (s *stack) mustJSON(w *httptest.ResponseRecorder, want int, out any) {
@@ -118,6 +142,145 @@ func (s *stack) assertNoResponseContains(needle string) {
 	}
 }
 
+// client calls the API as one signed-in user.
+type client struct {
+	s     *stack
+	id    string
+	token string
+}
+
+func (c *client) do(method, path string, body any) *httptest.ResponseRecorder {
+	c.s.t.Helper()
+	return c.s.request(c.token, method, path, body)
+}
+
+// signUp registers and verifies a fresh account; who only makes the address
+// readable, every call gets a new one.
+func (s *stack) signUp(who string) *client {
+	s.t.Helper()
+	return s.register(who + "-" + uuid.NewString()[:8] + "@it.test")
+}
+
+// freshAddress is a client address nobody used yet. Registering and signing
+// in are limited per client, and the suite signs in far more users than one
+// client may.
+func freshAddress() string {
+	id := uuid.New()
+	return net.IPv4(10, id[0], id[1], id[2]).String() + ":1234"
+}
+
+func (s *stack) register(email string) *client {
+	s.t.Helper()
+	s.mustJSON(s.requestFrom(freshAddress(), "", http.MethodPost, "/api/v1/auth/register", map[string]string{"email": email, "password": itPassword, "name": email}), http.StatusAccepted, nil)
+
+	var session a_ctrl.SessionResponse
+	s.mustJSON(s.do(http.MethodPost, "/api/v1/auth/verify-email", map[string]string{"token": s.lastMailedToken()}), http.StatusOK, &session)
+	return &client{s, session.User.Id.String(), session.AccessToken}
+}
+
+// admin signs in as the seeded platform admin, registering it on first use.
+func (s *stack) admin() *client {
+	s.t.Helper()
+	var session a_ctrl.SessionResponse
+	w := s.requestFrom(freshAddress(), "", http.MethodPost, "/api/v1/auth/login", map[string]string{"email": rootEmail, "password": itPassword})
+	if w.Code != http.StatusOK {
+		return s.register(rootEmail)
+	}
+	s.mustJSON(w, http.StatusOK, &session)
+	return &client{s, session.User.Id.String(), session.AccessToken}
+}
+
+func (c *client) newBoard(name string) models.Board {
+	c.s.t.Helper()
+	var board models.Board
+	c.s.mustJSON(c.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": name}), http.StatusCreated, &board)
+	return board
+}
+
+// Everything but /auth needs a token: the wiring is the only thing that puts
+// a route behind RequireAuth, so walk what is actually mounted.
+func TestEndToEnd_EveryPrivateRouteNeedsAToken(t *testing.T) {
+	s := newStack(t)
+	params := strings.NewReplacer(":id", uuid.NewString(), ":strand", uuid.NewString(), ":user", "u", ":name", "KEY")
+
+	checked := 0
+	for _, route := range s.app.router.Routes() {
+		if strings.HasPrefix(route.Path, "/api/v1/auth/") {
+			continue
+		}
+		checked++
+		if w := s.do(route.Method, params.Replace(route.Path), nil); w.Code != http.StatusUnauthorized {
+			t.Errorf("%s %s = %d, want 401", route.Method, route.Path, w.Code)
+		}
+	}
+	if checked < 30 {
+		t.Errorf("only %d private routes were found; is the router wired?", checked)
+	}
+}
+
+// Someone outside a board cannot read, draw on, run or move anything on it,
+// and cannot tell it from a board that does not exist.
+func TestEndToEnd_AStrangerSeesNothingOfABoard(t *testing.T) {
+	s := newStack(t)
+	owner, ana, eve := s.signUp("owner"), s.signUp("ana"), s.signUp("eve")
+
+	board := owner.newBoard("it")
+	defer owner.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
+	base := "/api/v1/boards/" + board.Id.String()
+	s.mustJSON(owner.do(http.MethodPost, base+"/collaborators", map[string]string{"user": ana.id}), http.StatusNoContent, nil)
+
+	var postit models.PostIts
+	s.mustJSON(ana.do(http.MethodPost, "/api/v1/post-its", map[string]any{"board": board.Id, "well_known": "dolar_oficial"}), http.StatusCreated, &postit)
+	card := "/api/v1/post-its/" + postit.Id.String()
+
+	for _, c := range []struct{ method, path string }{
+		{http.MethodGet, base},
+		{http.MethodGet, base + "/post-its"},
+		{http.MethodPatch, base + "/name"},
+		{http.MethodDelete, base},
+		{http.MethodGet, base + "/secrets"},
+		{http.MethodGet, card + "/settings"},
+		{http.MethodGet, card},
+		{http.MethodPatch, card + "/position"},
+		{http.MethodDelete, card},
+	} {
+		body := map[string]any{"name": "mine now", "x": 1, "y": 2}
+		if w := eve.do(c.method, c.path, body); w.Code != http.StatusNotFound {
+			t.Errorf("stranger %s %s = %d, want 404 (body: %s)", c.method, c.path, w.Code, w.Body.String())
+		}
+	}
+
+	// The collaborator can work on it but not rename it; the board is in
+	// both their listings and not in the stranger's.
+	if w := ana.do(http.MethodPatch, base+"/name", map[string]string{"name": "mine now"}); w.Code != http.StatusNotFound {
+		t.Errorf("collaborator renamed the board: %d", w.Code)
+	}
+	for who, c := range map[string]*client{"owner": owner, "ana": ana, "eve": eve} {
+		var boards []models.Board
+		s.mustJSON(c.do(http.MethodGet, "/api/v1/boards", nil), http.StatusOK, &boards)
+		listed := len(boards) == 1 && boards[0].Id == board.Id
+		if listed == (who == "eve") {
+			t.Errorf("%s's boards = %+v", who, boards)
+		}
+	}
+}
+
+// The operator routes belong to platform admins.
+func TestEndToEnd_SystemRoutesAreForAdmins(t *testing.T) {
+	s := newStack(t)
+	user, admin := s.signUp("user"), s.admin()
+
+	if w := user.do(http.MethodGet, "/api/v1/system/secrets", nil); w.Code != http.StatusForbidden {
+		t.Errorf("a user listed the system secrets: %d", w.Code)
+	}
+	if w := user.do(http.MethodPut, "/api/v1/system/secrets",
+		map[string]string{"name": "EXTRA_KEY", "kind": "api_key", "value": "v"}); w.Code != http.StatusForbidden {
+		t.Errorf("a user wrote a system secret: %d", w.Code)
+	}
+	s.mustJSON(admin.do(http.MethodGet, "/api/v1/system/secrets", nil), http.StatusOK, nil)
+	s.mustJSON(admin.do(http.MethodGet, "/api/v1/system/keys", nil), http.StatusOK, nil)
+}
+
 func TestEndToEnd_SystemSecretReachesTheProviderAndNoClient(t *testing.T) {
 	original := safehttp.IsSafeIP
 	safehttp.IsSafeIP = func(net.IP) bool { return true }
@@ -132,13 +295,15 @@ func TestEndToEnd_SystemSecretReachesTheProviderAndNoClient(t *testing.T) {
 	defer provider.Close()
 
 	s := newStack(t)
+	admin, user := s.admin(), s.signUp("user")
 
 	// The platform provisions its key; the listing shows it is there.
-	s.mustJSON(s.do(http.MethodPut, "/api/v1/system/secrets",
+	s.mustJSON(admin.do(http.MethodPut, "/api/v1/system/secrets",
 		map[string]string{"name": string(models.SystemNasaApiKey), "kind": "api_key", "value": nasaKey}), http.StatusNoContent, nil)
+	defer admin.do(http.MethodDelete, "/api/v1/system/secrets/"+string(models.SystemNasaApiKey), nil)
 
 	var statuses []models.SystemSecretStatus
-	s.mustJSON(s.do(http.MethodGet, "/api/v1/system/secrets", nil), http.StatusOK, &statuses)
+	s.mustJSON(admin.do(http.MethodGet, "/api/v1/system/secrets", nil), http.StatusOK, &statuses)
 	configured := false
 	for _, st := range statuses {
 		configured = configured || (st.Name == string(models.SystemNasaApiKey) && st.Configured)
@@ -148,12 +313,11 @@ func TestEndToEnd_SystemSecretReachesTheProviderAndNoClient(t *testing.T) {
 	}
 
 	// A user builds a board and drops the card on it.
-	var board models.Board
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": "it", "owner": testOwner}), http.StatusCreated, &board)
+	board := user.newBoard("it")
 
 	var postit models.PostIts
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/post-its",
-		map[string]any{"cognito_id": testOwner, "board": board.Id, "well_known": "nasa_apod"}), http.StatusCreated, &postit)
+	s.mustJSON(user.do(http.MethodPost, "/api/v1/post-its",
+		map[string]any{"board": board.Id, "well_known": "nasa_apod"}), http.StatusCreated, &postit)
 
 	if postit.Request.Queries["api_key"] != "$api_key" {
 		t.Fatalf("stored query = %q, want the placeholder", postit.Request.Queries["api_key"])
@@ -167,11 +331,11 @@ func TestEndToEnd_SystemSecretReachesTheProviderAndNoClient(t *testing.T) {
 	}
 
 	var settings models.PostIts
-	settingsResponse := s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String()+"/settings", nil)
+	settingsResponse := user.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String()+"/settings", nil)
 	s.mustJSON(settingsResponse, http.StatusOK, &settings)
 
 	var result map[string]any
-	executionResponse := s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil)
+	executionResponse := user.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil)
 	s.mustJSON(executionResponse, http.StatusOK, &result)
 
 	if seenKey != nasaKey {
@@ -183,13 +347,13 @@ func TestEndToEnd_SystemSecretReachesTheProviderAndNoClient(t *testing.T) {
 
 	// Executing again is served from Redis; the provider is not called twice.
 	seenKey = ""
-	s.mustJSON(s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil), http.StatusOK, &result)
+	s.mustJSON(user.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil), http.StatusOK, &result)
 	if seenKey != "" {
 		t.Error("the second execution hit the provider instead of the cache")
 	}
 
 	// Deleting the board purges the scope, and the platform's key stays.
-	s.mustJSON(s.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil), http.StatusNoContent, nil)
+	s.mustJSON(user.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil), http.StatusNoContent, nil)
 	if _, err := s.db.FindActiveKey(models.BoardScope(board.Id)); err == nil {
 		t.Error("the board's data key survived the delete")
 	}
@@ -205,25 +369,23 @@ func TestEndToEnd_SystemSecretReachesTheProviderAndNoClient(t *testing.T) {
 			t.Errorf("a user-facing response names the system secret: %s", w.Body.String())
 		}
 	}
-
-	s.mustJSON(s.do(http.MethodDelete, "/api/v1/system/secrets/"+string(models.SystemNasaApiKey), nil), http.StatusNoContent, nil)
 }
 
 // Without the platform key the card is unavailable, and the failure does not
 // say which credential is missing.
 func TestEndToEnd_MissingSystemSecretIsUnavailable(t *testing.T) {
 	s := newStack(t)
-	s.do(http.MethodDelete, "/api/v1/system/secrets/"+string(models.SystemNasaApiKey), nil)
+	user := s.signUp("user")
+	s.admin().do(http.MethodDelete, "/api/v1/system/secrets/"+string(models.SystemNasaApiKey), nil)
 
-	var board models.Board
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": "it", "owner": testOwner}), http.StatusCreated, &board)
-	defer s.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
+	board := user.newBoard("it")
+	defer user.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
 
 	var postit models.PostIts
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/post-its",
-		map[string]any{"cognito_id": testOwner, "board": board.Id, "well_known": "nasa_apod"}), http.StatusCreated, &postit)
+	s.mustJSON(user.do(http.MethodPost, "/api/v1/post-its",
+		map[string]any{"board": board.Id, "well_known": "nasa_apod"}), http.StatusCreated, &postit)
 
-	w := s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil)
+	w := user.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil)
 	if w.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want 503 (body: %s)", w.Code, w.Body.String())
 	}
@@ -236,22 +398,22 @@ func TestEndToEnd_MissingSystemSecretIsUnavailable(t *testing.T) {
 // stranger cannot even learn the board exists.
 func TestEndToEnd_BoardSecretsAreWriteOnly(t *testing.T) {
 	s := newStack(t)
+	owner, stranger := s.signUp("owner"), s.signUp("stranger")
 
-	var board models.Board
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": "it", "owner": testOwner}), http.StatusCreated, &board)
-	defer s.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
+	board := owner.newBoard("it")
+	defer owner.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
 	base := "/api/v1/boards/" + board.Id.String()
 
-	s.mustJSON(s.do(http.MethodPut, base+"/secrets",
-		map[string]string{"cognito_id": testOwner, "name": "MY_KEY", "kind": "bearer", "value": "board-secret-value"}), http.StatusNoContent, nil)
+	s.mustJSON(owner.do(http.MethodPut, base+"/secrets",
+		map[string]string{"name": "MY_KEY", "kind": "bearer", "value": "board-secret-value"}), http.StatusNoContent, nil)
 
 	var metas []models.SecretMeta
-	s.mustJSON(s.do(http.MethodGet, base+"/secrets?cognito_id="+testOwner, nil), http.StatusOK, &metas)
+	s.mustJSON(owner.do(http.MethodGet, base+"/secrets", nil), http.StatusOK, &metas)
 	if len(metas) != 1 || metas[0].Name != "MY_KEY" || metas[0].Scope != models.BoardScope(board.Id) {
 		t.Errorf("metas = %+v", metas)
 	}
 
-	if w := s.do(http.MethodGet, base+"/secrets?cognito_id=stranger", nil); w.Code != http.StatusNotFound {
+	if w := stranger.do(http.MethodGet, base+"/secrets", nil); w.Code != http.StatusNotFound {
 		t.Errorf("stranger got %d, want 404", w.Code)
 	}
 
@@ -266,7 +428,6 @@ func TestEndToEnd_MemberSecretIsOnlyBindableByItsOwner(t *testing.T) {
 	t.Cleanup(func() { safehttp.IsSafeIP = original })
 
 	const (
-		ana     = "it-ana"
 		anasKey = "cur_live_ONLY_ANAS_CARD_MAY_SEND_THIS"
 		keyName = "ANAS_CURRENCY_KEY"
 	)
@@ -280,50 +441,46 @@ func TestEndToEnd_MemberSecretIsOnlyBindableByItsOwner(t *testing.T) {
 	defer stub.Close()
 
 	s := newStack(t)
+	owner, ana := s.signUp("owner"), s.signUp("ana")
 
-	var board models.Board
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": "it", "owner": testOwner}), http.StatusCreated, &board)
-	defer s.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
+	board := owner.newBoard("it")
+	defer owner.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
 	base := "/api/v1/boards/" + board.Id.String()
-	s.mustJSON(s.do(http.MethodPost, base+"/collaborators", map[string]string{"cognito_id": ana}), http.StatusNoContent, nil)
+	s.mustJSON(owner.do(http.MethodPost, base+"/collaborators", map[string]string{"user": ana.id}), http.StatusNoContent, nil)
 
 	// Ana keeps her key on this board, for herself.
-	mine := base + "/members/" + ana + "/secrets"
-	s.mustJSON(s.do(http.MethodPut, mine,
-		map[string]string{"cognito_id": ana, "name": keyName, "kind": "api_key", "value": anasKey}), http.StatusNoContent, nil)
+	mine := base + "/members/" + ana.id + "/secrets"
+	s.mustJSON(ana.do(http.MethodPut, mine,
+		map[string]string{"name": keyName, "kind": "api_key", "value": anasKey}), http.StatusNoContent, nil)
 
-	if w := s.do(http.MethodGet, mine+"?cognito_id="+testOwner, nil); w.Code != http.StatusNotFound {
+	if w := owner.do(http.MethodGet, mine, nil); w.Code != http.StatusNotFound {
 		t.Errorf("the board owner listed Ana's secrets: %d", w.Code)
 	}
 
 	var usable []models.SecretMeta
-	s.mustJSON(s.do(http.MethodGet, base+"/secrets/usable?cognito_id="+ana, nil), http.StatusOK, &usable)
-	if len(usable) != 1 || usable[0].Name != keyName || usable[0].Scope != models.MemberScope(board.Id, ana) {
+	s.mustJSON(ana.do(http.MethodGet, base+"/secrets/usable", nil), http.StatusOK, &usable)
+	if len(usable) != 1 || usable[0].Name != keyName || usable[0].Scope != models.MemberScope(board.Id, ana.id) {
 		t.Errorf("Ana's usable secrets = %+v", usable)
 	}
-	s.mustJSON(s.do(http.MethodGet, base+"/secrets/usable?cognito_id="+testOwner, nil), http.StatusOK, &usable)
+	s.mustJSON(owner.do(http.MethodGet, base+"/secrets/usable", nil), http.StatusOK, &usable)
 	if len(usable) != 0 {
 		t.Errorf("the owner's usable secrets include Ana's: %+v", usable)
 	}
 
-	binding := map[string]any{"scope": models.MemberScope(board.Id, ana), "name": keyName}
-	card := func(caller string) map[string]any {
-		return map[string]any{
-			"cognito_id": caller,
-			"board":      board.Id,
-			"well_known": "exchange_rate",
-			"params":     map[string]string{"$credential": "$" + keyName},
-			"bindings":   map[string]any{keyName: binding},
-		}
+	card := map[string]any{
+		"board":      board.Id,
+		"well_known": "exchange_rate",
+		"params":     map[string]string{"$credential": "$" + keyName},
+		"bindings":   map[string]any{keyName: map[string]any{"scope": models.MemberScope(board.Id, ana.id), "name": keyName}},
 	}
 
-	if w := s.do(http.MethodPost, "/api/v1/post-its", card(testOwner)); w.Code != http.StatusForbidden {
+	if w := owner.do(http.MethodPost, "/api/v1/post-its", card); w.Code != http.StatusForbidden {
 		t.Errorf("the owner bound Ana's secret: %d %s", w.Code, w.Body.String())
 	}
 
 	var postit models.PostIts
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/post-its", card(ana)), http.StatusCreated, &postit)
-	if postit.RunAs != ana {
+	s.mustJSON(ana.do(http.MethodPost, "/api/v1/post-its", card), http.StatusCreated, &postit)
+	if postit.RunAs != ana.id {
 		t.Errorf("run_as = %q, want Ana", postit.RunAs)
 	}
 
@@ -332,28 +489,32 @@ func TestEndToEnd_MemberSecretIsOnlyBindableByItsOwner(t *testing.T) {
 		t.Fatalf("retarget: %v", err)
 	}
 
+	// Any member may look at the card; it always runs with Ana's key.
 	var result map[string]any
-	s.mustJSON(s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil), http.StatusOK, &result)
+	s.mustJSON(owner.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil), http.StatusOK, &result)
 	if len(seenKeys) != 1 || seenKeys[0] != anasKey {
 		t.Errorf("provider saw %v, want Ana's key once", seenKeys)
 	}
 
 	// The owner edits the card: it now runs as them, and Ana's key is out of reach.
-	if w := s.do(http.MethodPatch, "/api/v1/post-its/"+postit.Id.String()+"/settings",
-		map[string]any{"cognito_id": testOwner, "params": map[string]string{"$base": "EUR"}}); w.Code != http.StatusForbidden {
+	if w := owner.do(http.MethodPatch, "/api/v1/post-its/"+postit.Id.String()+"/settings",
+		map[string]any{"params": map[string]string{"$base": "EUR"}}); w.Code != http.StatusForbidden {
 		t.Errorf("the owner rebound the card to Ana's secret: %d %s", w.Code, w.Body.String())
 	}
 
 	// Ana leaves: her scope is destroyed and her card stops.
-	s.mustJSON(s.do(http.MethodDelete, base+"/collaborators", map[string]string{"cognito_id": ana}), http.StatusNoContent, nil)
-	if _, err := s.db.FindActiveKey(models.MemberScope(board.Id, ana)); err == nil {
+	s.mustJSON(ana.do(http.MethodDelete, base+"/collaborators", map[string]string{"user": ana.id}), http.StatusNoContent, nil)
+	if _, err := s.db.FindActiveKey(models.MemberScope(board.Id, ana.id)); err == nil {
 		t.Error("Ana's data key survived her removal")
 	}
 	if err := s.cache.DropPostItResult(postit.Id); err != nil {
 		t.Fatalf("drop cache: %v", err)
 	}
-	if w := s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil); w.Code != http.StatusForbidden {
+	if w := owner.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil); w.Code != http.StatusForbidden {
 		t.Errorf("the card still runs after Ana left: %d %s", w.Code, w.Body.String())
+	}
+	if w := ana.do(http.MethodGet, base, nil); w.Code != http.StatusNotFound {
+		t.Errorf("Ana still sees the board she left: %d", w.Code)
 	}
 
 	s.assertNoResponseContains(anasKey)
@@ -367,7 +528,6 @@ func TestEndToEnd_GroupSecretFollowsItsMembers(t *testing.T) {
 	t.Cleanup(func() { safehttp.IsSafeIP = original })
 
 	const (
-		ana     = "it-ana"
 		opsKey  = "cur_live_ONLY_THE_OPS_GROUP_MAY_SEND_THIS"
 		keyName = "OPS_CURRENCY_KEY"
 	)
@@ -381,30 +541,29 @@ func TestEndToEnd_GroupSecretFollowsItsMembers(t *testing.T) {
 	defer stub.Close()
 
 	s := newStack(t)
+	owner, ana := s.signUp("owner"), s.signUp("ana")
 
 	var group models.Group
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/groups", map[string]string{"cognito_id": testOwner, "name": "ops"}), http.StatusCreated, &group)
+	s.mustJSON(owner.do(http.MethodPost, "/api/v1/groups", map[string]string{"name": "ops"}), http.StatusCreated, &group)
 	groupBase := "/api/v1/groups/" + group.Id.String()
-	defer s.do(http.MethodDelete, groupBase+"?cognito_id="+testOwner, nil)
+	defer owner.do(http.MethodDelete, groupBase, nil)
 
-	s.mustJSON(s.do(http.MethodPut, groupBase+"/secrets",
-		map[string]string{"cognito_id": testOwner, "name": keyName, "kind": "api_key", "value": opsKey}), http.StatusNoContent, nil)
-	s.mustJSON(s.do(http.MethodPost, groupBase+"/members", map[string]string{"cognito_id": testOwner, "member": ana}), http.StatusNoContent, nil)
+	s.mustJSON(owner.do(http.MethodPut, groupBase+"/secrets",
+		map[string]string{"name": keyName, "kind": "api_key", "value": opsKey}), http.StatusNoContent, nil)
+	s.mustJSON(owner.do(http.MethodPost, groupBase+"/members", map[string]string{"member": ana.id}), http.StatusNoContent, nil)
 
 	// Ana's own board: the owner of the group is not on it, the key still is.
-	var board models.Board
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": "anas", "owner": ana}), http.StatusCreated, &board)
-	defer s.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
+	board := ana.newBoard("anas")
+	defer ana.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
 
 	var usable []models.SecretMeta
-	s.mustJSON(s.do(http.MethodGet, "/api/v1/boards/"+board.Id.String()+"/secrets/usable?cognito_id="+ana, nil), http.StatusOK, &usable)
+	s.mustJSON(ana.do(http.MethodGet, "/api/v1/boards/"+board.Id.String()+"/secrets/usable", nil), http.StatusOK, &usable)
 	if len(usable) != 1 || usable[0].Name != keyName || usable[0].Scope != models.GroupScope(group.Id) {
 		t.Errorf("Ana's usable secrets = %+v", usable)
 	}
 
 	var postit models.PostIts
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/post-its", map[string]any{
-		"cognito_id": ana,
+	s.mustJSON(ana.do(http.MethodPost, "/api/v1/post-its", map[string]any{
 		"board":      board.Id,
 		"well_known": "exchange_rate",
 		"params":     map[string]string{"$credential": "$" + keyName},
@@ -417,17 +576,17 @@ func TestEndToEnd_GroupSecretFollowsItsMembers(t *testing.T) {
 	}
 
 	var result map[string]any
-	s.mustJSON(s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil), http.StatusOK, &result)
+	s.mustJSON(ana.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil), http.StatusOK, &result)
 	if len(seenKeys) != 1 || seenKeys[0] != opsKey {
 		t.Errorf("provider saw %v, want the group's key once", seenKeys)
 	}
 
 	// Ana leaves the group: the card stops, the secret stays with the group.
-	s.mustJSON(s.do(http.MethodDelete, groupBase+"/members", map[string]string{"cognito_id": testOwner, "member": ana}), http.StatusNoContent, nil)
+	s.mustJSON(owner.do(http.MethodDelete, groupBase+"/members", map[string]string{"member": ana.id}), http.StatusNoContent, nil)
 	if err := s.cache.DropPostItResult(postit.Id); err != nil {
 		t.Fatalf("drop cache: %v", err)
 	}
-	if w := s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil); w.Code != http.StatusForbidden {
+	if w := ana.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil); w.Code != http.StatusForbidden {
 		t.Errorf("the card still runs after Ana left the group: %d %s", w.Code, w.Body.String())
 	}
 	if _, err := s.db.FindActiveKey(models.GroupScope(group.Id)); err != nil {
@@ -435,7 +594,7 @@ func TestEndToEnd_GroupSecretFollowsItsMembers(t *testing.T) {
 	}
 
 	// Deleting the group is crypto-shredding for everything it owned.
-	s.mustJSON(s.do(http.MethodDelete, groupBase+"?cognito_id="+testOwner, nil), http.StatusNoContent, nil)
+	s.mustJSON(owner.do(http.MethodDelete, groupBase, nil), http.StatusNoContent, nil)
 	if _, err := s.db.FindActiveKey(models.GroupScope(group.Id)); err == nil {
 		t.Error("the group's data key survived the delete")
 	}
@@ -451,8 +610,6 @@ func TestEndToEnd_SharedSecretStopsWhenRevoked(t *testing.T) {
 	t.Cleanup(func() { safehttp.IsSafeIP = original })
 
 	const (
-		alice     = "it-alice"
-		bob       = "it-bob"
 		alicesKey = "cur_live_ALICE_SHARED_THIS_WITH_BOB_ONLY"
 		keyName   = "ALICES_CURRENCY_KEY"
 	)
@@ -466,28 +623,31 @@ func TestEndToEnd_SharedSecretStopsWhenRevoked(t *testing.T) {
 	defer stub.Close()
 
 	s := newStack(t)
+	alice, bob := s.signUp("alice"), s.signUp("bob")
 
-	var shared, other models.Board
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": "shared", "owner": bob}), http.StatusCreated, &shared)
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": "other", "owner": bob}), http.StatusCreated, &other)
-	defer s.do(http.MethodDelete, "/api/v1/boards/"+shared.Id.String(), nil)
-	defer s.do(http.MethodDelete, "/api/v1/boards/"+other.Id.String(), nil)
+	shared, other := bob.newBoard("shared"), bob.newBoard("other")
+	defer bob.do(http.MethodDelete, "/api/v1/boards/"+shared.Id.String(), nil)
+	defer bob.do(http.MethodDelete, "/api/v1/boards/"+other.Id.String(), nil)
 
-	profile := "/api/v1/users/" + alice + "/secrets"
-	s.mustJSON(s.do(http.MethodPut, profile,
-		map[string]string{"cognito_id": alice, "name": keyName, "kind": "api_key", "value": alicesKey}), http.StatusNoContent, nil)
-	defer s.do(http.MethodDelete, profile+"/"+keyName+"?cognito_id="+alice, nil)
+	profile := "/api/v1/users/" + alice.id + "/secrets"
+	s.mustJSON(alice.do(http.MethodPut, profile,
+		map[string]string{"name": keyName, "kind": "api_key", "value": alicesKey}), http.StatusNoContent, nil)
+	defer alice.do(http.MethodDelete, profile+"/"+keyName, nil)
 
-	grant := models.Grant{To: models.Audience{Kind: models.AudienceUser, ID: bob}, Board: shared.Id.String()}
-	s.mustJSON(s.do(http.MethodPut, profile+"/"+keyName+"/grants",
-		map[string]any{"cognito_id": alice, "grants": []models.Grant{grant}}), http.StatusNoContent, nil)
+	if w := bob.do(http.MethodGet, profile, nil); w.Code != http.StatusNotFound {
+		t.Errorf("Bob listed Alice's profile secrets: %d", w.Code)
+	}
+
+	grant := models.Grant{To: models.Audience{Kind: models.AudienceUser, ID: bob.id}, Board: shared.Id.String()}
+	s.mustJSON(alice.do(http.MethodPut, profile+"/"+keyName+"/grants",
+		map[string]any{"grants": []models.Grant{grant}}), http.StatusNoContent, nil)
 
 	usableOn := func(board models.Board) []models.SecretMeta {
 		var usable []models.SecretMeta
-		s.mustJSON(s.do(http.MethodGet, "/api/v1/boards/"+board.Id.String()+"/secrets/usable?cognito_id="+bob, nil), http.StatusOK, &usable)
+		s.mustJSON(bob.do(http.MethodGet, "/api/v1/boards/"+board.Id.String()+"/secrets/usable", nil), http.StatusOK, &usable)
 		return usable
 	}
-	if usable := usableOn(shared); len(usable) != 1 || usable[0].Name != keyName || usable[0].Scope != models.UserScope(alice) {
+	if usable := usableOn(shared); len(usable) != 1 || usable[0].Name != keyName || usable[0].Scope != models.UserScope(alice.id) {
 		t.Errorf("Bob's usable secrets on the shared board = %+v", usable)
 	}
 	if usable := usableOn(other); len(usable) != 0 {
@@ -496,19 +656,18 @@ func TestEndToEnd_SharedSecretStopsWhenRevoked(t *testing.T) {
 
 	card := func(board models.Board) map[string]any {
 		return map[string]any{
-			"cognito_id": bob,
 			"board":      board.Id,
 			"well_known": "exchange_rate",
 			"params":     map[string]string{"$credential": "$" + keyName},
-			"bindings":   map[string]any{keyName: map[string]any{"scope": models.UserScope(alice), "name": keyName}},
+			"bindings":   map[string]any{keyName: map[string]any{"scope": models.UserScope(alice.id), "name": keyName}},
 		}
 	}
-	if w := s.do(http.MethodPost, "/api/v1/post-its", card(other)); w.Code != http.StatusForbidden {
+	if w := bob.do(http.MethodPost, "/api/v1/post-its", card(other)); w.Code != http.StatusForbidden {
 		t.Errorf("Bob bound the key on the other board: %d %s", w.Code, w.Body.String())
 	}
 
 	var postit models.PostIts
-	s.mustJSON(s.do(http.MethodPost, "/api/v1/post-its", card(shared)), http.StatusCreated, &postit)
+	s.mustJSON(bob.do(http.MethodPost, "/api/v1/post-its", card(shared)), http.StatusCreated, &postit)
 
 	resource, _ := url.Parse(stub.URL)
 	if err := s.db.UpdatePostIt(postit.Id, map[string]any{"resource": resource}); err != nil {
@@ -516,18 +675,18 @@ func TestEndToEnd_SharedSecretStopsWhenRevoked(t *testing.T) {
 	}
 
 	var result map[string]any
-	s.mustJSON(s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil), http.StatusOK, &result)
+	s.mustJSON(bob.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil), http.StatusOK, &result)
 	if len(seenKeys) != 1 || seenKeys[0] != alicesKey {
 		t.Errorf("provider saw %v, want Alice's key once", seenKeys)
 	}
 
 	// Alice withdraws the share: Bob's card stops, Alice's own use is untouched.
-	s.mustJSON(s.do(http.MethodPut, profile+"/"+keyName+"/grants",
-		map[string]any{"cognito_id": alice, "grants": []models.Grant{}}), http.StatusNoContent, nil)
+	s.mustJSON(alice.do(http.MethodPut, profile+"/"+keyName+"/grants",
+		map[string]any{"grants": []models.Grant{}}), http.StatusNoContent, nil)
 	if err := s.cache.DropPostItResult(postit.Id); err != nil {
 		t.Fatalf("drop cache: %v", err)
 	}
-	if w := s.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil); w.Code != http.StatusForbidden {
+	if w := bob.do(http.MethodGet, "/api/v1/post-its/"+postit.Id.String(), nil); w.Code != http.StatusForbidden {
 		t.Errorf("Bob's card still runs after the share was withdrawn: %d %s", w.Code, w.Body.String())
 	}
 	if usable := usableOn(shared); len(usable) != 0 {
