@@ -44,7 +44,7 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	secrets := s_srv.New(db, s_srv.NewPolicy(db, db), crypto.NewKeyring(kek, db), oauth.New(), cache, cache, db)
 
 	authService := a_srv.New(a_srv.Config{AccessTTL: cfg.accessTTL, RefreshTTL: cfg.refreshTTL, Admins: cfg.admins},
-		db, cache, password.New(), keys, cache, cache, mailer)
+		db, cache, password.New(), keys, cache, cache, mailer, cfg.identityProvider())
 	userService := u_srv.New(db)
 
 	boardService := b_srv.New(db, secrets)
