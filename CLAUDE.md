@@ -127,19 +127,20 @@ main.go                           bootstrap, maintenance flags, Run
 app.go                            newApp(): the whole service graph (shared with integration tests)
 maintenance.go                    -rewrap-keys / -rotate-key / -rotate-all-keys
 common/
-  models/          domain types (Board, PostIts, Secret, SecretScope, SecretRef, Grant, Group, DataKey, OAuth2Material, SystemSecretName)
-  infrastructure/  port interfaces (Database, Cache, Executer, SecretStore, KeyStore, GroupStore, ScopePolicy, SecretResolver, ...)
+  models/          domain types (Board, PostIts, Secret, SecretScope, SecretRef, Grant, Group, Org, DataKey, OAuth2Material, SystemSecretName)
+  infrastructure/  port interfaces (Database, Cache, Executer, SecretStore, KeyStore, GroupStore, OrgStore, Access, ScopePolicy, SecretResolver, ...)
   ports/
-    mongo/         Database, SecretStore, KeyStore and GroupStore impls (collections: boards, postit, secrets, data_keys, groups; uuid codec)
+    mongo/         Database, SecretStore, KeyStore, GroupStore and OrgStore impls (collections: boards, postit, secrets, data_keys, groups, orgs; uuid codec)
     redis/         Cache (post-it results), Locker, HandshakeStore and online peers
     crypto/        Sealer (master key ring = KEK) and Keyring (one wrapped data key per scope)
     oauth/         OAuth2 token endpoint client
     executer/      DewIt — HTTP fetch + gojq transform (json.go, html.go)
     safehttp/      SSRF-safe HTTP client
   services/
-    access/        the access resolver: a principal's role on a board (owner|editor|viewer) and in a group (owner|member)
+    access/        the access resolver: a principal's role on a board (owner|editor|viewer), in a group (owner|member|viewer) and in an organization (admin|member)
     boards/        board CRUD and members by role (+ purges the board's and its members' secrets and data keys on delete / on removing a member)
-    groups/        groups that own secrets: create, members, delete (+ purge)
+    groups/        groups that own secrets: create (optionally in an org), members, delete (+ purge)
+    orgs/          organizations: create, rename, members by email (the last admin stays), delete once nothing belongs to it
     postits/       post-it CRUD + execution + caching + secret injection; well-known definitions
     secrets/       vault: put/list/delete per scope, policy (CanManage/CanView/CanUse), bindings, grants, usable listing, OAuth2 handshakes, platform providers, key rotation
     realtime/      online-peer bookkeeping in Redis
@@ -147,12 +148,13 @@ common/
     boards/        Gin routes /v1/boards (+ strands, collaborators, online)
     postits/       Gin routes /v1/post-its
     groups/        Gin routes /v1/groups
+    orgs/          Gin routes /v1/orgs
     secrets/       Gin routes /v1/{boards,users,groups}/:id/{secrets,oauth2}, /v1/boards/:id/members/:user/*, /v1/boards/:id/secrets/usable, /v1/system/*, /v1/oauth2/*
 ```
 
 **Post-it execution flow**: `ExecutePostIt` → check Redis cache → `prepare` (map every `$TOKEN` in params/headers/queries to a `SecretRef`: the post-it's `Bindings[TOKEN]` if present, else the board's own scope by name; resolve them as the post-it's `RunAs` principal through `ResolveAs`, which re-checks `CanUse`; then inject the well-known's **system secrets** last, into a clone) → `DewIt.Execute` (HTTP GET to `Resource`, apply query params/headers from `Params`, parse JSON, run `gojq` query) → store result in Redis for `Rate` seconds. A bound secret the principal may no longer use makes the card answer `403`; an unbound board token nobody stored is sent verbatim.
 
-**Board roles** (`models.BoardRole`, `owner > editor > viewer`): the owner is `Board.Owner`, everyone else is in `Board.Members` with `editor` or `viewer`. Every check asks `infrastructure.Access` (`services/access`, the one place a role is decided; organizations join it in phase 17) and compares with `AtLeast`. Viewers read the board, its members and card results; editors also draw strands and create, edit, move and delete cards; the owner also renames, deletes and shares (by email, `PUT /boards/:id/members`). Anyone may leave. Below the role a route needs, the board answers `404`. Board responses carry the caller's `role`. **Post-it writes act as the caller**: they must be an editor; `bindings` are validated with `CanBind` as the caller; `RunAs` is stamped on create and whenever `params`/`bindings` change. Cards saved before `run_as` existed run as the board owner.
+**Board roles** (`models.BoardRole`, `owner > editor > viewer`): the owner is `Board.Owner`, everyone else is in `Board.Members` with `editor` or `viewer`. Every check asks `infrastructure.Access` (`services/access`, the one place a role is decided) and compares with `AtLeast`. Viewers read the board, its members and card results; editors also draw strands and create, edit, move and delete cards; the owner also renames, deletes and shares (by email, `PUT /boards/:id/members`). Anyone may leave. Below the role a route needs, the board answers `404`. Board responses carry the caller's `role`. **Organizations** (`models.Org`, roles `admin|member`) are a minimal tenant: a board or group created with `org` (by someone in it) reaches every member without being shared. On an org board, admins act as owners and members as viewers; the higher of that and the board's own role wins, so promoting a member is an explicit `PUT /boards/:id/members`. In an org group, admins act as owners and members only see it (`GroupViewer`): a group's secrets stay with the people it lists. An org keeps at least one admin (enforced in the Mongo filter) and is deleted only once no board or group names it (`409 org_not_empty`). **Post-it writes act as the caller**: they must be an editor; `bindings` are validated with `CanBind` as the caller; `RunAs` is stamped on create and whenever `params`/`bindings` change. Cards saved before `run_as` existed run as the board owner.
 
 **Well-Knowns** (`services/postits/well-knowns.go`): `wellKnown{template, systemSecrets}` definitions (e.g. `temperature`, `dolar_oficial`, `nasa_apod`). Creating with `WellKnown` fills in resource/query/rate from the template; `Params` provides variable overrides. Placeholders are lowercase (`$credential`, `$api_key`); user secret names are uppercase (`$MY_KEY`). `systemSecrets` maps a placeholder to a `models.SystemSecretName` that is resolved from the system scope at execution time and never stored on the post-it.
 
@@ -191,20 +193,21 @@ SvelteKit SPA (`ssr = false`, `prerender = false`). Svelte 5 **runes mode enforc
 - `$modules/realtime.svelte.ts` — `connect(board, user, onChange)`: opens the socket and the PeerJS mesh; used by `routes/(app)/board/[id]/Realtime.svelte`.
 - `$modules/sockets.svelte.ts` / `rtc.svelte.ts` — socket.io client and PeerJS cursor sharing.
 - `$modules/statefull.svelte.ts` — Preserves and restores arbitrary route state across navigation (`preserve` / `restore`), keyed by `[fromRoute][toRoute]`.
-- `$services/{board,post-it,secrets,edge,auth,users}.ts` — Typed API calls per resource; `auth.ts` throws `AuthError` with the backend's `error` code (`$lib/auth/form.ts` turns it into a message). `secrets.ts` is scope-first (`boardScope`, `memberScope`, `pathOf(scope)`): list/put/delete, self-managed OAuth2 (`put_oauth2`, `authorize`), platform providers (`providers`, `connect`), and `usable(board)`. `post-it.ts` sends `bindings`. No service names the caller: the bearer token does.
+- `$services/{board,post-it,secrets,edge,auth,users,orgs}.ts` — Typed API calls per resource; `auth.ts` throws `AuthError` with the backend's `error` code (`$lib/auth/form.ts` turns it into a message). `secrets.ts` is scope-first (`boardScope`, `memberScope`, `pathOf(scope)`): list/put/delete, self-managed OAuth2 (`put_oauth2`, `authorize`), platform providers (`providers`, `connect`), and `usable(board)`. `post-it.ts` sends `bindings`. No service names the caller: the bearer token does.
 - `$lib/secrets/{origin,binding}.ts` — Pure helpers behind the credential picker: where a usable secret comes from (`board | mine | profile | group | shared`) and what a card must send for the picked ones (`$NAME` + a binding for anything outside the board scope).
 - `$stores/boards.ts`, `$stores/sidebar.ts`, `$stores/mouses.svelte.ts` — Board list, sidebar open/close, live cursors.
+- `$stores/org.svelte.ts` — The user's organizations and the selected one (`"personal"` or an org id, kept in `localStorage` `tiu.org`). The header `OrgSwitcher` sets it, the sidebar shows only its boards (a board of an org the user is not in counts as personal), and new boards are created in it.
 - `$types/api.ts` — API types (`Board`, `PostIt`, `Strand`, `SecretMeta`, `OAuth2Config`, `OAuthProvider`, ...).
 - `$components/Nodes/node-map.ts` — Well-known key → Svelte node component, plus the parameter form each one needs (`type: "secret"` renders a picker over the board's credentials). A well-known whose credential is the platform's declares no parameter.
 - `$components/Share/ShareDialog.svelte` — Who is on a board: the owner adds people by email as editor or viewer, changes roles and removes them; anyone else sees the list and can leave. `Flow` hides the dock, dragging, connecting, deleting and the credentials for viewers (`role` comes from `GET /boards/:id`).
 - `$components/Secrets/SecretsPanel.svelte` — Board credentials modal with two tabs, "Board" (shared with every member) and "Only mine" (the caller's member scope); same forms for API keys, self-managed OAuth2 and "Connect an account".
-- Routes: group `(app)` (its `+layout.ts` bootstraps the session and redirects anonymous visitors to `/login?next=`; header with the user menu): `/` (board list), `/board/[id]` (canvas: `Flow`, `Dock`, `DnDProvider`, `Realtime`; the view is keyed by the board id so navigating between boards remounts it), `/profile`, `/oauth2/callback` (provider redirect target; forwards `state`/`code` to the backend). Group `(auth)`: `/login`, `/register`, `/verify?token=`, `/forgot`, `/reset?token=`, `/auth/google/callback` (Google's redirect target; posts `code`/`state` to the backend, then goes to `next`).
+- Routes: group `(app)` (its `+layout.ts` bootstraps the session and redirects anonymous visitors to `/login?next=`; header with the user menu): `/` (board list), `/board/[id]` (canvas: `Flow`, `Dock`, `DnDProvider`, `Realtime`; the view is keyed by the board id so navigating between boards remounts it), `/profile`, `/orgs` (list, create), `/orgs/[id]` (members and roles, rename, leave, delete), `/oauth2/callback` (provider redirect target; forwards `state`/`code` to the backend). Group `(auth)`: `/login`, `/register`, `/verify?token=`, `/forgot`, `/reset?token=`, `/auth/google/callback` (Google's redirect target; posts `code`/`state` to the backend, then goes to `next`).
 
 After editing `messages/{en,es}.json` outside the Vite dev server, regenerate with `npx paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide` before `pnpm check`.
 
 **i18n**: Paraglide. Source messages in `frontend/messages/{en,es}.json`. Generated output in `src/lib/paraglide/`. Import messages as `import { m } from '$lib/paraglide/messages'`.
 
-**UI library**: `@xyflow/svelte` for the board canvas. Component primitives in `$components/` (Button, Cursor, Divider, Drawer, Edges, Icon, Input, Modal, Nodes, Secrets, Share, Switch, Toast). Styling via Tailwind CSS 4 + `clsx` + `tailwind-merge` (re-exported as `cn` from `$lib/utils.ts`).
+**UI library**: `@xyflow/svelte` for the board canvas. Component primitives in `$components/` (Button, Cursor, Divider, Drawer, Edges, Icon, Input, Modal, Nodes, OrgSwitcher, Secrets, Share, Switch, Toast). Styling via Tailwind CSS 4 + `clsx` + `tailwind-merge` (re-exported as `cn` from `$lib/utils.ts`).
 
 ## Svelte MCP (available in frontend/)
 
