@@ -74,6 +74,10 @@ try {
         if ($LASTEXITCODE -eq 0) { $ready = $true } else { Start-Sleep -Seconds 1 }
     }
 
+    # Redis DB 1 belongs to the tests; rate-limit counters and sessions from an
+    # earlier run would otherwise leak into this one.
+    docker compose exec -T redis redis-cli -a $redisPassword --no-auth-warning -n 1 FLUSHDB | Out-Null
+
     Push-Location $backend
     try {
         Write-Host "==> Running integration tests against $itDatabase..." -ForegroundColor Cyan

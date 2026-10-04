@@ -75,6 +75,10 @@ for _ in $(seq 1 30); do
     sleep 1
 done
 
+# Redis DB 1 belongs to the tests; rate-limit counters and sessions from an
+# earlier run would otherwise leak into this one.
+docker compose exec -T redis redis-cli -a "$REDIS_PASSWORD" --no-auth-warning -n 1 FLUSHDB >/dev/null
+
 cd "$BACKEND"
 
 echo "==> Running integration tests against $IT_DATABASE..."
