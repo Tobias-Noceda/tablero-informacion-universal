@@ -17,6 +17,15 @@ type Group struct {
 	CreatedAt time.Time `bson:"createdat" json:"created_at"`
 }
 
+// GroupRole is what someone is in a group: its owner manages the group's
+// secrets, members may use them.
+type GroupRole string
+
+const (
+	GroupOwner  GroupRole = "owner"
+	GroupMember GroupRole = "member"
+)
+
 func (g *Group) IsMember(userID string) bool {
 	return userID != "" && (g.Owner == userID || slices.Contains(g.Members, userID))
 }

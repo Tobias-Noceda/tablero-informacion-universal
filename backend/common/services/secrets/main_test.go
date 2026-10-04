@@ -12,6 +12,7 @@ import (
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/ports/crypto"
+	"github.com/Secreto31126/tesis/common/services/access"
 	"github.com/google/uuid"
 )
 
@@ -113,10 +114,10 @@ func service(t *testing.T, store *memoryStore) *SecretsService {
 	}
 	boards := &mocks.MockDB{
 		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
-			return &models.Board{Id: id, Owner: owner.ID, Collaborators: []string{collaborator.ID}}, nil
+			return &models.Board{Id: id, Owner: owner.ID, Members: []models.BoardMember{{User: collaborator.ID, Role: models.BoardEditor}}}, nil
 		},
 	}
-	return New(store, NewPolicy(boards, store.groups), crypto.NewKeyring(sealer, store.keys), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, store.groups)
+	return New(store, NewPolicy(boards, store.groups, access.New()), crypto.NewKeyring(sealer, store.keys), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, store.groups)
 }
 
 func TestPut_StoresOnlyCiphertext(t *testing.T) {

@@ -11,12 +11,13 @@ var ErrForbidden = infrastructure.ErrForbidden
 type policy struct {
 	boards infrastructure.BoardReader
 	groups infrastructure.GroupReader
+	access infrastructure.Access
 }
 
 var _ infrastructure.ScopePolicy = (*policy)(nil)
 
-func NewPolicy(boards infrastructure.BoardReader, groups infrastructure.GroupReader) *policy {
-	return &policy{boards, groups}
+func NewPolicy(boards infrastructure.BoardReader, groups infrastructure.GroupReader, access infrastructure.Access) *policy {
+	return &policy{boards, groups, access}
 }
 
 func (p *policy) CanManage(principal models.Principal, scope models.SecretScope) error {
@@ -34,11 +35,26 @@ func (p *policy) check(principal models.Principal, scope models.SecretScope, man
 
 	switch scope.Kind {
 	case models.ScopeBoard:
-		return p.checkBoard(principal, scope, manage)
+		// The board's credentials are for building cards: editors see their
+		// names, only the owner changes them, a viewer does not learn them.
+		min := models.BoardEditor
+		if manage {
+			min = models.BoardOwner
+		}
+		return p.onBoard(principal, uuid.MustParse(scope.Owner), min)
 	case models.ScopeMember:
-		return p.checkMember(principal, scope)
+		// What someone keeps on a board is for cards, so it takes an editor.
+		boardID, userID, _ := scope.Member()
+		if principal.ID != userID {
+			return ErrForbidden
+		}
+		return p.onBoard(principal, boardID, models.BoardEditor)
 	case models.ScopeGroup:
-		return p.checkGroup(principal, scope, manage)
+		role := p.groupRole(principal, uuid.MustParse(scope.Owner))
+		if role == "" || (manage && role != models.GroupOwner) {
+			return ErrForbidden
+		}
+		return nil
 	case models.ScopeUser:
 		if principal.Anonymous() || principal.ID != scope.Owner {
 			return ErrForbidden
@@ -54,60 +70,25 @@ func (p *policy) check(principal models.Principal, scope models.SecretScope, man
 	}
 }
 
-func (p *policy) checkBoard(principal models.Principal, scope models.SecretScope, manage bool) error {
-	board, err := p.board(principal, uuid.MustParse(scope.Owner))
-	if err != nil {
-		return err
-	}
-
-	if board.Owner == principal.ID {
-		return nil
-	}
-
-	if !manage && board.IsMember(principal.ID) {
-		return nil
-	}
-
-	return ErrForbidden
-}
-
-func (p *policy) checkMember(principal models.Principal, scope models.SecretScope) error {
-	boardID, userID, _ := scope.Member()
-	if principal.ID != userID {
-		return ErrForbidden
-	}
-
-	_, err := p.board(principal, boardID)
-	return err
-}
-
-func (p *policy) checkGroup(principal models.Principal, scope models.SecretScope, manage bool) error {
-	group, err := p.group(principal, uuid.MustParse(scope.Owner))
-	if err != nil {
-		return err
-	}
-
-	if manage && group.Owner != principal.ID {
-		return ErrForbidden
-	}
-
-	return nil
-}
-
 // CanUse decides whether principal may bind secret into a card on board:
-// either the scope itself admits them, or a grant does. It is evaluated
-// again on every execution, so losing access stops the card.
+// they must be able to edit the board, and then either the scope itself
+// admits them or a grant does. It is evaluated again on every execution, so
+// losing access, or being demoted to viewer, stops the card.
 func (p *policy) CanUse(principal models.Principal, boardID uuid.UUID, secret *models.Secret) error {
 	if !secret.Scope.Valid() || principal.Anonymous() || secret.Scope.Kind == models.ScopeSystem {
 		return ErrForbidden
 	}
 
-	if p.owns(principal, boardID, secret.Scope) == nil {
+	if err := p.onBoard(principal, boardID, models.BoardEditor); err != nil {
+		return err
+	}
+
+	if p.owns(principal, boardID, secret.Scope) {
 		return nil
 	}
 
 	for _, grant := range secret.Grants {
-		if grant.AppliesTo(boardID) && p.reaches(principal, boardID, grant.To) == nil {
+		if grant.AppliesTo(boardID) && p.reaches(principal, boardID, grant.To) {
 			return nil
 		}
 	}
@@ -115,84 +96,65 @@ func (p *policy) CanUse(principal models.Principal, boardID uuid.UUID, secret *m
 	return ErrForbidden
 }
 
-func (p *policy) owns(principal models.Principal, boardID uuid.UUID, scope models.SecretScope) error {
+// owns tells whether the secret's own scope admits principal on boardID. The
+// caller has already checked that principal edits boardID.
+func (p *policy) owns(principal models.Principal, boardID uuid.UUID, scope models.SecretScope) bool {
 	switch scope.Kind {
 	case models.ScopeBoard:
-		if scope.Owner != boardID.String() {
-			return ErrForbidden
-		}
-		_, err := p.board(principal, boardID)
-		return err
+		return scope.Owner == boardID.String()
 	case models.ScopeMember:
 		memberBoard, userID, _ := scope.Member()
-		if memberBoard != boardID || principal.ID != userID {
-			return ErrForbidden
-		}
-		_, err := p.board(principal, boardID)
-		return err
+		return memberBoard == boardID && principal.ID == userID
 	case models.ScopeUser:
-		if principal.ID != scope.Owner {
-			return ErrForbidden
-		}
-		return nil
+		return principal.ID == scope.Owner
 	case models.ScopeGroup:
-		_, err := p.group(principal, uuid.MustParse(scope.Owner))
-		return err
+		return p.groupRole(principal, uuid.MustParse(scope.Owner)) != ""
 	default:
-		return ErrForbidden
+		return false
 	}
 }
 
-func (p *policy) reaches(principal models.Principal, boardID uuid.UUID, audience models.Audience) error {
+// reaches tells whether a grant's audience includes principal on boardID. A
+// grant to a board reaches whoever may bind on it, which CanUse already
+// checked.
+func (p *policy) reaches(principal models.Principal, boardID uuid.UUID, audience models.Audience) bool {
 	switch audience.Kind {
 	case models.AudienceUser:
-		if principal.ID != audience.ID {
-			return ErrForbidden
-		}
-		return nil
+		return principal.ID == audience.ID
 	case models.AudienceGroup:
 		id, err := uuid.Parse(audience.ID)
-		if err != nil {
-			return ErrForbidden
-		}
-		_, err = p.group(principal, id)
-		return err
+		return err == nil && p.groupRole(principal, id) != ""
 	case models.AudienceBoard:
-		if audience.ID != boardID.String() {
-			return ErrForbidden
-		}
-		_, err := p.board(principal, boardID)
-		return err
+		return audience.ID == boardID.String()
 	default:
-		return ErrForbidden
+		return false
 	}
 }
 
-// board loads a board the principal is a member of. A board that cannot be
-// found is indistinguishable from one the principal may not touch.
-func (p *policy) board(principal models.Principal, id uuid.UUID) (*models.Board, error) {
+// onBoard requires principal to hold at least min on the board. A board that
+// cannot be found is indistinguishable from one the principal may not touch.
+func (p *policy) onBoard(principal models.Principal, id uuid.UUID, min models.BoardRole) error {
 	if principal.Anonymous() {
-		return nil, ErrForbidden
+		return ErrForbidden
 	}
 
 	board, err := p.boards.FindBoard(id)
-	if err != nil || !board.IsMember(principal.ID) {
-		return nil, ErrForbidden
+	if err != nil || !p.access.BoardRole(principal, board).AtLeast(min) {
+		return ErrForbidden
 	}
 
-	return board, nil
+	return nil
 }
 
-// group loads a group the principal belongs to, with the same rule as board.
-func (p *policy) group(principal models.Principal, id uuid.UUID) (*models.Group, error) {
+func (p *policy) groupRole(principal models.Principal, id uuid.UUID) models.GroupRole {
 	if principal.Anonymous() {
-		return nil, ErrForbidden
+		return ""
 	}
 
 	group, err := p.groups.FindGroup(id)
-	if err != nil || !group.IsMember(principal.ID) {
-		return nil, ErrForbidden
+	if err != nil {
+		return ""
 	}
 
-	return group, nil
+	return p.access.GroupRole(principal, group)
 }

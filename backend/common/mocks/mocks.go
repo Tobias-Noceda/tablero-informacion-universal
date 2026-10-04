@@ -15,21 +15,21 @@ var ErrCacheMiss = errors.New("cache miss")
 
 // MockDB is a configurable test double for infrastructure.Database.
 type MockDB struct {
-	FindUserBoardsFn              func(user string) ([]models.Board, error)
-	FindBoardPostItsFn            func(id uuid.UUID) ([]models.PostIts, error)
-	FindPostItFn                  func(id uuid.UUID) (*models.PostIts, error)
-	FindBoardFn                   func(id uuid.UUID) (*models.Board, error)
-	DeletePostItFn                func(id uuid.UUID) ([]models.Strand, error)
-	DeleteBoardFn                 func(id uuid.UUID) error
-	UpdatePostItFn                func(id uuid.UUID, set map[string]any) error
-	CreatePostItFn                func(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
-	CreateBoardFn                 func(name, owner string) (*models.Board, error)
-	AddCollaboratorToBoardFn      func(boardID uuid.UUID, user string) error
-	RemoveCollaboratorFromBoardFn func(boardID uuid.UUID, user string) error
-	DisconnectPostItsFn           func(boardID, strandID uuid.UUID) error
-	ConnectPostItsFn              func(boardID, source, target uuid.UUID) (*models.Strand, error)
-	MovePostItFn                  func(boardID, postItID uuid.UUID, pos models.Position) error
-	UpdateBoardNameFn             func(id uuid.UUID, name string) error
+	FindUserBoardsFn    func(user string) ([]models.Board, error)
+	FindBoardPostItsFn  func(id uuid.UUID) ([]models.PostIts, error)
+	FindPostItFn        func(id uuid.UUID) (*models.PostIts, error)
+	FindBoardFn         func(id uuid.UUID) (*models.Board, error)
+	DeletePostItFn      func(id uuid.UUID) ([]models.Strand, error)
+	DeleteBoardFn       func(id uuid.UUID) error
+	UpdatePostItFn      func(id uuid.UUID, set map[string]any) error
+	CreatePostItFn      func(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
+	CreateBoardFn       func(name, owner string) (*models.Board, error)
+	SetBoardMemberFn    func(boardID uuid.UUID, user string, role models.BoardRole) error
+	RemoveBoardMemberFn func(boardID uuid.UUID, user string) error
+	DisconnectPostItsFn func(boardID, strandID uuid.UUID) error
+	ConnectPostItsFn    func(boardID, source, target uuid.UUID) (*models.Strand, error)
+	MovePostItFn        func(boardID, postItID uuid.UUID, pos models.Position) error
+	UpdateBoardNameFn   func(id uuid.UUID, name string) error
 }
 
 var _ infrastructure.Database = (*MockDB)(nil)
@@ -97,16 +97,16 @@ func (m *MockDB) CreateBoard(name, owner string) (*models.Board, error) {
 	return nil, nil
 }
 
-func (m *MockDB) AddCollaboratorToBoard(boardID uuid.UUID, user string) error {
-	if m.AddCollaboratorToBoardFn != nil {
-		return m.AddCollaboratorToBoardFn(boardID, user)
+func (m *MockDB) SetBoardMember(boardID uuid.UUID, user string, role models.BoardRole) error {
+	if m.SetBoardMemberFn != nil {
+		return m.SetBoardMemberFn(boardID, user, role)
 	}
 	return nil
 }
 
-func (m *MockDB) RemoveCollaboratorFromBoard(boardID uuid.UUID, user string) error {
-	if m.RemoveCollaboratorFromBoardFn != nil {
-		return m.RemoveCollaboratorFromBoardFn(boardID, user)
+func (m *MockDB) RemoveBoardMember(boardID uuid.UUID, user string) error {
+	if m.RemoveBoardMemberFn != nil {
+		return m.RemoveBoardMemberFn(boardID, user)
 	}
 	return nil
 }

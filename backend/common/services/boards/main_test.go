@@ -5,27 +5,52 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
+	"github.com/Secreto31126/tesis/common/services/access"
 	"github.com/google/uuid"
 )
 
+// The board below is owned by owner, edited by ana and viewed by bob; eve is
+// a stranger.
 var (
-	owner    = models.Principal{ID: "owner"}
-	ana      = models.Principal{ID: "ana"}
-	outsider = models.Principal{ID: "eve"}
+	ownerUser = models.User{Id: uuid.New(), Name: "Owner", Email: "owner@example.com"}
+	anaUser   = models.User{Id: uuid.New(), Name: "Ana", Email: "ana@example.com"}
+	bobUser   = models.User{Id: uuid.New(), Name: "Bob", Email: "bob@example.com"}
+	eveUser   = models.User{Id: uuid.New(), Name: "Eve", Email: "eve@example.com"}
+
+	owner    = ownerUser.Principal()
+	ana      = anaUser.Principal()
+	bob      = bobUser.Principal()
+	outsider = eveUser.Principal()
 )
 
-// boardDB serves one board owned by "owner" with "ana" as a collaborator.
+func boardFixture(id uuid.UUID) *models.Board {
+	return &models.Board{Id: id, Owner: owner.ID, Members: []models.BoardMember{
+		{User: ana.ID, Role: models.BoardEditor},
+		{User: bob.ID, Role: models.BoardViewer},
+	}}
+}
+
+// boardDB serves the board above under id, and nothing else.
 func boardDB(id uuid.UUID) *mocks.MockDB {
 	return &mocks.MockDB{
 		FindBoardFn: func(got uuid.UUID) (*models.Board, error) {
 			if got != id {
 				return nil, errors.New("no documents")
 			}
-			return &models.Board{Id: id, Owner: "owner", Collaborators: []string{"ana"}}, nil
+			return boardFixture(id), nil
 		},
 	}
+}
+
+func users() *mocks.MemoryUserStore {
+	return &mocks.MemoryUserStore{Users: []models.User{ownerUser, anaUser, bobUser, eveUser}}
+}
+
+func newService(db *mocks.MockDB, purger infrastructure.ScopePurger) *BoardService {
+	return New(db, purger, access.New(), users())
 }
 
 func TestCreateBoard_TheCallerOwnsIt(t *testing.T) {
@@ -37,187 +62,221 @@ func TestCreateBoard_TheCallerOwnsIt(t *testing.T) {
 		},
 	}
 
-	board, err := New(db, &purgeRecorder{}).CreateBoard(ana, "My Board")
+	board, err := newService(db, &purgeRecorder{}).CreateBoard(ana, "My Board")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotName != "My Board" || gotOwner != "ana" {
+	if gotName != "My Board" || gotOwner != ana.ID {
 		t.Errorf("delegated (%q,%q), want (My Board, ana)", gotName, gotOwner)
 	}
-	if board.Name != "My Board" {
-		t.Errorf("board name = %q", board.Name)
+	if board.Role != models.BoardOwner {
+		t.Errorf("role = %q, want owner", board.Role)
 	}
 }
 
 func TestCreateBoard_AnonymousIsForbidden(t *testing.T) {
-	if _, err := New(&mocks.MockDB{}, &purgeRecorder{}).CreateBoard(models.Principal{}, "B"); !errors.Is(err, ErrForbidden) {
+	if _, err := newService(&mocks.MockDB{}, &purgeRecorder{}).CreateBoard(models.Principal{}, "B"); !errors.Is(err, ErrForbidden) {
 		t.Errorf("got %v, want ErrForbidden", err)
 	}
 }
 
-func TestGetUserBoards_ListsTheCallersBoards(t *testing.T) {
-	want := []models.Board{{Id: uuid.New()}, {Id: uuid.New()}}
+// Each board in the listing says what the caller may do with it.
+func TestGetUserBoards_CarriesTheCallersRole(t *testing.T) {
+	id := uuid.New()
 	db := &mocks.MockDB{
 		FindUserBoardsFn: func(user string) ([]models.Board, error) {
-			if user != "ana" {
-				t.Errorf("user = %q, want ana", user)
+			if user != bob.ID {
+				t.Errorf("user = %q, want bob", user)
 			}
-			return want, nil
+			return []models.Board{*boardFixture(id)}, nil
 		},
 	}
 
-	got, err := New(db, &purgeRecorder{}).GetUserBoards(ana)
+	got, err := newService(db, &purgeRecorder{}).GetUserBoards(bob)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(got) != 2 {
-		t.Errorf("got %d boards, want 2", len(got))
+	if len(got) != 1 || got[0].Role != models.BoardViewer {
+		t.Errorf("got %+v, want the board as viewer", got)
 	}
 }
 
 func TestGetUserBoards_AnonymousIsForbidden(t *testing.T) {
-	if _, err := New(&mocks.MockDB{}, &purgeRecorder{}).GetUserBoards(models.Principal{}); !errors.Is(err, ErrForbidden) {
+	if _, err := newService(&mocks.MockDB{}, &purgeRecorder{}).GetUserBoards(models.Principal{}); !errors.Is(err, ErrForbidden) {
 		t.Errorf("got %v, want ErrForbidden", err)
 	}
 }
 
-// Reading and drawing on a board is for its members; anyone else cannot tell
-// it from a board that does not exist.
-func TestMemberRoutes_AdmitMembersOnly(t *testing.T) {
+// Who may do what, for every route of the service.
+func TestRoles_Matrix(t *testing.T) {
 	id := uuid.New()
 	db := boardDB(id)
-	db.FindBoardPostItsFn = func(uuid.UUID) ([]models.PostIts, error) { return []models.PostIts{{}}, nil }
+	db.FindBoardPostItsFn = func(uuid.UUID) ([]models.PostIts, error) { return []models.PostIts{}, nil }
 	db.ConnectPostItsFn = func(b, s, t uuid.UUID) (*models.Strand, error) { return &models.Strand{}, nil }
 	db.DisconnectPostItsFn = func(b, s uuid.UUID) error { return nil }
-	svc := New(db, &purgeRecorder{})
-
-	calls := map[string]func(models.Principal, uuid.UUID) error{
-		"get": func(p models.Principal, b uuid.UUID) error {
-			_, err := svc.GetBoard(p, b)
-			return err
-		},
-		"post-its": func(p models.Principal, b uuid.UUID) error {
-			_, err := svc.GetBoardPostIts(p, b)
-			return err
-		},
-		"connect": func(p models.Principal, b uuid.UUID) error {
-			_, err := svc.ConnectPostIts(p, b, uuid.New(), uuid.New())
-			return err
-		},
-		"disconnect": func(p models.Principal, b uuid.UUID) error {
-			return svc.DisconnectPostIts(p, b, uuid.New())
-		},
-	}
-
-	for name, call := range calls {
-		for _, member := range []models.Principal{owner, ana} {
-			if err := call(member, id); err != nil {
-				t.Errorf("%s as %s: %v", name, member.ID, err)
-			}
-		}
-		if err := call(outsider, id); !errors.Is(err, ErrForbidden) {
-			t.Errorf("%s as an outsider: got %v, want ErrForbidden", name, err)
-		}
-		if err := call(owner, uuid.New()); !errors.Is(err, ErrForbidden) {
-			t.Errorf("%s on a missing board: got %v, want ErrForbidden", name, err)
-		}
-	}
-}
-
-// Renaming, deleting and choosing the collaborators is the owner's call.
-func TestOwnerRoutes_AdmitTheOwnerOnly(t *testing.T) {
-	id := uuid.New()
-	db := boardDB(id)
 	db.UpdateBoardNameFn = func(uuid.UUID, string) error { return nil }
 	db.DeleteBoardFn = func(uuid.UUID) error { return nil }
-	db.AddCollaboratorToBoardFn = func(uuid.UUID, string) error { return nil }
-	db.RemoveCollaboratorFromBoardFn = func(uuid.UUID, string) error { return nil }
-	svc := New(db, &purgeRecorder{})
+	db.SetBoardMemberFn = func(uuid.UUID, string, models.BoardRole) error { return nil }
+	db.RemoveBoardMemberFn = func(uuid.UUID, string) error { return nil }
+	svc := newService(db, &purgeRecorder{})
 
-	calls := map[string]func(models.Principal) error{
-		"rename": func(p models.Principal) error { return svc.UpdateBoardName(p, id, "Renamed") },
-		"add":    func(p models.Principal) error { return svc.AddCollaboratorToBoard(p, id, "bob") },
-		"remove": func(p models.Principal) error { return svc.RemoveCollaboratorFromBoard(p, id, "bob") },
-		"delete": func(p models.Principal) error { return svc.DeleteBoard(p, id) },
+	calls := []struct {
+		name string
+		min  models.BoardRole
+		call func(models.Principal) error
+	}{
+		{"get", models.BoardViewer, func(p models.Principal) error { _, err := svc.GetBoard(p, id); return err }},
+		{"post-its", models.BoardViewer, func(p models.Principal) error { _, err := svc.GetBoardPostIts(p, id); return err }},
+		{"members", models.BoardViewer, func(p models.Principal) error { _, err := svc.Members(p, id); return err }},
+		{"connect", models.BoardEditor, func(p models.Principal) error {
+			_, err := svc.ConnectPostIts(p, id, uuid.New(), uuid.New())
+			return err
+		}},
+		{"disconnect", models.BoardEditor, func(p models.Principal) error { return svc.DisconnectPostIts(p, id, uuid.New()) }},
+		{"rename", models.BoardOwner, func(p models.Principal) error { return svc.UpdateBoardName(p, id, "Renamed") }},
+		{"set member", models.BoardOwner, func(p models.Principal) error {
+			_, err := svc.SetMember(p, id, eveUser.Email, models.BoardViewer)
+			return err
+		}},
+		{"remove someone else", models.BoardOwner, func(p models.Principal) error {
+			return svc.RemoveMember(p, id, eveUser.Id.String())
+		}},
+		{"delete", models.BoardOwner, func(p models.Principal) error { return svc.DeleteBoard(p, id) }},
 	}
 
-	for name, call := range calls {
-		for _, intruder := range []models.Principal{ana, outsider} {
-			if err := call(intruder); !errors.Is(err, ErrForbidden) {
-				t.Errorf("%s as %s: got %v, want ErrForbidden", name, intruder.ID, err)
+	roles := []struct {
+		principal models.Principal
+		role      models.BoardRole
+	}{{owner, models.BoardOwner}, {ana, models.BoardEditor}, {bob, models.BoardViewer}, {outsider, ""}}
+
+	for _, c := range calls {
+		for _, r := range roles {
+			err := c.call(r.principal)
+			allowed := r.role.AtLeast(c.min)
+			if allowed && err != nil {
+				t.Errorf("%s as %s: %v", c.name, r.role, err)
+			}
+			if !allowed && !errors.Is(err, ErrForbidden) {
+				t.Errorf("%s as %q: got %v, want ErrForbidden", c.name, r.role, err)
 			}
 		}
-		if err := call(owner); err != nil {
-			t.Errorf("%s as the owner: %v", name, err)
-		}
+	}
+
+	if _, err := svc.GetBoard(owner, uuid.New()); !errors.Is(err, ErrForbidden) {
+		t.Errorf("missing board: got %v, want ErrForbidden", err)
 	}
 }
 
-func TestUpdateBoardName_Delegates(t *testing.T) {
+func TestGetBoard_CarriesTheCallersRole(t *testing.T) {
 	id := uuid.New()
-	var gotName string
+	board, err := newService(boardDB(id), &purgeRecorder{}).GetBoard(ana, id)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if board.Role != models.BoardEditor {
+		t.Errorf("role = %q, want editor", board.Role)
+	}
+}
+
+// Members are listed with who they are, the owner first.
+func TestMembers_ListsSummariesOwnerFirst(t *testing.T) {
+	id := uuid.New()
+	members, err := newService(boardDB(id), &purgeRecorder{}).Members(bob, id)
+	if err != nil {
+		t.Fatalf("members: %v", err)
+	}
+
+	want := []models.BoardMemberSummary{
+		{User: ownerUser.Summary(), Role: models.BoardOwner},
+		{User: anaUser.Summary(), Role: models.BoardEditor},
+		{User: bobUser.Summary(), Role: models.BoardViewer},
+	}
+	if !slices.Equal(members, want) {
+		t.Errorf("members = %+v, want %+v", members, want)
+	}
+}
+
+// The owner shares by email; the address is matched however it was typed.
+func TestSetMember_ByEmail(t *testing.T) {
+	id := uuid.New()
+	var gotUser string
+	var gotRole models.BoardRole
 	db := boardDB(id)
-	db.UpdateBoardNameFn = func(_ uuid.UUID, name string) error {
-		gotName = name
+	db.SetBoardMemberFn = func(_ uuid.UUID, user string, role models.BoardRole) error {
+		gotUser, gotRole = user, role
 		return nil
 	}
 
-	if err := New(db, &purgeRecorder{}).UpdateBoardName(owner, id, "Renamed"); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	member, err := newService(db, &purgeRecorder{}).SetMember(owner, id, "  EVE@example.com ", models.BoardEditor)
+	if err != nil {
+		t.Fatalf("set: %v", err)
 	}
-	if gotName != "Renamed" {
-		t.Errorf("name = %q, want Renamed", gotName)
+	if gotUser != outsider.ID || gotRole != models.BoardEditor {
+		t.Errorf("stored (%q, %q), want (eve, editor)", gotUser, gotRole)
+	}
+	if member.User != eveUser.Summary() || member.Role != models.BoardEditor {
+		t.Errorf("member = %+v", member)
 	}
 }
 
-func TestConnectPostIts_Delegates(t *testing.T) {
-	id, src, tgt := uuid.New(), uuid.New(), uuid.New()
-	var gb, gs, gt uuid.UUID
+func TestSetMember_Refusals(t *testing.T) {
+	id := uuid.New()
 	db := boardDB(id)
-	db.ConnectPostItsFn = func(b, s, t uuid.UUID) (*models.Strand, error) {
-		gb, gs, gt = b, s, t
-		return &models.Strand{Id: uuid.New(), Source: s, Target: t}, nil
+	db.SetBoardMemberFn = func(uuid.UUID, string, models.BoardRole) error {
+		t.Error("a refused member was stored")
+		return nil
 	}
+	svc := newService(db, &purgeRecorder{})
 
-	if _, err := New(db, &purgeRecorder{}).ConnectPostIts(ana, id, src, tgt); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	cases := []struct {
+		name  string
+		email string
+		role  models.BoardRole
+		want  error
+	}{
+		{"unknown email", "nobody@example.com", models.BoardViewer, infrastructure.ErrUserNotFound},
+		{"owner role", eveUser.Email, models.BoardOwner, ErrInvalidRole},
+		{"made-up role", eveUser.Email, "admin", ErrInvalidRole},
+		{"the owner themselves", ownerUser.Email, models.BoardViewer, ErrOwnerRole},
 	}
-	if gb != id || gs != src || gt != tgt {
-		t.Errorf("connected (%v,%v,%v), want (%v,%v,%v)", gb, gs, gt, id, src, tgt)
+	for _, c := range cases {
+		if _, err := svc.SetMember(owner, id, c.email, c.role); !errors.Is(err, c.want) {
+			t.Errorf("%s: got %v, want %v", c.name, err, c.want)
+		}
 	}
 }
 
-// A collaborator may walk away from a board on their own.
-func TestRemoveCollaborator_ACollaboratorMayLeave(t *testing.T) {
+// Anyone may leave a board on their own.
+func TestRemoveMember_AMemberMayLeave(t *testing.T) {
 	id := uuid.New()
 	removed := ""
 	db := boardDB(id)
-	db.RemoveCollaboratorFromBoardFn = func(_ uuid.UUID, user string) error {
+	db.RemoveBoardMemberFn = func(_ uuid.UUID, user string) error {
 		removed = user
 		return nil
 	}
 
-	if err := New(db, &purgeRecorder{}).RemoveCollaboratorFromBoard(ana, id, "ana"); err != nil {
+	if err := newService(db, &purgeRecorder{}).RemoveMember(bob, id, bob.ID); err != nil {
 		t.Fatalf("leave: %v", err)
 	}
-	if removed != "ana" {
-		t.Errorf("removed %q, want ana", removed)
+	if removed != bob.ID {
+		t.Errorf("removed %q, want bob", removed)
 	}
 }
 
-// The owner is not a collaborator: "removing" them would only destroy what
-// they keep on the board.
-func TestRemoveCollaborator_TheOwnerIsNotACollaborator(t *testing.T) {
+// The owner is not a member: "removing" them would only destroy what they
+// keep on the board.
+func TestRemoveMember_TheOwnerCannotBeRemoved(t *testing.T) {
 	id := uuid.New()
 	db := boardDB(id)
-	db.RemoveCollaboratorFromBoardFn = func(uuid.UUID, string) error {
+	db.RemoveBoardMemberFn = func(uuid.UUID, string) error {
 		t.Error("the owner was removed")
 		return nil
 	}
 	purger := &purgeRecorder{}
 
-	if err := New(db, purger).RemoveCollaboratorFromBoard(owner, id, "owner"); !errors.Is(err, ErrOwnerIsNotACollaborator) {
-		t.Errorf("got %v, want ErrOwnerIsNotACollaborator", err)
+	if err := newService(db, purger).RemoveMember(owner, id, owner.ID); !errors.Is(err, ErrOwnerRole) {
+		t.Errorf("got %v, want ErrOwnerRole", err)
 	}
 	if len(purger.purged) != 0 {
 		t.Errorf("purged %v", purger.purged)
@@ -239,18 +298,14 @@ func (p *purgeRecorder) Purge(scope models.SecretScope) error {
 func TestDeleteBoard_PurgesItsSecrets(t *testing.T) {
 	id := uuid.New()
 	deleted := false
-	db := &mocks.MockDB{
-		FindBoardFn: func(got uuid.UUID) (*models.Board, error) {
-			return &models.Board{Id: got, Owner: "owner", Collaborators: []string{"ana", "bob"}}, nil
-		},
-		DeleteBoardFn: func(got uuid.UUID) error {
-			deleted = got == id
-			return nil
-		},
+	db := boardDB(id)
+	db.DeleteBoardFn = func(got uuid.UUID) error {
+		deleted = got == id
+		return nil
 	}
 	purger := &purgeRecorder{}
 
-	if err := New(db, purger).DeleteBoard(owner, id); err != nil {
+	if err := newService(db, purger).DeleteBoard(owner, id); err != nil {
 		t.Fatalf("delete: %v", err)
 	}
 	if !deleted {
@@ -259,9 +314,9 @@ func TestDeleteBoard_PurgesItsSecrets(t *testing.T) {
 
 	want := []models.SecretScope{
 		models.BoardScope(id),
-		models.MemberScope(id, "owner"),
-		models.MemberScope(id, "ana"),
-		models.MemberScope(id, "bob"),
+		models.MemberScope(id, owner.ID),
+		models.MemberScope(id, ana.ID),
+		models.MemberScope(id, bob.ID),
 	}
 	if len(purger.purged) != len(want) {
 		t.Fatalf("purged %v, want %v", purger.purged, want)
@@ -273,25 +328,17 @@ func TestDeleteBoard_PurgesItsSecrets(t *testing.T) {
 	}
 }
 
-// A collaborator who leaves takes nothing with them: what they kept on the
-// board is destroyed, not left for the next person with the same id.
-func TestRemoveCollaborator_PurgesWhatTheyKeptOnTheBoard(t *testing.T) {
+// A member who leaves takes nothing with them: what they kept on the board is
+// destroyed, not left for the day they are added again.
+func TestRemoveMember_PurgesWhatTheyKeptOnTheBoard(t *testing.T) {
 	id := uuid.New()
-	removed := false
 	db := boardDB(id)
-	db.RemoveCollaboratorFromBoardFn = func(got uuid.UUID, user string) error {
-		removed = got == id && user == "ana"
-		return nil
-	}
 	purger := &purgeRecorder{}
 
-	if err := New(db, purger).RemoveCollaboratorFromBoard(owner, id, "ana"); err != nil {
+	if err := newService(db, purger).RemoveMember(owner, id, ana.ID); err != nil {
 		t.Fatalf("remove: %v", err)
 	}
-	if !removed {
-		t.Error("the collaborator was not removed")
-	}
-	if len(purger.purged) != 1 || purger.purged[0] != models.MemberScope(id, "ana") {
-		t.Errorf("purged %v, want the member scope", purger.purged)
+	if len(purger.purged) != 1 || purger.purged[0] != models.MemberScope(id, ana.ID) {
+		t.Errorf("purged %v, want ana's member scope", purger.purged)
 	}
 }

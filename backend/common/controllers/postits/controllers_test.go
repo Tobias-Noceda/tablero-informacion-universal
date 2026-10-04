@@ -14,6 +14,7 @@ import (
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
+	"github.com/Secreto31126/tesis/common/services/access"
 	srv "github.com/Secreto31126/tesis/common/services/postits"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -47,7 +48,7 @@ func setupRouterWith(db *mocks.MockDB, cache *mocks.MockCache, run *mocks.MockEx
 	}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(db, cache, run, secrets)).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
+	NewController(srv.New(db, cache, run, secrets, access.New())).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
 	return r
 }
 

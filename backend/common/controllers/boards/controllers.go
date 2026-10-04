@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/Secreto31126/tesis/common/controllers/middleware"
+	"github.com/Secreto31126/tesis/common/infrastructure"
 	b_srv "github.com/Secreto31126/tesis/common/services/boards"
 	r_srv "github.com/Secreto31126/tesis/common/services/realtime"
 	"github.com/gin-gonic/gin"
@@ -34,8 +35,9 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 
 		boardGroup.GET("/:id/post-its", ctrl.GetBoardPostIts)
 
-		boardGroup.POST("/:id/collaborators", ctrl.AddCollaborator)
-		boardGroup.DELETE("/:id/collaborators", ctrl.RemoveCollaborator)
+		boardGroup.GET("/:id/members", ctrl.GetMembers)
+		boardGroup.PUT("/:id/members", ctrl.SetMember)
+		boardGroup.DELETE("/:id/members/:user", ctrl.RemoveMember)
 
 		boardGroup.POST("/:id/strands", ctrl.ConnectPostIts)
 		boardGroup.DELETE("/:id/strands/:strand", ctrl.DisconnectPostIts)
@@ -53,8 +55,12 @@ func (ctrl *Controller) fail(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, b_srv.ErrForbidden):
 		c.JSON(http.StatusNotFound, gin.H{"error": "Board not found"})
-	case errors.Is(err, b_srv.ErrOwnerIsNotACollaborator):
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	case errors.Is(err, infrastructure.ErrUserNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "user_not_found"})
+	case errors.Is(err, b_srv.ErrInvalidRole):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_role"})
+	case errors.Is(err, b_srv.ErrOwnerRole):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "owner_role"})
 	default:
 		ctrl.logger.Error("board request failed", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -194,59 +200,79 @@ func (ctrl *Controller) GetBoardPostIts(c *gin.Context) {
 	c.JSON(http.StatusOK, postIts)
 }
 
-// AddCollaborator godoc
-// @Summary      Add a collaborator
-// @Description  Owner only.
-// @Tags         boards, collaborators
-// @Accept       json
-// @Param        id       path      string               true  "Board UUID" format(uuid)
-// @Param        request  body      CollaboratorRequest  true  "The user to add"
-// @Success      204      "No Content"
-// @Failure      400      {object}  map[string]string{"error": "string"}
-// @Failure      404      {object}  map[string]string{"error": "string"}
-// @Router       /boards/{id}/collaborators [post]
-func (ctrl *Controller) AddCollaborator(c *gin.Context) {
+// GetMembers godoc
+// @Summary      List who is on a board
+// @Description  Anyone on the board. The owner comes first.
+// @Tags         boards, members
+// @Produce      json
+// @Param        id   path      string  true  "Board UUID" format(uuid)
+// @Success      200  {array}   models.BoardMemberSummary
+// @Failure      404  {object}  map[string]string{"error": "string"}
+// @Router       /boards/{id}/members [get]
+func (ctrl *Controller) GetMembers(c *gin.Context) {
 	id, ok := uuidParam(c, "id")
 	if !ok {
 		return
 	}
 
-	var req CollaboratorRequest
-	if !bind(c, &req) {
-		return
-	}
-
-	if err := ctrl.service.AddCollaboratorToBoard(middleware.Principal(c), id, req.User); err != nil {
+	members, err := ctrl.service.Members(middleware.Principal(c), id)
+	if err != nil {
 		ctrl.fail(c, err)
 		return
 	}
 
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, members)
 }
 
-// RemoveCollaborator godoc
-// @Summary      Remove a collaborator
-// @Description  Owner only, or the collaborator themselves leaving the board.
-// @Tags         boards, collaborators
+// SetMember godoc
+// @Summary      Share a board, or change someone's role on it
+// @Description  Owner only. The user is named by the email they registered with.
+// @Tags         boards, members
 // @Accept       json
-// @Param        id       path      string               true  "Board UUID" format(uuid)
-// @Param        request  body      CollaboratorRequest  true  "The user to remove"
-// @Success      204      "No Content"
-// @Failure      400      {object}  map[string]string{"error": "string"}
-// @Failure      404      {object}  map[string]string{"error": "string"}
-// @Router       /boards/{id}/collaborators [delete]
-func (ctrl *Controller) RemoveCollaborator(c *gin.Context) {
+// @Produce      json
+// @Param        id       path      string             true  "Board UUID" format(uuid)
+// @Param        request  body      SetMemberRequest   true  "Who and with which role"
+// @Success      200      {object}  models.BoardMemberSummary
+// @Failure      400      {object}  map[string]string{"error": "invalid_role | owner_role"}
+// @Failure      404      {object}  map[string]string{"error": "user_not_found"}
+// @Router       /boards/{id}/members [put]
+func (ctrl *Controller) SetMember(c *gin.Context) {
 	id, ok := uuidParam(c, "id")
 	if !ok {
 		return
 	}
 
-	var req CollaboratorRequest
+	var req SetMemberRequest
 	if !bind(c, &req) {
 		return
 	}
 
-	if err := ctrl.service.RemoveCollaboratorFromBoard(middleware.Principal(c), id, req.User); err != nil {
+	member, err := ctrl.service.SetMember(middleware.Principal(c), id, req.Email, req.Role)
+	if err != nil {
+		ctrl.fail(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, member)
+}
+
+// RemoveMember godoc
+// @Summary      Remove someone from a board
+// @Description  Owner only, or the member themselves leaving. What they kept on the board is destroyed.
+// @Tags         boards, members
+// @Param        id    path  string  true  "Board UUID" format(uuid)
+// @Param        user  path  string  true  "User id"
+// @Success      204   "No Content"
+// @Failure      400   {object}  map[string]string{"error": "owner_role"}
+// @Failure      404   {object}  map[string]string{"error": "string"}
+// @Router       /boards/{id}/members/{user} [delete]
+func (ctrl *Controller) RemoveMember(c *gin.Context) {
+	id, ok := uuidParam(c, "id")
+	if !ok {
+		return
+	}
+
+	if err := ctrl.service.RemoveMember(middleware.Principal(c), id, c.Param("user")); err != nil {
 		ctrl.fail(c, err)
 		return
 	}

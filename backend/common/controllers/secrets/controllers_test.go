@@ -13,6 +13,7 @@ import (
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/ports/crypto"
+	"github.com/Secreto31126/tesis/common/services/access"
 	srv "github.com/Secreto31126/tesis/common/services/secrets"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -37,14 +38,14 @@ func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 
 	boards := &mocks.MockDB{
 		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
-			return &models.Board{Id: id, Owner: owner, Collaborators: []string{collaborator}}, nil
+			return &models.Board{Id: id, Owner: owner, Members: []models.BoardMember{{User: collaborator, Role: models.BoardEditor}}}, nil
 		},
 	}
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	groups := &mocks.MemoryGroupStore{Groups: []models.Group{opsGroup}}
-	NewController(srv.New(store, srv.NewPolicy(boards, groups), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, groups)).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
+	NewController(srv.New(store, srv.NewPolicy(boards, groups, access.New()), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, groups)).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
 	return r
 }
 

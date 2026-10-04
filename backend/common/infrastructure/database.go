@@ -6,7 +6,7 @@ import (
 )
 
 type Database interface {
-	// Find user's boards
+	// Find every board the user owns or is a member of
 	FindUserBoards(user string) ([]models.Board, error)
 	// Find all the board post-its
 	FindBoardPostIts(id uuid.UUID) ([]models.PostIts, error)
@@ -24,10 +24,10 @@ type Database interface {
 	CreatePostIt(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
 	// Creates a Board
 	CreateBoard(name, owner string) (*models.Board, error)
-	// Adds collaborator to board
-	AddCollaboratorToBoard(boardID uuid.UUID, user string) error
-	// Removes collaborator from board
-	RemoveCollaboratorFromBoard(boardID uuid.UUID, user string) error
+	// Adds a member to a board, or changes the role of one already on it
+	SetBoardMember(boardID uuid.UUID, user string, role models.BoardRole) error
+	// Removes a member from a board
+	RemoveBoardMember(boardID uuid.UUID, user string) error
 	// Disconnects a strand
 	DisconnectPostIts(boardID, strandID uuid.UUID) error
 	// Connects a Strand

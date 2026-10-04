@@ -11,6 +11,7 @@ import (
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/ports/crypto"
+	"github.com/Secreto31126/tesis/common/services/access"
 	"github.com/google/uuid"
 )
 
@@ -32,7 +33,7 @@ func oauthService(t *testing.T, store *memoryStore, tokens *mocks.MockTokenClien
 	if locks == nil {
 		locks = &mocks.MockLocker{}
 	}
-	return New(store, NewPolicy(boards, store.groups), crypto.NewKeyring(sealer, store.keys), tokens, locks, &mocks.MockHandshakeStore{}, store.groups)
+	return New(store, NewPolicy(boards, store.groups, access.New()), crypto.NewKeyring(sealer, store.keys), tokens, locks, &mocks.MockHandshakeStore{}, store.groups)
 }
 
 func clientCredentials() *models.OAuth2Material {

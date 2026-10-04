@@ -16,6 +16,7 @@ import (
 	"github.com/Secreto31126/tesis/common/ports/oauth"
 	"github.com/Secreto31126/tesis/common/ports/password"
 	"github.com/Secreto31126/tesis/common/ports/redis"
+	"github.com/Secreto31126/tesis/common/services/access"
 	a_srv "github.com/Secreto31126/tesis/common/services/auth"
 	b_srv "github.com/Secreto31126/tesis/common/services/boards"
 	g_srv "github.com/Secreto31126/tesis/common/services/groups"
@@ -42,15 +43,16 @@ func corsConfig() cors.Config {
 }
 
 func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *jwt.Keyring, cfg config, mailer infrastructure.Mailer) *app {
-	secrets := s_srv.New(db, s_srv.NewPolicy(db, db), crypto.NewKeyring(kek, db), oauth.New(), cache, cache, db)
+	resolver := access.New()
+	secrets := s_srv.New(db, s_srv.NewPolicy(db, db, resolver), crypto.NewKeyring(kek, db), oauth.New(), cache, cache, db)
 
 	authService := a_srv.New(a_srv.Config{AccessTTL: cfg.accessTTL, RefreshTTL: cfg.refreshTTL, Admins: cfg.admins},
 		db, cache, password.New(), keys, cache, cache, mailer, cfg.identityProvider())
 	userService := u_srv.New(db)
 
-	boardService := b_srv.New(db, secrets)
+	boardService := b_srv.New(db, secrets, resolver, db)
 	groupService := g_srv.New(db, secrets)
-	postitService := p_srv.New(db, cache, executer.New(), secrets)
+	postitService := p_srv.New(db, cache, executer.New(), secrets, resolver)
 	realtimeService := r_srv.New(boardService, cache)
 
 	router := gin.Default()
