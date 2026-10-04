@@ -14,8 +14,8 @@ func TestScopeKey(t *testing.T) {
 		want  string
 	}{
 		{BoardScope(board), "board:6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"},
-		{UserScope("cognito-123"), "user:cognito-123"},
-		{MemberScope(board, "cognito-123"), "member:6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d:cognito-123"},
+		{UserScope("user-123"), "user:user-123"},
+		{MemberScope(board, "user-123"), "member:6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d:user-123"},
 		{GroupScope(board), "group:6f1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"},
 		{SystemScope, "system"},
 	}
@@ -44,13 +44,13 @@ func TestScopeValid(t *testing.T) {
 		want  bool
 	}{
 		{"board", BoardScope(uuid.New()), true},
-		{"user", UserScope("cognito-123"), true},
+		{"user", UserScope("user-123"), true},
 		{"system", SystemScope, true},
-		{"member", MemberScope(uuid.New(), "cognito-123"), true},
+		{"member", MemberScope(uuid.New(), "user-123"), true},
 		{"group", GroupScope(uuid.New()), true},
 		{"group with non uuid owner", SecretScope{Kind: ScopeGroup, Owner: "nope"}, false},
 		{"member without user", SecretScope{Kind: ScopeMember, Owner: uuid.New().String() + ":"}, false},
-		{"member with non uuid board", SecretScope{Kind: ScopeMember, Owner: "nope:cognito-123"}, false},
+		{"member with non uuid board", SecretScope{Kind: ScopeMember, Owner: "nope:user-123"}, false},
 		{"member without separator", SecretScope{Kind: ScopeMember, Owner: uuid.New().String()}, false},
 		{"board without owner", SecretScope{Kind: ScopeBoard}, false},
 		{"board with non uuid owner", SecretScope{Kind: ScopeBoard, Owner: "nope"}, false},
@@ -69,9 +69,9 @@ func TestScopeValid(t *testing.T) {
 func TestMemberScope_Member(t *testing.T) {
 	board := uuid.New()
 
-	gotBoard, gotUser, ok := MemberScope(board, "cognito-123").Member()
-	if !ok || gotBoard != board || gotUser != "cognito-123" {
-		t.Errorf("Member() = (%v, %q, %v), want (%v, %q, true)", gotBoard, gotUser, ok, board, "cognito-123")
+	gotBoard, gotUser, ok := MemberScope(board, "user-123").Member()
+	if !ok || gotBoard != board || gotUser != "user-123" {
+		t.Errorf("Member() = (%v, %q, %v), want (%v, %q, true)", gotBoard, gotUser, ok, board, "user-123")
 	}
 
 	if _, _, ok := BoardScope(board).Member(); ok {

@@ -193,7 +193,8 @@ func (srv *SecretsService) ListSystem(principal models.Principal) ([]models.Syst
 // MissingSystemSecrets names the platform credentials the code references
 // that nobody has provisioned yet. Meant for a startup warning.
 func (srv *SecretsService) MissingSystemSecrets() ([]models.SystemSecretName, error) {
-	statuses, err := srv.ListSystem(models.Principal{})
+	// The boot check runs as the platform itself.
+	statuses, err := srv.ListSystem(models.Principal{Admin: true})
 	if err != nil {
 		return nil, err
 	}

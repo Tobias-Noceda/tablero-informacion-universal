@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/ports/crypto"
@@ -20,6 +21,8 @@ import (
 const (
 	owner        = "owner-id"
 	collaborator = "collab-id"
+	// admin is a bearer token: mocks.SubjectVerifier reads it as an admin.
+	admin = "admin:root"
 )
 
 var opsGroup = models.Group{Id: uuid.New(), Name: "ops", Owner: owner, Members: []string{collaborator}}
@@ -41,17 +44,20 @@ func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	groups := &mocks.MemoryGroupStore{Groups: []models.Group{opsGroup}}
-	NewController(srv.New(store, srv.NewPolicy(boards, groups), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, groups)).RegisterRoutes(r)
+	NewController(srv.New(store, srv.NewPolicy(boards, groups), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, groups)).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
 	return r
 }
 
-func do(r http.Handler, method, path, body string) *httptest.ResponseRecorder {
+func do(r http.Handler, caller, method, path, body string) *httptest.ResponseRecorder {
 	var rdr io.Reader
 	if body != "" {
 		rdr = strings.NewReader(body)
 	}
 	req := httptest.NewRequest(method, path, rdr)
 	req.Header.Set("Content-Type", "application/json")
+	if caller != "" {
+		req.Header.Set("Authorization", "Bearer "+caller)
+	}
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w
@@ -68,8 +74,8 @@ func TestPutSecret_OK(t *testing.T) {
 	r := setupRouter(store)
 	board := uuid.New()
 
-	w := do(r, http.MethodPut, "/boards/"+board.String()+"/secrets",
-		`{"cognito_id":"`+owner+`","name":"API_KEY","kind":"api_key","value":"s3cr3t"}`)
+	w := do(r, owner, http.MethodPut, "/boards/"+board.String()+"/secrets",
+		`{"name":"API_KEY","kind":"api_key","value":"s3cr3t"}`)
 
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204 (body: %s)", w.Code, w.Body.String())
@@ -87,8 +93,8 @@ func TestPutSecret_ResponseCarriesNoValue(t *testing.T) {
 	r := setupRouter(nil)
 	board := uuid.New()
 
-	w := do(r, http.MethodPut, "/boards/"+board.String()+"/secrets",
-		`{"cognito_id":"`+owner+`","name":"API_KEY","kind":"api_key","value":"s3cr3t"}`)
+	w := do(r, owner, http.MethodPut, "/boards/"+board.String()+"/secrets",
+		`{"name":"API_KEY","kind":"api_key","value":"s3cr3t"}`)
 
 	if strings.Contains(w.Body.String(), "s3cr3t") {
 		t.Errorf("the response echoed the secret: %s", w.Body.String())
@@ -106,8 +112,8 @@ func TestPutSecret_RejectsNonOwnerAsNotFound(t *testing.T) {
 	r := setupRouter(store)
 	board := uuid.New()
 
-	w := do(r, http.MethodPut, "/boards/"+board.String()+"/secrets",
-		`{"cognito_id":"stranger","name":"API_KEY","kind":"api_key","value":"v"}`)
+	w := do(r, "stranger", http.MethodPut, "/boards/"+board.String()+"/secrets",
+		`{"name":"API_KEY","kind":"api_key","value":"v"}`)
 
 	// 404 rather than 403: a stranger should not learn the board exists.
 	if w.Code != http.StatusNotFound {
@@ -122,8 +128,8 @@ func TestPutSecret_RejectsBadName(t *testing.T) {
 	r := setupRouter(nil)
 	board := uuid.New()
 
-	w := do(r, http.MethodPut, "/boards/"+board.String()+"/secrets",
-		`{"cognito_id":"`+owner+`","name":"lower_case","kind":"api_key","value":"v"}`)
+	w := do(r, owner, http.MethodPut, "/boards/"+board.String()+"/secrets",
+		`{"name":"lower_case","kind":"api_key","value":"v"}`)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400 (body: %s)", w.Code, w.Body.String())
@@ -132,8 +138,8 @@ func TestPutSecret_RejectsBadName(t *testing.T) {
 
 func TestPutSecret_InvalidBoard(t *testing.T) {
 	r := setupRouter(nil)
-	w := do(r, http.MethodPut, "/boards/not-a-uuid/secrets",
-		`{"cognito_id":"`+owner+`","name":"API_KEY","kind":"api_key","value":"v"}`)
+	w := do(r, owner, http.MethodPut, "/boards/not-a-uuid/secrets",
+		`{"name":"API_KEY","kind":"api_key","value":"v"}`)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("status = %d, want 400", w.Code)
@@ -155,7 +161,7 @@ func TestListSecrets_ReturnsMetadataOnly(t *testing.T) {
 	}
 	r := setupRouter(store)
 
-	w := do(r, http.MethodGet, "/boards/"+board.String()+"/secrets?cognito_id="+owner, "")
+	w := do(r, owner, http.MethodGet, "/boards/"+board.String()+"/secrets", "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
@@ -171,12 +177,13 @@ func TestListSecrets_ReturnsMetadataOnly(t *testing.T) {
 	}
 }
 
-func TestListSecrets_MissingCognitoID(t *testing.T) {
+func TestEveryRoute_RequiresAToken(t *testing.T) {
 	r := setupRouter(nil)
-	w := do(r, http.MethodGet, "/boards/"+uuid.New().String()+"/secrets", "")
-
-	if w.Code != http.StatusBadRequest {
-		t.Errorf("status = %d, want 400", w.Code)
+	for _, route := range r.Routes() {
+		path := strings.NewReplacer(":id", uuid.NewString(), ":user", owner, ":name", "KEY").Replace(route.Path)
+		if w := do(r, "", route.Method, path, ""); w.Code != http.StatusUnauthorized {
+			t.Errorf("%s %s = %d, want 401", route.Method, route.Path, w.Code)
+		}
 	}
 }
 
@@ -190,7 +197,7 @@ func TestDeleteSecret_OK(t *testing.T) {
 	}
 	r := setupRouter(store)
 
-	w := do(r, http.MethodDelete, "/boards/"+uuid.New().String()+"/secrets/API_KEY?cognito_id="+owner, "")
+	w := do(r, owner, http.MethodDelete, "/boards/"+uuid.New().String()+"/secrets/API_KEY", "")
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204 (body: %s)", w.Code, w.Body.String())
 	}
@@ -209,7 +216,7 @@ func TestDeleteSecret_NonOwner(t *testing.T) {
 	}
 	r := setupRouter(store)
 
-	w := do(r, http.MethodDelete, "/boards/"+uuid.New().String()+"/secrets/API_KEY?cognito_id=stranger", "")
+	w := do(r, "stranger", http.MethodDelete, "/boards/"+uuid.New().String()+"/secrets/API_KEY", "")
 	if w.Code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404", w.Code)
 	}

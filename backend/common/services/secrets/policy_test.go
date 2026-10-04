@@ -94,17 +94,24 @@ func TestPolicy_User(t *testing.T) {
 	}
 }
 
-// Nobody can be told apart until authentication exists, so the system scope
-// is open. This test pins that down so the day it changes is a deliberate one.
-func TestPolicy_SystemIsOpenUntilAuthExists(t *testing.T) {
+// The platform's own credentials are for platform admins, and nobody else,
+// whatever boards they own.
+func TestPolicy_SystemIsForAdminsOnly(t *testing.T) {
 	p := testPolicy()
 
+	if err := p.CanManage(admin, models.SystemScope); err != nil {
+		t.Errorf("admin: CanManage = %v", err)
+	}
+	if err := p.CanView(admin, models.SystemScope); err != nil {
+		t.Errorf("admin: CanView = %v", err)
+	}
+
 	for _, caller := range []models.Principal{owner, stranger, anonymous} {
-		if err := p.CanManage(caller, models.SystemScope); err != nil {
-			t.Errorf("caller %q: CanManage = %v", caller.ID, err)
+		if err := p.CanManage(caller, models.SystemScope); !errors.Is(err, ErrForbidden) {
+			t.Errorf("caller %q: CanManage = %v, want ErrForbidden", caller.ID, err)
 		}
-		if err := p.CanView(caller, models.SystemScope); err != nil {
-			t.Errorf("caller %q: CanView = %v", caller.ID, err)
+		if err := p.CanView(caller, models.SystemScope); !errors.Is(err, ErrForbidden) {
+			t.Errorf("caller %q: CanView = %v, want ErrForbidden", caller.ID, err)
 		}
 	}
 }

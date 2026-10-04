@@ -97,10 +97,11 @@ func newStore() *memoryStore {
 }
 
 var (
-	owner        = models.Principal{ID: "owner-cognito-id"}
-	collaborator = models.Principal{ID: "collab-cognito-id"}
+	owner        = models.Principal{ID: "owner-id"}
+	collaborator = models.Principal{ID: "collab-id"}
 	stranger     = models.Principal{ID: "stranger"}
 	anonymous    = models.Principal{}
+	admin        = models.Principal{ID: "admin-id", Admin: true}
 )
 
 func service(t *testing.T, store *memoryStore) *SecretsService {
@@ -358,11 +359,11 @@ func TestListSystem_ReportsKnownNamesAndExtras(t *testing.T) {
 	store := newStore()
 	srv := service(t, store)
 
-	if err := srv.Put(models.SystemScope, anonymous, "EXTRA_KEY", models.SecretApiKey, "v"); err != nil {
+	if err := srv.Put(models.SystemScope, admin, "EXTRA_KEY", models.SecretApiKey, "v"); err != nil {
 		t.Fatalf("put: %v", err)
 	}
 
-	statuses, err := srv.ListSystem(anonymous)
+	statuses, err := srv.ListSystem(admin)
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -395,7 +396,7 @@ func TestMissingSystemSecrets_ListsWhatTheCodeExpectsButIsNotStored(t *testing.T
 		t.Fatalf("missing = %v, want every known secret before any is provisioned", missing)
 	}
 
-	_ = srv.Put(models.SystemScope, anonymous, string(models.SystemNasaApiKey), models.SecretApiKey, "v")
+	_ = srv.Put(models.SystemScope, admin, string(models.SystemNasaApiKey), models.SecretApiKey, "v")
 
 	missing, _ = srv.MissingSystemSecrets()
 	for _, name := range missing {

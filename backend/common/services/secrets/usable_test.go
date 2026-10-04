@@ -178,8 +178,8 @@ func TestSetGrants(t *testing.T) {
 		t.Error("an invalid grant was accepted")
 	}
 
-	put(t, srv, models.SystemScope, models.Principal{}, "PLATFORM", "v")
-	if err := srv.SetGrants(models.SystemScope, models.Principal{}, "PLATFORM", share); err == nil {
+	put(t, srv, models.SystemScope, admin, "PLATFORM", "v")
+	if err := srv.SetGrants(models.SystemScope, admin, "PLATFORM", share); err == nil {
 		t.Error("a system secret was shared")
 	}
 

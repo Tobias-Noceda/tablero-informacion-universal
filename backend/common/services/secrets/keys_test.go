@@ -142,7 +142,7 @@ func TestRotateAll_TouchesEveryScopeWithAKey(t *testing.T) {
 
 	_ = srv.Put(a, owner, "A", models.SecretApiKey, "1")
 	_ = srv.Put(b, models.Principal{ID: "alice"}, "B", models.SecretApiKey, "2")
-	_ = srv.Put(models.SystemScope, anonymous, "S", models.SecretApiKey, "3")
+	_ = srv.Put(models.SystemScope, admin, "S", models.SecretApiKey, "3")
 	before := map[uuid.UUID]bool{}
 	for _, scope := range []models.SecretScope{a, b, models.SystemScope} {
 		before[activeKeyID(t, store, scope)] = true
@@ -171,9 +171,9 @@ func TestRotateAll_TouchesEveryScopeWithAKey(t *testing.T) {
 func TestListKeys_NeverCarriesMaterial(t *testing.T) {
 	store := newStore()
 	srv := service(t, store)
-	_ = srv.Put(models.SystemScope, anonymous, "S", models.SecretApiKey, "3")
+	_ = srv.Put(models.SystemScope, admin, "S", models.SecretApiKey, "3")
 
-	keys, err := srv.ListKeys(anonymous)
+	keys, err := srv.ListKeys(admin)
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}

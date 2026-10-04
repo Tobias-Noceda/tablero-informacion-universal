@@ -45,8 +45,9 @@ func (p *policy) check(principal models.Principal, scope models.SecretScope, man
 		}
 		return nil
 	case models.ScopeSystem:
-		// Nobody can be told apart until authentication exists. This is where
-		// the admin role check goes once it does.
+		if !principal.Admin {
+			return ErrForbidden
+		}
 		return nil
 	default:
 		return ErrForbidden

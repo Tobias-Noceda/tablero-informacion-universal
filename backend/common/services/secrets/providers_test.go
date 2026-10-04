@@ -24,7 +24,7 @@ func googleConfig() models.OAuthProviderConfig {
 
 func withGoogleClient(t *testing.T, srv *SecretsService) {
 	t.Helper()
-	if err := srv.PutOAuth2Client(anonymous, models.ProviderGoogle, platformClientID, platformClientSecret); err != nil {
+	if err := srv.PutOAuth2Client(admin, models.ProviderGoogle, platformClientID, platformClientSecret); err != nil {
 		t.Fatalf("put client: %v", err)
 	}
 }
@@ -67,13 +67,13 @@ func TestPutOAuth2Client_StoresUnderTheProviderNameInTheSystemScope(t *testing.T
 func TestPutOAuth2Client_Rejects(t *testing.T) {
 	srv := service(t, newStore())
 
-	if err := srv.PutOAuth2Client(anonymous, "myspace", "id", "secret"); err == nil {
+	if err := srv.PutOAuth2Client(admin, "myspace", "id", "secret"); err == nil {
 		t.Error("an unknown provider was accepted")
 	}
-	if err := srv.PutOAuth2Client(anonymous, models.ProviderGoogle, "", "secret"); err == nil {
+	if err := srv.PutOAuth2Client(admin, models.ProviderGoogle, "", "secret"); err == nil {
 		t.Error("an empty client id was accepted")
 	}
-	if err := srv.PutOAuth2Client(anonymous, models.ProviderGoogle, "id", ""); err == nil {
+	if err := srv.PutOAuth2Client(admin, models.ProviderGoogle, "id", ""); err == nil {
 		t.Error("an empty client secret was accepted")
 	}
 }
@@ -83,7 +83,7 @@ func TestPutOAuth2Client_Rejects(t *testing.T) {
 func TestPut_RejectsTheClientKind(t *testing.T) {
 	srv := service(t, newStore())
 
-	if err := srv.Put(models.SystemScope, anonymous, "X", models.SecretOAuth2Client, `{"client_id":"a","client_secret":"b"}`); err == nil {
+	if err := srv.Put(models.SystemScope, admin, "X", models.SecretOAuth2Client, `{"client_id":"a","client_secret":"b"}`); err == nil {
 		t.Error("oauth2_client was accepted through Put")
 	}
 }
@@ -144,7 +144,7 @@ func TestConnect_Rejects(t *testing.T) {
 	if _, err := srv.Connect(board, stranger, models.ProviderGoogle, "GOOGLE", redirectURI); !errors.Is(err, ErrForbidden) {
 		t.Errorf("a stranger connected: %v", err)
 	}
-	if _, err := srv.Connect(models.SystemScope, anonymous, models.ProviderGoogle, "GOOGLE", redirectURI); err == nil {
+	if _, err := srv.Connect(models.SystemScope, admin, models.ProviderGoogle, "GOOGLE", redirectURI); err == nil {
 		t.Error("the system scope consented to something")
 	}
 	if _, err := srv.Connect(board, owner, models.ProviderGoogle, "lower", redirectURI); err == nil {
@@ -191,7 +191,7 @@ func TestCallback_ExchangesWithThePlatformClient(t *testing.T) {
 	target, _ := srv.Connect(board, owner, models.ProviderGoogle, "GOOGLE", redirectURI)
 	parsed, _ := url.Parse(target)
 
-	if err := srv.Callback(parsed.Query().Get("state"), "the-code"); err != nil {
+	if err := srv.Callback(owner, parsed.Query().Get("state"), "the-code"); err != nil {
 		t.Fatalf("callback: %v", err)
 	}
 
@@ -238,7 +238,7 @@ func TestResolve_RefreshesAProviderGrantWithThePlatformClient(t *testing.T) {
 
 	target, _ := srv.Connect(board, owner, models.ProviderGoogle, "GOOGLE", redirectURI)
 	parsed, _ := url.Parse(target)
-	_ = srv.Callback(parsed.Query().Get("state"), "the-code")
+	_ = srv.Callback(owner, parsed.Query().Get("state"), "the-code")
 
 	resolved, err := srv.Resolve(board, []string{"GOOGLE"})
 	if err != nil {
@@ -283,9 +283,9 @@ func TestResolve_PicksUpARotatedPlatformClient(t *testing.T) {
 
 	target, _ := srv.Connect(board, owner, models.ProviderGoogle, "GOOGLE", redirectURI)
 	parsed, _ := url.Parse(target)
-	_ = srv.Callback(parsed.Query().Get("state"), "the-code")
+	_ = srv.Callback(owner, parsed.Query().Get("state"), "the-code")
 
-	if err := srv.PutOAuth2Client(anonymous, models.ProviderGoogle, "new-id", "new-secret"); err != nil {
+	if err := srv.PutOAuth2Client(admin, models.ProviderGoogle, "new-id", "new-secret"); err != nil {
 		t.Fatalf("rotate client: %v", err)
 	}
 
@@ -303,10 +303,10 @@ func TestPutOAuth2_SystemScopeOnlyTakesClientCredentials(t *testing.T) {
 	store := newStore()
 	srv := service(t, store)
 
-	if err := srv.PutOAuth2(models.SystemScope, anonymous, "MACHINE", clientCredentials()); err != nil {
+	if err := srv.PutOAuth2(models.SystemScope, admin, "MACHINE", clientCredentials()); err != nil {
 		t.Errorf("client_credentials rejected in the system scope: %v", err)
 	}
-	if err := srv.PutOAuth2(models.SystemScope, anonymous, "CONSENT", authCode()); err == nil {
+	if err := srv.PutOAuth2(models.SystemScope, admin, "CONSENT", authCode()); err == nil {
 		t.Error("authorization_code accepted in the system scope")
 	}
 }

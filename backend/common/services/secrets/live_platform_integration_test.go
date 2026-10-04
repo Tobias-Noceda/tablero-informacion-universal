@@ -38,7 +38,7 @@ func TestLivePlatformConnect(t *testing.T) {
 	srv := handshakeService(t, store, &mocks.MockHandshakeStore{}, nil)
 	srv.tokens = oauth.New()
 
-	if err := srv.PutOAuth2Client(anonymous, mock, "test-client", "test-secret"); err != nil {
+	if err := srv.PutOAuth2Client(admin, mock, "test-client", "test-secret"); err != nil {
 		t.Fatalf("provision client: %v", err)
 	}
 
@@ -73,7 +73,7 @@ func TestLivePlatformConnect(t *testing.T) {
 		t.Fatalf("provider returned no code (status %d)", res.StatusCode)
 	}
 
-	if err := srv.Callback(state, code); err != nil {
+	if err := srv.Callback(owner, state, code); err != nil {
 		t.Fatalf("callback: %v", err)
 	}
 
