@@ -146,6 +146,7 @@ func (s *stack) assertNoResponseContains(needle string) {
 type client struct {
 	s     *stack
 	id    string
+	email string
 	token string
 }
 
@@ -175,7 +176,7 @@ func (s *stack) register(email string) *client {
 
 	var session a_ctrl.SessionResponse
 	s.mustJSON(s.do(http.MethodPost, "/api/v1/auth/verify-email", map[string]string{"token": s.lastMailedToken()}), http.StatusOK, &session)
-	return &client{s, session.User.Id.String(), session.AccessToken}
+	return &client{s, session.User.Id.String(), email, session.AccessToken}
 }
 
 // admin signs in as the seeded platform admin, registering it on first use.
@@ -187,7 +188,14 @@ func (s *stack) admin() *client {
 		return s.register(rootEmail)
 	}
 	s.mustJSON(w, http.StatusOK, &session)
-	return &client{s, session.User.Id.String(), session.AccessToken}
+	return &client{s, session.User.Id.String(), rootEmail, session.AccessToken}
+}
+
+// share puts who on the board with role, as the board's owner c.
+func (c *client) share(board models.Board, who *client, role models.BoardRole) {
+	c.s.t.Helper()
+	c.s.mustJSON(c.do(http.MethodPut, "/api/v1/boards/"+board.Id.String()+"/members",
+		map[string]any{"email": who.email, "role": role}), http.StatusOK, nil)
 }
 
 func (c *client) newBoard(name string) models.Board {
@@ -227,7 +235,7 @@ func TestEndToEnd_AStrangerSeesNothingOfABoard(t *testing.T) {
 	board := owner.newBoard("it")
 	defer owner.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
 	base := "/api/v1/boards/" + board.Id.String()
-	s.mustJSON(owner.do(http.MethodPost, base+"/collaborators", map[string]string{"user": ana.id}), http.StatusNoContent, nil)
+	owner.share(board, ana, models.BoardEditor)
 
 	var postit models.PostIts
 	s.mustJSON(ana.do(http.MethodPost, "/api/v1/post-its", map[string]any{"board": board.Id, "well_known": "dolar_oficial"}), http.StatusCreated, &postit)
@@ -250,10 +258,10 @@ func TestEndToEnd_AStrangerSeesNothingOfABoard(t *testing.T) {
 		}
 	}
 
-	// The collaborator can work on it but not rename it; the board is in
-	// both their listings and not in the stranger's.
+	// The editor can work on it but not rename it; the board is in both
+	// their listings and not in the stranger's.
 	if w := ana.do(http.MethodPatch, base+"/name", map[string]string{"name": "mine now"}); w.Code != http.StatusNotFound {
-		t.Errorf("collaborator renamed the board: %d", w.Code)
+		t.Errorf("an editor renamed the board: %d", w.Code)
 	}
 	for who, c := range map[string]*client{"owner": owner, "ana": ana, "eve": eve} {
 		var boards []models.Board
@@ -446,7 +454,7 @@ func TestEndToEnd_MemberSecretIsOnlyBindableByItsOwner(t *testing.T) {
 	board := owner.newBoard("it")
 	defer owner.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
 	base := "/api/v1/boards/" + board.Id.String()
-	s.mustJSON(owner.do(http.MethodPost, base+"/collaborators", map[string]string{"user": ana.id}), http.StatusNoContent, nil)
+	owner.share(board, ana, models.BoardEditor)
 
 	// Ana keeps her key on this board, for herself.
 	mine := base + "/members/" + ana.id + "/secrets"
@@ -503,7 +511,7 @@ func TestEndToEnd_MemberSecretIsOnlyBindableByItsOwner(t *testing.T) {
 	}
 
 	// Ana leaves: her scope is destroyed and her card stops.
-	s.mustJSON(ana.do(http.MethodDelete, base+"/collaborators", map[string]string{"user": ana.id}), http.StatusNoContent, nil)
+	s.mustJSON(ana.do(http.MethodDelete, base+"/members/"+ana.id, nil), http.StatusNoContent, nil)
 	if _, err := s.db.FindActiveKey(models.MemberScope(board.Id, ana.id)); err == nil {
 		t.Error("Ana's data key survived her removal")
 	}
@@ -694,4 +702,132 @@ func TestEndToEnd_SharedSecretStopsWhenRevoked(t *testing.T) {
 	}
 
 	s.assertNoResponseContains(alicesKey)
+}
+
+// A board shared by role: a viewer looks and runs, an editor builds with their
+// own credentials, a demotion stops what they built with them, and removal
+// takes the board and what they kept on it away.
+func TestEndToEnd_BoardRoles(t *testing.T) {
+	original := safehttp.IsSafeIP
+	safehttp.IsSafeIP = func(net.IP) bool { return true }
+	t.Cleanup(func() { safehttp.IsSafeIP = original })
+
+	const (
+		bsKey   = "cur_live_ONLY_BS_CARD_MAY_SEND_THIS"
+		keyName = "BS_CURRENCY_KEY"
+	)
+
+	var seenKeys []string
+	stub := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenKeys = append(seenKeys, r.Header.Get("apikey"))
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"meta":{"last_updated_at":"2026-09-20T00:00:00Z"},"data":{"ARS":{"code":"ARS","value":1465.5}}}`)
+	}))
+	defer stub.Close()
+	resource, _ := url.Parse(stub.URL)
+
+	s := newStack(t)
+	owner, b := s.signUp("owner"), s.signUp("b")
+
+	board := owner.newBoard("roles")
+	defer owner.do(http.MethodDelete, "/api/v1/boards/"+board.Id.String(), nil)
+	base := "/api/v1/boards/" + board.Id.String()
+
+	var ownersCard models.PostIts
+	s.mustJSON(owner.do(http.MethodPost, "/api/v1/post-its", map[string]any{"board": board.Id, "well_known": "dolar_oficial"}), http.StatusCreated, &ownersCard)
+	if err := s.db.UpdatePostIt(ownersCard.Id, map[string]any{"resource": resource}); err != nil {
+		t.Fatalf("retarget: %v", err)
+	}
+	ownersCardPath := "/api/v1/post-its/" + ownersCard.Id.String()
+
+	// Shared as viewer: B lists and opens the board and reads results.
+	owner.share(board, b, models.BoardViewer)
+
+	var listed []models.Board
+	s.mustJSON(b.do(http.MethodGet, "/api/v1/boards", nil), http.StatusOK, &listed)
+	if len(listed) != 1 || listed[0].Id != board.Id || listed[0].Role != models.BoardViewer {
+		t.Fatalf("B's boards = %+v, want the board as viewer", listed)
+	}
+	var members []models.BoardMemberSummary
+	s.mustJSON(b.do(http.MethodGet, base+"/members", nil), http.StatusOK, &members)
+	if len(members) != 2 || members[0].User.Id.String() != owner.id || members[1].User.Email != b.email || members[1].Role != models.BoardViewer {
+		t.Errorf("members = %+v", members)
+	}
+	s.mustJSON(b.do(http.MethodGet, ownersCardPath, nil), http.StatusOK, nil)
+
+	// ...and changes nothing, nor learns the board's credentials.
+	for _, c := range []struct {
+		method, path string
+		body         any
+	}{
+		{http.MethodPost, "/api/v1/post-its", map[string]any{"board": board.Id, "well_known": "dolar_oficial"}},
+		{http.MethodPatch, ownersCardPath + "/position", map[string]any{"x": 1, "y": 2}},
+		{http.MethodPatch, ownersCardPath + "/settings", map[string]any{"rate": 5}},
+		{http.MethodDelete, ownersCardPath, nil},
+		{http.MethodGet, base + "/secrets", nil},
+		{http.MethodGet, base + "/secrets/usable", nil},
+		{http.MethodPut, base + "/members/" + b.id + "/secrets", map[string]string{"name": keyName, "kind": "api_key", "value": bsKey}},
+		{http.MethodPut, base + "/members", map[string]any{"email": b.email, "role": "editor"}},
+	} {
+		if w := b.do(c.method, c.path, c.body); w.Code != http.StatusNotFound {
+			t.Errorf("viewer %s %s = %d, want 404 (body: %s)", c.method, c.path, w.Code, w.Body.String())
+		}
+	}
+
+	// Promoted to editor: B keeps a key on the board and builds a card with it.
+	owner.share(board, b, models.BoardEditor)
+	s.mustJSON(b.do(http.MethodPut, base+"/members/"+b.id+"/secrets",
+		map[string]string{"name": keyName, "kind": "api_key", "value": bsKey}), http.StatusNoContent, nil)
+
+	var bsCard models.PostIts
+	s.mustJSON(b.do(http.MethodPost, "/api/v1/post-its", map[string]any{
+		"board":      board.Id,
+		"well_known": "exchange_rate",
+		"params":     map[string]string{"$credential": "$" + keyName},
+		"bindings":   map[string]any{keyName: map[string]any{"scope": models.MemberScope(board.Id, b.id), "name": keyName}},
+	}), http.StatusCreated, &bsCard)
+	if err := s.db.UpdatePostIt(bsCard.Id, map[string]any{"resource": resource}); err != nil {
+		t.Fatalf("retarget: %v", err)
+	}
+	bsCardPath := "/api/v1/post-its/" + bsCard.Id.String()
+
+	s.mustJSON(owner.do(http.MethodGet, bsCardPath, nil), http.StatusOK, nil)
+	if len(seenKeys) == 0 || seenKeys[len(seenKeys)-1] != bsKey {
+		t.Errorf("provider saw %v, want B's key last", seenKeys)
+	}
+
+	// Demoted to viewer: B may no longer bind, so the card that runs as B
+	// stops, for everyone, until someone who may edits it.
+	owner.share(board, b, models.BoardViewer)
+	if err := s.cache.DropPostItResult(bsCard.Id); err != nil {
+		t.Fatalf("drop cache: %v", err)
+	}
+	if w := owner.do(http.MethodGet, bsCardPath, nil); w.Code != http.StatusForbidden {
+		t.Errorf("B's card still runs after the demotion: %d %s", w.Code, w.Body.String())
+	}
+
+	// Removed: the board leaves B's listing and B's key is destroyed.
+	s.mustJSON(owner.do(http.MethodDelete, base+"/members/"+b.id, nil), http.StatusNoContent, nil)
+	s.mustJSON(b.do(http.MethodGet, "/api/v1/boards", nil), http.StatusOK, &listed)
+	if len(listed) != 0 {
+		t.Errorf("B still lists %+v", listed)
+	}
+	if _, err := s.db.FindActiveKey(models.MemberScope(board.Id, b.id)); err == nil {
+		t.Error("B's data key survived the removal")
+	}
+
+	// Nobody can be made a second owner, and an unknown address is reported.
+	for body, want := range map[string]int{
+		`{"email":"` + owner.email + `","role":"editor"}`: http.StatusBadRequest,
+		`{"email":"` + b.email + `","role":"owner"}`:      http.StatusBadRequest,
+		`{"email":"nobody@it.test","role":"viewer"}`:      http.StatusNotFound,
+	} {
+		var payload map[string]any
+		_ = json.Unmarshal([]byte(body), &payload)
+		if w := owner.do(http.MethodPut, base+"/members", payload); w.Code != want {
+			t.Errorf("PUT members %s = %d, want %d (body: %s)", body, w.Code, want, w.Body.String())
+		}
+	}
+
+	s.assertNoResponseContains(bsKey)
 }

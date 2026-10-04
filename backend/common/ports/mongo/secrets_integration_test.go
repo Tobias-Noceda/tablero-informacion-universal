@@ -43,6 +43,7 @@ func integrationDB(t *testing.T) *MongoDB {
 		_ = db.dataKeys.Drop(ctx)
 		_ = db.groups.Drop(ctx)
 		_ = db.users.Drop(ctx)
+		_ = db.boards.Drop(ctx)
 		_ = db.Close()
 	})
 
