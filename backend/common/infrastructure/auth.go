@@ -8,9 +8,10 @@ import (
 )
 
 var (
-	ErrInvalidToken    = errors.New("invalid token")
-	ErrSessionNotFound = errors.New("session not found")
-	ErrRateLimited     = errors.New("too many attempts")
+	ErrInvalidToken     = errors.New("invalid token")
+	ErrSessionNotFound  = errors.New("session not found")
+	ErrRateLimited      = errors.New("too many attempts")
+	ErrIdentityProvider = errors.New("identity provider rejected the sign-in")
 )
 
 type Claims struct {
@@ -71,7 +72,9 @@ type ExternalIdentity struct {
 	Picture       string
 }
 
+// IdentityProvider runs an OpenID Connect authorization code flow with PKCE.
+// Every failure on the provider's side wraps ErrIdentityProvider.
 type IdentityProvider interface {
-	AuthURL(state, nonce, codeChallenge, redirectURI string) string
+	AuthURL(state, nonce, codeChallenge, redirectURI string) (string, error)
 	Complete(code, redirectURI, verifier, nonce string) (*ExternalIdentity, error)
 }

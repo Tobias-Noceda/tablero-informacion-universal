@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"maps"
+	"net/url"
 	"slices"
 	"sync"
 	"time"
@@ -277,8 +278,9 @@ type MockIdentityProvider struct {
 
 var _ infrastructure.IdentityProvider = (*MockIdentityProvider)(nil)
 
-func (p *MockIdentityProvider) AuthURL(state, nonce, codeChallenge, redirectURI string) string {
-	return "https://idp.test/authorize?state=" + state + "&nonce=" + nonce + "&code_challenge=" + codeChallenge + "&redirect_uri=" + redirectURI
+func (p *MockIdentityProvider) AuthURL(state, nonce, codeChallenge, redirectURI string) (string, error) {
+	query := url.Values{"state": {state}, "nonce": {nonce}, "code_challenge": {codeChallenge}, "redirect_uri": {redirectURI}}
+	return "https://idp.test/authorize?" + query.Encode(), nil
 }
 
 func (p *MockIdentityProvider) Complete(code, redirectURI, verifier, nonce string) (*infrastructure.ExternalIdentity, error) {
