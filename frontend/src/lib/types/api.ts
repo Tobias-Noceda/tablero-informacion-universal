@@ -6,14 +6,39 @@ export type Envs = {
     key: `${'global' | 'user' | 'board' | 'post-it'}:${UUID}:${string}`
 };
 
-// export type User = {
-//     cognito_id: string;
-//     boards: Board['id'][]
-//     // Future ideas:
-//     // plan: string;
-//     // team: UUID;
-//     // idk, i forgot
-// }
+export type IdentityProvider = 'google' | 'password';
+
+// The signed-in user as only they see it.
+export type Profile = {
+    id: UUID;
+    email: string;
+    email_verified: boolean;
+    name: string;
+    picture?: string;
+    admin: boolean;
+    identities: IdentityProvider[];
+    created_at: string;
+}
+
+// What anyone else gets to see about a user.
+export type UserSummary = {
+    id: UUID;
+    name: string;
+    email: string;
+    picture?: string;
+}
+
+// Every sign-in answers this; the refresh token only travels in its cookie.
+export type SessionResponse = {
+    access_token: string;
+    token_type: 'Bearer';
+    expires_in: number;
+    user: Profile;
+}
+
+export type GoogleSessionResponse = SessionResponse & {
+    next: string;
+}
 
 export type Board = {
     id: UUID;
