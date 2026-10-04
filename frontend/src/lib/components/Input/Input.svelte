@@ -2,12 +2,15 @@
   import { cn } from '$lib/utils';
   import Icon from '$components/Icon/Icon.svelte';
   import { m } from '$lib/paraglide/messages.js';
+  import type { HTMLInputAttributes } from 'svelte/elements';
 
   interface Props {
     id?: string;
     label?: string;
     placeholder?: string;
-    type?: 'text' | 'password' | 'number';
+    type?: 'text' | 'password' | 'number' | 'email';
+    name?: string;
+    autocomplete?: HTMLInputAttributes['autocomplete'];
     value?: string | number;
     min?: number;
     errorMessage?: string;
@@ -27,6 +30,8 @@
     label,
     placeholder,
     type = 'text',
+    name,
+    autocomplete,
     value = $bindable(''),
     min,
     errorMessage,
@@ -103,6 +108,8 @@
       <input
         {id}
         type={type === 'password' ? (showPassword ? 'text' : 'password') : type}
+        {name}
+        {autocomplete}
         class={finalClass}
         placeholder={skeleton ? m.input_loading() : placeholder}
         bind:value

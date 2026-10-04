@@ -12,7 +12,7 @@
 	import Button from '$components/Button/Button.svelte';
 	import SecretsPanel from '$components/Secrets/SecretsPanel.svelte';
 	import * as secretsApi from '$services/secrets';
-	import { CURRENT_USER } from '$modules/api.svelte';
+	import { session } from '$modules/session.svelte';
 	import { groupByOrigin } from '$lib/secrets/origin';
 	import { bindingsFor, refKey } from '$lib/secrets/binding';
 	import type { SecretMeta } from '$types/api';
@@ -24,12 +24,11 @@
 	import Realtime from './Realtime.svelte';
 	import type { Update } from '$modules/sockets.svelte';
 
-	let { nodes, edges, name, boardId, userId, boardUpdate }: {
+	let { nodes, edges, name, boardId, boardUpdate }: {
 		nodes: Node[],
 		edges: Edge[],
 		name: string,
 		boardId: string,
-		userId: string,
 		boardUpdate: (update: Update) => void
 	} = $props();
 
@@ -39,7 +38,7 @@
 	let managingSecrets = $state(false);
 	// Everything this user may bind on this board, wherever it lives.
 	let usableSecrets = $state<SecretMeta[]>([]);
-	const pickable = $derived(groupByOrigin(usableSecrets, boardId, CURRENT_USER));
+	const pickable = $derived(groupByOrigin(usableSecrets, boardId, session.userId));
 	const byKey = $derived(new Map(usableSecrets.map((s) => [refKey(s), s])));
 
 	// Refreshed whenever the panel closes, so a credential added there is
@@ -243,7 +242,7 @@
 
 <div class="flex flex-row h-full w-full">
 	<main class="dndflow">
-		<Realtime {boardId} {userId} {boardUpdate}>
+		<Realtime {boardId} {boardUpdate}>
 			<div class="reactflow-wrapper">
 				<SvelteFlow
 					bind:nodes
