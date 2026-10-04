@@ -3,8 +3,7 @@ package boards
 import "github.com/google/uuid"
 
 type CreateBoardRequest struct {
-	Name  string `json:"name" binding:"required"`
-	Owner string `json:"owner" binding:"required"`
+	Name string `json:"name" binding:"required"`
 }
 
 type UpdateBoardNameRequest struct {
@@ -12,7 +11,7 @@ type UpdateBoardNameRequest struct {
 }
 
 type CollaboratorRequest struct {
-	CognitoID string `json:"cognito_id" binding:"required"`
+	User string `json:"user" binding:"required"`
 }
 
 type StrandRequest struct {
