@@ -47,7 +47,7 @@ docker compose up --build
 cd backend
 go run .                # listens on :$PORT (default 31126)
 ```
-Needs MongoDB, Redis and `SECRETS_MASTER_KEYS` (see `backend/.env.example`). The main package spans `main.go`, `app.go` and `maintenance.go`, so build it as a package (`go run .`, `go build .`), never `go run main.go`.
+Needs MongoDB, Redis, `SECRETS_MASTER_KEYS` and `AUTH_SIGNING_KEYS` (see `backend/.env.example`). The main package spans `main.go`, `app.go` and `maintenance.go`, so build it as a package (`go run .`, `go build .`), never `go run main.go`.
 
 Maintenance (one-shot, exits afterwards): `go run . -rewrap-keys`, `go run . -rotate-key <kind>:<owner>`, `go run . -rotate-all-keys`.
 
@@ -57,7 +57,7 @@ cd realtime
 pnpm install
 pnpm build:dev && pnpm start:dev   # tsc → node dist/server.js, listens on :$PORT (default 3000)
 ```
-Needs `MONGODB_URI` (replica set), `REDIS_URL` and `API_URL` (see `realtime/.env.example`). `pnpm test` compiles and runs `node --test` on `src/*.test.ts` (no services needed). `package.json` pins pnpm via `devEngines` (`^12.3.4`, downloaded automatically).
+Needs `MONGODB_URI` (replica set), `REDIS_URL` and `API_URL` (see `realtime/.env.example`). `pnpm test` compiles and runs `node --test` on `src/*.test.ts` (no services needed), `pnpm lint` runs Prettier and ESLint; CI runs both (`.github/workflows/realtime-tests.yml`). `package.json` pins pnpm via `devEngines` (`^12.3.4`, downloaded automatically).
 
 ### Frontend only
 ```bash
@@ -74,8 +74,13 @@ pnpm dev                # Vite dev server
 | root (compose) | `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD` | Required. Compose builds `MONGODB_URI` from them |
 | root (compose) | `MONGO_DATABASE` | Default `prod` |
 | root (compose) | `REDIS_PASSWORD` | Required. Compose builds `REDIS_URL` from it |
-| root (compose) | `SECRETS_MASTER_KEYS` | Required (backend). `<version>:<base64 of 32 bytes>`, comma-separated for rotation |
-| backend | `PORT`, `MONGODB_URI`, `MONGO_DATABASE`, `REDIS_URL`, `SECRETS_MASTER_KEYS` | Defaults: `31126`, `mongo:27017`, `prod`, `redis:6379`. Keys are required |
+| root (compose) | `SECRETS_MASTER_KEYS` | Required (backend). `<version>:<base64 of 32 bytes>`, comma-separated for rotation; the highest version encrypts |
+| root (compose) | `AUTH_SIGNING_KEYS` | Required (backend). Ed25519 seeds `<kid>:<base64 of 32 bytes>`, comma-separated; the first signs, all verify |
+| root (compose) | `PLATFORM_ADMINS`, `AUTH_COOKIE_SECURE`, `GOOGLE_SIGNIN_CLIENT_ID`, `GOOGLE_SIGNIN_CLIENT_SECRET`, `GOOGLE_ISSUER` | Passed to the backend (below) |
+| backend | `PORT`, `MONGODB_URI`, `MONGO_DATABASE`, `REDIS_URL`, `SECRETS_MASTER_KEYS`, `AUTH_SIGNING_KEYS` | Defaults: `31126`, `mongo:27017`, `prod`, `redis:6379`. Keys are required |
+| backend | `PLATFORM_ADMINS` | Emails that are platform admins when they sign in |
+| backend | `AUTH_COOKIE_SECURE`, `ACCESS_TTL`, `REFRESH_TTL` | Defaults `true`, `15m`, `720h`. `false` only for plain-HTTP development; keep `true` on Vercel |
+| backend | `GOOGLE_SIGNIN_CLIENT_ID`, `GOOGLE_SIGNIN_CLIENT_SECRET`, `GOOGLE_ISSUER` | Optional "Sign in with Google" (redirect URI `<origin>/auth/google/callback`); empty turns it off |
 | realtime | `MONGODB_URI`, `REDIS_URL`, `API_URL` | Required, no defaults. `API_URL` is the backend with `/api/v1` (compose: `http://backend:31126/api/v1`) |
 | realtime | `MONGO_DATABASE`, `PORT` | Defaults `prod`, `3000` |
 | frontend | `VITE_API_URL` | **Leave empty** (see below). Baked in at build time |
@@ -127,30 +132,40 @@ main.go                           bootstrap, maintenance flags, Run
 app.go                            newApp(): the whole service graph (shared with integration tests)
 maintenance.go                    -rewrap-keys / -rotate-key / -rotate-all-keys
 common/
-  models/          domain types (Board, PostIts, Secret, SecretScope, SecretRef, Grant, Group, Org, DataKey, OAuth2Material, SystemSecretName)
-  infrastructure/  port interfaces (Database, Cache, Executer, SecretStore, KeyStore, GroupStore, OrgStore, Access, ScopePolicy, SecretResolver, ...)
+  models/          domain types (User, Principal, Board, PostIts, Secret, SecretScope, SecretRef, Grant, Group, Org, DataKey, OAuth2Material, SystemSecretName)
+  infrastructure/  port interfaces (Database, Cache, Executer, UserStore, SessionStore, TokenSigner/Verifier, PasswordHasher, RateLimiter, Mailer, IdentityProvider, SecretStore, KeyStore, GroupStore, OrgStore, Access, ScopePolicy, SecretResolver, ...)
   ports/
-    mongo/         Database, SecretStore, KeyStore, GroupStore and OrgStore impls (collections: boards, postit, secrets, data_keys, groups, orgs; uuid codec)
-    redis/         Cache (post-it results), Locker, HandshakeStore and online peers
+    mongo/         Database, UserStore, SecretStore, KeyStore, GroupStore and OrgStore impls (collections: users, boards, postit, secrets, data_keys, groups, orgs; uuid codec)
+    redis/         Cache (post-it results), Locker, HandshakeStore, refresh sessions and rate limits
+    jwt/           access tokens: EdDSA keyring over AUTH_SIGNING_KEYS
+    password/      argon2id hashing
+    oidc/          Google sign-in (OIDC code flow)
+    mail/          mailer that writes to the log (development: verification and reset links)
     crypto/        Sealer (master key ring = KEK) and Keyring (one wrapped data key per scope)
     oauth/         OAuth2 token endpoint client
     executer/      DewIt — HTTP fetch + gojq transform (json.go, html.go)
     safehttp/      SSRF-safe HTTP client
   services/
+    auth/          register, verify email, login, refresh rotation (10 s reuse grace, then the whole family is revoked), logout, forgot/reset password, Google sign-in; rate limits per address and per account
+    users/         a user's own profile
     access/        the access resolver: a principal's role on a board (owner|editor|viewer), in a group (owner|member|viewer) and in an organization (admin|member)
     boards/        board CRUD and members by role (+ purges the board's and its members' secrets and data keys on delete / on removing a member)
     groups/        groups that own secrets: create (optionally in an org), members, delete (+ purge)
-    orgs/          organizations: create, rename, members by email (the last admin stays), delete once nothing belongs to it
+    orgs/          organizations: create, rename, members by email (the last admin stays), delete once nothing belongs to it (+ purges what a leaving member kept on its boards)
     postits/       post-it CRUD + execution + caching + secret injection; well-known definitions
     secrets/       vault: put/list/delete per scope, policy (CanManage/CanView/CanUse), bindings, grants, usable listing, OAuth2 handshakes, platform providers, key rotation
-    realtime/      online-peer bookkeeping in Redis
   controllers/
-    boards/        Gin routes /v1/boards (+ strands, collaborators, online)
+    middleware/    RequireAuth (bearer → Principal), RequireAdmin, SameOrigin (Sec-Fetch-Site on the cookie routes)
+    auth/          Gin routes /v1/auth (the refresh cookie: httpOnly, Secure, SameSite=Strict, Path /api/v1/auth)
+    users/         Gin routes /v1/users/:id
+    boards/        Gin routes /v1/boards (+ strands, members)
     postits/       Gin routes /v1/post-its
     groups/        Gin routes /v1/groups
     orgs/          Gin routes /v1/orgs
     secrets/       Gin routes /v1/{boards,users,groups}/:id/{secrets,oauth2}, /v1/boards/:id/members/:user/*, /v1/boards/:id/secrets/usable, /v1/system/*, /v1/oauth2/*
 ```
+
+**Authentication**: email/password (argon2id, email verified through a mailed link) or Google sign-in. A session is a 15-minute EdDSA access token, kept by the frontend in memory and sent as `Authorization: Bearer`, plus a rotating refresh token in Redis carried by the httpOnly cookie `tiu_refresh` (only `/auth/refresh` and `/auth/logout` read it, and refuse cross-site requests). The principal is `{ID: sub, Admin}`; `Admin` comes from `PLATFORM_ADMINS` at sign-in. Login, registration and reset mails are limited per client address and per account, adding people by email (boards and organizations share it) per user: `429 rate_limited`.
 
 **Post-it execution flow**: `ExecutePostIt` → check Redis cache → `prepare` (map every `$TOKEN` in params/headers/queries to a `SecretRef`: the post-it's `Bindings[TOKEN]` if present, else the board's own scope by name; resolve them as the post-it's `RunAs` principal through `ResolveAs`, which re-checks `CanUse`; then inject the well-known's **system secrets** last, into a clone) → `DewIt.Execute` (HTTP GET to `Resource`, apply query params/headers from `Params`, parse JSON, run `gojq` query) → store result in Redis for `Rate` seconds. A bound secret the principal may no longer use makes the card answer `403`; an unbound board token nobody stored is sent verbatim.
 
@@ -168,7 +183,8 @@ Adding a system secret, a provider or a well-known that needs one: see `.claude/
 
 - `mongo.ts` watches the `boards` collection with a change stream (`update` operations only, `fullDocument: updateLookup`). Needs a replica set.
 - `socket.ts` runs socket.io at path `/ws`. A client connects with `?board=<id>&peer=<id>` and `auth: { token }` (the session's access token). The handshake middleware asks the backend `GET /boards/:id` with that token (`auth.ts`, `roleOn`): no `200` with a role, an outage included, refuses it with `unauthorized`. Node never verifies a JWT; it only reads `sub`/`exp` from a token the backend just accepted. A member joins the room `<board>`, receives `peers`, then `update` events `{ board, ts }` on every board change. A minute before the token expires the server emits `token_expiring`; the client answers `auth { token }` (same user), the role is checked again and the timer restarts. No answer within 30 s after expiry, or no role any more, and the server disconnects the socket, so a removed member is dropped at the next renewal at the latest.
-- `redis.ts` keeps online peers in the hash `board:<id>:online`, peer → user (one entry per tab), expiring 20 min after the last join or renewal. The Go endpoints `PUT/DELETE /boards/:id/online` still write a set under the same key; they are dead code (the frontend uses the socket).
+- `redis.ts` keeps online peers in the hash `board:<id>:online`, peer → user (one entry per tab), expiring 20 min after the last join or renewal. It is the only presence writer.
+- Neither a Redis nor a Mongo restart ends the process: the Redis client reconnects, and a change stream that gives up is reopened from the last change seen.
 - Mouse cursors are peer-to-peer through PeerJS (`$modules/rtc.svelte.ts`), bootstrapped with the `peers` list from the socket.
 
 ## Architecture: Frontend
