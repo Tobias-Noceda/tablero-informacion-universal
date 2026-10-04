@@ -33,7 +33,7 @@ func setupRouter() (*gin.Engine, *mocks.MemoryOrgStore) {
 
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(store, users)).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
+	NewController(srv.New(store, users, &mocks.MockScopePurger{}, &mocks.CountingLimiter{})).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
 	return r, store
 }
 

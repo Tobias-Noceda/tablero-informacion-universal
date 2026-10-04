@@ -14,7 +14,6 @@ import (
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/services/access"
 	b_srv "github.com/Secreto31126/tesis/common/services/boards"
-	r_srv "github.com/Secreto31126/tesis/common/services/realtime"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -59,22 +58,14 @@ func withBoard(db *mocks.MockDB) *mocks.MockDB {
 	return db
 }
 
-func setupRouter(db *mocks.MockDB, cache *mocks.MockCache) *gin.Engine {
-	if cache == nil {
-		cache = &mocks.MockCache{
-			ConnectClientToBoardFn:      func(*models.Board, uuid.UUID) ([]string, error) { return []string{}, nil },
-			DisconnectClientFromBoardFn: func(*models.Board, uuid.UUID) error { return nil },
-		}
-	}
-
+func setupRouter(db *mocks.MockDB) *gin.Engine {
 	gin.SetMode(gin.TestMode)
 
 	r := gin.New()
 	users := &mocks.MemoryUserStore{Users: []models.User{ownerUser, anaUser, bobUser, eveUser}}
-	bs := b_srv.New(withBoard(db), &mocks.MockScopePurger{}, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}), users)
-	rs := r_srv.New(bs, cache)
+	bs := b_srv.New(withBoard(db), &mocks.MockScopePurger{}, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}), users, &mocks.CountingLimiter{})
 
-	NewController(bs, rs).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
+	NewController(bs).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
 	return r
 }
 
@@ -103,7 +94,7 @@ func TestCreateBoard_TheCallerOwnsIt(t *testing.T) {
 		},
 	}
 
-	w := do(setupRouter(db, nil), ana, http.MethodPost, "/boards", `{"name":"B","owner":"someone-else"}`)
+	w := do(setupRouter(db), ana, http.MethodPost, "/boards", `{"name":"B","owner":"someone-else"}`)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201 (body: %s)", w.Code, w.Body.String())
 	}
@@ -121,7 +112,7 @@ func TestCreateBoard_TheCallerOwnsIt(t *testing.T) {
 }
 
 func TestCreateBoard_MissingName(t *testing.T) {
-	w := do(setupRouter(nil, nil), ana, http.MethodPost, "/boards", `{}`)
+	w := do(setupRouter(nil), ana, http.MethodPost, "/boards", `{}`)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", w.Code)
 	}
@@ -137,14 +128,14 @@ func TestGetUserBoards_ListsTheCallersBoards(t *testing.T) {
 		},
 	}
 
-	w := do(setupRouter(db, nil), ana, http.MethodGet, "/boards", "")
+	w := do(setupRouter(db), ana, http.MethodGet, "/boards", "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", w.Code)
 	}
 }
 
 func TestGetBoard_CarriesTheCallersRole(t *testing.T) {
-	w := do(setupRouter(nil, nil), bob, http.MethodGet, board, "")
+	w := do(setupRouter(nil), bob, http.MethodGet, board, "")
 	var got struct{ Role models.BoardRole }
 	_ = json.Unmarshal(w.Body.Bytes(), &got)
 	if w.Code != http.StatusOK || got.Role != models.BoardViewer {
@@ -153,7 +144,7 @@ func TestGetBoard_CarriesTheCallersRole(t *testing.T) {
 }
 
 func TestEveryRoute_RequiresAToken(t *testing.T) {
-	r := setupRouter(nil, nil)
+	r := setupRouter(nil)
 	for _, route := range r.Routes() {
 		path := strings.NewReplacer(":id", boardID.String(), ":strand", uuid.NewString(), ":user", ana).Replace(route.Path)
 		if w := do(r, "", route.Method, path, ""); w.Code != http.StatusUnauthorized {
@@ -189,8 +180,6 @@ var calls = []struct {
 	{call{"GetBoard", http.MethodGet, board, "", http.StatusOK}, models.BoardViewer},
 	{call{"GetBoardPostIts", http.MethodGet, board + "/post-its", "", http.StatusOK}, models.BoardViewer},
 	{call{"GetMembers", http.MethodGet, board + "/members", "", http.StatusOK}, models.BoardViewer},
-	{call{"ConnectClient", http.MethodPut, board + "/online?peer=" + uuid.NewString(), "", http.StatusOK}, models.BoardViewer},
-	{call{"DisconnectClient", http.MethodDelete, board + "/online?peer=" + uuid.NewString(), "", http.StatusNoContent}, models.BoardViewer},
 	{call{"ConnectPostIts", http.MethodPost, board + "/strands", strand, http.StatusCreated}, models.BoardEditor},
 	{call{"DisconnectPostIts", http.MethodDelete, board + "/strands/" + uuid.NewString(), "", http.StatusNoContent}, models.BoardEditor},
 	{call{"UpdateBoardName", http.MethodPatch, board + "/name", `{"name":"N"}`, http.StatusNoContent}, models.BoardOwner},
@@ -205,7 +194,7 @@ func TestRoutes_ByRole(t *testing.T) {
 
 	for _, tc := range calls {
 		t.Run(tc.name, func(t *testing.T) {
-			r := setupRouter(okDB(), nil)
+			r := setupRouter(okDB())
 			for caller, role := range roles {
 				want := http.StatusNotFound
 				if role.AtLeast(tc.min) {
@@ -220,14 +209,14 @@ func TestRoutes_ByRole(t *testing.T) {
 }
 
 func TestMissingBoard_IsNotFound(t *testing.T) {
-	w := do(setupRouter(nil, nil), owner, http.MethodGet, "/boards/"+uuid.NewString(), "")
+	w := do(setupRouter(nil), owner, http.MethodGet, "/boards/"+uuid.NewString(), "")
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", w.Code)
 	}
 }
 
 func TestGetMembers_ListsWhoIsOnTheBoard(t *testing.T) {
-	w := do(setupRouter(nil, nil), bob, http.MethodGet, board+"/members", "")
+	w := do(setupRouter(nil), bob, http.MethodGet, board+"/members", "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d", w.Code)
 	}
@@ -249,7 +238,7 @@ func TestSetMember_NamesTheUserByEmail(t *testing.T) {
 		return nil
 	}
 
-	w := do(setupRouter(db, nil), owner, http.MethodPut, board+"/members", `{"email":"Eve@Example.com","role":"editor"}`)
+	w := do(setupRouter(db), owner, http.MethodPut, board+"/members", `{"email":"Eve@Example.com","role":"editor"}`)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200 (body: %s)", w.Code, w.Body.String())
 	}
@@ -277,7 +266,7 @@ func TestSetMember_ErrorCodes(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		w := do(setupRouter(okDB(), nil), owner, http.MethodPut, board+"/members", c.body)
+		w := do(setupRouter(okDB()), owner, http.MethodPut, board+"/members", c.body)
 		if w.Code != c.code || (c.err != "" && !strings.Contains(w.Body.String(), `"`+c.err+`"`)) {
 			t.Errorf("%s: %d %s, want %d %s", c.body, w.Code, w.Body.String(), c.code, c.err)
 		}
@@ -285,14 +274,14 @@ func TestSetMember_ErrorCodes(t *testing.T) {
 }
 
 func TestRemoveMember_AMemberMayLeave(t *testing.T) {
-	w := do(setupRouter(okDB(), nil), bob, http.MethodDelete, board+"/members/"+bob, "")
+	w := do(setupRouter(okDB()), bob, http.MethodDelete, board+"/members/"+bob, "")
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204 (body: %s)", w.Code, w.Body.String())
 	}
 }
 
 func TestRemoveMember_TheOwnerIsABadRequest(t *testing.T) {
-	w := do(setupRouter(okDB(), nil), owner, http.MethodDelete, board+"/members/"+owner, "")
+	w := do(setupRouter(okDB()), owner, http.MethodDelete, board+"/members/"+owner, "")
 	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "owner_role") {
 		t.Fatalf("status = %d %s, want 400 owner_role", w.Code, w.Body.String())
 	}
@@ -322,7 +311,7 @@ func TestBoardHandlers_ServiceErrors(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if w := do(setupRouter(db, nil), owner, tc.method, tc.path, tc.body); w.Code != http.StatusInternalServerError {
+			if w := do(setupRouter(db), owner, tc.method, tc.path, tc.body); w.Code != http.StatusInternalServerError {
 				t.Fatalf("status = %d, want 500 (body: %s)", w.Code, w.Body.String())
 			}
 		})
@@ -341,12 +330,11 @@ func TestBoardHandlers_InvalidUUID(t *testing.T) {
 		{"ConnectPostIts", http.MethodPost, "/boards/nope/strands", strand, 0},
 		{"DisconnectPostIts board", http.MethodDelete, "/boards/nope/strands/" + uuid.NewString(), "", 0},
 		{"DisconnectPostIts strand", http.MethodDelete, board + "/strands/jajant", "", 0},
-		{"ConnectClient peer", http.MethodPut, board + "/online?peer=nope", "", 0},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if w := do(setupRouter(nil, nil), owner, tc.method, tc.path, tc.body); w.Code != http.StatusBadRequest {
+			if w := do(setupRouter(nil), owner, tc.method, tc.path, tc.body); w.Code != http.StatusBadRequest {
 				t.Fatalf("status = %d, want 400", w.Code)
 			}
 		})
@@ -359,7 +347,7 @@ func TestBoardHandlers_BadBody(t *testing.T) {
 		{http.MethodPatch, board + "/name"},
 		{http.MethodPost, board + "/strands"},
 	} {
-		if w := do(setupRouter(nil, nil), owner, c.method, c.path, `{bad json`); w.Code != http.StatusBadRequest {
+		if w := do(setupRouter(nil), owner, c.method, c.path, `{bad json`); w.Code != http.StatusBadRequest {
 			t.Errorf("%s %s: status = %d, want 400", c.method, c.path, w.Code)
 		}
 	}
@@ -373,7 +361,7 @@ func TestCreateBoard_InAnOrg(t *testing.T) {
 			return &models.Board{Id: uuid.New(), Name: name, Owner: owner, Org: org}, nil
 		},
 	}
-	r := setupRouter(db, nil)
+	r := setupRouter(db)
 
 	w := do(r, ana, http.MethodPost, "/boards", `{"name":"B","org":"`+acme.Id.String()+`"}`)
 	if w.Code != http.StatusCreated || gotOrg == nil || *gotOrg != acme.Id {

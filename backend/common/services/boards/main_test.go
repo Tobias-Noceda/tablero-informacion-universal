@@ -50,7 +50,7 @@ func users() *mocks.MemoryUserStore {
 }
 
 func newService(db *mocks.MockDB, purger infrastructure.ScopePurger) *BoardService {
-	return New(db, purger, access.New(nil), users())
+	return New(db, purger, access.New(nil), users(), &mocks.CountingLimiter{})
 }
 
 func TestCreateBoard_TheCallerOwnsIt(t *testing.T) {
@@ -246,6 +246,28 @@ func TestSetMember_Refusals(t *testing.T) {
 	}
 }
 
+// Only the owner's lookups count, and once they run out nobody is looked up.
+func TestSetMember_LookupsAreLimited(t *testing.T) {
+	id := uuid.New()
+	db := boardDB(id)
+	db.SetBoardMemberFn = func(uuid.UUID, string, models.BoardRole) error {
+		t.Error("a member was stored past the limit")
+		return nil
+	}
+	limiter := &mocks.CountingLimiter{Refuse: map[string]bool{"member-lookup:" + owner.ID: true}}
+	svc := New(db, &purgeRecorder{}, access.New(nil), users(), limiter)
+
+	if _, err := svc.SetMember(bob, id, eveUser.Email, models.BoardViewer); !errors.Is(err, ErrForbidden) {
+		t.Errorf("a viewer: %v, want ErrForbidden", err)
+	}
+	if limiter.Calls["member-lookup:"+bob.ID] != 0 {
+		t.Error("a refused caller used a lookup")
+	}
+	if _, err := svc.SetMember(owner, id, eveUser.Email, models.BoardViewer); !errors.Is(err, ErrRateLimited) {
+		t.Errorf("past the limit: %v, want ErrRateLimited", err)
+	}
+}
+
 // Anyone may leave a board on their own.
 func TestRemoveMember_AMemberMayLeave(t *testing.T) {
 	id := uuid.New()
@@ -349,7 +371,7 @@ func acmeService(db *mocks.MockDB) (*BoardService, models.Org) {
 		{User: ana.ID, Role: models.OrgRoleAdmin},
 		{User: bob.ID, Role: models.OrgRoleMember},
 	}}
-	return New(db, &purgeRecorder{}, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}), users()), acme
+	return New(db, &purgeRecorder{}, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}), users(), &mocks.CountingLimiter{}), acme
 }
 
 func TestCreateBoard_InAnOrgTheCallerBelongsTo(t *testing.T) {

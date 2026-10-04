@@ -20,13 +20,13 @@ import (
 )
 
 const (
-	owner        = "owner-id"
-	collaborator = "collab-id"
+	owner  = "owner-id"
+	editor = "editor-id"
 	// admin is a bearer token: mocks.SubjectVerifier reads it as an admin.
 	admin = "admin:root"
 )
 
-var opsGroup = models.Group{Id: uuid.New(), Name: "ops", Owner: owner, Members: []string{collaborator}}
+var opsGroup = models.Group{Id: uuid.New(), Name: "ops", Owner: owner, Members: []string{editor}}
 
 func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 	if store == nil {
@@ -38,7 +38,7 @@ func setupRouter(store *mocks.MockSecretStore) *gin.Engine {
 
 	boards := &mocks.MockDB{
 		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
-			return &models.Board{Id: id, Owner: owner, Members: []models.BoardMember{{User: collaborator, Role: models.BoardEditor}}}, nil
+			return &models.Board{Id: id, Owner: owner, Members: []models.BoardMember{{User: editor, Role: models.BoardEditor}}}, nil
 		},
 	}
 

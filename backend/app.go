@@ -23,7 +23,6 @@ import (
 	g_srv "github.com/Secreto31126/tesis/common/services/groups"
 	o_srv "github.com/Secreto31126/tesis/common/services/orgs"
 	p_srv "github.com/Secreto31126/tesis/common/services/postits"
-	r_srv "github.com/Secreto31126/tesis/common/services/realtime"
 	s_srv "github.com/Secreto31126/tesis/common/services/secrets"
 	u_srv "github.com/Secreto31126/tesis/common/services/users"
 	"github.com/gin-contrib/cors"
@@ -52,11 +51,10 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 		db, cache, password.New(), keys, cache, cache, mailer, cfg.identityProvider())
 	userService := u_srv.New(db)
 
-	boardService := b_srv.New(db, secrets, resolver, db)
+	boardService := b_srv.New(db, secrets, resolver, db, cache)
 	groupService := g_srv.New(db, secrets, resolver)
-	orgService := o_srv.New(db, db)
+	orgService := o_srv.New(db, db, secrets, cache)
 	postitService := p_srv.New(db, cache, executer.New(), secrets, resolver)
-	realtimeService := r_srv.New(boardService, cache)
 
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
@@ -69,7 +67,7 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	// from middleware.Principal.
 	private := api.Group("", middleware.RequireAuth(keys))
 	u_ctrl.NewController(userService).RegisterRoutes(private)
-	boards.NewController(boardService, realtimeService).RegisterRoutes(private)
+	boards.NewController(boardService).RegisterRoutes(private)
 	postits.NewController(postitService).RegisterRoutes(private)
 	s_ctrl.NewController(secrets).RegisterRoutes(private)
 	g_ctrl.NewController(groupService).RegisterRoutes(private)

@@ -51,6 +51,8 @@ func (ctrl *Controller) fail(c *gin.Context, err error) {
 		c.JSON(http.StatusConflict, gin.H{"error": "last_admin"})
 	case errors.Is(err, srv.ErrOrgNotEmpty):
 		c.JSON(http.StatusConflict, gin.H{"error": "org_not_empty"})
+	case errors.Is(err, srv.ErrRateLimited):
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate_limited"})
 	default:
 		ctrl.logger.Error("organization request failed", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

@@ -16,15 +16,24 @@ var (
 	ErrInvalidName = errors.New("Organization name cannot be empty")
 	ErrInvalidRole = errors.New("A member is an admin or a member")
 	ErrOrgNotEmpty = errors.New("The organization still has boards or groups")
+	ErrRateLimited = infrastructure.ErrRateLimited
+)
+
+// The same lookups as adding someone to a board, from the same allowance.
+const (
+	lookupLimit  = 30
+	lookupWindow = 10 * time.Minute
 )
 
 type OrgService struct {
-	store infrastructure.OrgStore
-	users infrastructure.UserReader
+	store   infrastructure.OrgStore
+	users   infrastructure.UserReader
+	secrets infrastructure.ScopePurger
+	limiter infrastructure.RateLimiter
 }
 
-func New(store infrastructure.OrgStore, users infrastructure.UserReader) *OrgService {
-	return &OrgService{store, users}
+func New(store infrastructure.OrgStore, users infrastructure.UserReader, secrets infrastructure.ScopePurger, limiter infrastructure.RateLimiter) *OrgService {
+	return &OrgService{store, users, secrets, limiter}
 }
 
 // member loads an organization the principal belongs to, with their role
@@ -171,6 +180,13 @@ func (srv *OrgService) SetMember(principal models.Principal, id uuid.UUID, email
 	if !role.Valid() {
 		return nil, ErrInvalidRole
 	}
+	allowed, err := srv.limiter.Allow("member-lookup:"+principal.ID, lookupLimit, lookupWindow)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, ErrRateLimited
+	}
 
 	user, err := srv.users.FindUserByEmail(models.NormalizeEmail(email))
 	if err != nil {
@@ -184,7 +200,8 @@ func (srv *OrgService) SetMember(principal models.Principal, id uuid.UUID, email
 }
 
 // RemoveMember is an admin's to decide, except that anyone may leave. The
-// last admin can do neither.
+// last admin can do neither. What the member kept for themselves on the
+// organization's boards goes with them, unless a board lists them on its own.
 func (srv *OrgService) RemoveMember(principal models.Principal, id uuid.UUID, user string) error {
 	org, err := srv.member(principal, id)
 	if err != nil {
@@ -194,5 +211,21 @@ func (srv *OrgService) RemoveMember(principal models.Principal, id uuid.UUID, us
 		return ErrForbidden
 	}
 
-	return srv.store.RemoveOrgMember(id, user)
+	if err := srv.store.RemoveOrgMember(id, user); err != nil {
+		return err
+	}
+
+	boards, err := srv.store.FindOrgBoards(id)
+	if err != nil {
+		return err
+	}
+	for _, board := range boards {
+		if board.ExplicitRole(user) != "" {
+			continue
+		}
+		if err := srv.secrets.Purge(models.MemberScope(board.Id, user)); err != nil {
+			return err
+		}
+	}
+	return nil
 }

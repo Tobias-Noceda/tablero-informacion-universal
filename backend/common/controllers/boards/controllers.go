@@ -9,20 +9,18 @@ import (
 	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	b_srv "github.com/Secreto31126/tesis/common/services/boards"
-	r_srv "github.com/Secreto31126/tesis/common/services/realtime"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type Controller struct {
-	service  *b_srv.BoardService
-	realtime *r_srv.RealTimeService
-	logger   *slog.Logger
+	service *b_srv.BoardService
+	logger  *slog.Logger
 }
 
-func NewController(boards *b_srv.BoardService, realtime *r_srv.RealTimeService) *Controller {
+func NewController(boards *b_srv.BoardService) *Controller {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	return &Controller{boards, realtime, logger}
+	return &Controller{boards, logger}
 }
 
 func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
@@ -44,8 +42,6 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 
 		boardGroup.PATCH("/:id/name", ctrl.UpdateBoardName)
 
-		boardGroup.PUT("/:id/online", ctrl.ConnectClient)
-		boardGroup.DELETE("/:id/online", ctrl.DisconnectClient)
 	}
 }
 
@@ -63,6 +59,8 @@ func (ctrl *Controller) fail(c *gin.Context, err error) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_role"})
 	case errors.Is(err, b_srv.ErrOwnerRole):
 		c.JSON(http.StatusBadRequest, gin.H{"error": "owner_role"})
+	case errors.Is(err, b_srv.ErrRateLimited):
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate_limited"})
 	default:
 		ctrl.logger.Error("board request failed", "error", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -366,54 +364,6 @@ func (ctrl *Controller) DisconnectPostIts(c *gin.Context) {
 	}
 
 	if err := ctrl.service.DisconnectPostIts(middleware.Principal(c), id, strand); err != nil {
-		ctrl.fail(c, err)
-		return
-	}
-
-	c.Status(http.StatusNoContent)
-}
-
-func peer(c *gin.Context) (uuid.UUID, bool) {
-	client, err := uuid.Parse(c.Query("peer"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid uuid"})
-		return uuid.Nil, false
-	}
-	return client, true
-}
-
-func (ctrl *Controller) ConnectClient(c *gin.Context) {
-	id, ok := uuidParam(c, "id")
-	if !ok {
-		return
-	}
-
-	client, ok := peer(c)
-	if !ok {
-		return
-	}
-
-	list, err := ctrl.realtime.AddClientOnline(middleware.Principal(c), id, client)
-	if err != nil {
-		ctrl.fail(c, err)
-		return
-	}
-
-	c.JSON(http.StatusOK, list)
-}
-
-func (ctrl *Controller) DisconnectClient(c *gin.Context) {
-	id, ok := uuidParam(c, "id")
-	if !ok {
-		return
-	}
-
-	client, ok := peer(c)
-	if !ok {
-		return
-	}
-
-	if err := ctrl.realtime.RemoveClientOnline(middleware.Principal(c), id, client); err != nil {
 		ctrl.fail(c, err)
 		return
 	}

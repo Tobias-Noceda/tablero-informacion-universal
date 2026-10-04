@@ -22,10 +22,23 @@ var (
 	eve = eveUser.Principal()
 )
 
+type purgeRecorder struct{ purged []models.SecretScope }
+
+func (p *purgeRecorder) Purge(scope models.SecretScope) error {
+	p.purged = append(p.purged, scope)
+	return nil
+}
+
 func service() (*OrgService, *mocks.MemoryOrgStore) {
-	store := &mocks.MemoryOrgStore{Boards: map[uuid.UUID]int64{}, Groups: map[uuid.UUID]int64{}}
+	srv, store, _ := serviceWith(&mocks.CountingLimiter{})
+	return srv, store
+}
+
+func serviceWith(limiter infrastructure.RateLimiter) (*OrgService, *mocks.MemoryOrgStore, *purgeRecorder) {
+	store := &mocks.MemoryOrgStore{Boards: map[uuid.UUID]int64{}, Groups: map[uuid.UUID]int64{}, OrgBoards: map[uuid.UUID][]models.Board{}}
 	users := &mocks.MemoryUserStore{Users: []models.User{anaUser, bobUser, cyUser, eveUser}}
-	return New(store, users), store
+	purger := &purgeRecorder{}
+	return New(store, users, purger, limiter), store, purger
 }
 
 // acme is created by ana, with bob as a member.
@@ -195,6 +208,51 @@ func TestRemoveMember_AdminOrOneself(t *testing.T) {
 	stored, _ := store.FindOrg(org.Id)
 	if len(stored.Members) != 1 || stored.RoleOf(ana.ID) != models.OrgRoleAdmin {
 		t.Errorf("members = %+v, want only ana", stored.Members)
+	}
+}
+
+// bob reached the first board through the org only; the second one lists him.
+func TestRemoveMember_PurgesWhatTheyKeptOnTheOrgsBoards(t *testing.T) {
+	srv, store, purger := serviceWith(&mocks.CountingLimiter{})
+	org := acme(t, srv)
+	reached := models.Board{Id: uuid.New(), Owner: ana.ID, Org: &org.Id}
+	listed := models.Board{Id: uuid.New(), Owner: ana.ID, Org: &org.Id, Members: []models.BoardMember{{User: bob.ID, Role: models.BoardEditor}}}
+	store.OrgBoards[org.Id] = []models.Board{reached, listed}
+
+	if err := srv.RemoveMember(bob, org.Id, bob.ID); err != nil {
+		t.Fatalf("leave: %v", err)
+	}
+	if len(purger.purged) != 1 || purger.purged[0] != models.MemberScope(reached.Id, bob.ID) {
+		t.Errorf("purged %v, want bob's member scope on the board he only reached through the org", purger.purged)
+	}
+}
+
+func TestRemoveMember_RefusedPurgesNothing(t *testing.T) {
+	srv, store, purger := serviceWith(&mocks.CountingLimiter{})
+	org := acme(t, srv)
+	store.OrgBoards[org.Id] = []models.Board{{Id: uuid.New(), Owner: ana.ID, Org: &org.Id}}
+
+	_ = srv.RemoveMember(ana, org.Id, ana.ID)
+	_ = srv.RemoveMember(bob, org.Id, ana.ID)
+	if len(purger.purged) != 0 {
+		t.Errorf("purged %v after refused removals", purger.purged)
+	}
+}
+
+func TestSetMember_LookupsAreLimited(t *testing.T) {
+	limiter := &mocks.CountingLimiter{Refuse: map[string]bool{}}
+	srv, _, _ := serviceWith(limiter)
+	org := acme(t, srv)
+	limiter.Refuse["member-lookup:"+ana.ID] = true
+
+	if _, err := srv.SetMember(bob, org.Id, cyUser.Email, models.OrgRoleMember); !errors.Is(err, ErrForbidden) {
+		t.Errorf("a member: %v, want ErrForbidden", err)
+	}
+	if limiter.Calls["member-lookup:"+bob.ID] != 0 {
+		t.Error("a refused caller used a lookup")
+	}
+	if _, err := srv.SetMember(ana, org.Id, cyUser.Email, models.OrgRoleMember); !errors.Is(err, ErrRateLimited) {
+		t.Errorf("past the limit: %v, want ErrRateLimited", err)
 	}
 }
 

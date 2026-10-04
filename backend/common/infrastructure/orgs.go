@@ -30,5 +30,6 @@ type OrgStore interface {
 	RemoveOrgMember(id uuid.UUID, userID string) error
 	DeleteOrg(id uuid.UUID) error
 	CountOrgBoards(id uuid.UUID) (int64, error)
+	FindOrgBoards(id uuid.UUID) ([]models.Board, error)
 	CountOrgGroups(id uuid.UUID) (int64, error)
 }

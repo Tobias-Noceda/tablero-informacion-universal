@@ -173,6 +173,22 @@ func (db *MongoDB) CountOrgBoards(id uuid.UUID) (int64, error) {
 	return db.boards.CountDocuments(ctx, bson.M{"org": id})
 }
 
+func (db *MongoDB) FindOrgBoards(id uuid.UUID) ([]models.Board, error) {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	cursor, err := db.boards.Find(ctx, bson.M{"org": id})
+	if err != nil {
+		return nil, err
+	}
+
+	boards := []models.Board{}
+	if err := cursor.All(ctx, &boards); err != nil {
+		return nil, err
+	}
+	return boards, nil
+}
+
 func (db *MongoDB) CountOrgGroups(id uuid.UUID) (int64, error) {
 	ctx, cancel := timeout()
 	defer cancel()

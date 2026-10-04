@@ -77,7 +77,7 @@ func TestGrants_OwnerSharesAndTheListingShowsIt(t *testing.T) {
 		t.Fatalf("PUT: status = %d (body: %s)", w.Code, w.Body.String())
 	}
 
-	body := `{"grants":[{"to":{"kind":"user","id":"` + collaborator + `"},"board":"` + board.String() + `"}]}`
+	body := `{"grants":[{"to":{"kind":"user","id":"` + editor + `"},"board":"` + board.String() + `"}]}`
 	w = do(r, "alice", http.MethodPut, path+"/KEY/grants", body)
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("PUT grants: status = %d (body: %s)", w.Code, w.Body.String())
@@ -88,15 +88,15 @@ func TestGrants_OwnerSharesAndTheListingShowsIt(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &metas); err != nil || len(metas) != 1 {
 		t.Fatalf("list: status = %d, body = %s", w.Code, w.Body.String())
 	}
-	if len(metas[0].Grants) != 1 || metas[0].Grants[0].To.ID != collaborator || metas[0].Grants[0].Board != board.String() {
+	if len(metas[0].Grants) != 1 || metas[0].Grants[0].To.ID != editor || metas[0].Grants[0].Board != board.String() {
 		t.Errorf("grants in the listing = %+v", metas[0].Grants)
 	}
 
-	w = do(r, collaborator, http.MethodGet, "/boards/"+board.String()+"/secrets/usable", "")
+	w = do(r, editor, http.MethodGet, "/boards/"+board.String()+"/secrets/usable", "")
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"KEY"`) {
 		t.Errorf("usable for the grantee: status = %d, body = %s", w.Code, w.Body.String())
 	}
-	w = do(r, collaborator, http.MethodGet, "/boards/"+uuid.New().String()+"/secrets/usable", "")
+	w = do(r, editor, http.MethodGet, "/boards/"+uuid.New().String()+"/secrets/usable", "")
 	if strings.Contains(w.Body.String(), `"KEY"`) {
 		t.Errorf("the grant leaked onto another board: %s", w.Body.String())
 	}
@@ -119,14 +119,14 @@ func TestMemberSecrets_OnlyThatMemberSeesThem(t *testing.T) {
 	store := rememberingStore()
 	r := setupRouter(store)
 	board := uuid.New()
-	path := "/boards/" + board.String() + "/members/" + collaborator + "/secrets"
+	path := "/boards/" + board.String() + "/members/" + editor + "/secrets"
 
-	w := do(r, collaborator, http.MethodPut, path, `{"name":"MINE","kind":"api_key","value":"v"}`)
+	w := do(r, editor, http.MethodPut, path, `{"name":"MINE","kind":"api_key","value":"v"}`)
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("PUT status = %d, want 204 (body: %s)", w.Code, w.Body.String())
 	}
 
-	w = do(r, collaborator, http.MethodGet, path, "")
+	w = do(r, editor, http.MethodGet, path, "")
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"MINE"`) {
 		t.Errorf("GET by the member: status = %d, body = %s", w.Code, w.Body.String())
 	}
@@ -161,11 +161,11 @@ func TestUsableSecrets_ListsWhatTheCallerCanBind(t *testing.T) {
 		}
 	}
 	put("/boards/"+board.String()+"/secrets", owner, "SHARED")
-	put("/boards/"+board.String()+"/members/"+collaborator+"/secrets", collaborator, "MINE")
+	put("/boards/"+board.String()+"/members/"+editor+"/secrets", editor, "MINE")
 	put("/boards/"+board.String()+"/members/"+owner+"/secrets", owner, "OWNERS")
-	put("/users/"+collaborator+"/secrets", collaborator, "PROFILE")
+	put("/users/"+editor+"/secrets", editor, "PROFILE")
 
-	w := do(r, collaborator, http.MethodGet, "/boards/"+board.String()+"/secrets/usable", "")
+	w := do(r, editor, http.MethodGet, "/boards/"+board.String()+"/secrets/usable", "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200 (body: %s)", w.Code, w.Body.String())
 	}
@@ -511,12 +511,12 @@ func TestGroupSecrets_OwnerManagesMembersView(t *testing.T) {
 		t.Fatalf("PUT by the owner: status = %d (body: %s)", w.Code, w.Body.String())
 	}
 
-	w = do(r, collaborator, http.MethodPut, path, `{"name":"OPS_KEY","kind":"api_key","value":"x"}`)
+	w = do(r, editor, http.MethodPut, path, `{"name":"OPS_KEY","kind":"api_key","value":"x"}`)
 	if w.Code != http.StatusNotFound {
 		t.Errorf("PUT by a member: status = %d, want 404", w.Code)
 	}
 
-	for _, caller := range []string{owner, collaborator} {
+	for _, caller := range []string{owner, editor} {
 		w = do(r, caller, http.MethodGet, path, "")
 		if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"OPS_KEY"`) {
 			t.Errorf("GET by %s: status = %d, body = %s", caller, w.Code, w.Body.String())
@@ -526,7 +526,7 @@ func TestGroupSecrets_OwnerManagesMembersView(t *testing.T) {
 		t.Errorf("GET by a stranger: status = %d, want 404", w.Code)
 	}
 
-	w = do(r, collaborator, http.MethodGet, "/boards/"+uuid.New().String()+"/secrets/usable", "")
+	w = do(r, editor, http.MethodGet, "/boards/"+uuid.New().String()+"/secrets/usable", "")
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"OPS_KEY"`) {
 		t.Errorf("usable for a member: status = %d, body = %s", w.Code, w.Body.String())
 	}

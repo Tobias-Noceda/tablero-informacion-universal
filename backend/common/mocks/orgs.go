@@ -9,11 +9,13 @@ import (
 )
 
 // MemoryOrgStore is an OrgStore over a slice, enough for a service test.
-// Boards and Groups are how many of each name an organization.
+// Boards and Groups are how many of each name an organization; OrgBoards are
+// the boards FindOrgBoards answers.
 type MemoryOrgStore struct {
-	Orgs   []models.Org
-	Boards map[uuid.UUID]int64
-	Groups map[uuid.UUID]int64
+	Orgs      []models.Org
+	Boards    map[uuid.UUID]int64
+	Groups    map[uuid.UUID]int64
+	OrgBoards map[uuid.UUID][]models.Board
 }
 
 var _ infrastructure.OrgStore = (*MemoryOrgStore)(nil)
@@ -105,6 +107,10 @@ func (m *MemoryOrgStore) DeleteOrg(id uuid.UUID) error {
 
 func (m *MemoryOrgStore) CountOrgBoards(id uuid.UUID) (int64, error) {
 	return m.Boards[id], nil
+}
+
+func (m *MemoryOrgStore) FindOrgBoards(id uuid.UUID) ([]models.Board, error) {
+	return slices.Clone(m.OrgBoards[id]), nil
 }
 
 func (m *MemoryOrgStore) CountOrgGroups(id uuid.UUID) (int64, error) {

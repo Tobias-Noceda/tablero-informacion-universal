@@ -2,6 +2,7 @@ package boards
 
 import (
 	"errors"
+	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
@@ -13,6 +14,14 @@ var (
 	ErrOrgNotFound = infrastructure.ErrOrgNotFound
 	ErrInvalidRole = errors.New("A member is an editor or a viewer")
 	ErrOwnerRole   = errors.New("The owner's role cannot change")
+	ErrRateLimited = infrastructure.ErrRateLimited
+)
+
+// Adding someone by email tells the caller whether they have an account, so
+// each user gets a bounded number of lookups (shared with organizations).
+const (
+	lookupLimit  = 30
+	lookupWindow = 10 * time.Minute
 )
 
 type BoardService struct {
@@ -20,10 +29,11 @@ type BoardService struct {
 	secrets infrastructure.ScopePurger
 	access  infrastructure.Access
 	users   infrastructure.UserReader
+	limiter infrastructure.RateLimiter
 }
 
-func New(db infrastructure.Database, secrets infrastructure.ScopePurger, access infrastructure.Access, users infrastructure.UserReader) *BoardService {
-	return &BoardService{db, secrets, access, users}
+func New(db infrastructure.Database, secrets infrastructure.ScopePurger, access infrastructure.Access, users infrastructure.UserReader, limiter infrastructure.RateLimiter) *BoardService {
+	return &BoardService{db, secrets, access, users, limiter}
 }
 
 // require loads a board on which the principal holds at least min, with the
@@ -152,6 +162,9 @@ func (srv *BoardService) SetMember(principal models.Principal, id uuid.UUID, ema
 	if !role.Assignable() {
 		return nil, ErrInvalidRole
 	}
+	if err := srv.allowLookup(principal); err != nil {
+		return nil, err
+	}
 
 	user, err := srv.users.FindUserByEmail(models.NormalizeEmail(email))
 	if err != nil {
@@ -165,6 +178,17 @@ func (srv *BoardService) SetMember(principal models.Principal, id uuid.UUID, ema
 		return nil, err
 	}
 	return &models.BoardMemberSummary{User: user.Summary(), Role: role}, nil
+}
+
+func (srv *BoardService) allowLookup(principal models.Principal) error {
+	allowed, err := srv.limiter.Allow("member-lookup:"+principal.ID, lookupLimit, lookupWindow)
+	if err != nil {
+		return err
+	}
+	if !allowed {
+		return ErrRateLimited
+	}
+	return nil
 }
 
 // RemoveMember is the owner's to decide, except that anyone may leave a board
