@@ -35,14 +35,18 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      backend:
+        condition: service_started
     environment:
       MONGODB_URI: *mongo-uri
       MONGO_DATABASE: ${MONGO_DATABASE:-prod}
       REDIS_URL: *redis-url
+      API_URL: http://backend:31126/api/v1
       PORT: "3000"
     networks:
       - mongo
       - redis
+      - backend
       - realtime
 
   frontend:
