@@ -57,7 +57,7 @@ cd realtime
 pnpm install
 pnpm build:dev && pnpm start:dev   # tsc → node dist/server.js, listens on :$PORT (default 3000)
 ```
-Needs `MONGODB_URI` (replica set) and `REDIS_URL` (see `realtime/.env.example`). `package.json` pins pnpm via `devEngines` (`^12.3.4`, downloaded automatically).
+Needs `MONGODB_URI` (replica set), `REDIS_URL` and `API_URL` (see `realtime/.env.example`). `pnpm test` compiles and runs `node --test` on `src/*.test.ts` (no services needed). `package.json` pins pnpm via `devEngines` (`^12.3.4`, downloaded automatically).
 
 ### Frontend only
 ```bash
@@ -76,7 +76,7 @@ pnpm dev                # Vite dev server
 | root (compose) | `REDIS_PASSWORD` | Required. Compose builds `REDIS_URL` from it |
 | root (compose) | `SECRETS_MASTER_KEYS` | Required (backend). `<version>:<base64 of 32 bytes>`, comma-separated for rotation |
 | backend | `PORT`, `MONGODB_URI`, `MONGO_DATABASE`, `REDIS_URL`, `SECRETS_MASTER_KEYS` | Defaults: `31126`, `mongo:27017`, `prod`, `redis:6379`. Keys are required |
-| realtime | `MONGODB_URI`, `REDIS_URL` | Required, no defaults |
+| realtime | `MONGODB_URI`, `REDIS_URL`, `API_URL` | Required, no defaults. `API_URL` is the backend with `/api/v1` (compose: `http://backend:31126/api/v1`) |
 | realtime | `MONGO_DATABASE`, `PORT` | Defaults `prod`, `3000` |
 | frontend | `VITE_API_URL` | **Leave empty** (see below). Baked in at build time |
 | frontend | `VITE_REALTIME_URL` | **Leave empty.** Optional socket.io origin override, falls back to `VITE_API_URL` then the page origin. Bare origin only |
@@ -167,8 +167,8 @@ Adding a system secret, a provider or a well-known that needs one: see `.claude/
 `realtime/` is a separate Node service, not part of the Go module.
 
 - `mongo.ts` watches the `boards` collection with a change stream (`update` operations only, `fullDocument: updateLookup`). Needs a replica set.
-- `socket.ts` runs socket.io at path `/ws`. A client connects with `?board=<id>&peer=<id>`, joins the room `<board>` and receives a `peers` event, then `update` events `{ board, ts }` on every board change.
-- `redis.ts` keeps online peers in the set `board:<id>:online` (no TTL). The Go endpoints `PUT/DELETE /boards/:id/online` write the same key but the frontend uses the socket instead.
+- `socket.ts` runs socket.io at path `/ws`. A client connects with `?board=<id>&peer=<id>` and `auth: { token }` (the session's access token). The handshake middleware asks the backend `GET /boards/:id` with that token (`auth.ts`, `roleOn`): no `200` with a role, an outage included, refuses it with `unauthorized`. Node never verifies a JWT; it only reads `sub`/`exp` from a token the backend just accepted. A member joins the room `<board>`, receives `peers`, then `update` events `{ board, ts }` on every board change. A minute before the token expires the server emits `token_expiring`; the client answers `auth { token }` (same user), the role is checked again and the timer restarts. No answer within 30 s after expiry, or no role any more, and the server disconnects the socket, so a removed member is dropped at the next renewal at the latest.
+- `redis.ts` keeps online peers in the hash `board:<id>:online`, peer → user (one entry per tab), expiring 20 min after the last join or renewal. The Go endpoints `PUT/DELETE /boards/:id/online` still write a set under the same key; they are dead code (the frontend uses the socket).
 - Mouse cursors are peer-to-peer through PeerJS (`$modules/rtc.svelte.ts`), bootstrapped with the `peers` list from the socket.
 
 ## Architecture: Frontend
@@ -190,8 +190,9 @@ SvelteKit SPA (`ssr = false`, `prerender = false`). Svelte 5 **runes mode enforc
 
 - `$modules/api.svelte.ts` — HTTP helpers (`get`, `post`, `put`, `patch`, `del`) over one `request()`. Resolves relative paths against the page origin (see above), adds the session's `Authorization: Bearer`, renews once on a `401` (never for `/v1/auth/*`) and sends an expired session to `/login?next=`; `get` maps network errors to SvelteKit `error(503)`.
 - `$modules/session.svelte.ts` — `session`: `user`, `status` (`unknown | anonymous | authenticated`), the access token in memory only. `bootstrap()` trades the httpOnly refresh cookie for a session once; `refresh()` is single-flight (Web Locks across tabs when available); `BroadcastChannel('tiu-session')` shares sign-in and sign-out between tabs.
-- `$modules/realtime.svelte.ts` — `connect(board, user, onChange)`: opens the socket and the PeerJS mesh; used by `routes/(app)/board/[id]/Realtime.svelte`.
-- `$modules/sockets.svelte.ts` / `rtc.svelte.ts` — socket.io client and PeerJS cursor sharing.
+- `$modules/realtime.svelte.ts` — `connect(board, user, onChange)`: opens the socket and the PeerJS mesh (`user` is only the cursor's name and picture; the socket knows the user from the token); used by `routes/(app)/board/[id]/Realtime.svelte`.
+- `$modules/sockets.svelte.ts` — the board socket: sends `session.accessToken` on every handshake, answers `token_expiring` (renewing the session when its token is about to expire), reconnects when the server drops it and gives up after one refused handshake retried with a renewed session (the board keeps working without live updates).
+- `$modules/rtc.svelte.ts` — PeerJS cursor sharing.
 - `$modules/statefull.svelte.ts` — Preserves and restores arbitrary route state across navigation (`preserve` / `restore`), keyed by `[fromRoute][toRoute]`.
 - `$services/{board,post-it,secrets,edge,auth,users,orgs}.ts` — Typed API calls per resource; `auth.ts` throws `AuthError` with the backend's `error` code (`$lib/auth/form.ts` turns it into a message). `secrets.ts` is scope-first (`boardScope`, `memberScope`, `pathOf(scope)`): list/put/delete, self-managed OAuth2 (`put_oauth2`, `authorize`), platform providers (`providers`, `connect`), and `usable(board)`. `post-it.ts` sends `bindings`. No service names the caller: the bearer token does.
 - `$lib/secrets/{origin,binding}.ts` — Pure helpers behind the credential picker: where a usable secret comes from (`board | mine | profile | group | shared`) and what a card must send for the picked ones (`$NAME` + a binding for anything outside the board scope).
