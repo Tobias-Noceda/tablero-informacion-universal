@@ -3,7 +3,7 @@
 	import Input from '$components/Input/Input.svelte';
 	import Modal from '$components/Modal/Modal.svelte';
 	import * as secretsApi from '$services/secrets';
-	import { CURRENT_USER } from '$modules/api.svelte';
+	import { session } from '$modules/session.svelte';
 	import type { OAuth2Flow, OAuthProvider, OAuthProviderStatus, SecretMeta, UUID } from '$types/api';
 
 	type StaticKind = 'api_key' | 'bearer' | 'basic';
@@ -17,7 +17,7 @@
 	type Tab = 'board' | 'mine';
 	let tab = $state<Tab>('board');
 	const scope = $derived(
-		tab === 'board' ? secretsApi.boardScope(board) : secretsApi.memberScope(board, CURRENT_USER)
+		tab === 'board' ? secretsApi.boardScope(board) : secretsApi.memberScope(board, session.userId)
 	);
 
 	let secrets = $state<SecretMeta[]>([]);

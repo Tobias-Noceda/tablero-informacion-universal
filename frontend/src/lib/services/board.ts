@@ -1,13 +1,14 @@
 import type { Board, PostIt, UUID } from "$types/api";
 
 import * as api from "$modules/api.svelte"
+import { session } from "$modules/session.svelte";
 
-export async function create(name: string, owner = "Messi") {
+export async function create(name: string, owner = session.userId) {
     const res = await api.post("/v1/boards", { name, owner });
     return await res.json() as Board;
 }
 
-export async function get_all(cognito_id = "Messi") {
+export async function get_all(cognito_id = session.userId) {
     const res = await api.get(`/v1/boards?${new URLSearchParams({ cognito_id })}`);
     return await res.json() as Board[];
 }
@@ -26,12 +27,12 @@ export async function get_post_its(id: UUID) {
     return await res.json() as PostIt[];
 }
 
-export async function share(id: UUID, cognito_id = "Messi") {
+export async function share(id: UUID, cognito_id: string) {
     await api.post(`/v1/boards/${id}/collaborators`, { cognito_id });
 }
 
 // TODO: broken
-export async function unshare(id: UUID, cognito_id = "Messi") {
+export async function unshare(id: UUID, cognito_id: string) {
     await api.del(`/v1/boards/${id}/collaborators?${new URLSearchParams({ cognito_id })}`);
 }
 
