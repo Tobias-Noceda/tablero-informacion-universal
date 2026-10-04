@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 
 	import Cursor from '$components/Cursor/Cursor.svelte';
 
@@ -16,11 +16,18 @@
 	let { children, boardId, boardUpdate }: Props = $props();
 
 	let frame: number | null = null;
-	let connection: Promise<realtime.Connection>;
+	// Null when the board has no live updates (the service refused the socket).
+	let connection: Promise<realtime.Connection | null>;
 
 	// https://github.com/sveltejs/svelte/issues/13249#issuecomment-2351801858
 	$effect.pre(() => {
-		connection = realtime.connect(boardId, session.user!, boardUpdate);
+		const board = boardId;
+		// Only the board reopens the connection: renewing the session replaces
+		// `session.user`, and the socket renews its own token.
+		connection = untrack(() => realtime.connect(board, session.user!, boardUpdate)).catch((err) => {
+			console.warn('Live updates are off for this board:', err);
+			return null;
+		});
 
 		return async () => {
 			if (frame) cancelAnimationFrame(frame);
@@ -36,7 +43,7 @@
 		frame = requestAnimationFrame(() => {
 			frame = null;
 			const { x, y } = mouses.convert({ x: e.clientX, y: e.clientY });
-			connection.then((r) => r.update([x, y]));
+			connection.then((r) => r?.update([x, y]));
 		});
 	}
 </script>

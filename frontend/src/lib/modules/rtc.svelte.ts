@@ -30,7 +30,7 @@ export class RTC {
 		this.peer.on('error', console.error);
 
 		this.peer.on('open', () =>
-			Object.entries(clients).forEach(([user, peer], i) => {
+			Object.entries(clients).forEach(([peer, user], i) => {
 				const conn = this.peer.connect(peer, {
 					reliable: true,
 					metadata: { ...me, color } satisfies ClientData

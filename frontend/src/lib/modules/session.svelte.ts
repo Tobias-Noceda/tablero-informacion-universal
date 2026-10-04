@@ -35,6 +35,10 @@ export class Session implements api.Authenticator {
 		return this.#expiresAt;
 	}
 
+	get accessToken() {
+		return this.#token;
+	}
+
 	header() {
 		return this.#token && `Bearer ${this.#token}`;
 	}
