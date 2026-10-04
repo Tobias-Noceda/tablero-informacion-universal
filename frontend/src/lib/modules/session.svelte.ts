@@ -23,7 +23,7 @@ export class Session implements api.Authenticator {
 
 	constructor(private readonly channelName = 'tiu-session') {}
 
-	// Who the API calls act as. Only read it where a user is guaranteed: the
+	// The signed-in user's id. Only read it where a user is guaranteed: the
 	// (app) routes and what they call.
 	get userId() {
 		if (!this.user) throw new Error('No signed-in user');

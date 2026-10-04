@@ -43,8 +43,8 @@ export type GoogleSessionResponse = SessionResponse & {
 export type Board = {
     id: UUID;
     name: string;
-    owner: string; // cognito_id
-    collaborators: string[]; // cognito_ids
+    owner: UUID; // user id
+    collaborators: UUID[]; // user ids
     postits: {
         id: UUID;
         type?: string;
