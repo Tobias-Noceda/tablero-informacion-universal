@@ -6,13 +6,19 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/Secreto31126/tesis/common/infrastructure"
+	"github.com/Secreto31126/tesis/common/ports/oidc"
 )
 
 const (
-	ENV_PLATFORM_ADMINS    = "PLATFORM_ADMINS"
-	ENV_AUTH_COOKIE_SECURE = "AUTH_COOKIE_SECURE"
-	ENV_ACCESS_TTL         = "ACCESS_TTL"
-	ENV_REFRESH_TTL        = "REFRESH_TTL"
+	ENV_PLATFORM_ADMINS      = "PLATFORM_ADMINS"
+	ENV_AUTH_COOKIE_SECURE   = "AUTH_COOKIE_SECURE"
+	ENV_ACCESS_TTL           = "ACCESS_TTL"
+	ENV_REFRESH_TTL          = "REFRESH_TTL"
+	ENV_GOOGLE_ISSUER        = "GOOGLE_ISSUER"
+	ENV_GOOGLE_CLIENT_ID     = "GOOGLE_SIGNIN_CLIENT_ID"
+	ENV_GOOGLE_CLIENT_SECRET = "GOOGLE_SIGNIN_CLIENT_SECRET"
 
 	DEFAULT_ACCESS_TTL  = 15 * time.Minute
 	DEFAULT_REFRESH_TTL = 30 * 24 * time.Hour
@@ -26,6 +32,7 @@ type config struct {
 	cookieSecure bool
 	accessTTL    time.Duration
 	refreshTTL   time.Duration
+	google       oidc.Config
 }
 
 func loadConfig() (config, error) {
@@ -34,6 +41,15 @@ func loadConfig() (config, error) {
 		cookieSecure: true,
 		accessTTL:    DEFAULT_ACCESS_TTL,
 		refreshTTL:   DEFAULT_REFRESH_TTL,
+		google: oidc.Config{
+			Issuer:       os.Getenv(ENV_GOOGLE_ISSUER),
+			ClientID:     os.Getenv(ENV_GOOGLE_CLIENT_ID),
+			ClientSecret: os.Getenv(ENV_GOOGLE_CLIENT_SECRET),
+		},
+	}
+
+	if (cfg.google.ClientID == "") != (cfg.google.ClientSecret == "") {
+		return cfg, fmt.Errorf("%s and %s go together: set both to enable Google sign-in, or neither", ENV_GOOGLE_CLIENT_ID, ENV_GOOGLE_CLIENT_SECRET)
 	}
 
 	if raw := os.Getenv(ENV_AUTH_COOKIE_SECURE); raw != "" {
@@ -60,6 +76,14 @@ func loadConfig() (config, error) {
 	}
 
 	return cfg, nil
+}
+
+// identityProvider is Google sign-in, or nil when no client is configured.
+func (cfg config) identityProvider() infrastructure.IdentityProvider {
+	if cfg.google.ClientID == "" {
+		return nil
+	}
+	return oidc.New(cfg.google)
 }
 
 func splitList(raw string) []string {

@@ -27,6 +27,7 @@ type fixture struct {
 	mailer   *mocks.RecordingMailer
 	limiter  *mocks.CountingLimiter
 	verifier *staticKeys
+	google   *mocks.MockIdentityProvider
 	now      time.Time
 }
 
@@ -49,10 +50,11 @@ func newFixture(t *testing.T, admins ...string) *fixture {
 		mailer:   &mocks.RecordingMailer{},
 		limiter:  &mocks.CountingLimiter{},
 		verifier: &staticKeys{},
+		google:   &mocks.MockIdentityProvider{},
 		now:      time.Date(2026, 9, 21, 12, 0, 0, 0, time.UTC),
 	}
 	f.svc = New(Config{AccessTTL: 15 * time.Minute, RefreshTTL: 30 * 24 * time.Hour, Admins: admins},
-		f.users, f.sessions, mocks.PlainHasher{}, f.verifier, f.tokens, f.limiter, f.mailer)
+		f.users, f.sessions, mocks.PlainHasher{}, f.verifier, f.tokens, f.limiter, f.mailer, f.google)
 	f.svc.now = func() time.Time { return f.now }
 	return f
 }

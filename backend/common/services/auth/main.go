@@ -66,12 +66,15 @@ type AuthService struct {
 	tokens   infrastructure.HandshakeStore
 	limiter  infrastructure.RateLimiter
 	mailer   infrastructure.Mailer
+	google   infrastructure.IdentityProvider
 	dummy    string
 	now      func() time.Time
 }
 
+// New builds the service; google may be nil, which turns Google sign-in off.
 func New(config Config, users infrastructure.UserStore, sessions infrastructure.SessionStore, hasher infrastructure.PasswordHasher,
-	signer infrastructure.TokenSigner, tokens infrastructure.HandshakeStore, limiter infrastructure.RateLimiter, mailer infrastructure.Mailer) *AuthService {
+	signer infrastructure.TokenSigner, tokens infrastructure.HandshakeStore, limiter infrastructure.RateLimiter, mailer infrastructure.Mailer,
+	google infrastructure.IdentityProvider) *AuthService {
 	admins := make(map[string]bool, len(config.Admins))
 	for _, email := range config.Admins {
 		if normalized := models.NormalizeEmail(email); normalized != "" {
@@ -91,6 +94,7 @@ func New(config Config, users infrastructure.UserStore, sessions infrastructure.
 		tokens:   tokens,
 		limiter:  limiter,
 		mailer:   mailer,
+		google:   google,
 		dummy:    dummy,
 		now:      time.Now,
 	}
@@ -144,7 +148,7 @@ func (srv *AuthService) Register(email, password, name, origin, client string) e
 			Text:    "Someone tried to sign up with this address, which already has an account. If it was you and you forgot your password, reset it at " + origin + "/forgot",
 		})
 	default:
-		if err := srv.users.ReplaceIdentities(existing.Id, withPassword(existing.Identities, hash)); err != nil {
+		if err := srv.users.ReplaceIdentities(existing.Id, withIdentity(existing.Identities, models.Identity{Provider: models.IdentityPassword, Hash: hash})); err != nil {
 			return err
 		}
 		if err := srv.users.UpdateUser(existing.Id, map[string]any{"name": name}); err != nil {
@@ -306,7 +310,7 @@ func (srv *AuthService) ResetPassword(token, password string) (*Tokens, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := srv.users.ReplaceIdentities(user.Id, withPassword(user.Identities, hash)); err != nil {
+	if err := srv.users.ReplaceIdentities(user.Id, withIdentity(user.Identities, models.Identity{Provider: models.IdentityPassword, Hash: hash})); err != nil {
 		return nil, err
 	}
 	if err := srv.users.UpdateUser(user.Id, map[string]any{"emailverified": true}); err != nil {
@@ -430,14 +434,15 @@ func (srv *AuthService) limit(limit int, window time.Duration, keys ...string) e
 	return nil
 }
 
-func withPassword(identities []models.Identity, hash string) []models.Identity {
+// withIdentity adds an identity, replacing the one of the same provider.
+func withIdentity(identities []models.Identity, added models.Identity) []models.Identity {
 	out := make([]models.Identity, 0, len(identities)+1)
 	for _, identity := range identities {
-		if identity.Provider != models.IdentityPassword {
+		if identity.Provider != added.Provider {
 			out = append(out, identity)
 		}
 	}
-	return append(out, models.Identity{Provider: models.IdentityPassword, Hash: hash})
+	return append(out, added)
 }
 
 func validPassword(password string) bool {
