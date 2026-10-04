@@ -831,3 +831,88 @@ func TestEndToEnd_BoardRoles(t *testing.T) {
 
 	s.assertNoResponseContains(bsKey)
 }
+
+// An organization's boards and groups reach its members without being shared
+// one by one: admins act as owners, members look, and the org cannot be
+// deleted while it still owns something.
+func TestEndToEnd_OrgBoardsAndGroups(t *testing.T) {
+	s := newStack(t)
+	admin, member, stranger := s.signUp("org-admin"), s.signUp("org-member"), s.signUp("stranger")
+
+	var org models.Org
+	s.mustJSON(admin.do(http.MethodPost, "/api/v1/orgs", map[string]string{"name": "acme"}), http.StatusCreated, &org)
+	orgBase := "/api/v1/orgs/" + org.Id.String()
+	s.mustJSON(admin.do(http.MethodPut, orgBase+"/members", map[string]string{"email": member.email, "role": "member"}), http.StatusOK, nil)
+
+	var board models.Board
+	s.mustJSON(admin.do(http.MethodPost, "/api/v1/boards", map[string]any{"name": "roadmap", "org": org.Id}), http.StatusCreated, &board)
+	base := "/api/v1/boards/" + board.Id.String()
+	if w := stranger.do(http.MethodPost, "/api/v1/boards", map[string]any{"name": "x", "org": org.Id}); w.Code != http.StatusNotFound {
+		t.Errorf("a stranger created a board in the org: %d", w.Code)
+	}
+
+	// The member lists and opens the board as viewer, and cannot change it.
+	var listed []models.Board
+	s.mustJSON(member.do(http.MethodGet, "/api/v1/boards", nil), http.StatusOK, &listed)
+	if len(listed) != 1 || listed[0].Id != board.Id || listed[0].Role != models.BoardViewer || listed[0].Org == nil {
+		t.Fatalf("member's boards = %+v, want the org's board as viewer", listed)
+	}
+	s.mustJSON(stranger.do(http.MethodGet, "/api/v1/boards", nil), http.StatusOK, &listed)
+	if len(listed) != 0 {
+		t.Errorf("stranger's boards = %+v", listed)
+	}
+	newCard := map[string]any{"board": board.Id, "well_known": "dolar_oficial"}
+	if w := member.do(http.MethodPost, "/api/v1/post-its", newCard); w.Code != http.StatusNotFound {
+		t.Errorf("an org member created a card: %d", w.Code)
+	}
+
+	// Promoting them is an explicit role on the board.
+	admin.share(board, member, models.BoardEditor)
+	s.mustJSON(member.do(http.MethodPost, "/api/v1/post-its", newCard), http.StatusCreated, nil)
+
+	// The org's group: its admin keeps a secret in it; the member sees the
+	// group and nothing in it.
+	var group models.Group
+	s.mustJSON(admin.do(http.MethodPost, "/api/v1/groups", map[string]any{"name": "ops", "org": org.Id}), http.StatusCreated, &group)
+	groupBase := "/api/v1/groups/" + group.Id.String()
+	s.mustJSON(admin.do(http.MethodPut, groupBase+"/secrets",
+		map[string]string{"name": "OPS_KEY", "kind": "api_key", "value": "ops-secret"}), http.StatusNoContent, nil)
+
+	var seen models.Group
+	s.mustJSON(member.do(http.MethodGet, groupBase, nil), http.StatusOK, &seen)
+	if seen.Role != models.GroupViewer {
+		t.Errorf("member's role in the group = %q, want viewer", seen.Role)
+	}
+	if w := member.do(http.MethodGet, groupBase+"/secrets", nil); w.Code != http.StatusNotFound {
+		t.Errorf("an org member listed the group's secrets: %d", w.Code)
+	}
+	if w := stranger.do(http.MethodGet, groupBase, nil); w.Code != http.StatusNotFound {
+		t.Errorf("a stranger saw the group: %d", w.Code)
+	}
+
+	usableBy := func(c *client) []models.SecretMeta {
+		var usable []models.SecretMeta
+		s.mustJSON(c.do(http.MethodGet, base+"/secrets/usable", nil), http.StatusOK, &usable)
+		return usable
+	}
+	if usable := usableBy(admin); len(usable) != 1 || usable[0].Scope != models.GroupScope(group.Id) {
+		t.Errorf("admin's usable = %+v, want the org group's key", usable)
+	}
+	if usable := usableBy(member); len(usable) != 0 {
+		t.Errorf("member's usable = %+v, want nothing", usable)
+	}
+
+	// The org goes only once nothing belongs to it.
+	for _, remove := range []string{base, groupBase} {
+		if w := admin.do(http.MethodDelete, orgBase, nil); w.Code != http.StatusConflict || !strings.Contains(w.Body.String(), "org_not_empty") {
+			t.Errorf("deleting the org with something in it: %d %s", w.Code, w.Body.String())
+		}
+		s.mustJSON(admin.do(http.MethodDelete, remove, nil), http.StatusNoContent, nil)
+	}
+	if w := member.do(http.MethodDelete, orgBase, nil); w.Code != http.StatusNotFound {
+		t.Errorf("a member deleted the org: %d", w.Code)
+	}
+	s.mustJSON(admin.do(http.MethodDelete, orgBase, nil), http.StatusNoContent, nil)
+
+	s.assertNoResponseContains("ops-secret")
+}

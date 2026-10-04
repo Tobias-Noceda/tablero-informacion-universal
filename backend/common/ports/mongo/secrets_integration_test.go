@@ -15,6 +15,7 @@ import (
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/ports/crypto"
+	"github.com/Secreto31126/tesis/common/services/access"
 	secretsrv "github.com/Secreto31126/tesis/common/services/secrets"
 	"github.com/google/uuid"
 )
@@ -44,6 +45,7 @@ func integrationDB(t *testing.T) *MongoDB {
 		_ = db.groups.Drop(ctx)
 		_ = db.users.Drop(ctx)
 		_ = db.boards.Drop(ctx)
+		_ = db.orgs.Drop(ctx)
 		_ = db.Close()
 	})
 
@@ -57,7 +59,7 @@ func integrationService(t *testing.T, db *MongoDB, kekEntries string) *secretsrv
 		t.Fatalf("kek: %v", err)
 	}
 	return secretsrv.New(db, &mocks.MockScopePolicy{}, crypto.NewKeyring(kek, db),
-		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, db)
+		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, db, access.New(nil))
 }
 
 func kek(version int, fill byte) string {

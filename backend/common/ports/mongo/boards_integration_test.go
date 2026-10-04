@@ -5,6 +5,8 @@ package mongo
 import (
 	"testing"
 
+	"go.mongodb.org/mongo-driver/v2/mongo"
+
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/google/uuid"
 )
@@ -12,7 +14,7 @@ import (
 func TestMongo_BoardMembers(t *testing.T) {
 	db := integrationDB(t)
 
-	board, err := db.CreateBoard("it", "owner")
+	board, err := db.CreateBoard("it", "owner", nil)
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -37,7 +39,7 @@ func TestMongo_BoardMembers(t *testing.T) {
 	}
 
 	for _, user := range []string{"owner", "ana", "bob"} {
-		boards, err := db.FindUserBoards(user)
+		boards, err := db.FindUserBoards(user, nil)
 		if err != nil {
 			t.Fatalf("boards of %s: %v", user, err)
 		}
@@ -45,14 +47,14 @@ func TestMongo_BoardMembers(t *testing.T) {
 			t.Errorf("%s's boards = %+v, want the board", user, boards)
 		}
 	}
-	if boards, _ := db.FindUserBoards("eve"); len(boards) != 0 {
+	if boards, _ := db.FindUserBoards("eve", nil); len(boards) != 0 {
 		t.Errorf("eve's boards = %+v, want none", boards)
 	}
 
 	if err := db.RemoveBoardMember(board.Id, "ana"); err != nil {
 		t.Fatalf("remove: %v", err)
 	}
-	if boards, _ := db.FindUserBoards("ana"); len(boards) != 0 {
+	if boards, _ := db.FindUserBoards("ana", nil); len(boards) != 0 {
 		t.Errorf("ana still lists %+v", boards)
 	}
 
@@ -64,10 +66,20 @@ func TestMongo_BoardMembers(t *testing.T) {
 func TestMongo_BoardIndexes(t *testing.T) {
 	db := integrationDB(t)
 
+	names := indexNames(t, db.boards)
+	for _, want := range []string{"owner_1", "members.user_1"} {
+		if !names[want] {
+			t.Errorf("index %s missing, have %v", want, names)
+		}
+	}
+}
+
+func indexNames(t *testing.T, collection *mongo.Collection) map[string]bool {
+	t.Helper()
 	ctx, cancel := timeout()
 	defer cancel()
 
-	cursor, err := db.boards.Indexes().List(ctx)
+	cursor, err := collection.Indexes().List(ctx)
 	if err != nil {
 		t.Fatalf("list: %v", err)
 	}
@@ -82,9 +94,5 @@ func TestMongo_BoardIndexes(t *testing.T) {
 	for _, index := range indexes {
 		names[index.Name] = true
 	}
-	for _, want := range []string{"owner_1", "members.user_1"} {
-		if !names[want] {
-			t.Errorf("index %s missing, have %v", want, names)
-		}
-	}
+	return names
 }
