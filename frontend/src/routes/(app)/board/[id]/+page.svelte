@@ -9,14 +9,16 @@
 
 	import { page } from '$app/state';
 	import type { Node, Edge } from '@xyflow/svelte';
+	import type { BoardRole } from '$types/api';
 
 	const id = $derived(page.params.id!);
 
 	let { data } = $props();
-	const { nodes, edges, name } = $derived(data) as {
+	const { nodes, edges, name, role } = $derived(data) as {
 		nodes: Node[];
 		edges: Edge[];
 		name: string;
+		role: BoardRole;
 	};
 
 	function boardUpdate(update: Update) {
@@ -32,7 +34,7 @@
 {#key id}
 	<DnDProvider>
 		<!-- <Realtime boardId={id} {boardUpdate}> -->
-		<Flow {name} {nodes} {edges} boardId={id} {boardUpdate} />
+		<Flow {name} {nodes} {edges} {role} boardId={id} {boardUpdate} />
 		<!-- </Realtime> -->
 	</DnDProvider>
 {/key}

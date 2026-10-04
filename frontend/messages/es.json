@@ -133,5 +133,23 @@
 		"profile": "Perfil",
 		"logout": "Cerrar sesión",
 		"menu": "Menú de la cuenta"
+	},
+	"members": {
+		"share": "Compartir",
+		"title": "Personas en este tablero",
+		"role_owner": "Dueño",
+		"role_editor": "Editor",
+		"role_viewer": "Lector",
+		"email": "Email de un usuario registrado",
+		"add": "Agregar",
+		"remove": "Quitar",
+		"leave": "Salir de este tablero",
+		"you": "vos",
+		"viewer_hint": "Podés ver este tablero y sus tarjetas, pero no modificarlos.",
+		"loading": "Cargando…",
+		"error_user_not_found": "No hay nadie registrado con ese email.",
+		"error_invalid_role": "Elegí editor o lector.",
+		"error_owner_role": "El rol del dueño no se puede cambiar.",
+		"error_unknown": "No funcionó. Probá de nuevo."
 	}
 }

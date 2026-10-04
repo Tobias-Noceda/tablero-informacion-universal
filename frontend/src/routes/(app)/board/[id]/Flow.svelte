@@ -6,11 +6,15 @@
 
 	import * as postItsApi from '$services/post-it';
 	import * as edgesApi from '$services/edge';
-	import type { Board } from '$types/api';
+	import type { Board, BoardRole } from '$types/api';
 	import Modal from '$components/Modal/Modal.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import Button from '$components/Button/Button.svelte';
 	import SecretsPanel from '$components/Secrets/SecretsPanel.svelte';
+	import ShareDialog from '$components/Share/ShareDialog.svelte';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { refreshBoards } from '$stores/boards';
 	import * as secretsApi from '$services/secrets';
 	import { session } from '$modules/session.svelte';
 	import { groupByOrigin } from '$lib/secrets/origin';
@@ -24,13 +28,25 @@
 	import Realtime from './Realtime.svelte';
 	import type { Update } from '$modules/sockets.svelte';
 
-	let { nodes, edges, name, boardId, boardUpdate }: {
+	let { nodes, edges, name, role, boardId, boardUpdate }: {
 		nodes: Node[],
 		edges: Edge[],
 		name: string,
+		role: BoardRole,
 		boardId: string,
 		boardUpdate: (update: Update) => void
 	} = $props();
+
+	// Viewers look: no dock, no dragging or connecting, no deleting and no
+	// credentials (the backend refuses all of it anyway).
+	const canEdit = $derived(role === 'owner' || role === 'editor');
+	let sharing = $state(false);
+
+	async function left() {
+		sharing = false;
+		await refreshBoards();
+		await goto(resolve('/'));
+	}
 
 	let selectedNode: Node | null = $state(null);
 	let selectedEdge: Edge | null = $state(null);
@@ -44,7 +60,7 @@
 	// Refreshed whenever the panel closes, so a credential added there is
 	// immediately pickable when creating a node.
 	$effect(() => {
-		if (managingSecrets) return;
+		if (managingSecrets || !canEdit) return;
 		secretsApi.usable(boardId).then((s) => (usableSecrets = s)).catch(() => (usableSecrets = []));
 	});
 	let creatingNode = $state<Board['postits'][number] | null>(null);
@@ -80,7 +96,7 @@
 	const onDrop = async (event: DragEvent) => {
 		event.preventDefault();
 
-		if (!type.current) {
+		if (!type.current || !canEdit) {
 			return;
 		}
 
@@ -202,6 +218,7 @@
 
 	// Keyboard shortcuts
 	const onKeyDown = (event: KeyboardEvent) => {
+		if (!canEdit) return;
 		if (event.key === 'Delete' || event.key === 'Backspace') {
 			if (selectedEdge) {
 				edgesApi.disconnect(boardId, selectedEdge.id);
@@ -252,6 +269,8 @@
 					defaultEdgeOptions={{ type: 'floating' }}
 					fitView
 					connectionMode={ConnectionMode.Loose}
+					nodesDraggable={canEdit}
+					nodesConnectable={canEdit}
 					ondragover={onDragOver}
 					ondrop={onDrop}
 					onnodeclick={onNodeClick}
@@ -266,14 +285,23 @@
 					<Controls />
 					<div class="absolute top-0 inset-x-0 flex flex-row items-center justify-between p-3 z-100! bg-transparent pointer-events-none">
 						<h1 class="text-2xl font-bold">{name}</h1>
-						<Button class="pointer-events-auto" variant="secondary" onclick={() => (managingSecrets = true)}>
-							{m['secrets.title']()}
-						</Button>
+						<div class="flex gap-2 pointer-events-auto">
+							<Button variant="secondary" onclick={() => (sharing = true)}>
+								{m['members.share']()}
+							</Button>
+							{#if canEdit}
+								<Button variant="secondary" onclick={() => (managingSecrets = true)}>
+									{m['secrets.title']()}
+								</Button>
+							{/if}
+						</div>
 					</div>
 				</SvelteFlow>
 			</div>
 		</Realtime>
-		<Dock />
+		{#if canEdit}
+			<Dock />
+		{/if}
 	</main>
 	{#if selectedNode}
 		<div
@@ -285,17 +313,23 @@
 				<p>Type: {selectedNode.type}</p>
 				<p>Position: ({selectedNode.position.x}, {selectedNode.position.y})</p>
 			</div>
-			<Button
-				variant="destructive"
-				onclick={() => {
-					if (selectedNode) {
-						deleteNode(selectedNode);
-					}
-				}}
-			>
-				Delete Node
-			</Button>
+			{#if canEdit}
+				<Button
+					variant="destructive"
+					onclick={() => {
+						if (selectedNode) {
+							deleteNode(selectedNode);
+						}
+					}}
+				>
+					Delete Node
+				</Button>
+			{/if}
 		</div>
+	{/if}
+
+	{#if sharing}
+		<ShareDialog board={boardId} {role} onclose={() => (sharing = false)} onleave={left} />
 	{/if}
 
 	{#if managingSecrets}

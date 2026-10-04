@@ -40,11 +40,26 @@ export type GoogleSessionResponse = SessionResponse & {
     next: string;
 }
 
+// What someone may do on a board: viewers look, editors work on the cards,
+// the owner also decides who else is on it.
+export type BoardRole = "owner" | "editor" | "viewer";
+
+export type BoardMember = {
+    user: UUID;
+    role: Exclude<BoardRole, "owner">;
+};
+
+export type BoardMemberSummary = {
+    user: UserSummary;
+    role: BoardRole;
+};
+
 export type Board = {
     id: UUID;
     name: string;
     owner: UUID; // user id
-    collaborators: UUID[]; // user ids
+    members: BoardMember[]; // everyone else on the board
+    role?: BoardRole; // the caller's
     postits: {
         id: UUID;
         type?: string;

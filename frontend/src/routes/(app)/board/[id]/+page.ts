@@ -5,11 +5,12 @@ export const load = (async ({ params, parent }) => {
 	await parent();
 	const id = params.id;
 
-	const { postits, strands, name } = await boardApi.get(id);
+	const { postits, strands, name, role } = await boardApi.get(id);
 
 	return {
 		nodes: postits,
 		edges: strands,
-		name
+		name,
+		role: role ?? 'viewer'
 	};
 }) satisfies PageLoad;

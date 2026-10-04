@@ -133,5 +133,23 @@
 		"profile": "Profile",
 		"logout": "Sign out",
 		"menu": "Account menu"
+	},
+	"members": {
+		"share": "Share",
+		"title": "People on this board",
+		"role_owner": "Owner",
+		"role_editor": "Editor",
+		"role_viewer": "Viewer",
+		"email": "Email of a registered user",
+		"add": "Add",
+		"remove": "Remove",
+		"leave": "Leave this board",
+		"you": "you",
+		"viewer_hint": "You can look at this board and its cards, but not change them.",
+		"loading": "Loading…",
+		"error_user_not_found": "Nobody is registered with that email.",
+		"error_invalid_role": "Pick editor or viewer.",
+		"error_owner_role": "The owner's role cannot change.",
+		"error_unknown": "That did not work. Try again."
 	}
 }
