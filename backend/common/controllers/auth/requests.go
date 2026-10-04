@@ -34,3 +34,19 @@ type SessionResponse struct {
 	ExpiresIn   int            `json:"expires_in"`
 	User        models.Profile `json:"user"`
 }
+
+type GoogleCallbackRequest struct {
+	Code  string `json:"code" binding:"required"`
+	State string `json:"state" binding:"required"`
+}
+
+type GoogleStartResponse struct {
+	AuthorizationURL string `json:"authorization_url"`
+}
+
+// GoogleSessionResponse is a session plus the page the user was headed to
+// when the sign-in started.
+type GoogleSessionResponse struct {
+	SessionResponse
+	Next string `json:"next"`
+}

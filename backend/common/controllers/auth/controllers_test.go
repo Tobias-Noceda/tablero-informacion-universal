@@ -27,24 +27,30 @@ type harness struct {
 	mailer  *mocks.RecordingMailer
 	limiter *mocks.CountingLimiter
 	users   *mocks.MemoryUserStore
+	google  *mocks.MockIdentityProvider
 }
 
 func setup(t *testing.T, secure bool) *harness {
 	t.Helper()
-	h := &harness{mailer: &mocks.RecordingMailer{}, limiter: &mocks.CountingLimiter{}, users: &mocks.MemoryUserStore{}}
+	h := &harness{mailer: &mocks.RecordingMailer{}, limiter: &mocks.CountingLimiter{}, users: &mocks.MemoryUserStore{}, google: &mocks.MockIdentityProvider{}}
+	h.mount(secure, h.google)
+	return h
+}
+
+func (h *harness) mount(secure bool, google infrastructure.IdentityProvider) {
 	service := srv.New(srv.Config{AccessTTL: 15 * time.Minute, RefreshTTL: 30 * 24 * time.Hour},
-		h.users, &mocks.MemorySessionStore{}, mocks.PlainHasher{}, signer{}, &mocks.MockHandshakeStore{}, h.limiter, h.mailer)
+		h.users, &mocks.MemorySessionStore{}, mocks.PlainHasher{}, signer{}, &mocks.MockHandshakeStore{}, h.limiter, h.mailer, google)
 
 	gin.SetMode(gin.TestMode)
 	h.r = gin.New()
 	api := h.r.Group("/api/v1")
 	NewController(service, Cookies{Secure: secure, Path: "/api/v1/auth"}).RegisterRoutes(api)
-	return h
 }
 
 type response struct {
 	*httptest.ResponseRecorder
 	cookie *http.Cookie
+	signin *http.Cookie
 }
 
 func (h *harness) do(method, path, body string, headers ...string) response {
@@ -64,8 +70,11 @@ func (h *harness) do(method, path, body string, headers ...string) response {
 
 	res := response{ResponseRecorder: w}
 	for _, cookie := range w.Result().Cookies() {
-		if cookie.Name == REFRESH_COOKIE {
+		switch cookie.Name {
+		case REFRESH_COOKIE:
 			res.cookie = cookie
+		case SIGNIN_COOKIE:
+			res.signin = cookie
 		}
 	}
 	return res

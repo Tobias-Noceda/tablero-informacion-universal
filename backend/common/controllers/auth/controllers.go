@@ -9,7 +9,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const REFRESH_COOKIE = "tiu_refresh"
+const (
+	REFRESH_COOKIE = "tiu_refresh"
+	SIGNIN_COOKIE  = "tiu_signin"
+)
 
 // Cookies is how the refresh token travels: only to the auth routes, never
 // to scripts, and over TLS unless a plain-HTTP dev setup says otherwise.
@@ -37,6 +40,8 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 		auth.POST("/logout", middleware.SameOrigin(), ctrl.Logout)
 		auth.POST("/password/forgot", ctrl.ForgotPassword)
 		auth.POST("/password/reset", ctrl.ResetPassword)
+		auth.GET("/google/start", ctrl.GoogleStart)
+		auth.POST("/google/callback", middleware.SameOrigin(), ctrl.GoogleCallback)
 	}
 }
 
@@ -206,15 +211,22 @@ func (ctrl *Controller) ResetPassword(c *gin.Context) {
 }
 
 func (ctrl *Controller) session(c *gin.Context, tokens *srv.Tokens) {
+	ctrl.setRefreshCookie(c, tokens)
+	c.JSON(http.StatusOK, sessionResponse(tokens))
+}
+
+func (ctrl *Controller) setRefreshCookie(c *gin.Context, tokens *srv.Tokens) {
 	c.SetSameSite(http.SameSiteStrictMode)
 	c.SetCookie(REFRESH_COOKIE, tokens.Refresh, int(tokens.RefreshTTL.Seconds()), ctrl.cookies.Path, "", ctrl.cookies.Secure, true)
+}
 
-	c.JSON(http.StatusOK, SessionResponse{
+func sessionResponse(tokens *srv.Tokens) SessionResponse {
+	return SessionResponse{
 		AccessToken: tokens.Access,
 		TokenType:   "Bearer",
 		ExpiresIn:   int(tokens.ExpiresIn.Seconds()),
 		User:        tokens.User.Profile(),
-	})
+	}
 }
 
 func (ctrl *Controller) clearCookie(c *gin.Context) {
@@ -236,6 +248,14 @@ func (ctrl *Controller) fail(c *gin.Context, err error) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "email_not_verified"})
 	case errors.Is(err, srv.ErrRateLimited):
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate_limited"})
+	case errors.Is(err, srv.ErrInvalidState):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_state"})
+	case errors.Is(err, srv.ErrInvalidNext):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_next"})
+	case errors.Is(err, srv.ErrIdentityProvider):
+		c.JSON(http.StatusBadGateway, gin.H{"error": "provider_error"})
+	case errors.Is(err, srv.ErrGoogleDisabled):
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "google_not_configured"})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal"})
 	}
