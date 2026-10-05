@@ -8,6 +8,7 @@ import (
 type CreatePostItRequest struct {
 	CognitoID string                      `json:"cognito_id" binding:"required"`
 	Board     uuid.UUID                   `json:"board" binding:"required"`
+	Title     *models.Title               `json:"title"`
 	WellKnown string                      `json:"well_known"`
 	Params    map[string]string           `json:"params"`
 	Bindings  map[string]models.SecretRef `json:"bindings"`
