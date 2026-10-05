@@ -6,10 +6,10 @@
 
 	// import { resolve } from '$app/paths';
 
-	import CardsSidebar from '$layouts/sidebar/CardsSidebar.svelte';
+	import CardsSidebar from '$layouts/Sidebar/CardsSidebar.svelte';
 	import { cn } from '$lib/utils';
 	import Icon from '$components/Icon/Icon.svelte';
-	import CredentialsSidebar from '$layouts/sidebar/CredentialsSidebar.svelte';
+	import CredentialsSidebar from '$layouts/Sidebar/CredentialsSidebar.svelte';
 	import { page } from '$app/state';
 
 	const { children } = $props();
