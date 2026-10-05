@@ -65,7 +65,7 @@
 			creatingOutputs.map((o) => o.key)
 		)
 	);
-	const titleInvalid = $derived(titleAnalysis.unsupported || titleAnalysis.unknown.length > 0);
+	const titleInvalid = $derived(titleAnalysis.unsupported || titleAnalysis.unknown.length > 0 || !creatingTitle.trim());
 
     const insertVariable = (key: string) => {
 		const separator = creatingTitle && !creatingTitle.endsWith(' ') ? ' ' : '';
@@ -112,12 +112,17 @@
 		const created = newPostIt as unknown as { title?: { text: string; vars: boolean } };
         onCreateNode({ ...creatingNode, id: newPostIt.id, data: { title: created.title } } as Node);
 		pickedKeys = {};
+        creatingTitle = '';
 	};
 </script>
 
 {#if creatingNode}
     <Modal
-        {onclose}
+        onclose={() => {
+            creatingTitle = '';
+            pickedKeys = {};
+            onclose();
+        }}
         onaccept={() => {
             if (creatingNode) {
                 createNode();
@@ -132,6 +137,7 @@
         <Input
             label={m['card_title.label']()}
             placeholder={m['card_title.placeholder']({ example: '{{value}}' })}
+            required
             bind:value={creatingTitle}
             labelClass="font-semibold"
         />
@@ -197,6 +203,7 @@
             {:else}
                 <Input
                     label={param.label}
+                    labelClass="font-semibold"
                     placeholder={param.placeholder}
                     type={param.type === 'number' ? 'number' : 'text'}
                     required={param.default === undefined}

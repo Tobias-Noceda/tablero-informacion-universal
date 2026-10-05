@@ -35,7 +35,7 @@
   >
     {@render children()}
     <div class="flex gap-3 justify-end">
-      <Button variant="secondary" onclick={onclose}>{m.cancel()}</Button>
+      <Button variant="gray" onclick={onclose}>{m.cancel()}</Button>
       <Button variant="success" onclick={onaccept} disabled={acceptDisabled}>{acceptText || m.accept()}</Button>
     </div>
   </div>
