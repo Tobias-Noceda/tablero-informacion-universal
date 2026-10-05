@@ -93,6 +93,13 @@
 	const onBoardClick = () => {
 		selectedNode = null;
 		selectedEdge = null;
+
+		nodes = nodes.map((n) => {
+			return { ...n, data: { ...n.data, isSelected: false } };
+		});
+		edges = edges.map((e) => {
+			return { ...e, data: { ...e.data, isSelected: false } };
+		});
 	};
 
 	const createNode = (newNode: Node) => {
@@ -123,6 +130,7 @@
 			selectedNode = event.node;
 			nodes = nodes.map((n) => { return { ...n, data: { ...n.data, isSelected: n.id === event.node.id } } });
 		}
+		edges = edges.map((e) => { return { ...e, data: { ...e.data, isSelected: false } } });
 	};
 
 	const onNodeDragStop = async (event: { targetNode: Node | null, nodes: Node[], event: MouseEvent | TouchEvent }) => {
@@ -142,6 +150,7 @@
 			selectedEdge = event.edge;
 			edges = edges.map((e) => { return { ...e, data: { ...e.data, isSelected: e.id === event.edge.id } } });
 		}
+		nodes = nodes.map((n) => { return { ...n, data: { ...n.data, isSelected: false } } });
 	};
 
 	const onConnect = async (connection: Connection) => {
