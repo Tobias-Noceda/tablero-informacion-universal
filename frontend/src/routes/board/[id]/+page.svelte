@@ -7,10 +7,15 @@
 	// import Realtime from './Realtime.svelte';
 
 	import type { Node, Edge } from '@xyflow/svelte';
+	import { mapPostitWithTitle, type PostItWithTitle } from '$lib/helpers/post-it.js';
 	// import type { PostIt, Strand } from '$types/api.js';
 
+	// type PageProps = { data: Board };
 	let { data } = $props();
-	const { boardId, nodes, edges, userId } = $derived(data) as {
+	const { boardId, nodes, edges, userId } = $derived({
+		...data,
+		nodes: data.nodes.map(mapPostitWithTitle)
+	}) as {
 		boardId: string
 		boardName: string;
 		nodes: Node[];
@@ -19,10 +24,11 @@
 	};
 
 	function boardUpdate(update: Update) {
+		console.log('boardUpdate: ', update);
 		data = {
 			...data,
 			boardName: update.board.name ?? data.boardName,
-			nodes: update.board.postits ?? data.nodes,
+			nodes: update.board.postits?.map((postit) => mapPostitWithTitle(postit as PostItWithTitle)) ?? data.nodes,
 			edges: update.board.strands ?? data.edges,
 		};
 	}

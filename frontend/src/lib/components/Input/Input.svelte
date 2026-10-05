@@ -15,6 +15,7 @@
     skeleton?: boolean;
     required?: boolean;
     multiline?: boolean;
+    labelClass?: string;
     class?: string;
     oninput?: (event: Event & { currentTarget: HTMLInputElement | HTMLTextAreaElement }) => void;
     onsubmit?: () => void;
@@ -34,12 +35,18 @@
     skeleton = false,
     required = false,
     multiline = false,
+    labelClass,
     class: inputClass,
     oninput,
     onsubmit
   }: Props = $props();
 
-  const finalClass = cn(
+  const finalLabelClass = $derived(cn(
+    'text-sm font-medium text-foreground',
+    labelClass
+  ));
+
+  const finalClass = $derived(cn(
     'w-full transition-colors',
     inputClass,
     'px-3 py-2.5 rounded-md border bg-background text-foreground',
@@ -49,7 +56,7 @@
     skeleton ? 'bg-skeleton animate-pulse text-transparent cursor-default' : '',
     multiline ? 'resize-none overflow-hidden' : '',
     type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''
-  );
+  ));
 
   let textareaElement: HTMLTextAreaElement | null = $state(null);
 
@@ -72,7 +79,7 @@
 
 <div class="flex flex-col gap-1 w-full">
   {#if label}
-    <label class="text-sm font-medium text-foreground" for={id}>
+    <label class={finalLabelClass} for={id}>
       {label}
       {#if required}
         <span class="text-destructive">*</span>

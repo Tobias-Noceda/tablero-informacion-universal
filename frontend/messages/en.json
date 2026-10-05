@@ -85,5 +85,16 @@
 		"origin_profile": "My profile",
 		"origin_group": "Groups",
 		"origin_shared": "Shared with me"
+	},
+	"card_title": {
+		"label": "Title",
+		"placeholder": "Optional, e.g. Dollar at {example}",
+		"variables": "Available values",
+		"variables_hint": "Click one to insert it, or type {syntax}. Values are filled in when the card loads.",
+		"sample": "Example response",
+		"preview": "Preview",
+		"unknown": "Unknown value: {names}",
+		"unsupported": "Only plain {syntax} values are supported",
+		"none": "This card has no values to use in its title."
 	}
 }

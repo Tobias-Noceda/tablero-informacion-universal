@@ -16,7 +16,8 @@
 	import type { SecretMeta } from '$types/api';
 	import { m } from '$lib/paraglide/messages';
 	import { uuid } from '$lib/utils';
-	import { nodesMap, parameters } from '$components/Nodes/node-map';
+	import { nodesMap, outputs, parameters } from '$components/Nodes/node-map';
+	import { analyzeTitle, renderTitle } from '$lib/title';
 	import { edgesMap } from '$components/Edges/edge-map';
 	import { mouses } from '$stores/mouses.svelte';
 	import Realtime from './Realtime.svelte';
@@ -49,6 +50,7 @@
 	});
 	let creatingNode = $state<Board['postits'][number] | null>(null);
 	let paramValues = $state<Record<string, string>>({});
+	let creatingTitle = $state<string>('');
 	// A secret parameter holds the picked secret's key, not its name.
 	let pickedKeys = $state<Record<string, string>>({});
 
@@ -59,6 +61,28 @@
 			return p.default === undefined && !(value ?? '').trim();
 		})
 	);
+
+	// What the card answers with, usable in its title as {{key}}.
+	const creatingOutputs = $derived(creatingNode ? (outputs[creatingNode.type!] ?? []) : []);
+	// Example values to preview the title; a card without a resource answers
+	// with its own params, so those show what the user typed.
+	const sampleResponse = $derived(
+		Object.fromEntries(
+			creatingOutputs.map((o) => [o.key, (paramValues[o.key] ?? '').trim() || o.example])
+		)
+	);
+	const titleAnalysis = $derived(
+		analyzeTitle(
+			creatingTitle,
+			creatingOutputs.map((o) => o.key)
+		)
+	);
+	const titleInvalid = $derived(titleAnalysis.unsupported || titleAnalysis.unknown.length > 0);
+
+	const insertVariable = (key: string) => {
+		const separator = creatingTitle && !creatingTitle.endsWith(' ') ? ' ' : '';
+		creatingTitle = `${creatingTitle}${separator}{{${key}}}`;
+	};
 
 	const { screenToFlowPosition, flowToScreenPosition } = useSvelteFlow();
 
@@ -89,22 +113,21 @@
 			y: event.clientY
 		});
 
-		if ((parameters[type.current] ?? []).length === 0) {
-			const newPostIt = await postItsApi.create_well_known(boardId, type.current, {}, $getUser?.id ?? '');
-			await postItsApi.move(newPostIt.id, position.x, position.y);
-			nodes = [...nodes, { id: newPostIt.id, position, type: type.current } as Node];
-			return;
-		}
+		// if ((parameters[type.current] ?? []).length === 0) {
+		// 	const newPostIt = await postItsApi.create_well_known(boardId, type.current, {}, $getUser?.id ?? '');
+		// 	await postItsApi.move(newPostIt.id, position.x, position.y);
+		// 	nodes = [...nodes, { id: newPostIt.id, position, type: type.current } as Node];
+		// 	return;
+		// }
 
 		paramValues = Object.fromEntries(
 			(parameters[type.current] ?? []).map((p) => [p.key, p.default ?? ''])
 		);
+		creatingTitle = '';
 		creatingNode = {
 			id: uuid(),
-			// title: { text: '', vars: false },
 			type: type.current,
 			position,
-			// data: {}
 		};
 	};
 
@@ -114,7 +137,7 @@
 	};
 
 	const createNode = async () => {
-		if (!creatingNode || missingRequired) return;
+		if (!creatingNode || missingRequired || titleInvalid) return;
 
 		const picked = Object.fromEntries(
 			creatingParams
@@ -132,10 +155,15 @@
 			...secrets.params
 		};
 
-		const newPostIt = await postItsApi.create_well_known(boardId, creatingNode.type!, params, $getUser?.id ?? '', secrets.bindings);
+		const title = creatingTitle.trim();
+
+		// The backend recomputes vars, this only mirrors it.
+		const newPostIt = await postItsApi.create_well_known(boardId, { text: title, vars: titleAnalysis.vars }, creatingNode.type!, params, $getUser?.id ?? '', secrets.bindings);
 		await postItsApi.move(newPostIt.id, creatingNode.position.x, creatingNode.position.y);
 
-		nodes = [...nodes, { ...creatingNode, id: newPostIt.id, data: params }];
+		// The create response is the post-it itself: its title is top level.
+		const created = newPostIt as unknown as { title?: { text: string; vars: boolean } };
+		nodes = [...nodes, { ...creatingNode, id: newPostIt.id, data: { title: created.title } } as Node];
 		creatingNode = null;
 		paramValues = {};
 		pickedKeys = {};
@@ -306,13 +334,58 @@
 				}
 			}}
 			acceptText="Create"
-			acceptDisabled={missingRequired}
+			acceptDisabled={missingRequired || titleInvalid}
 		>
-			<h2 class="text-lg font-semibold">Create Node</h2>
+			<div class="flex w-full justify-center">
+				<h2 class="text-xl font-semibold">Create Node</h2>
+			</div>
+			<Input
+				label={m['card_title.label']()}
+				placeholder={m['card_title.placeholder']({ example: '{{value}}' })}
+				bind:value={creatingTitle}
+				labelClass="font-semibold"
+			/>
+			{#if titleAnalysis.unsupported}
+				<span class="text-xs text-destructive">{m['card_title.unsupported']({ syntax: '{{name}}' })}</span>
+			{:else if titleAnalysis.unknown.length > 0}
+				<span class="text-xs text-destructive">
+					{m['card_title.unknown']({ names: titleAnalysis.unknown.map((n) => `{{${n}}}`).join(', ') })}
+				</span>
+			{/if}
+			{#if creatingOutputs.length === 0}
+				<span class="text-xs opacity-70">{m['card_title.none']()}</span>
+			{:else}
+				<div class="flex flex-col gap-1 text-sm">
+					<span class="font-semibold">{m['card_title.variables']()}</span>
+					<div class="flex flex-wrap gap-1">
+						{#each creatingOutputs as output (output.key)}
+							<button
+								type="button"
+								class="rounded-md border border-main-border bg-background px-2 py-0.5 font-mono text-xs hover:bg-main-hover cursor-pointer"
+								title={`${output.label}: ${JSON.stringify(sampleResponse[output.key])}`}
+								onclick={() => insertVariable(output.key)}
+							>
+								{`{{${output.key}}}`}
+							</button>
+						{/each}
+					</div>
+					<span class="text-xs opacity-70">{m['card_title.variables_hint']({ syntax: '{{name}}' })}</span>
+				</div>
+				<details class="text-xs">
+					<summary class="cursor-pointer">{m['card_title.sample']()}</summary>
+					<pre class="mt-1 max-h-40 overflow-auto rounded-md bg-background p-2">{JSON.stringify(sampleResponse, null, 2)}</pre>
+				</details>
+				{#if titleAnalysis.vars}
+					<div class="flex flex-col gap-1 text-sm">
+						<span class="font-semibold">{m['card_title.preview']()}</span>
+						<span class="rounded-md bg-background px-2 py-1 font-bold">{renderTitle(creatingTitle, sampleResponse)}</span>
+					</div>
+				{/if}
+			{/if}
 			{#each creatingParams as param (param.key)}
 				{#if param.type === 'secret'}
 					<label class="flex flex-col gap-1 text-sm">
-						{param.label}
+						<span class="font-semibold">{param.label}</span>
 						{#if pickable.length === 0}
 							<span class="text-xs text-destructive">{m['secrets.no_credentials']()}</span>
 						{:else}

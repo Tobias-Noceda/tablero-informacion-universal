@@ -14,7 +14,7 @@ export async function get_all(cognito_id = "Messi") {
 
 export async function get(id: UUID) {
     const res = await api.get(`/v1/boards/${id}`);
-    return await res.json() as Board;
+    return await res.json();
 }
 
 export async function del(id: UUID) {
@@ -40,10 +40,10 @@ export async function rename(id: UUID, name: string) {
 }
 
 export async function online(id: UUID, peer: UUID) {
-	const res = await api.put(`/v1/boards/${id}/online?${new URLSearchParams({ peer })}`);
+    const res = await api.put(`/v1/boards/${id}/online?${new URLSearchParams({ peer })}`);
     return await res.json() as string[];
 }
 
 export async function offline(id: UUID, peer: UUID) {
-	return api.del(`/v1/boards/${id}/online?${new URLSearchParams({ peer })}`, { keepalive: true });
+    return api.del(`/v1/boards/${id}/online?${new URLSearchParams({ peer })}`, { keepalive: true });
 }

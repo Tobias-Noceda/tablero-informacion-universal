@@ -86,5 +86,16 @@
 		"origin_profile": "Mi perfil",
 		"origin_group": "Grupos",
 		"origin_shared": "Compartidas conmigo"
+	},
+	"card_title": {
+		"label": "Título",
+		"placeholder": "Opcional, ej. Dólar a {example}",
+		"variables": "Valores disponibles",
+		"variables_hint": "Hacé click en uno para insertarlo, o escribí {syntax}. Los valores se completan cuando carga la tarjeta.",
+		"sample": "Respuesta de ejemplo",
+		"preview": "Vista previa",
+		"unknown": "Valor desconocido: {names}",
+		"unsupported": "Solo se admiten valores simples {syntax}",
+		"none": "Esta tarjeta no tiene valores para usar en su título."
 	}
 }
