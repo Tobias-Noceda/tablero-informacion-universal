@@ -17,7 +17,11 @@ export class RTC {
 	private readonly connections = new SvelteMap<string, DataConnection>();
 	private readonly peer: Peer;
 
-	constructor(id: string, clients: Record<string, string>) {
+	constructor(
+		id: string,
+		clients: Record<string, string>,
+		me: Pick<ClientData, 'username' | 'picture'>
+	) {
 		this.peer = new Peer(id);
 
 		const color = RTC.getColor(Object.keys(clients).length);
@@ -26,14 +30,10 @@ export class RTC {
 		this.peer.on('error', console.error);
 
 		this.peer.on('open', () =>
-			Object.entries(clients).forEach(([user, peer], i) => {
+			Object.entries(clients).forEach(([peer, user], i) => {
 				const conn = this.peer.connect(peer, {
 					reliable: true,
-					metadata: {
-						username: 'Messi',
-						picture: 'TBD',
-						color
-					} satisfies ClientData
+					metadata: { ...me, color } satisfies ClientData
 				});
 
 				// TODO: use external peer metadata

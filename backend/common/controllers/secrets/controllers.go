@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/models"
 	srv "github.com/Secreto31126/tesis/common/services/secrets"
 	"github.com/gin-gonic/gin"
@@ -20,24 +21,10 @@ func NewController(service *srv.SecretsService) *Controller {
 	}
 }
 
-// scoping tells a handler which scope a route addresses and whether the
-// caller has to identify itself. Replacing cognito_id with an authenticated
-// subject means changing principal() and nothing else here.
-type scoping struct {
-	scope             func(*gin.Context) (models.SecretScope, bool)
-	principalRequired bool
-}
-
-func (s scoping) principal(c *gin.Context, cognitoID string) (models.Principal, bool) {
-	if cognitoID == "" && s.principalRequired {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Missing cognito_id",
-		})
-		return models.Principal{}, false
-	}
-
-	return models.Principal{ID: cognitoID}, true
-}
+// scoping tells a handler which scope a route addresses. Who is asking always
+// comes from the bearer token (middleware.Principal); the policy decides
+// whether they may.
+type scoping func(*gin.Context) (models.SecretScope, bool)
 
 func boardScope(c *gin.Context) (models.SecretScope, bool) {
 	id, err := uuid.Parse(c.Param("id"))
@@ -81,15 +68,16 @@ func systemScope(*gin.Context) (models.SecretScope, bool) {
 }
 
 func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
-	boards := scoping{scope: boardScope, principalRequired: true}
-	ctrl.registerScoped(router.Group("/boards/:id"), boards)
-	router.GET("/boards/:id/secrets/usable", ctrl.ListUsable(boards))
-	ctrl.registerScoped(router.Group("/boards/:id/members/:user"), scoping{scope: memberScope, principalRequired: true})
-	ctrl.registerScoped(router.Group("/users/:id"), scoping{scope: userScope, principalRequired: true})
-	ctrl.registerScoped(router.Group("/groups/:id"), scoping{scope: groupScope, principalRequired: true})
+	ctrl.registerScoped(router.Group("/boards/:id"), boardScope)
+	router.GET("/boards/:id/secrets/usable", ctrl.ListUsable(boardScope))
+	ctrl.registerScoped(router.Group("/boards/:id/members/:user"), memberScope)
+	ctrl.registerScoped(router.Group("/users/:id"), userScope)
+	ctrl.registerScoped(router.Group("/groups/:id"), groupScope)
 
-	system := scoping{scope: systemScope}
-	systemGroup := router.Group("/system")
+	// The policy refuses the system scope to anyone but an admin as well;
+	// this keeps the operator routes from even parsing a stranger's request.
+	system := scoping(systemScope)
+	systemGroup := router.Group("/system", middleware.RequireAdmin())
 	{
 		systemGroup.GET("/secrets", ctrl.ListSystemSecrets)
 		systemGroup.PUT("/secrets", ctrl.PutSecret(system))
@@ -141,7 +129,6 @@ func fail(c *gin.Context, err error) {
 // @Tags         secrets
 // @Produce      json
 // @Param        id          path      string  true  "Board UUID or user id"
-// @Param        cognito_id  query     string  true  "AWS Cognito User ID"
 // @Success      200         {array}   models.SecretMeta
 // @Failure      400         {object}  map[string]string
 // @Failure      404         {object}  map[string]string
@@ -149,15 +136,12 @@ func fail(c *gin.Context, err error) {
 // @Router       /users/{id}/secrets [get]
 func (ctrl *Controller) ListSecrets(s scoping) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		scope, ok := s.scope(c)
+		scope, ok := s(c)
 		if !ok {
 			return
 		}
 
-		principal, ok := s.principal(c, c.Query("cognito_id"))
-		if !ok {
-			return
-		}
+		principal := middleware.Principal(c)
 
 		metas, err := ctrl.service.List(scope, principal)
 		if err != nil {
@@ -175,22 +159,18 @@ func (ctrl *Controller) ListSecrets(s scoping) gin.HandlerFunc {
 // @Tags         secrets
 // @Produce      json
 // @Param        id          path      string  true  "Board UUID"
-// @Param        cognito_id  query     string  true  "AWS Cognito User ID"
 // @Success      200         {array}   models.SecretMeta
 // @Failure      400         {object}  map[string]string
 // @Failure      404         {object}  map[string]string
 // @Router       /boards/{id}/secrets/usable [get]
 func (ctrl *Controller) ListUsable(s scoping) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		scope, ok := s.scope(c)
+		scope, ok := s(c)
 		if !ok {
 			return
 		}
 
-		principal, ok := s.principal(c, c.Query("cognito_id"))
-		if !ok {
-			return
-		}
+		principal := middleware.Principal(c)
 
 		metas, err := ctrl.service.ListUsable(principal, uuid.MustParse(scope.Owner))
 		if err != nil {
@@ -210,7 +190,7 @@ func (ctrl *Controller) ListUsable(s scoping) gin.HandlerFunc {
 // @Success      200  {array}  models.SystemSecretStatus
 // @Router       /system/secrets [get]
 func (ctrl *Controller) ListSystemSecrets(c *gin.Context) {
-	statuses, err := ctrl.service.ListSystem(models.Principal{ID: c.Query("cognito_id")})
+	statuses, err := ctrl.service.ListSystem(middleware.Principal(c))
 	if err != nil {
 		fail(c, err)
 		return
@@ -227,7 +207,7 @@ func (ctrl *Controller) ListSystemSecrets(c *gin.Context) {
 // @Success      200  {array}  models.DataKey
 // @Router       /system/keys [get]
 func (ctrl *Controller) ListKeys(c *gin.Context) {
-	keys, err := ctrl.service.ListKeys(models.Principal{ID: c.Query("cognito_id")})
+	keys, err := ctrl.service.ListKeys(middleware.Principal(c))
 	if err != nil {
 		fail(c, err)
 		return
@@ -251,7 +231,7 @@ func (ctrl *Controller) ListKeys(c *gin.Context) {
 // @Router       /system/secrets [put]
 func (ctrl *Controller) PutSecret(s scoping) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		scope, ok := s.scope(c)
+		scope, ok := s(c)
 		if !ok {
 			return
 		}
@@ -264,10 +244,7 @@ func (ctrl *Controller) PutSecret(s scoping) gin.HandlerFunc {
 			return
 		}
 
-		principal, ok := s.principal(c, req.CognitoID)
-		if !ok {
-			return
-		}
+		principal := middleware.Principal(c)
 
 		if err := ctrl.service.Put(scope, principal, req.Name, req.Kind, req.Value); err != nil {
 			fail(c, err)
@@ -284,7 +261,6 @@ func (ctrl *Controller) PutSecret(s scoping) gin.HandlerFunc {
 // @Tags         secrets
 // @Param        id          path   string  true  "Board UUID or user id"
 // @Param        name        path   string  true  "Secret name"
-// @Param        cognito_id  query  string  true  "AWS Cognito User ID"
 // @Success      204
 // @Failure      400         {object}  map[string]string
 // @Failure      404         {object}  map[string]string
@@ -293,15 +269,12 @@ func (ctrl *Controller) PutSecret(s scoping) gin.HandlerFunc {
 // @Router       /system/secrets/{name} [delete]
 func (ctrl *Controller) DeleteSecret(s scoping) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		scope, ok := s.scope(c)
+		scope, ok := s(c)
 		if !ok {
 			return
 		}
 
-		principal, ok := s.principal(c, c.Query("cognito_id"))
-		if !ok {
-			return
-		}
+		principal := middleware.Principal(c)
 
 		if err := ctrl.service.Delete(scope, principal, c.Param("name")); err != nil {
 			fail(c, err)
@@ -328,7 +301,7 @@ func (ctrl *Controller) DeleteSecret(s scoping) gin.HandlerFunc {
 // @Router       /groups/{id}/secrets/{name}/grants [put]
 func (ctrl *Controller) SetGrants(s scoping) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		scope, ok := s.scope(c)
+		scope, ok := s(c)
 		if !ok {
 			return
 		}
@@ -341,10 +314,7 @@ func (ctrl *Controller) SetGrants(s scoping) gin.HandlerFunc {
 			return
 		}
 
-		principal, ok := s.principal(c, req.CognitoID)
-		if !ok {
-			return
-		}
+		principal := middleware.Principal(c)
 
 		if err := ctrl.service.SetGrants(scope, principal, c.Param("name"), req.Grants); err != nil {
 			fail(c, err)
@@ -368,7 +338,7 @@ func (ctrl *Controller) SetGrants(s scoping) gin.HandlerFunc {
 // @Router       /system/oauth2 [put]
 func (ctrl *Controller) PutOAuth2(s scoping) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		scope, ok := s.scope(c)
+		scope, ok := s(c)
 		if !ok {
 			return
 		}
@@ -381,10 +351,7 @@ func (ctrl *Controller) PutOAuth2(s scoping) gin.HandlerFunc {
 			return
 		}
 
-		principal, ok := s.principal(c, req.CognitoID)
-		if !ok {
-			return
-		}
+		principal := middleware.Principal(c)
 
 		if err := ctrl.service.PutOAuth2(scope, principal, req.Name, req.Material()); err != nil {
 			fail(c, err)
@@ -402,14 +369,13 @@ func (ctrl *Controller) PutOAuth2(s scoping) gin.HandlerFunc {
 // @Produce      json
 // @Param        id           path   string  true  "Board UUID or user id"
 // @Param        name         query  string  true  "Credential name"
-// @Param        cognito_id   query  string  true  "AWS Cognito User ID"
 // @Param        redirect_uri query  string  true  "Callback URL registered with the provider"
 // @Success      200  {object}  map[string]string
 // @Router       /boards/{id}/oauth2/authorize [get]
 // @Router       /users/{id}/oauth2/authorize [get]
 func (ctrl *Controller) Authorize(s scoping) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		scope, ok := s.scope(c)
+		scope, ok := s(c)
 		if !ok {
 			return
 		}
@@ -423,10 +389,7 @@ func (ctrl *Controller) Authorize(s scoping) gin.HandlerFunc {
 			return
 		}
 
-		principal, ok := s.principal(c, c.Query("cognito_id"))
-		if !ok {
-			return
-		}
+		principal := middleware.Principal(c)
 
 		target, err := ctrl.service.Authorize(scope, principal, name, redirect)
 		if err != nil {
@@ -452,7 +415,7 @@ func (ctrl *Controller) Authorize(s scoping) gin.HandlerFunc {
 // @Router       /users/{id}/oauth2/connect [post]
 func (ctrl *Controller) Connect(s scoping) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		scope, ok := s.scope(c)
+		scope, ok := s(c)
 		if !ok {
 			return
 		}
@@ -465,10 +428,7 @@ func (ctrl *Controller) Connect(s scoping) gin.HandlerFunc {
 			return
 		}
 
-		principal, ok := s.principal(c, req.CognitoID)
-		if !ok {
-			return
-		}
+		principal := middleware.Principal(c)
 
 		target, err := ctrl.service.Connect(scope, principal, req.Provider, req.Name, req.RedirectURI)
 		if err != nil {
@@ -497,7 +457,7 @@ func (ctrl *Controller) PutOAuth2Client(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.service.PutOAuth2Client(models.Principal{ID: c.Query("cognito_id")}, req.Provider, req.ClientID, req.ClientSecret); err != nil {
+	if err := ctrl.service.PutOAuth2Client(middleware.Principal(c), req.Provider, req.ClientID, req.ClientSecret); err != nil {
 		fail(c, err)
 		return
 	}
@@ -524,7 +484,7 @@ func (ctrl *Controller) Providers(c *gin.Context) {
 
 // Callback godoc
 // @Summary      Finish an OAuth2 authorization code handshake
-// @Description  Called by the provider. Authenticated by the state value alone.
+// @Description  Forwarded by the app's callback page. Only the user who started the consent may finish it.
 // @Tags         secrets
 // @Param        state  query  string  true  "Opaque state issued by Authorize"
 // @Param        code   query  string  true  "Authorization code"
@@ -538,7 +498,7 @@ func (ctrl *Controller) Callback(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.service.Callback(c.Query("state"), c.Query("code")); err != nil {
+	if err := ctrl.service.Callback(middleware.Principal(c), c.Query("state"), c.Query("code")); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})

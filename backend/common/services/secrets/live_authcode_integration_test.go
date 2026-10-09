@@ -80,7 +80,7 @@ func TestLiveAuthorizationCode(t *testing.T) {
 	}
 	t.Logf("consent   : code=%s... state echoed back intact", code[:16])
 
-	if err := srv.Callback(state, code); err != nil {
+	if err := srv.Callback(owner, state, code); err != nil {
 		t.Fatalf("callback: %v", err)
 	}
 
@@ -99,7 +99,7 @@ func TestLiveAuthorizationCode(t *testing.T) {
 	}
 	t.Logf("exchange  : access=%s... refresh=%s...", stored.AccessToken[:20], stored.RefreshToken[:20])
 
-	if err := srv.Callback(state, code); err == nil {
+	if err := srv.Callback(owner, state, code); err == nil {
 		t.Error("the state was accepted a second time")
 	}
 	t.Log("replay    : the spent state was rejected")

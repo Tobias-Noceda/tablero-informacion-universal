@@ -8,6 +8,7 @@ import (
 
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
+	"github.com/Secreto31126/tesis/common/services/access"
 	"github.com/google/uuid"
 )
 
@@ -24,7 +25,7 @@ func newService(db *mocks.MockDB, cache *mocks.MockCache, run *mocks.MockExecute
 	if run == nil {
 		run = &mocks.MockExecuter{}
 	}
-	return New(db, cache, run, &mocks.MockSecretResolver{})
+	return New(db, cache, run, &mocks.MockSecretResolver{}, access.New(nil))
 }
 
 func TestCreatePostIt_PlainPassesThrough(t *testing.T) {
@@ -175,7 +176,7 @@ func TestMovePostIt_UsesBoardFromPostIt(t *testing.T) {
 	}
 
 	svc := newService(db, nil, nil)
-	if err := svc.MovePostIt(id, models.Position{X: 1, Y: 2}); err != nil {
+	if err := svc.MovePostIt(boardOwner, id, models.Position{X: 1, Y: 2}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotBoard != board || gotID != id {
@@ -193,7 +194,7 @@ func TestMovePostIt_FindError(t *testing.T) {
 		},
 	}
 	svc := newService(db, nil, nil)
-	if err := svc.MovePostIt(uuid.New(), models.Position{}); err == nil {
+	if err := svc.MovePostIt(boardOwner, uuid.New(), models.Position{}); err == nil {
 		t.Fatal("expected error propagated from FindPostIt")
 	}
 }
@@ -264,7 +265,7 @@ func TestGetPostIt_Delegates(t *testing.T) {
 		},
 	}
 
-	postit, err := newService(db, nil, nil).GetPostIt(id)
+	postit, err := newService(db, nil, nil).GetPostIt(boardOwner, id)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -277,6 +278,7 @@ func TestDeletePostIt_Delegates(t *testing.T) {
 	id := uuid.New()
 	called := false
 	db := &mocks.MockDB{
+		FindPostItFn: existingCard(id),
 		DeletePostItFn: func(p uuid.UUID) (s []models.Strand, _ error) {
 			if p != id {
 				t.Errorf("id = %v, want %v", p, id)
@@ -286,11 +288,102 @@ func TestDeletePostIt_Delegates(t *testing.T) {
 		},
 	}
 
-	if _, err := newService(db, nil, nil).DeletePostIt(id); err != nil {
+	if _, err := newService(db, nil, nil).DeletePostIt(boardOwner, id); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !called {
 		t.Error("DeletePostIt was not delegated")
+	}
+}
+
+// Reading, moving and deleting a card is for the members of its board; to
+// anyone else the card does not exist.
+func TestCardRoutes_AdmitMembersOnly(t *testing.T) {
+	id := uuid.New()
+	db := &mocks.MockDB{
+		FindPostItFn:   existingCard(id),
+		MovePostItFn:   func(_, _ uuid.UUID, _ models.Position) error { return nil },
+		DeletePostItFn: func(uuid.UUID) ([]models.Strand, error) { return nil, nil },
+	}
+	svc := newService(db, nil, nil)
+
+	calls := map[string]func(models.Principal) error{
+		"get": func(p models.Principal) error {
+			_, err := svc.GetPostIt(p, id)
+			return err
+		},
+		"move": func(p models.Principal) error { return svc.MovePostIt(p, id, models.Position{}) },
+		"delete": func(p models.Principal) error {
+			_, err := svc.DeletePostIt(p, id)
+			return err
+		},
+	}
+
+	for name, call := range calls {
+		if err := call(models.Principal{ID: "eve"}); !errors.Is(err, ErrNotAMember) {
+			t.Errorf("%s as an outsider: got %v, want ErrNotAMember", name, err)
+		}
+		if err := call(boardOwner); err != nil {
+			t.Errorf("%s as the owner: %v", name, err)
+		}
+	}
+}
+
+// A viewer looks at the cards and their results; changing them takes an editor.
+func TestViewer_ReadsAndRunsButCannotChangeCards(t *testing.T) {
+	id := uuid.New()
+	viewer := models.Principal{ID: "viewer-id"}
+	db := &mocks.MockDB{
+		FindBoardFn: func(board uuid.UUID) (*models.Board, error) {
+			return &models.Board{Id: board, Owner: boardOwner.ID, Members: []models.BoardMember{{User: viewer.ID, Role: models.BoardViewer}}}, nil
+		},
+		FindPostItFn: existingCard(id),
+		CreatePostItFn: func(*models.PostIts, string, models.Position) (*models.PostIts, error) {
+			t.Error("a viewer created a card")
+			return nil, nil
+		},
+		UpdatePostItFn: func(uuid.UUID, map[string]any) error {
+			t.Error("a viewer edited a card")
+			return nil
+		},
+		MovePostItFn: func(_, _ uuid.UUID, _ models.Position) error {
+			t.Error("a viewer moved a card")
+			return nil
+		},
+		DeletePostItFn: func(uuid.UUID) ([]models.Strand, error) {
+			t.Error("a viewer deleted a card")
+			return nil, nil
+		},
+	}
+	run := &mocks.MockExecuter{ExecuteFn: func(*models.PostIts) (any, error) { return "data", nil }}
+	svc := New(db, &mocks.MockCache{}, run, &mocks.MockSecretResolver{}, access.New(nil))
+
+	postit, err := svc.GetPostIt(viewer, id)
+	if err != nil {
+		t.Fatalf("a viewer could not read the card: %v", err)
+	}
+	if data, err := svc.ExecutePostIt(postit); err != nil || data != "data" {
+		t.Errorf("a viewer could not run the card: %v %v", data, err)
+	}
+
+	changes := map[string]error{}
+	_, changes["create"] = svc.CreatePostIt(viewer, &models.PostIts{Board: uuid.New()})
+	changes["update"] = svc.UpdatePostIt(viewer, id, map[string]any{"rate": 5})
+	changes["move"] = svc.MovePostIt(viewer, id, models.Position{})
+	_, changes["delete"] = svc.DeletePostIt(viewer, id)
+	for name, err := range changes {
+		if !errors.Is(err, ErrNotAMember) {
+			t.Errorf("%s as a viewer: got %v, want ErrNotAMember", name, err)
+		}
+	}
+}
+
+func TestGetPostIt_MissingCardIsNotAMember(t *testing.T) {
+	db := &mocks.MockDB{
+		FindPostItFn: func(uuid.UUID) (*models.PostIts, error) { return nil, errors.New("mongo: no documents in result") },
+	}
+	if _, err := newService(db, nil, nil).GetPostIt(boardOwner, uuid.New()); !errors.Is(err, ErrNotAMember) {
+		t.Errorf("got %v, want ErrNotAMember", err)
 	}
 }
 
@@ -346,7 +439,7 @@ func TestExecutePostIt_DoesNotLeakSecretsOntoTheCaller(t *testing.T) {
 		},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver)
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver, access.New(nil))
 
 	if _, err := svc.ExecutePostIt(postit); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -391,7 +484,7 @@ func TestExecutePostIt_ResourcelessPostItNeverResolvesSecrets(t *testing.T) {
 		},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver)
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver, access.New(nil))
 
 	out, err := svc.ExecutePostIt(postit)
 	if err != nil {

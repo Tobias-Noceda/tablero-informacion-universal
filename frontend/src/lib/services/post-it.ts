@@ -1,23 +1,23 @@
 import type { PostIt, SecretRef, Strand, UUID } from "$types/api";
 
 import * as api from "$modules/api.svelte"
-import { CURRENT_USER } from "$modules/api.svelte";
+import { mapPostitWithTitle, type PostItWithTitle } from "$lib/helpers/post-it";
 
 // TODO: support custom post its
-export async function create_custom(board: UUID, cognito_id = CURRENT_USER) {
-    const res = await api.post("/v1/post-its", { cognito_id, board });
+export async function create_custom(board: UUID) {
+    const res = await api.post("/v1/post-its", { board });
     return await res.json() as PostIt;
 }
 
 export async function create_well_known(
     board: UUID,
+    title: { text: string, vars: boolean },
     well_known: string,
     params: Record<string, string>,
     bindings: Record<string, SecretRef> = {},
-    cognito_id = CURRENT_USER,
 ) {
-    const res = await api.post("/v1/post-its", { cognito_id, board, well_known, params, bindings });
-    return await res.json() as PostIt;
+    const res = await api.post("/v1/post-its", { board, title, well_known, params, bindings });
+    return mapPostitWithTitle(await res.json() as PostItWithTitle);
 }
 
 export async function del(id: UUID): Promise<Strand[]> {
@@ -39,9 +39,8 @@ export async function update_settings(
     id: UUID,
     params: Record<string, string>,
     bindings?: Record<string, SecretRef>,
-    cognito_id = CURRENT_USER,
 ) {
-    await api.patch(`/v1/post-its/${id}/settings`, { cognito_id, params, bindings });
+    await api.patch(`/v1/post-its/${id}/settings`, { params, bindings });
 }
 
 export async function move(id: UUID, x: number, y: number) {

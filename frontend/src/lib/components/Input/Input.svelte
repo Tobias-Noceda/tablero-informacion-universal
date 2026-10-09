@@ -2,12 +2,15 @@
   import { cn } from '$lib/utils';
   import Icon from '$components/Icon/Icon.svelte';
   import { m } from '$lib/paraglide/messages.js';
+  import type { HTMLInputAttributes } from 'svelte/elements';
 
   interface Props {
     id?: string;
     label?: string;
     placeholder?: string;
-    type?: 'text' | 'password' | 'number';
+    type?: 'text' | 'password' | 'number' | 'email';
+    name?: string;
+    autocomplete?: HTMLInputAttributes['autocomplete'];
     value?: string | number;
     min?: number;
     errorMessage?: string;
@@ -15,6 +18,7 @@
     skeleton?: boolean;
     required?: boolean;
     multiline?: boolean;
+    labelClass?: string;
     class?: string;
     oninput?: (event: Event & { currentTarget: HTMLInputElement | HTMLTextAreaElement }) => void;
     onsubmit?: () => void;
@@ -27,6 +31,8 @@
     label,
     placeholder,
     type = 'text',
+    name,
+    autocomplete,
     value = $bindable(''),
     min,
     errorMessage,
@@ -34,12 +40,18 @@
     skeleton = false,
     required = false,
     multiline = false,
+    labelClass,
     class: inputClass,
     oninput,
     onsubmit
   }: Props = $props();
 
-  const finalClass = cn(
+  const finalLabelClass = $derived(cn(
+    'text-sm font-medium text-foreground',
+    labelClass
+  ));
+
+  const finalClass = $derived(cn(
     'w-full transition-colors',
     inputClass,
     'px-3 py-2.5 rounded-md border bg-background text-foreground',
@@ -49,7 +61,7 @@
     skeleton ? 'bg-skeleton animate-pulse text-transparent cursor-default' : '',
     multiline ? 'resize-none overflow-hidden' : '',
     type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''
-  );
+  ));
 
   let textareaElement: HTMLTextAreaElement | null = $state(null);
 
@@ -72,7 +84,7 @@
 
 <div class="flex flex-col gap-1 w-full">
   {#if label}
-    <label class="text-sm font-medium text-foreground" for={id}>
+    <label class={finalLabelClass} for={id}>
       {label}
       {#if required}
         <span class="text-destructive">*</span>
@@ -103,6 +115,8 @@
       <input
         {id}
         type={type === 'password' ? (showPassword ? 'text' : 'password') : type}
+        {name}
+        {autocomplete}
         class={finalClass}
         placeholder={skeleton ? m.input_loading() : placeholder}
         bind:value

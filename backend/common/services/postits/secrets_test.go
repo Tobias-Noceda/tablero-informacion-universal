@@ -17,6 +17,7 @@ import (
 	"github.com/Secreto31126/tesis/common/ports/crypto"
 	"github.com/Secreto31126/tesis/common/ports/executer"
 	"github.com/Secreto31126/tesis/common/ports/safehttp"
+	"github.com/Secreto31126/tesis/common/services/access"
 	secretsrv "github.com/Secreto31126/tesis/common/services/secrets"
 	"github.com/google/uuid"
 )
@@ -119,8 +120,8 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 	}
 
 	groups := &mocks.MemoryGroupStore{}
-	secrets := secretsrv.New(store, secretsrv.NewPolicy(boards, groups), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}),
-		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, groups)
+	secrets := secretsrv.New(store, secretsrv.NewPolicy(boards, groups, access.New(nil)), crypto.NewKeyring(sealer, &mocks.MemoryKeyStore{}),
+		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, groups, access.New(nil))
 
 	if err := secrets.Put(models.BoardScope(board), models.Principal{ID: owner}, "CURRENCY_API_KEY", models.SecretApiKey, theKey); err != nil {
 		t.Fatalf("put secret: %v", err)
@@ -150,7 +151,7 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 		},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, executer.New(), secrets)
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, executer.New(), secrets, access.New(nil))
 
 	data, err := svc.ExecutePostIt(postit)
 	if err != nil {
@@ -212,7 +213,7 @@ func TestExecutePostIt_MissingSecretIsNotSubstituted(t *testing.T) {
 		Query:    map[string]string{"value": ".data[].value"},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, executer.New(), &mocks.MockSecretResolver{})
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, executer.New(), &mocks.MockSecretResolver{}, access.New(nil))
 
 	if _, err := svc.ExecutePostIt(postit); err == nil {
 		t.Fatal("expected an error when the provider rejects the credential")

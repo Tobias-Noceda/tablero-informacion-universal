@@ -27,6 +27,7 @@ type MongoDB struct {
 	secrets  *mongo.Collection
 	dataKeys *mongo.Collection
 	groups   *mongo.Collection
+	orgs     *mongo.Collection
 }
 
 func New() (*MongoDB, error) {
@@ -66,6 +67,7 @@ func New() (*MongoDB, error) {
 	db.secrets = db.client.Database(name).Collection("secrets")
 	db.dataKeys = db.client.Database(name).Collection("data_keys")
 	db.groups = db.client.Database(name).Collection("groups")
+	db.orgs = db.client.Database(name).Collection("orgs")
 
 	return db, nil
 }
@@ -85,20 +87,34 @@ func (db *MongoDB) EnsureIndexes() error {
 		return err
 	}
 
-	return db.ensureGroupIndexes()
+	if err := db.ensureGroupIndexes(); err != nil {
+		return err
+	}
+
+	if err := db.ensureBoardIndexes(); err != nil {
+		return err
+	}
+
+	if err := db.ensureOrgIndexes(); err != nil {
+		return err
+	}
+
+	return db.ensureUserIndexes()
 }
 
 func timeout() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), REQUEST_TIMEOUT)
 }
 
-func (db *MongoDB) FindUserBoards(cognito_id string) ([]models.Board, error) {
+// FindUserBoards lists every board the user belongs to, owned, shared or
+// through one of orgs.
+func (db *MongoDB) FindUserBoards(user string, orgs []uuid.UUID) ([]models.Board, error) {
 	ctx, cancel := timeout()
 	defer cancel()
 
-	var boards []models.Board
+	boards := []models.Board{}
 
-	filter := bson.M{"owner": cognito_id}
+	filter := reachedBy(bson.A{bson.M{"owner": user}, bson.M{"members.user": user}}, orgs)
 
 	cursor, err := db.boards.Find(ctx, filter)
 
@@ -246,6 +262,14 @@ func (db *MongoDB) UpdatePostIt(id uuid.UUID, set map[string]any) error {
 		return mongo.ErrNoDocuments
 	}
 
+	// The board keeps its own copy of the title to render the canvas.
+	if title, ok := set["title"]; ok {
+		return db.updateBoard(
+			bson.M{"postits.id": id},
+			bson.M{"$set": bson.M{"postits.$.title": title}},
+		)
+	}
+
 	return nil
 }
 
@@ -271,11 +295,11 @@ func (db *MongoDB) UpdateBoardName(id uuid.UUID, name string) error {
 	)
 }
 
-func (db *MongoDB) CreateBoard(name string, owner string) (*models.Board, error) {
+func (db *MongoDB) CreateBoard(name string, owner string, org *uuid.UUID) (*models.Board, error) {
 	ctx, cancel := timeout()
 	defer cancel()
 
-	board := &models.Board{Id: uuid.New(), Name: name, Owner: owner}
+	board := &models.Board{Id: uuid.New(), Name: name, Owner: owner, Org: org}
 
 	_, err := db.boards.InsertOne(ctx, board)
 	if err != nil {
@@ -349,17 +373,59 @@ func (db *MongoDB) DisconnectPostIts(boardID, strandID uuid.UUID) error {
 	)
 }
 
-func (db *MongoDB) AddCollaboratorToBoard(boardID uuid.UUID, cognitoID string) error {
-	return db.updateBoard(
-		bson.M{"_id": boardID},
-		bson.M{"$addToSet": bson.M{"collaborators": cognitoID}},
-	)
+func (db *MongoDB) ensureBoardIndexes() error {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	_, err := db.boards.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{Key: "owner", Value: 1}}},
+		{Keys: bson.D{{Key: "members.user", Value: 1}}},
+		{Keys: bson.D{{Key: "org", Value: 1}}},
+	})
+
+	return err
 }
 
-func (db *MongoDB) RemoveCollaboratorFromBoard(boardID uuid.UUID, cognitoID string) error {
+// SetBoardMember changes the member's role in place, or appends them. The
+// append only matches while the user is absent, so two concurrent calls can
+// never list someone twice.
+func (db *MongoDB) SetBoardMember(boardID uuid.UUID, user string, role models.BoardRole) error {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	res, err := db.boards.UpdateOne(ctx,
+		bson.M{"_id": boardID, "members.user": user},
+		bson.M{"$set": bson.M{"members.$.role": role}},
+	)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount > 0 {
+		return nil
+	}
+
+	res, err = db.boards.UpdateOne(ctx,
+		bson.M{"_id": boardID, "members.user": bson.M{"$ne": user}},
+		bson.M{"$push": bson.M{"members": models.BoardMember{User: user, Role: role}}},
+	)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		// Either the board is gone or someone added the user in between;
+		// only the first is a failure.
+		if _, err := db.FindBoard(boardID); err != nil {
+			return err
+		}
+		return db.SetBoardMember(boardID, user, role)
+	}
+	return nil
+}
+
+func (db *MongoDB) RemoveBoardMember(boardID uuid.UUID, user string) error {
 	return db.updateBoard(
 		bson.M{"_id": boardID},
-		bson.M{"$pull": bson.M{"collaborators": cognitoID}},
+		bson.M{"$pull": bson.M{"members": bson.M{"user": user}}},
 	)
 }
 

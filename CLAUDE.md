@@ -47,7 +47,7 @@ docker compose up --build
 cd backend
 go run .                # listens on :$PORT (default 31126)
 ```
-Needs MongoDB, Redis and `SECRETS_MASTER_KEYS` (see `backend/.env.example`). The main package spans `main.go`, `app.go` and `maintenance.go`, so build it as a package (`go run .`, `go build .`), never `go run main.go`.
+Needs MongoDB, Redis, `SECRETS_MASTER_KEYS` and `AUTH_SIGNING_KEYS` (see `backend/.env.example`). The main package spans `main.go`, `app.go` and `maintenance.go`, so build it as a package (`go run .`, `go build .`), never `go run main.go`.
 
 Maintenance (one-shot, exits afterwards): `go run . -rewrap-keys`, `go run . -rotate-key <kind>:<owner>`, `go run . -rotate-all-keys`.
 
@@ -57,7 +57,7 @@ cd realtime
 pnpm install
 pnpm build:dev && pnpm start:dev   # tsc → node dist/server.js, listens on :$PORT (default 3000)
 ```
-Needs `MONGODB_URI` (replica set) and `REDIS_URL` (see `realtime/.env.example`). `package.json` pins pnpm via `devEngines` (`^12.3.4`, downloaded automatically).
+Needs `MONGODB_URI` (replica set), `REDIS_URL` and `API_URL` (see `realtime/.env.example`). `pnpm test` compiles and runs `node --test` on `src/*.test.ts` (no services needed), `pnpm lint` runs Prettier and ESLint; CI runs both (`.github/workflows/realtime-tests.yml`). `package.json` pins pnpm via `devEngines` (`^12.3.4`, downloaded automatically).
 
 ### Frontend only
 ```bash
@@ -65,7 +65,7 @@ cd frontend
 pnpm install
 pnpm dev                # Vite dev server
 ```
-`pnpm dev` is not behind the ALB, so `/api` and `/ws` do not exist on the dev origin. To use the Docker stack as the API, set `VITE_API_URL=http://localhost` in `frontend/.env` (the ALB on port 80 routes `/api` and `/ws`; leave `VITE_REALTIME_URL` empty). Docker does not publish the backend (31126) or realtime (3000) ports. If you run those services yourself instead, use `VITE_API_URL=http://localhost:31126` and `VITE_REALTIME_URL=http://localhost:3000` (websocket-only transport, so no CORS is needed on realtime). Use `pnpm dev --host` and your LAN IP to open the dev server from another machine.
+`pnpm dev` is not behind the ALB, so `/api` and `/ws` do not exist on the dev origin. To use the Docker stack as the API, set `VITE_API_URL=http://localhost` in `frontend/.env` (the ALB on port 80 routes `/api` and `/ws`; leave `VITE_REALTIME_URL` empty). Docker does not publish the backend (31126) or realtime (3000) ports. If you run those services yourself instead, use `VITE_API_URL=http://localhost:31126` and `VITE_REALTIME_URL=http://localhost:3000` (websocket-only transport, so no CORS is needed on realtime). Use `pnpm dev --host` and your LAN IP to open the dev server from another machine. With `VITE_API_URL` pointing at another origin the refresh cookie is not sent (fetch only sends cookies same-origin), so signing in works but a reload signs you out.
 
 ## Environment variables
 
@@ -74,9 +74,14 @@ pnpm dev                # Vite dev server
 | root (compose) | `MONGO_INITDB_ROOT_USERNAME`, `MONGO_INITDB_ROOT_PASSWORD` | Required. Compose builds `MONGODB_URI` from them |
 | root (compose) | `MONGO_DATABASE` | Default `prod` |
 | root (compose) | `REDIS_PASSWORD` | Required. Compose builds `REDIS_URL` from it |
-| root (compose) | `SECRETS_MASTER_KEYS` | Required (backend). `<version>:<base64 of 32 bytes>`, comma-separated for rotation |
-| backend | `PORT`, `MONGODB_URI`, `MONGO_DATABASE`, `REDIS_URL`, `SECRETS_MASTER_KEYS` | Defaults: `31126`, `mongo:27017`, `prod`, `redis:6379`. Keys are required |
-| realtime | `MONGODB_URI`, `REDIS_URL` | Required, no defaults |
+| root (compose) | `SECRETS_MASTER_KEYS` | Required (backend). `<version>:<base64 of 32 bytes>`, comma-separated for rotation; the highest version encrypts |
+| root (compose) | `AUTH_SIGNING_KEYS` | Required (backend). Ed25519 seeds `<kid>:<base64 of 32 bytes>`, comma-separated; the first signs, all verify |
+| root (compose) | `PLATFORM_ADMINS`, `AUTH_COOKIE_SECURE`, `GOOGLE_SIGNIN_CLIENT_ID`, `GOOGLE_SIGNIN_CLIENT_SECRET`, `GOOGLE_ISSUER` | Passed to the backend (below) |
+| backend | `PORT`, `MONGODB_URI`, `MONGO_DATABASE`, `REDIS_URL`, `SECRETS_MASTER_KEYS`, `AUTH_SIGNING_KEYS` | Defaults: `31126`, `mongo:27017`, `prod`, `redis:6379`. Keys are required |
+| backend | `PLATFORM_ADMINS` | Emails that are platform admins when they sign in |
+| backend | `AUTH_COOKIE_SECURE`, `ACCESS_TTL`, `REFRESH_TTL` | Defaults `true`, `15m`, `720h`. `false` only for plain-HTTP development; keep `true` on Vercel |
+| backend | `GOOGLE_SIGNIN_CLIENT_ID`, `GOOGLE_SIGNIN_CLIENT_SECRET`, `GOOGLE_ISSUER` | Optional "Sign in with Google" (redirect URI `<origin>/auth/google/callback`); empty turns it off |
+| realtime | `MONGODB_URI`, `REDIS_URL`, `API_URL` | Required, no defaults. `API_URL` is the backend with `/api/v1` (compose: `http://backend:31126/api/v1`) |
 | realtime | `MONGO_DATABASE`, `PORT` | Defaults `prod`, `3000` |
 | frontend | `VITE_API_URL` | **Leave empty** (see below). Baked in at build time |
 | frontend | `VITE_REALTIME_URL` | **Leave empty.** Optional socket.io origin override, falls back to `VITE_API_URL` then the page origin. Bare origin only |
@@ -120,42 +125,55 @@ go test ./...                      # unit tests, no services needed
 
 ## Architecture: Backend
 
-Layered Go hexagonal structure. All routes are registered under `/api/v1` (nginx and Vercel forward `/api` untouched, do not strip it).
+Layered Go hexagonal structure. All routes are registered under `/api/v1` (nginx and Vercel forward `/api` untouched, do not strip it). Only `/auth/*` is public: `app.go` mounts every other controller on a group behind `middleware.RequireAuth`, handlers read the caller with `middleware.Principal(c)` (never from the body or the query), and `/system/*` adds `middleware.RequireAdmin`. Anything the caller may not touch answers `404`.
 
 ```
 main.go                           bootstrap, maintenance flags, Run
 app.go                            newApp(): the whole service graph (shared with integration tests)
 maintenance.go                    -rewrap-keys / -rotate-key / -rotate-all-keys
 common/
-  models/          domain types (Board, PostIts, Secret, SecretScope, SecretRef, Grant, Group, DataKey, OAuth2Material, SystemSecretName)
-  infrastructure/  port interfaces (Database, Cache, Executer, SecretStore, KeyStore, GroupStore, ScopePolicy, SecretResolver, ...)
+  models/          domain types (User, Principal, Board, PostIts, Secret, SecretScope, SecretRef, Grant, Group, Org, DataKey, OAuth2Material, SystemSecretName)
+  infrastructure/  port interfaces (Database, Cache, Executer, UserStore, SessionStore, TokenSigner/Verifier, PasswordHasher, RateLimiter, Mailer, IdentityProvider, SecretStore, KeyStore, GroupStore, OrgStore, Access, ScopePolicy, SecretResolver, ...)
   ports/
-    mongo/         Database, SecretStore, KeyStore and GroupStore impls (collections: boards, postit, secrets, data_keys, groups; uuid codec)
-    redis/         Cache (post-it results), Locker, HandshakeStore and online peers
+    mongo/         Database, UserStore, SecretStore, KeyStore, GroupStore and OrgStore impls (collections: users, boards, postit, secrets, data_keys, groups, orgs; uuid codec)
+    redis/         Cache (post-it results), Locker, HandshakeStore, refresh sessions and rate limits
+    jwt/           access tokens: EdDSA keyring over AUTH_SIGNING_KEYS
+    password/      argon2id hashing
+    oidc/          Google sign-in (OIDC code flow)
+    mail/          mailer that writes to the log (development: verification and reset links)
     crypto/        Sealer (master key ring = KEK) and Keyring (one wrapped data key per scope)
     oauth/         OAuth2 token endpoint client
     executer/      DewIt — HTTP fetch + gojq transform (json.go, html.go)
     safehttp/      SSRF-safe HTTP client
   services/
-    boards/        board CRUD (+ purges the board's and its members' secrets and data keys on delete / on removing a collaborator)
-    groups/        groups that own secrets: create, members, delete (+ purge)
+    auth/          register, verify email, login, refresh rotation (10 s reuse grace, then the whole family is revoked), logout, forgot/reset password, Google sign-in; rate limits per address and per account
+    users/         a user's own profile
+    access/        the access resolver: a principal's role on a board (owner|editor|viewer), in a group (owner|member|viewer) and in an organization (admin|member)
+    boards/        board CRUD and members by role (+ purges the board's and its members' secrets and data keys on delete / on removing a member)
+    groups/        groups that own secrets: create (optionally in an org), members, delete (+ purge)
+    orgs/          organizations: create, rename, members by email (the last admin stays), delete once nothing belongs to it (+ purges what a leaving member kept on its boards)
     postits/       post-it CRUD + execution + caching + secret injection; well-known definitions
     secrets/       vault: put/list/delete per scope, policy (CanManage/CanView/CanUse), bindings, grants, usable listing, OAuth2 handshakes, platform providers, key rotation
-    realtime/      online-peer bookkeeping in Redis
   controllers/
-    boards/        Gin routes /v1/boards (+ strands, collaborators, online)
+    middleware/    RequireAuth (bearer → Principal), RequireAdmin, SameOrigin (Sec-Fetch-Site on the cookie routes)
+    auth/          Gin routes /v1/auth (the refresh cookie: httpOnly, Secure, SameSite=Strict, Path /api/v1/auth)
+    users/         Gin routes /v1/users/:id
+    boards/        Gin routes /v1/boards (+ strands, members)
     postits/       Gin routes /v1/post-its
     groups/        Gin routes /v1/groups
+    orgs/          Gin routes /v1/orgs
     secrets/       Gin routes /v1/{boards,users,groups}/:id/{secrets,oauth2}, /v1/boards/:id/members/:user/*, /v1/boards/:id/secrets/usable, /v1/system/*, /v1/oauth2/*
 ```
 
+**Authentication**: email/password (argon2id, email verified through a mailed link) or Google sign-in. A session is a 15-minute EdDSA access token, kept by the frontend in memory and sent as `Authorization: Bearer`, plus a rotating refresh token in Redis carried by the httpOnly cookie `tiu_refresh` (only `/auth/refresh` and `/auth/logout` read it, and refuse cross-site requests). The principal is `{ID: sub, Admin}`; `Admin` comes from `PLATFORM_ADMINS` at sign-in. Login, registration and reset mails are limited per client address and per account, adding people by email (boards and organizations share it) per user: `429 rate_limited`.
+
 **Post-it execution flow**: `ExecutePostIt` → check Redis cache → `prepare` (map every `$TOKEN` in params/headers/queries to a `SecretRef`: the post-it's `Bindings[TOKEN]` if present, else the board's own scope by name; resolve them as the post-it's `RunAs` principal through `ResolveAs`, which re-checks `CanUse`; then inject the well-known's **system secrets** last, into a clone) → `DewIt.Execute` (HTTP GET to `Resource`, apply query params/headers from `Params`, parse JSON, run `gojq` query) → store result in Redis for `Rate` seconds. A bound secret the principal may no longer use makes the card answer `403`; an unbound board token nobody stored is sent verbatim.
 
-**Post-it writes carry a principal** (`cognito_id` in the body): the caller must be a board member; `bindings` are validated with `CanBind` as the caller; `RunAs` is stamped on create and whenever `params`/`bindings` change. Cards saved before `run_as` existed run as the board owner.
+**Board roles** (`models.BoardRole`, `owner > editor > viewer`): the owner is `Board.Owner`, everyone else is in `Board.Members` with `editor` or `viewer`. Every check asks `infrastructure.Access` (`services/access`, the one place a role is decided) and compares with `AtLeast`. Viewers read the board, its members and card results; editors also draw strands and create, edit, move and delete cards; the owner also renames, deletes and shares (by email, `PUT /boards/:id/members`). Anyone may leave. Below the role a route needs, the board answers `404`. Board responses carry the caller's `role`. **Organizations** (`models.Org`, roles `admin|member`) are a minimal tenant: a board or group created with `org` (by someone in it) reaches every member without being shared. On an org board, admins act as owners and members as viewers; the higher of that and the board's own role wins, so promoting a member is an explicit `PUT /boards/:id/members`. In an org group, admins act as owners and members only see it (`GroupViewer`): a group's secrets stay with the people it lists. An org keeps at least one admin (enforced in the Mongo filter) and is deleted only once no board or group names it (`409 org_not_empty`). **Post-it writes act as the caller**: they must be an editor; `bindings` are validated with `CanBind` as the caller; `RunAs` is stamped on create and whenever `params`/`bindings` change. Cards saved before `run_as` existed run as the board owner.
 
 **Well-Knowns** (`services/postits/well-knowns.go`): `wellKnown{template, systemSecrets}` definitions (e.g. `temperature`, `dolar_oficial`, `nasa_apod`). Creating with `WellKnown` fills in resource/query/rate from the template; `Params` provides variable overrides. Placeholders are lowercase (`$credential`, `$api_key`); user secret names are uppercase (`$MY_KEY`). `systemSecrets` maps a placeholder to a `models.SystemSecretName` that is resolved from the system scope at execution time and never stored on the post-it.
 
-**Secrets vault** (`services/secrets`): a secret is `(scope, name)` where `SecretScope{Kind: board|member|user|group|system, Owner}` (`member` owner is `<board>:<user>`: what one user keeps on one board for themselves, purged with the membership; `group` owner is the group id). Values are AES-GCM sealed with the scope's data key (`crypto.Keyring`), which is itself wrapped by the versioned master key ring in `SECRETS_MASTER_KEYS`. `ScopePolicy` (`policy.go`) is the only authorization seam: `CanManage`/`CanView` per scope and `CanUse(principal, board, secret)` = the scope admits the principal **or** one of the secret's `Grants` (`{to: user|group|board, board?}`, stored in the clear) reaches them on that board. `ListUsable(principal, board)` is what a picker offers. The controller's `scoping.principal` is the only place `cognito_id` is read. System-scope routes are open until authentication exists; system secrets are never bindable nor shareable. OAuth2 grants can be self-managed (user brings a client) or obtained through a platform **provider** (`models.OAuthProviders`; client id/secret stored as a system secret of kind `oauth2_client`, hydrated into the grant in memory only). Never return a secret value, a client secret or a token from any handler.
+**Secrets vault** (`services/secrets`): a secret is `(scope, name)` where `SecretScope{Kind: board|member|user|group|system, Owner}` (`member` owner is `<board>:<user>`: what one user keeps on one board for themselves, purged with the membership; `group` owner is the group id). Values are AES-GCM sealed with the scope's data key (`crypto.Keyring`), which is itself wrapped by the versioned master key ring in `SECRETS_MASTER_KEYS`. `ScopePolicy` (`policy.go`) is the only authorization seam: `CanManage`/`CanView` per scope (board scope: owner manages, editors view; member scope: that user, as editor) and `CanUse(principal, board, secret)` = the principal edits the board **and** the scope admits them **or** one of the secret's `Grants` (`{to: user|group|board, board?}`, stored in the clear) reaches them on that board. A viewer never binds, and demoting someone to viewer stops the cards that run as them (`403`). `ListUsable(principal, board)` is what a picker offers. The system scope is for platform admins only (`Principal.Admin`, seeded from `PLATFORM_ADMINS`), in the policy and on the routes; system secrets are never bindable nor shareable. An OAuth2 consent can only be finished (`/oauth2/callback`) by the user who started it. OAuth2 grants can be self-managed (user brings a client) or obtained through a platform **provider** (`models.OAuthProviders`; client id/secret stored as a system secret of kind `oauth2_client`, hydrated into the grant in memory only). Never return a secret value, a client secret or a token from any handler.
 
 Adding a system secret, a provider or a well-known that needs one: see `.claude/tesis/operations.md` (local notes, not versioned).
 
@@ -164,8 +182,9 @@ Adding a system secret, a provider or a well-known that needs one: see `.claude/
 `realtime/` is a separate Node service, not part of the Go module.
 
 - `mongo.ts` watches the `boards` collection with a change stream (`update` operations only, `fullDocument: updateLookup`). Needs a replica set.
-- `socket.ts` runs socket.io at path `/ws`. A client connects with `?board=<id>&peer=<id>`, joins the room `<board>` and receives a `peers` event, then `update` events `{ board, ts }` on every board change.
-- `redis.ts` keeps online peers in the set `board:<id>:online` (no TTL). The Go endpoints `PUT/DELETE /boards/:id/online` write the same key but the frontend uses the socket instead.
+- `socket.ts` runs socket.io at path `/ws`. A client connects with `?board=<id>&peer=<id>` and `auth: { token }` (the session's access token). The handshake middleware asks the backend `GET /boards/:id` with that token (`auth.ts`, `roleOn`): no `200` with a role, an outage included, refuses it with `unauthorized`. Node never verifies a JWT; it only reads `sub`/`exp` from a token the backend just accepted. A member joins the room `<board>`, receives `peers`, then `update` events `{ board, ts }` on every board change. A minute before the token expires the server emits `token_expiring`; the client answers `auth { token }` (same user), the role is checked again and the timer restarts. No answer within 30 s after expiry, or no role any more, and the server disconnects the socket, so a removed member is dropped at the next renewal at the latest.
+- `redis.ts` keeps online peers in the hash `board:<id>:online`, peer → user (one entry per tab), expiring 20 min after the last join or renewal. It is the only presence writer.
+- Neither a Redis nor a Mongo restart ends the process: the Redis client reconnects, and a change stream that gives up is reopened from the last change seen.
 - Mouse cursors are peer-to-peer through PeerJS (`$modules/rtc.svelte.ts`), bootstrapped with the `peers` list from the socket.
 
 ## Architecture: Frontend
@@ -185,23 +204,27 @@ SvelteKit SPA (`ssr = false`, `prerender = false`). Svelte 5 **runes mode enforc
 
 **Key modules**:
 
-- `$modules/api.svelte.ts` — HTTP helpers (`get`, `post`, `put`, `patch`, `del`). Resolves relative paths against the page origin (see above) and maps network errors to SvelteKit `error(503)`. There is no authentication yet: `cognito_id` is passed explicitly; `CURRENT_USER` (`Messi`) lives here.
-- `$modules/realtime.svelte.ts` — `connect(board, onChange)`: opens the socket and the PeerJS mesh; used by `routes/board/[id]/Realtime.svelte`.
-- `$modules/sockets.svelte.ts` / `rtc.svelte.ts` — socket.io client and PeerJS cursor sharing.
+- `$modules/api.svelte.ts` — HTTP helpers (`get`, `post`, `put`, `patch`, `del`) over one `request()`. Resolves relative paths against the page origin (see above), adds the session's `Authorization: Bearer`, renews once on a `401` (never for `/v1/auth/*`) and sends an expired session to `/login?next=`; `get` maps network errors to SvelteKit `error(503)`.
+- `$modules/session.svelte.ts` — `session`: `user`, `status` (`unknown | anonymous | authenticated`), the access token in memory only. `bootstrap()` trades the httpOnly refresh cookie for a session once; `refresh()` is single-flight (Web Locks across tabs when available); `BroadcastChannel('tiu-session')` shares sign-in and sign-out between tabs.
+- `$modules/realtime.svelte.ts` — `connect(board, user, onChange)`: opens the socket and the PeerJS mesh (`user` is only the cursor's name and picture; the socket knows the user from the token); used by `routes/(app)/board/[id]/Realtime.svelte`.
+- `$modules/sockets.svelte.ts` — the board socket: sends `session.accessToken` on every handshake, answers `token_expiring` (renewing the session when its token is about to expire), reconnects when the server drops it and gives up after one refused handshake retried with a renewed session (the board keeps working without live updates).
+- `$modules/rtc.svelte.ts` — PeerJS cursor sharing.
 - `$modules/statefull.svelte.ts` — Preserves and restores arbitrary route state across navigation (`preserve` / `restore`), keyed by `[fromRoute][toRoute]`.
-- `$services/{board,post-it,secrets,edge}.ts` — Typed API calls per resource. `secrets.ts` is scope-first (`boardScope`, `memberScope`, `pathOf(scope)`): list/put/delete, self-managed OAuth2 (`put_oauth2`, `authorize`), platform providers (`providers`, `connect`), and `usable(board)`. `post-it.ts` sends `cognito_id` and `bindings`.
+- `$services/{board,post-it,secrets,edge,auth,users,orgs}.ts` — Typed API calls per resource; `auth.ts` throws `AuthError` with the backend's `error` code (`$lib/auth/form.ts` turns it into a message). `secrets.ts` is scope-first (`boardScope`, `memberScope`, `pathOf(scope)`): list/put/delete, self-managed OAuth2 (`put_oauth2`, `authorize`), platform providers (`providers`, `connect`), and `usable(board)`. `post-it.ts` sends `bindings`. No service names the caller: the bearer token does.
 - `$lib/secrets/{origin,binding}.ts` — Pure helpers behind the credential picker: where a usable secret comes from (`board | mine | profile | group | shared`) and what a card must send for the picked ones (`$NAME` + a binding for anything outside the board scope).
 - `$stores/boards.ts`, `$stores/sidebar.ts`, `$stores/mouses.svelte.ts` — Board list, sidebar open/close, live cursors.
+- `$stores/org.svelte.ts` — The user's organizations and the selected one (`"personal"` or an org id, kept in `localStorage` `tiu.org`). The header `OrgSwitcher` sets it, the sidebar shows only its boards (a board of an org the user is not in counts as personal), and new boards are created in it.
 - `$types/api.ts` — API types (`Board`, `PostIt`, `Strand`, `SecretMeta`, `OAuth2Config`, `OAuthProvider`, ...).
 - `$components/Nodes/node-map.ts` — Well-known key → Svelte node component, plus the parameter form each one needs (`type: "secret"` renders a picker over the board's credentials). A well-known whose credential is the platform's declares no parameter.
+- `$components/Share/ShareDialog.svelte` — Who is on a board: the owner adds people by email as editor or viewer, changes roles and removes them; anyone else sees the list and can leave. `Flow` hides the dock, dragging, connecting, deleting and the credentials for viewers (`role` comes from `GET /boards/:id`).
 - `$components/Secrets/SecretsPanel.svelte` — Board credentials modal with two tabs, "Board" (shared with every member) and "Only mine" (the caller's member scope); same forms for API keys, self-managed OAuth2 and "Connect an account".
-- Routes: `/` (board list), `/board/[id]` (canvas: `Flow`, `Dock`, `DnDProvider`, `Realtime`; the view is keyed by the board id so navigating between boards remounts it), `/oauth2/callback` (provider redirect target; forwards `state`/`code` to the backend).
+- Routes: group `(app)` (its `+layout.ts` bootstraps the session and redirects anonymous visitors to `/login?next=`; header with the user menu): `/` (board list), `/board/[id]` (canvas: `Flow`, `Dock`, `DnDProvider`, `Realtime`; the view is keyed by the board id so navigating between boards remounts it), `/profile`, `/orgs` (list, create), `/orgs/[id]` (members and roles, rename, leave, delete), `/oauth2/callback` (provider redirect target; forwards `state`/`code` to the backend). Group `(auth)`: `/login`, `/register`, `/verify?token=`, `/forgot`, `/reset?token=`, `/auth/google/callback` (Google's redirect target; posts `code`/`state` to the backend, then goes to `next`).
 
 After editing `messages/{en,es}.json` outside the Vite dev server, regenerate with `npx paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide` before `pnpm check`.
 
 **i18n**: Paraglide. Source messages in `frontend/messages/{en,es}.json`. Generated output in `src/lib/paraglide/`. Import messages as `import { m } from '$lib/paraglide/messages'`.
 
-**UI library**: `@xyflow/svelte` for the board canvas. Component primitives in `$components/` (Button, Cursor, Divider, Drawer, Edges, Icon, Input, Modal, Nodes, Secrets, Switch, Toast). Styling via Tailwind CSS 4 + `clsx` + `tailwind-merge` (re-exported as `cn` from `$lib/utils.ts`).
+**UI library**: `@xyflow/svelte` for the board canvas. Component primitives in `$components/` (Button, Cursor, Divider, Drawer, Edges, Icon, Input, Modal, Nodes, OrgSwitcher, Secrets, Share, Switch, Toast). Styling via Tailwind CSS 4 + `clsx` + `tailwind-merge` (re-exported as `cn` from `$lib/utils.ts`).
 
 ## Svelte MCP (available in frontend/)
 

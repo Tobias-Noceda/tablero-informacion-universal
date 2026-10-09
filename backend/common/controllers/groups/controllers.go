@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/models"
 	srv "github.com/Secreto31126/tesis/common/services/groups"
 	"github.com/gin-gonic/gin"
@@ -33,6 +34,13 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 // A group the caller may not touch answers 404: whether it exists is not
 // disclosed, the same rule the vault applies to scopes.
 func fail(c *gin.Context, err error) {
+	if errors.Is(err, srv.ErrOrgNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "org_not_found",
+		})
+		return
+	}
+
 	if errors.Is(err, srv.ErrForbidden) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Group not found",
@@ -57,21 +65,9 @@ func groupID(c *gin.Context) (uuid.UUID, bool) {
 	return id, true
 }
 
-func caller(c *gin.Context) (models.Principal, bool) {
-	cognitoID := c.Query("cognito_id")
-	if cognitoID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Missing cognito_id",
-		})
-		return models.Principal{}, false
-	}
-
-	return models.Principal{ID: cognitoID}, true
-}
-
 // CreateGroup godoc
 // @Summary      Create a group
-// @Description  The caller becomes its owner. A group owns secrets its members may use on any board.
+// @Description  The caller becomes its owner. A group owns secrets its members may use on any board. With org, the group belongs to that organization (the caller must be in it) and its admins own it too.
 // @Tags         groups
 // @Accept       json
 // @Produce      json
@@ -88,7 +84,7 @@ func (ctrl *Controller) CreateGroup(c *gin.Context) {
 		return
 	}
 
-	group, err := ctrl.service.Create(models.Principal{ID: req.CognitoID}, req.Name)
+	group, err := ctrl.service.Create(middleware.Principal(c), req.Name, req.Org)
 	if err != nil {
 		fail(c, err)
 		return
@@ -98,20 +94,14 @@ func (ctrl *Controller) CreateGroup(c *gin.Context) {
 }
 
 // ListMine godoc
-// @Summary      List the groups the caller belongs to
+// @Summary      List the groups the caller belongs to, or sees through an organization
 // @Tags         groups
 // @Produce      json
-// @Param        cognito_id  query     string  true  "AWS Cognito User ID"
 // @Success      200         {array}   models.Group
 // @Failure      400         {object}  map[string]string
 // @Router       /groups [get]
 func (ctrl *Controller) ListMine(c *gin.Context) {
-	principal, ok := caller(c)
-	if !ok {
-		return
-	}
-
-	groups, err := ctrl.service.ListMine(principal)
+	groups, err := ctrl.service.ListMine(middleware.Principal(c))
 	if err != nil {
 		fail(c, err)
 		return
@@ -125,7 +115,6 @@ func (ctrl *Controller) ListMine(c *gin.Context) {
 // @Tags         groups
 // @Produce      json
 // @Param        id          path      string  true  "Group UUID" format(uuid)
-// @Param        cognito_id  query     string  true  "AWS Cognito User ID"
 // @Success      200         {object}  models.Group
 // @Failure      400         {object}  map[string]string
 // @Failure      404         {object}  map[string]string
@@ -136,12 +125,7 @@ func (ctrl *Controller) GetGroup(c *gin.Context) {
 		return
 	}
 
-	principal, ok := caller(c)
-	if !ok {
-		return
-	}
-
-	group, err := ctrl.service.Get(principal, id)
+	group, err := ctrl.service.Get(middleware.Principal(c), id)
 	if err != nil {
 		fail(c, err)
 		return
@@ -154,7 +138,6 @@ func (ctrl *Controller) GetGroup(c *gin.Context) {
 // @Summary      Delete a group and every secret it owned
 // @Tags         groups
 // @Param        id          path      string  true  "Group UUID" format(uuid)
-// @Param        cognito_id  query     string  true  "AWS Cognito User ID"
 // @Success      204         "No Content"
 // @Failure      400         {object}  map[string]string
 // @Failure      404         {object}  map[string]string
@@ -165,12 +148,7 @@ func (ctrl *Controller) DeleteGroup(c *gin.Context) {
 		return
 	}
 
-	principal, ok := caller(c)
-	if !ok {
-		return
-	}
-
-	if err := ctrl.service.Delete(principal, id); err != nil {
+	if err := ctrl.service.Delete(middleware.Principal(c), id); err != nil {
 		fail(c, err)
 		return
 	}
@@ -222,7 +200,7 @@ func (ctrl *Controller) changeMembers(c *gin.Context, change func(models.Princip
 		return
 	}
 
-	if err := change(models.Principal{ID: req.CognitoID}, id, req.Member); err != nil {
+	if err := change(middleware.Principal(c), id, req.Member); err != nil {
 		fail(c, err)
 		return
 	}

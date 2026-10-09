@@ -6,17 +6,28 @@ import (
 
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
+	"github.com/Secreto31126/tesis/common/services/access"
 	"github.com/google/uuid"
 )
 
-var opsGroup = models.Group{Id: uuid.New(), Name: "ops", Owner: owner.ID, Members: []string{collaborator.ID}}
+var (
+	opsGroup = models.Group{Id: uuid.New(), Name: "ops", Owner: owner.ID, Members: []string{collaborator.ID}}
+	viewer   = models.Principal{ID: "viewer-id"}
+	alice    = models.Principal{ID: "alice"}
+)
 
+// testPolicy serves every board as owned by owner, edited by collaborator and
+// alice, and viewed by viewer.
 func testPolicy() *policy {
 	return NewPolicy(&mocks.MockDB{
 		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
-			return &models.Board{Id: id, Owner: owner.ID, Collaborators: []string{collaborator.ID}}, nil
+			return &models.Board{Id: id, Owner: owner.ID, Members: []models.BoardMember{
+				{User: collaborator.ID, Role: models.BoardEditor},
+				{User: alice.ID, Role: models.BoardEditor},
+				{User: viewer.ID, Role: models.BoardViewer},
+			}}, nil
 		},
-	}, &mocks.MemoryGroupStore{Groups: []models.Group{opsGroup}})
+	}, &mocks.MemoryGroupStore{Groups: []models.Group{opsGroup}}, access.New(nil))
 }
 
 func TestPolicy_Group(t *testing.T) {
@@ -59,6 +70,7 @@ func TestPolicy_Board(t *testing.T) {
 	}{
 		{owner, true, true},
 		{collaborator, false, true},
+		{viewer, false, false},
 		{stranger, false, false},
 		{anonymous, false, false},
 	}
@@ -94,17 +106,24 @@ func TestPolicy_User(t *testing.T) {
 	}
 }
 
-// Nobody can be told apart until authentication exists, so the system scope
-// is open. This test pins that down so the day it changes is a deliberate one.
-func TestPolicy_SystemIsOpenUntilAuthExists(t *testing.T) {
+// The platform's own credentials are for platform admins, and nobody else,
+// whatever boards they own.
+func TestPolicy_SystemIsForAdminsOnly(t *testing.T) {
 	p := testPolicy()
 
+	if err := p.CanManage(admin, models.SystemScope); err != nil {
+		t.Errorf("admin: CanManage = %v", err)
+	}
+	if err := p.CanView(admin, models.SystemScope); err != nil {
+		t.Errorf("admin: CanView = %v", err)
+	}
+
 	for _, caller := range []models.Principal{owner, stranger, anonymous} {
-		if err := p.CanManage(caller, models.SystemScope); err != nil {
-			t.Errorf("caller %q: CanManage = %v", caller.ID, err)
+		if err := p.CanManage(caller, models.SystemScope); !errors.Is(err, ErrForbidden) {
+			t.Errorf("caller %q: CanManage = %v, want ErrForbidden", caller.ID, err)
 		}
-		if err := p.CanView(caller, models.SystemScope); err != nil {
-			t.Errorf("caller %q: CanView = %v", caller.ID, err)
+		if err := p.CanView(caller, models.SystemScope); !errors.Is(err, ErrForbidden) {
+			t.Errorf("caller %q: CanView = %v, want ErrForbidden", caller.ID, err)
 		}
 	}
 }
@@ -135,7 +154,7 @@ func TestPolicy_UnknownBoardIsForbidden(t *testing.T) {
 		FindBoardFn: func(uuid.UUID) (*models.Board, error) {
 			return nil, errors.New("no documents")
 		},
-	}, &mocks.MemoryGroupStore{})
+	}, &mocks.MemoryGroupStore{}, access.New(nil))
 
 	if err := p.CanView(owner, models.BoardScope(uuid.New())); !errors.Is(err, ErrForbidden) {
 		t.Errorf("got %v, want ErrForbidden", err)
@@ -166,6 +185,12 @@ func TestPolicy_Member(t *testing.T) {
 	if err := p.CanManage(stranger, models.MemberScope(board, stranger.ID)); !errors.Is(err, ErrForbidden) {
 		t.Errorf("someone who is not on the board got a member scope there: %v", err)
 	}
+
+	// What one keeps on a board is for binding into cards, which a viewer
+	// never does.
+	if err := p.CanView(viewer, models.MemberScope(board, viewer.ID)); !errors.Is(err, ErrForbidden) {
+		t.Errorf("a viewer got a member scope: %v", err)
+	}
 }
 
 func TestPolicy_CanUse(t *testing.T) {
@@ -187,8 +212,12 @@ func TestPolicy_CanUse(t *testing.T) {
 		{"member secret by its user", collaborator, board, models.MemberScope(board, collaborator.ID), true},
 		{"member secret by the board owner", owner, board, models.MemberScope(board, collaborator.ID), false},
 		{"member secret on another board", collaborator, otherBoard, models.MemberScope(board, collaborator.ID), false},
-		{"user secret by its user", stranger, board, models.UserScope(stranger.ID), true},
-		{"user secret by someone else", owner, board, models.UserScope(stranger.ID), false},
+		{"user secret by its user", collaborator, board, models.UserScope(collaborator.ID), true},
+		{"user secret by someone else", owner, board, models.UserScope(collaborator.ID), false},
+		{"user secret by its user on a board they are not on", stranger, board, models.UserScope(stranger.ID), false},
+		{"board secret by a viewer", viewer, board, models.BoardScope(board), false},
+		{"user secret by a viewer", viewer, board, models.UserScope(viewer.ID), false},
+		{"member secret by a viewer", viewer, board, models.MemberScope(board, viewer.ID), false},
 		{"group secret by a group member on any board", collaborator, otherBoard, models.GroupScope(opsGroup.Id), true},
 		{"group secret by the group owner", owner, board, models.GroupScope(opsGroup.Id), true},
 		{"group secret by an outsider", stranger, board, models.GroupScope(opsGroup.Id), false},
@@ -216,7 +245,7 @@ func TestPolicy_CanUse_RemovedCollaboratorLosesAccess(t *testing.T) {
 		FindBoardFn: func(id uuid.UUID) (*models.Board, error) {
 			return &models.Board{Id: id, Owner: owner.ID}, nil
 		},
-	}, &mocks.MemoryGroupStore{})
+	}, &mocks.MemoryGroupStore{}, access.New(nil))
 	board := uuid.New()
 
 	for _, scope := range []models.SecretScope{
@@ -256,7 +285,9 @@ func TestPolicy_CanUse_Grants(t *testing.T) {
 		{"granted board members, a member", collaborator, board, grant(models.Audience{Kind: models.AudienceBoard, ID: board.String()}, ""), true},
 		{"granted board members, from another board", collaborator, otherBoard, grant(models.Audience{Kind: models.AudienceBoard, ID: board.String()}, ""), false},
 		{"granted board members, a stranger", stranger, board, grant(models.Audience{Kind: models.AudienceBoard, ID: board.String()}, ""), false},
-		{"the owner still can", models.Principal{ID: "alice"}, board, grant(user(collaborator.ID), ""), true},
+		{"granted board members, a viewer", viewer, board, grant(models.Audience{Kind: models.AudienceBoard, ID: board.String()}, ""), false},
+		{"granted user, who only views the board", viewer, board, grant(user(viewer.ID), ""), false},
+		{"the owner still can", alice, board, grant(user(collaborator.ID), ""), true},
 		{"no grants", collaborator, board, &models.Secret{Scope: alicesKey, Name: "KEY"}, false},
 		{"a grant on a system secret is ignored", collaborator, board, &models.Secret{Scope: models.SystemScope, Name: "KEY", Grants: []models.Grant{{To: user(collaborator.ID)}}}, false},
 		{"anonymous", anonymous, board, grant(user(""), ""), false},
@@ -266,6 +297,47 @@ func TestPolicy_CanUse_Grants(t *testing.T) {
 		err := p.CanUse(c.caller, c.board, c.secret)
 		if got := err == nil; got != c.want {
 			t.Errorf("%s: CanUse = %v, want allowed=%v", c.label, err, c.want)
+		}
+	}
+}
+
+// An organization's admins own its groups; its members only see that the
+// group exists, so neither its secrets nor what is shared with it reach them.
+func TestPolicy_OrgGroup(t *testing.T) {
+	acme := models.Org{Id: uuid.New(), Members: []models.OrgMember{
+		{User: alice.ID, Role: models.OrgRoleAdmin},
+		{User: collaborator.ID, Role: models.OrgRoleMember},
+	}}
+	group := models.Group{Id: uuid.New(), Owner: owner.ID, Members: []string{}, Org: &acme.Id}
+	board := uuid.New()
+
+	p := NewPolicy(testPolicy().boards, &mocks.MemoryGroupStore{Groups: []models.Group{group}},
+		access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}))
+
+	scope := models.GroupScope(group.Id)
+	own := &models.Secret{Scope: scope, Name: "TOKEN"}
+	shared := &models.Secret{Scope: models.UserScope(owner.ID), Name: "TOKEN",
+		Grants: []models.Grant{{To: models.Audience{Kind: models.AudienceGroup, ID: group.Id.String()}}}}
+
+	cases := []struct {
+		caller                  models.Principal
+		manage, view, use, gets bool
+	}{
+		{alice, true, true, true, true},
+		{collaborator, false, false, false, false},
+	}
+	for _, c := range cases {
+		if got := p.CanManage(c.caller, scope) == nil; got != c.manage {
+			t.Errorf("%s: CanManage = %v, want %v", c.caller.ID, got, c.manage)
+		}
+		if got := p.CanView(c.caller, scope) == nil; got != c.view {
+			t.Errorf("%s: CanView = %v, want %v", c.caller.ID, got, c.view)
+		}
+		if got := p.CanUse(c.caller, board, own) == nil; got != c.use {
+			t.Errorf("%s: CanUse(group secret) = %v, want %v", c.caller.ID, got, c.use)
+		}
+		if got := p.CanUse(c.caller, board, shared) == nil; got != c.gets {
+			t.Errorf("%s: CanUse(granted to the group) = %v, want %v", c.caller.ID, got, c.gets)
 		}
 	}
 }
