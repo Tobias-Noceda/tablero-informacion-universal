@@ -21,7 +21,7 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div
-  class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+  class="fixed inset-0 z-200 flex items-center justify-center bg-black/50"
   role="presentation"
   onclick={onclose}
 >
@@ -35,7 +35,7 @@
   >
     {@render children()}
     <div class="flex gap-3 justify-end">
-      <Button variant="secondary" onclick={onclose}>{m.cancel()}</Button>
+      <Button variant="gray" onclick={onclose}>{m.cancel()}</Button>
       <Button variant="success" onclick={onaccept} disabled={acceptDisabled}>{acceptText || m.accept()}</Button>
     </div>
   </div>

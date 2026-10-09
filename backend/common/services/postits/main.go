@@ -47,6 +47,10 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, postIt *mode
 
 		wk.Board = postIt.Board
 		wk.Bindings = postIt.Bindings
+		// An empty title keeps the well-known's default.
+		if postIt.Title.Text != "" {
+			wk.Title = postIt.Title
+		}
 		postIt = wk
 	}
 
@@ -54,6 +58,7 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, postIt *mode
 		return nil, err
 	}
 	postIt.RunAs = principal.ID
+	postIt.Title.Vars = titleVars(postIt.Title.Text, outputsOf(postIt))
 
 	return srv.db.CreatePostIt(postIt, postIt.WellKnown, models.Position{X: 750, Y: 350})
 }
@@ -97,6 +102,17 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 			return err
 		}
 		set["runas"] = principal.ID
+	}
+
+	if title, ok := set["title"].(*models.Title); ok && title != nil {
+		edited := *postit
+		if params, ok := set["params"].(map[string]string); ok {
+			edited.Params = params
+		}
+		if query, ok := set["query"].(map[string]string); ok {
+			edited.Query = query
+		}
+		set["title"] = models.Title{Text: title.Text, Vars: titleVars(title.Text, outputsOf(&edited))}
 	}
 
 	if err := srv.db.UpdatePostIt(id, set); err != nil {

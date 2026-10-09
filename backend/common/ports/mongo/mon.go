@@ -262,6 +262,14 @@ func (db *MongoDB) UpdatePostIt(id uuid.UUID, set map[string]any) error {
 		return mongo.ErrNoDocuments
 	}
 
+	// The board keeps its own copy of the title to render the canvas.
+	if title, ok := set["title"]; ok {
+		return db.updateBoard(
+			bson.M{"postits.id": id},
+			bson.M{"$set": bson.M{"postits.$.title": title}},
+		)
+	}
+
 	return nil
 }
 

@@ -85,6 +85,9 @@ services:
       MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-prod}
     networks:
       - mongo
+      - debug
+    ports:
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo_data:/data/db
 
@@ -101,6 +104,9 @@ services:
       retries: 10
     networks:
       - redis
+      - debug
+    ports:
+      - "127.0.0.1:6379:6379"
 
   mock-oauth2:
     image: ghcr.io/navikt/mock-oauth2-server:2.1.10
@@ -133,6 +139,7 @@ networks:
   frontend: {}
   backend: {}
   realtime: {}
+  debug: {}
 
 volumes:
   mongo_data: {}

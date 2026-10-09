@@ -1,14 +1,23 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
-	"hello_world": "Hello, {name} from en!",
 	"input_loading": "Loading...",
 	"create_board": "Create a new board",
+	"board_dropdown_placeholder": "Select a board",
 	"board_name_label": "Board name",
 	"board_name_placeholder": "My board",
 	"cancel": "Cancel",
 	"create": "Create",
 	"accept": "Accept",
+	"user_info": {
+		"language": {
+			"title": "Language",
+			"en": "English",
+			"es": "Spanish"
+		},
+		"logout": "Log out"
+	},
 	"nodes": {
+		"title": "Cards",
 		"static_card": "Note",
 		"temperature": "Temperature",
 		"events_search": "Events Search",
@@ -21,10 +30,13 @@
 		"exchange_rate": "Exchange Rate",
 		"gmail_inbox": "Gmail Inbox",
 		"google_calendar": "Google Calendar",
-		"nasa_apod": "NASA Picture of the Day"
+		"nasa_apod": "NASA Picture of the Day",
+		"create": "Create a new card"
 	},
 	"secrets": {
 		"title": "Board credentials",
+		"create": "Create a new credential",
+		"manage": "Manage credentials",
 		"close": "Close",
 		"loading": "Loading...",
 		"empty": "This board has no credentials.",
@@ -183,5 +195,16 @@
 		"error_org_not_empty": "Delete its boards and groups first.",
 		"error_rate_limited": "You added too many people in a short time. Wait a few minutes and try again.",
 		"error_unknown": "That did not work. Try again."
+	},
+	"card_title": {
+		"label": "Title",
+		"placeholder": "Optional, e.g. Dollar at {example}",
+		"variables": "Available values",
+		"variables_hint": "Click one to insert it, or type {syntax}. Values are filled in when the card loads.",
+		"sample": "Example response",
+		"preview": "Preview",
+		"unknown": "Unknown value: {names}",
+		"unsupported": "Only plain {syntax} values are supported",
+		"none": "This card has no values to use in its title."
 	}
 }

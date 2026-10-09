@@ -7,6 +7,7 @@ import (
 
 type CreatePostItRequest struct {
 	Board     uuid.UUID                   `json:"board" binding:"required"`
+	Title     *models.Title               `json:"title"`
 	WellKnown string                      `json:"well_known"`
 	Params    map[string]string           `json:"params"`
 	Bindings  map[string]models.SecretRef `json:"bindings"`

@@ -75,6 +75,34 @@ export type OrgDetail = Omit<Org, "members"> & {
     members: OrgMemberSummary[];
 };
 
+export type Paginated<T> = {
+	_links: {
+		first?: string;
+		prev?: string;
+		next?: string;
+		last?: string;
+	};
+	_pageInfo?: {
+		currentPage?: number;
+		totalPages?: number;
+		currentDate?: Date;
+		maxDate?: Date;
+	};
+	results: T[];
+};
+
+export type PostIt = {
+    id: UUID;
+    type?: string;
+    position: { x: number; y: number; };
+    data: {
+        title?: {
+            text: string;
+            vars: boolean;
+        }
+    } & Record<string, unknown>;
+}
+
 export type Board = {
     id: UUID;
     name: string;
@@ -98,32 +126,32 @@ export type Board = {
     envs: Envs[];
 };
 
-export type PostIt = {
-    id: UUID;
-    params: Map<string, string>;
+// export type PostIt = {
+//     id: UUID;
+//     params: Map<string, string>;
 
-    // Used to reference "propietary" post-its, which may reference
-    // global secrets.
-    well_known?: string;
+//     // Used to reference "propietary" post-its, which may reference
+//     // global secrets.
+//     well_known?: string;
 
-    // If well-known, these options are NOT in the user's control,
-    // they are persisted in the DB, but completely hidden in the DTO.
-    resource: URL;
-    request: Pick<RequestInit, 'method' | 'headers' | 'body'>;
-    response: 'json';
-    // https://github.com/itchyny/gojq
-    query: string;
-    rate?: number; // A rate-less post-it should only be updated on creation
-    // Board + Post-it defined env variables
-    envs: Envs[];
+//     // If well-known, these options are NOT in the user's control,
+//     // they are persisted in the DB, but completely hidden in the DTO.
+//     resource: URL;
+//     request: Pick<RequestInit, 'method' | 'headers' | 'body'>;
+//     response: 'json';
+//     // https://github.com/itchyny/gojq
+//     query: string;
+//     rate?: number; // A rate-less post-it should only be updated on creation
+//     // Board + Post-it defined env variables
+//     envs: Envs[];
 
-    // Whose credentials the card runs with: whoever last saved its params
-    // or bindings. Empty on cards from before this existed (board owner).
-    run_as?: string;
-    // "$TOKEN"s the card uses that do not live in the board's own scope,
-    // keyed by the token name without the dollar sign.
-    bindings?: Record<string, SecretRef>;
-}
+//     // Whose credentials the card runs with: whoever last saved its params
+//     // or bindings. Empty on cards from before this existed (board owner).
+//     run_as?: string;
+//     // "$TOKEN"s the card uses that do not live in the board's own scope,
+//     // keyed by the token name without the dollar sign.
+//     bindings?: Record<string, SecretRef>;
+// }
 
 export type Strand = {
     id: UUID;

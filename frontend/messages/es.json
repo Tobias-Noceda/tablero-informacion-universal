@@ -3,12 +3,22 @@
 	"hello_world": "Hola {name} desde es!",
 	"input_loading": "Cargando...",
 	"create_board": "Crear un nuevo tablero",
+	"board_dropdown_placeholder": "Seleccionar un tablero",
 	"board_name_label": "Nombre del tablero",
 	"board_name_placeholder": "Mi tablero",
 	"cancel": "Cancelar",
 	"create": "Crear",
 	"accept": "Aceptar",
+	"user_info": {
+		"language": {
+			"title": "Idioma",
+			"en": "Inglés",
+			"es": "Español"
+		},
+		"logout": "Cerrar sesión"
+	},
 	"nodes": {
+		"title": "Tarjetas",
 		"static_card": "Nota",
 		"temperature": "Temperatura",
 		"events_search": "Búsqueda de Eventos",
@@ -21,10 +31,13 @@
 		"exchange_rate": "Cotización",
 		"gmail_inbox": "Bandeja de Gmail",
 		"google_calendar": "Calendario de Google",
-		"nasa_apod": "Foto del Día de la NASA"
+		"nasa_apod": "Foto del Día de la NASA",
+		"create": "Crear una nueva tarjeta"
 	},
 	"secrets": {
 		"title": "Credenciales del tablero",
+		"create": "Crear una nueva credencial",
+		"manage": "Administrar credenciales",
 		"close": "Cerrar",
 		"loading": "Cargando...",
 		"empty": "Este tablero no tiene credenciales.",
@@ -183,5 +196,16 @@
 		"error_org_not_empty": "Eliminá primero sus tableros y grupos.",
 		"error_rate_limited": "Agregaste demasiadas personas en poco tiempo. Esperá unos minutos y volvé a intentar.",
 		"error_unknown": "No funcionó. Probá de nuevo."
+	},
+	"card_title": {
+		"label": "Título",
+		"placeholder": "Opcional, ej. Dólar a {example}",
+		"variables": "Valores disponibles",
+		"variables_hint": "Hacé click en uno para insertarlo, o escribí {syntax}. Los valores se completan cuando carga la tarjeta.",
+		"sample": "Respuesta de ejemplo",
+		"preview": "Vista previa",
+		"unknown": "Valor desconocido: {names}",
+		"unsupported": "Solo se admiten valores simples {syntax}",
+		"none": "Esta tarjeta no tiene valores para usar en su título."
 	}
 }
