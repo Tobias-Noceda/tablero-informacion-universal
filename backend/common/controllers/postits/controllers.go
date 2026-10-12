@@ -53,7 +53,7 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		return
 	}
 
-	postIt, err := ctrl.service.CreatePostIt(models.Principal{ID: req.CognitoID}, &models.PostIts{
+	newPostIt := &models.PostIts{
 		Board:     req.Board,
 		WellKnown: req.WellKnown,
 		Params:    req.Params,
@@ -65,7 +65,12 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		Rate:      req.Rate,
 		Envs:      req.Envs,
 		Bindings:  req.Bindings,
-	})
+	}
+	if req.Title != nil {
+		newPostIt.Title = *req.Title
+	}
+
+	postIt, err := ctrl.service.CreatePostIt(models.Principal{ID: req.CognitoID}, newPostIt)
 	if err != nil {
 		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),

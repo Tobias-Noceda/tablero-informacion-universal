@@ -8,9 +8,10 @@ export const load = (async ({ params }) => {
 	const { postits, strands, name } = await boardApi.get(id);
 
 	return {
+		boardId: id,
+		boardName: name,
 		userId: uuid(),
 		nodes: postits,
 		edges: strands,
-		name
 	};
 }) satisfies PageLoad;

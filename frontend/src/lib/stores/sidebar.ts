@@ -1,9 +1,16 @@
 import { writable } from "svelte/store";
 
-const sidebarOpen = writable<boolean>(false);
+const sidebarOpen = writable<'cards' | 'credentials' | null>(null);
+const managingSecrets = writable(false);
 
-export const toggleSidebar = () => {
-    sidebarOpen.update(open => !open);
+export const setSidebar = (type: 'cards' | 'credentials' | null) => {
+    sidebarOpen.set(type);
 }
 
-export const isSidebarOpen = { subscribe: sidebarOpen.subscribe };
+export const getSidebar = { subscribe: sidebarOpen.subscribe };
+
+export const setManagingSecrets = (value: boolean) => {
+    managingSecrets.set(value);
+}
+
+export const isManagingSecrets = { subscribe: managingSecrets.subscribe };
