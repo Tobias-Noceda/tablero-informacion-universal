@@ -66,7 +66,7 @@ func TestCreatePostIt_OK(t *testing.T) {
 	board := uuid.New()
 	newID := uuid.New()
 	db := &mocks.MockDB{
-		CreatePostItFn: func(p *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(p *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error) {
 			p.Id = newID
 			return p, nil
 		},
@@ -316,7 +316,7 @@ func TestDeletePostIt_ServiceError(t *testing.T) {
 
 func TestCreatePostIt_ServiceError(t *testing.T) {
 	db := &mocks.MockDB{
-		CreatePostItFn: func(_ *models.PostIts, _ string, _ models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(_ *models.PostIts, title models.BoardPostItTitle, _ string, _ models.Position) (*models.PostIts, error) {
 			return nil, errors.New("mongo: no documents in result")
 		},
 	}
@@ -421,7 +421,7 @@ func TestCreatePostIt_BindsAsTheCaller(t *testing.T) {
 		},
 	}
 	db := &mocks.MockDB{
-		CreatePostItFn: func(p *models.PostIts, _ string, _ models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(p *models.PostIts, title models.BoardPostItTitle, _ string, _ models.Position) (*models.PostIts, error) {
 			return p, nil
 		},
 	}

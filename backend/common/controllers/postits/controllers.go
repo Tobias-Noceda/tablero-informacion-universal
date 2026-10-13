@@ -56,9 +56,7 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 	newPostIt := &models.PostIts{
 		Board:     req.Board,
 		WellKnown: req.WellKnown,
-		Title:     req.Title,
 		Params:    req.Params,
-		Title:     req.Title,
 		Resource:  req.Resource,
 		Request:   req.Request,
 		Response:  req.Response,
@@ -68,7 +66,7 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		Bindings:  req.Bindings,
 	}
 
-	postIt, err := ctrl.service.CreatePostIt(models.Principal{ID: req.CognitoID}, newPostIt)
+	postIt, err := ctrl.service.CreatePostIt(models.Principal{ID: req.CognitoID}, req.Title, newPostIt)
 	if err != nil {
 		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),

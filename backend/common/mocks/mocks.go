@@ -22,7 +22,7 @@ type MockDB struct {
 	DeletePostItFn                func(id uuid.UUID) ([]models.Strand, error)
 	DeleteBoardFn                 func(id uuid.UUID) error
 	UpdatePostItFn                func(id uuid.UUID, set map[string]any) error
-	CreatePostItFn                func(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
+	CreatePostItFn                func(postIt *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error)
 	CreateBoardFn                 func(name, owner string) (*models.Board, error)
 	AddCollaboratorToBoardFn      func(boardID uuid.UUID, cognitoID string) error
 	RemoveCollaboratorFromBoardFn func(boardID uuid.UUID, cognitoID string) error
@@ -83,9 +83,9 @@ func (m *MockDB) UpdatePostIt(id uuid.UUID, set map[string]any) error {
 	return nil
 }
 
-func (m *MockDB) CreatePostIt(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error) {
+func (m *MockDB) CreatePostIt(postIt *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error) {
 	if m.CreatePostItFn != nil {
-		return m.CreatePostItFn(postIt, ptype, pos)
+		return m.CreatePostItFn(postIt, title, ptype, pos)
 	}
 	return postIt, nil
 }

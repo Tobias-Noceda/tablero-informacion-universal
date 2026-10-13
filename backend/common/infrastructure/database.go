@@ -21,7 +21,7 @@ type Database interface {
 	// Updates a given PostIt
 	UpdatePostIt(id uuid.UUID, set map[string]any) error
 	// Creates a PostIt
-	CreatePostIt(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
+	CreatePostIt(postIt *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error)
 	// Creates a Board
 	CreateBoard(name, owner string) (*models.Board, error)
 	// Adds collaborator to board

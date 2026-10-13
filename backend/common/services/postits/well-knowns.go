@@ -14,15 +14,17 @@ import (
 type wellKnown struct {
 	template      models.PostIts
 	systemSecrets map[string]models.SystemSecretName
+	title         models.BoardPostItTitle
 }
 
-func findWellKnown(key string, params map[string]string) (*models.PostIts, error) {
+func findWellKnown(key string, params map[string]string) (*models.PostIts, *models.BoardPostItTitle, error) {
 	def, ok := configuredPostIts[key]
 	if !ok {
-		return nil, fmt.Errorf("Well Known post-it not found")
+		return nil, nil, fmt.Errorf("Well Known post-it not found")
 	}
 
 	wk := def.template
+	title := def.title
 
 	if wk.Request.Queries != nil {
 		wk.Request.Queries = maps.Clone(wk.Request.Queries)
@@ -47,11 +49,11 @@ func findWellKnown(key string, params map[string]string) (*models.PostIts, error
 				continue
 			}
 
-			return nil, fmt.Errorf("Missing required variable")
+			return nil, nil, fmt.Errorf("Missing required variable")
 		}
 	}
 
-	return &wk, nil
+	return &wk, &title, nil
 }
 
 func getURL(raw string) *url.URL {
@@ -63,6 +65,10 @@ var configuredPostIts = map[string]wellKnown{
 	"nasa_apod": {
 		systemSecrets: map[string]models.SystemSecretName{
 			"$api_key": models.SystemNasaApiKey,
+		},
+		title: models.BoardPostItTitle{
+			Text: "Today's NASA's picture: {{title}}: {{explanation}}",
+			Vars: true,
 		},
 		template: models.PostIts{
 			WellKnown: "nasa_apod",
@@ -86,302 +92,322 @@ var configuredPostIts = map[string]wellKnown{
 			Rate: 3600,
 		},
 	},
-	"static_card": {template: models.PostIts{
-		WellKnown: "static_card",
-		Title: models.Title{
+	"static_card": {
+		title: models.BoardPostItTitle{
 			Text: "{{text}}",
 			Vars: true,
 		},
-		Params: map[string]string{
-			"text": "",
-		},
-		Resource: nil,
-		Rate:     0,
-	}},
-	"temperature": {template: models.PostIts{
-		WellKnown: "temperature",
-		Title: models.Title{
+		template: models.PostIts{
+			WellKnown: "static_card",
+			Params: map[string]string{
+				"text": "",
+			},
+			Resource: nil,
+			Rate:     0,
+		}},
+	"temperature": {
+		title: models.BoardPostItTitle{
 			Text: "Today's temps are between {{min}}°C and {{max}}°C",
 			Vars: true,
 		},
-		Params: map[string]string{
-			"$latitude":   "-34.6131",
-			"$longitude":  "-58.3772",
-			"$start_date": "",
-			"$end_date":   "",
-		},
-		Resource: getURL("https://api.open-meteo.com/v1/forecast"),
-		Request: models.Request{
-			Method: "GET",
-			Queries: map[string]string{
-				"hourly":     "temperature_2m",
-				"latitude":   "$latitude",
-				"longitude":  "$longitude",
-				"start_date": "$start_date",
-				"end_date":   "$end_date",
+		template: models.PostIts{
+			WellKnown: "temperature",
+			Params: map[string]string{
+				"$latitude":   "-34.6131",
+				"$longitude":  "-58.3772",
+				"$start_date": "",
+				"$end_date":   "",
 			},
-			Headers: map[string]string{
-				"Accept": "application/json",
+			Resource: getURL("https://api.open-meteo.com/v1/forecast"),
+			Request: models.Request{
+				Method: "GET",
+				Queries: map[string]string{
+					"hourly":     "temperature_2m",
+					"latitude":   "$latitude",
+					"longitude":  "$longitude",
+					"start_date": "$start_date",
+					"end_date":   "$end_date",
+				},
+				Headers: map[string]string{
+					"Accept": "application/json",
+				},
 			},
-		},
-		Response: "json",
-		Query: map[string]string{
-			"min": ".hourly.temperature_2m | min",
-			"max": ".hourly.temperature_2m | max",
-		},
-		Rate: 30,
-	}},
-	"events_search": {template: models.PostIts{
-		WellKnown: "events_search",
-		Title: models.Title{
+			Response: "json",
+			Query: map[string]string{
+				"min": ".hourly.temperature_2m | min",
+				"max": ".hourly.temperature_2m | max",
+			},
+			Rate: 30,
+		}},
+	"events_search": {
+		title: models.BoardPostItTitle{
 			Text: "{{sales}}: {{name}}",
 			Vars: true,
 		},
-		Params: map[string]string{
-			"$keyword":    "",
-			"$credential": "",
-		},
-		Resource: getURL("https://app.ticketmaster.com/discovery/v2/events.json"),
-		Request: models.Request{
-			Method: "GET",
-			Queries: map[string]string{
-				"keyword": "$keyword",
-				"size":    "1",
-				"apikey":  "$credential",
+		template: models.PostIts{
+			WellKnown: "events_search",
+			Params: map[string]string{
+				"$keyword":    "",
+				"$credential": "",
 			},
-			Headers: map[string]string{
-				"Accept": "application/json",
+			Resource: getURL("https://app.ticketmaster.com/discovery/v2/events.json"),
+			Request: models.Request{
+				Method: "GET",
+				Queries: map[string]string{
+					"keyword": "$keyword",
+					"size":    "1",
+					"apikey":  "$credential",
+				},
+				Headers: map[string]string{
+					"Accept": "application/json",
+				},
 			},
-		},
-		Response: "json",
-		Query: map[string]string{
-			"name":  "._embedded.events[0].name",
-			"sales": "._embedded.events[0].sales.public.startDateTime",
-			"image": "._embedded.events[0].images[0].url",
-		},
-		Rate: 120,
-	}},
-	"dog_facts": {template: models.PostIts{
-		WellKnown: "dog_facts",
-		Title: models.Title{
+			Response: "json",
+			Query: map[string]string{
+				"name":  "._embedded.events[0].name",
+				"sales": "._embedded.events[0].sales.public.startDateTime",
+				"image": "._embedded.events[0].images[0].url",
+			},
+			Rate: 120,
+		}},
+	"dog_facts": {
+		title: models.BoardPostItTitle{
 			Text: "{{body}}",
 			Vars: true,
 		},
-		Resource: getURL("https://dogapi.dog/api/v2/facts"),
-		Request: models.Request{
-			Method: "GET",
-		},
-		Response: "json",
-		Query: map[string]string{
-			"body": ".data[0].attributes.body",
-		},
-		Rate: 5,
-	}},
-	"dolar_oficial": {template: models.PostIts{
-		WellKnown: "dolar_oficial",
-		Title: models.Title{
+		template: models.PostIts{
+			WellKnown: "dog_facts",
+			Resource:  getURL("https://dogapi.dog/api/v2/facts"),
+			Request: models.Request{
+				Method: "GET",
+			},
+			Response: "json",
+			Query: map[string]string{
+				"body": ".data[0].attributes.body",
+			},
+			Rate: 5,
+		}},
+	"dolar_oficial": {
+		title: models.BoardPostItTitle{
 			Text: "Dolar at {{compra}}",
 			Vars: true,
 		},
-		Resource: getURL("https://dolarapi.com/v1/dolares/oficial"),
-		Request: models.Request{
-			Method: "GET",
-		},
-		Response: "json",
-		Query: map[string]string{
-			"compra": ".compra",
-			"venta":  ".venta",
-		},
-		Rate: 120,
-	}},
-	"exchange_rate": {template: models.PostIts{
-		WellKnown: "exchange_rate",
-		Title: models.Title{
+		template: models.PostIts{
+			WellKnown: "dolar_oficial",
+			Resource:  getURL("https://dolarapi.com/v1/dolares/oficial"),
+			Request: models.Request{
+				Method: "GET",
+			},
+			Response: "json",
+			Query: map[string]string{
+				"compra": ".compra",
+				"venta":  ".venta",
+			},
+			Rate: 120,
+		}},
+	"exchange_rate": {
+		title: models.BoardPostItTitle{
 			Text: "{{code}} at {{value}}",
 			Vars: true,
 		},
-		Params: map[string]string{
-			"$base":       "USD",
-			"$currency":   "ARS",
-			"$credential": "",
-		},
-		Resource: getURL("https://api.currencyapi.com/v3/latest"),
-		Request: models.Request{
-			Method: "GET",
-			Queries: map[string]string{
-				"base_currency": "$base",
-				"currencies":    "$currency",
+		template: models.PostIts{
+			WellKnown: "exchange_rate",
+			Params: map[string]string{
+				"$base":       "USD",
+				"$currency":   "ARS",
+				"$credential": "",
 			},
-			Headers: map[string]string{
-				"Accept": "application/json",
-				"apikey": "$credential",
+			Resource: getURL("https://api.currencyapi.com/v3/latest"),
+			Request: models.Request{
+				Method: "GET",
+				Queries: map[string]string{
+					"base_currency": "$base",
+					"currencies":    "$currency",
+				},
+				Headers: map[string]string{
+					"Accept": "application/json",
+					"apikey": "$credential",
+				},
 			},
-		},
-		Response: "json",
-		Query: map[string]string{
-			"code":    ".data[].code",
-			"value":   ".data[].value",
-			"updated": ".meta.last_updated_at",
-		},
-		Rate: 3600,
-	}},
-	"riesgo_pais": {template: models.PostIts{
-		WellKnown: "riesgo_pais",
-		Title: models.Title{
+			Response: "json",
+			Query: map[string]string{
+				"code":    ".data[].code",
+				"value":   ".data[].value",
+				"updated": ".meta.last_updated_at",
+			},
+			Rate: 3600,
+		}},
+	"riesgo_pais": {
+		title: models.BoardPostItTitle{
 			Text: "Argentine's country risk: {{valor}}",
 			Vars: true,
 		},
-		Resource: getURL("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo"),
-		Request: models.Request{
-			Method: "GET",
-			Headers: map[string]string{
-				"Accept": "application/json",
+		template: models.PostIts{
+			WellKnown: "riesgo_pais",
+			Resource:  getURL("https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo"),
+			Request: models.Request{
+				Method: "GET",
+				Headers: map[string]string{
+					"Accept": "application/json",
+				},
 			},
-		},
-		Response: "json",
-		Query: map[string]string{
-			"valor": ".valor",
-			"fecha": ".fecha",
-		},
-		Rate: 3600,
-	}},
-	"crypto_price": {template: models.PostIts{
-		WellKnown: "crypto_price",
-		Title: models.Title{
+			Response: "json",
+			Query: map[string]string{
+				"valor": ".valor",
+				"fecha": ".fecha",
+			},
+			Rate: 3600,
+		}},
+	"crypto_price": {
+		title: models.BoardPostItTitle{
 			Text: "Let's go gambling! {{coin}} at {{price}}",
 			Vars: true,
 		},
-		Params: map[string]string{
-			"$coin":     "bitcoin",
-			"$currency": "usd",
-		},
-		Resource: getURL("https://api.coingecko.com/api/v3/simple/price"),
-		Request: models.Request{
-			Method: "GET",
-			Queries: map[string]string{
-				"ids":                 "$coin",
-				"vs_currencies":       "$currency",
-				"include_24hr_change": "true",
+		template: models.PostIts{
+			WellKnown: "crypto_price",
+			Params: map[string]string{
+				"$coin":     "bitcoin",
+				"$currency": "usd",
 			},
-			Headers: map[string]string{
-				"Accept": "application/json",
+			Resource: getURL("https://api.coingecko.com/api/v3/simple/price"),
+			Request: models.Request{
+				Method: "GET",
+				Queries: map[string]string{
+					"ids":                 "$coin",
+					"vs_currencies":       "$currency",
+					"include_24hr_change": "true",
+				},
+				Headers: map[string]string{
+					"Accept": "application/json",
+				},
 			},
-		},
-		Response: "json",
-		Query: map[string]string{
-			"coin":   "keys_unsorted[0]",
-			"price":  ".[] | to_entries[] | select(.key | endswith(\"_24h_change\") | not) | .value",
-			"change": ".[] | to_entries[] | select(.key | endswith(\"_24h_change\")) | .value",
-		},
-		Rate: 60,
-	}},
-	"air_quality": {template: models.PostIts{
-		WellKnown: "air_quality",
-		Title: models.Title{
+			Response: "json",
+			Query: map[string]string{
+				"coin":   "keys_unsorted[0]",
+				"price":  ".[] | to_entries[] | select(.key | endswith(\"_24h_change\") | not) | .value",
+				"change": ".[] | to_entries[] | select(.key | endswith(\"_24h_change\")) | .value",
+			},
+			Rate: 60,
+		}},
+	"air_quality": {
+		title: models.BoardPostItTitle{
 			Text: "Today's air is {{pm25}}",
 			Vars: true,
 		},
-		Params: map[string]string{
-			"$latitude":  "-34.6131",
-			"$longitude": "-58.3772",
-		},
-		Resource: getURL("https://air-quality-api.open-meteo.com/v1/air-quality"),
-		Request: models.Request{
-			Method: "GET",
-			Queries: map[string]string{
-				"latitude":  "$latitude",
-				"longitude": "$longitude",
-				"current":   "us_aqi,pm2_5",
+		template: models.PostIts{
+			WellKnown: "air_quality",
+			Params: map[string]string{
+				"$latitude":  "-34.6131",
+				"$longitude": "-58.3772",
 			},
-			Headers: map[string]string{
-				"Accept": "application/json",
+			Resource: getURL("https://air-quality-api.open-meteo.com/v1/air-quality"),
+			Request: models.Request{
+				Method: "GET",
+				Queries: map[string]string{
+					"latitude":  "$latitude",
+					"longitude": "$longitude",
+					"current":   "us_aqi,pm2_5",
+				},
+				Headers: map[string]string{
+					"Accept": "application/json",
+				},
 			},
-		},
-		Response: "json",
-		Query: map[string]string{
-			"aqi":  ".current.us_aqi",
-			"pm25": ".current.pm2_5",
-			"time": ".current.time",
-		},
-		Rate: 900,
-	}},
-	"gmail_inbox": {template: models.PostIts{
-		WellKnown: "gmail_inbox",
-		Params: map[string]string{
-			"$credential": "",
-		},
-		Resource: getURL("https://gmail.googleapis.com/gmail/v1/users/me/labels/INBOX"),
-		Request: models.Request{
-			Method: "GET",
-			Headers: map[string]string{
-				"Accept":        "application/json",
-				"Authorization": "$credential",
+			Response: "json",
+			Query: map[string]string{
+				"aqi":  ".current.us_aqi",
+				"pm25": ".current.pm2_5",
+				"time": ".current.time",
 			},
+			Rate: 900,
+		}},
+	"gmail_inbox": {
+		title: models.BoardPostItTitle{
+			Text: "You have {{unread}} new emails",
+			Vars: true,
 		},
-		Response: "json",
-		Query: map[string]string{
-			"unread": ".messagesUnread",
-			"total":  ".messagesTotal",
-		},
-		Rate: 60,
-	}},
-	"google_calendar": {template: models.PostIts{
-		WellKnown: "google_calendar",
-		Params: map[string]string{
-			"$credential": "",
-			"$time_min":   "",
-		},
-		Resource: getURL("https://www.googleapis.com/calendar/v3/calendars/primary/events"),
-		Request: models.Request{
-			Method: "GET",
-			Queries: map[string]string{
-				"singleEvents": "true",
-				"orderBy":      "startTime",
-				"maxResults":   "50",
-				"timeMin":      "$time_min",
+		template: models.PostIts{
+			WellKnown: "gmail_inbox",
+			Params: map[string]string{
+				"$credential": "",
 			},
-			Headers: map[string]string{
-				"Accept":        "application/json",
-				"Authorization": "$credential",
+			Resource: getURL("https://gmail.googleapis.com/gmail/v1/users/me/labels/INBOX"),
+			Request: models.Request{
+				Method: "GET",
+				Headers: map[string]string{
+					"Accept":        "application/json",
+					"Authorization": "$credential",
+				},
 			},
+			Response: "json",
+			Query: map[string]string{
+				"unread": ".messagesUnread",
+				"total":  ".messagesTotal",
+			},
+			Rate: 60,
+		}},
+	"google_calendar": {
+		title: models.BoardPostItTitle{
+			Text: "{{summary}} starts at {{start}}",
+			Vars: true,
 		},
-		Response: "json",
-		Query: map[string]string{
-			"summary": "[.items[] | select((.start.dateTime // .start.date) >= (now | todate))] | first | .summary",
-			"start":   "[.items[] | select((.start.dateTime // .start.date) >= (now | todate))] | first | .start.dateTime // .start.date",
-		},
-		Rate: 300,
-	}},
-	"github_repo": {template: models.PostIts{
-		WellKnown: "github_repo",
-		Title: models.Title{
+		template: models.PostIts{
+			WellKnown: "google_calendar",
+			Params: map[string]string{
+				"$credential": "",
+				"$time_min":   "",
+			},
+			Resource: getURL("https://www.googleapis.com/calendar/v3/calendars/primary/events"),
+			Request: models.Request{
+				Method: "GET",
+				Queries: map[string]string{
+					"singleEvents": "true",
+					"orderBy":      "startTime",
+					"maxResults":   "50",
+					"timeMin":      "$time_min",
+				},
+				Headers: map[string]string{
+					"Accept":        "application/json",
+					"Authorization": "$credential",
+				},
+			},
+			Response: "json",
+			Query: map[string]string{
+				"summary": "[.items[] | select((.start.dateTime // .start.date) >= (now | todate))] | first | .summary",
+				"start":   "[.items[] | select((.start.dateTime // .start.date) >= (now | todate))] | first | .start.dateTime // .start.date",
+			},
+			Rate: 300,
+		}},
+	"github_repo": {
+		title: models.BoardPostItTitle{
 			Text: "The repo {{name}} has {{stars}} stars and {{issues}} open issues",
 			Vars: true,
 		},
-		Params: map[string]string{
-			"$query": "",
-		},
-		Resource: getURL("https://api.github.com/search/repositories"),
-		Request: models.Request{
-			Method: "GET",
-			Queries: map[string]string{
-				"q":        "$query",
-				"sort":     "stars",
-				"order":    "desc",
-				"per_page": "1",
+		template: models.PostIts{
+			WellKnown: "github_repo",
+			Params: map[string]string{
+				"$query": "",
 			},
-			Headers: map[string]string{
-				"Accept": "application/vnd.github+json",
+			Resource: getURL("https://api.github.com/search/repositories"),
+			Request: models.Request{
+				Method: "GET",
+				Queries: map[string]string{
+					"q":        "$query",
+					"sort":     "stars",
+					"order":    "desc",
+					"per_page": "1",
+				},
+				Headers: map[string]string{
+					"Accept": "application/vnd.github+json",
+				},
 			},
-		},
-		Response: "json",
-		Query: map[string]string{
-			"name":        ".items[0].full_name",
-			"stars":       ".items[0].stargazers_count",
-			"forks":       ".items[0].forks_count",
-			"issues":      ".items[0].open_issues_count",
-			"description": ".items[0].description",
-		},
-		Rate: 300,
-	}},
+			Response: "json",
+			Query: map[string]string{
+				"name":        ".items[0].full_name",
+				"stars":       ".items[0].stargazers_count",
+				"forks":       ".items[0].forks_count",
+				"issues":      ".items[0].open_issues_count",
+				"description": ".items[0].description",
+			},
+			Rate: 300,
+		}},
 }

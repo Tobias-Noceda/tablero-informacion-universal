@@ -2,6 +2,7 @@ package postits
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"maps"
 	"strings"
@@ -31,29 +32,37 @@ func New(db infrastructure.Database, cache infrastructure.Cache, run infrastruct
 	return &PostItsService{db, cache, run, secrets}
 }
 
-func (srv *PostItsService) CreatePostIt(principal models.Principal, postIt *models.PostIts) (*models.PostIts, error) {
+func (srv *PostItsService) CreatePostIt(principal models.Principal, title *models.BoardPostItTitle, postIt *models.PostIts) (*models.PostIts, error) {
 	if _, err := srv.member(principal, postIt.Board); err != nil {
 		return nil, err
 	}
 
 	if postIt.WellKnown != "" {
-		wk, err := findWellKnown(postIt.WellKnown, postIt.Params)
+		wk, wk_title, err := findWellKnown(postIt.WellKnown, postIt.Params)
 		if err != nil {
 			return nil, err
 		}
 
 		wk.Board = postIt.Board
 		wk.Bindings = postIt.Bindings
+
 		postIt = wk
+
+		if title != nil {
+			title = wk_title
+		}
+	}
+
+	if title == nil {
+		return nil, fmt.Errorf("Missing post-it title")
 	}
 
 	if err := srv.bind(principal, postIt.Board, postIt.Bindings); err != nil {
 		return nil, err
 	}
 	postIt.RunAs = principal.ID
-	postIt.Title.Vars = titleVars(postIt.Title.Text, outputsOf(postIt))
 
-	return srv.db.CreatePostIt(postIt, postIt.WellKnown, models.Position{X: 750, Y: 350})
+	return srv.db.CreatePostIt(postIt, *title, postIt.WellKnown, models.Position{X: 750, Y: 350})
 }
 
 func (srv *PostItsService) GetPostIt(id uuid.UUID) (*models.PostIts, error) {
