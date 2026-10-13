@@ -3,8 +3,9 @@
 	import Input from '$components/Input/Input.svelte';
 	import Modal from '$components/Modal/Modal.svelte';
 	import * as secretsApi from '$services/secrets';
-	import { CURRENT_USER } from '$modules/api.svelte';
 	import type { OAuth2Flow, OAuthProvider, OAuthProviderStatus, SecretMeta, UUID } from '$types/api';
+
+	import { getUser } from '$stores/user';
 
 	type StaticKind = 'api_key' | 'bearer' | 'basic';
 	import { m } from '$lib/paraglide/messages';
@@ -17,7 +18,7 @@
 	type Tab = 'board' | 'mine';
 	let tab = $state<Tab>('board');
 	const scope = $derived(
-		tab === 'board' ? secretsApi.boardScope(board) : secretsApi.memberScope(board, CURRENT_USER)
+		tab === 'board' ? secretsApi.boardScope(board) : secretsApi.memberScope(board, $getUser?.id ?? '')
 	);
 
 	let secrets = $state<SecretMeta[]>([]);
@@ -67,7 +68,7 @@
 		loading = true;
 		error = '';
 		try {
-			[secrets, providers] = await Promise.all([secretsApi.list(scope), secretsApi.providers()]);
+			[secrets, providers] = await Promise.all([secretsApi.list(scope, $getUser?.id ?? ''), secretsApi.providers()]);
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -94,12 +95,12 @@
 		error = '';
 		try {
 			if (drafting === 'static') {
-				await secretsApi.put(scope, name, kind, staticValue);
+				await secretsApi.put(scope, name, kind, staticValue, $getUser?.id ?? '');
 			} else if (drafting === 'connect') {
 				// The grant is created server-side and the user is sent to consent;
 				// the panel is left behind, so there is nothing to refresh here.
 				const redirect = `${window.location.origin}/oauth2/callback`;
-				window.location.href = await secretsApi.connect(scope, provider, name, redirect);
+				window.location.href = await secretsApi.connect(scope, provider, name, redirect, $getUser?.id ?? '');
 				return;
 			} else {
 				await secretsApi.put_oauth2(scope, {
@@ -110,7 +111,7 @@
 					token_url: tokenUrl.trim(),
 					auth_url: flow === 'authorization_code' ? authUrl.trim() : undefined,
 					scopes: scopes.trim() || undefined
-				});
+				}, $getUser?.id ?? '');
 			}
 			resetDraft();
 			await refresh();
@@ -122,7 +123,7 @@
 	async function remove(secret: SecretMeta) {
 		error = '';
 		try {
-			await secretsApi.del(scope, secret.name);
+			await secretsApi.del(scope, secret.name, $getUser?.id ?? '');
 			await refresh();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
@@ -133,7 +134,7 @@
 		error = '';
 		try {
 			const redirect = `${window.location.origin}/oauth2/callback`;
-			const target = await secretsApi.authorize(scope, secret.name, redirect);
+			const target = await secretsApi.authorize(scope, secret.name, redirect, $getUser?.id ?? '');
 			window.location.href = target;
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);

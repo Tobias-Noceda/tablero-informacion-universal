@@ -4,36 +4,38 @@
 	import type { Update } from '$modules/realtime.svelte.js';
 
 	import Flow from './Flow.svelte';
-	import DnDProvider from './DnDProvider.svelte';
 	// import Realtime from './Realtime.svelte';
 
-	import { page } from '$app/state';
 	import type { Node, Edge } from '@xyflow/svelte';
+	import { mapPostitWithTitle, type PostItWithTitle } from '$lib/helpers/post-it.js';
+	// import type { PostIt, Strand } from '$types/api.js';
 
-	const id = $derived(page.params.id!);
-
+	// type PageProps = { data: Board };
 	let { data } = $props();
-	const { nodes, edges, name, userId } = $derived(data) as {
+	const { boardId, nodes, edges, userId } = $derived({
+		...data,
+		nodes: data.nodes.map(mapPostitWithTitle)
+	}) as {
+		boardId: string
+		boardName: string;
 		nodes: Node[];
 		edges: Edge[];
-		name: string;
 		userId: string;
 	};
 
 	function boardUpdate(update: Update) {
+		console.log('boardUpdate: ', update);
 		data = {
 			...data,
-			nodes: update.board.postits ?? data.nodes,
+			boardName: update.board.name ?? data.boardName,
+			nodes: update.board.postits?.map((postit) => mapPostitWithTitle(postit as PostItWithTitle)) ?? data.nodes,
 			edges: update.board.strands ?? data.edges,
-			name: update.board.name ?? data.name
 		};
 	}
 </script>
 
-{#key id}
-	<DnDProvider>
-		<!-- <Realtime boardId={id} {boardUpdate}> -->
-		<Flow {name} {nodes} {edges} boardId={id} {userId} {boardUpdate} />
-		<!-- </Realtime> -->
-	</DnDProvider>
+{#key boardId}
+	<!-- <Realtime boardId={id} {boardUpdate}> -->
+	<Flow {nodes} {edges} {boardId} {userId} {boardUpdate} />
+	<!-- </Realtime> -->
 {/key}

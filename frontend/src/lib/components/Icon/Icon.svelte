@@ -63,7 +63,8 @@
   const finalClass = $derived(cn(
     'inline-block align-middle select-none',
     /\b(w-|h-)/.test(className) ? '' : 'w-4 h-4', // default size
-    className
+    className,
+    'fill-transparent!',
   ));
 </script>
 

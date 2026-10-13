@@ -51,6 +51,7 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, postIt *mode
 		return nil, err
 	}
 	postIt.RunAs = principal.ID
+	postIt.Title.Vars = titleVars(postIt.Title.Text, outputsOf(postIt))
 
 	return srv.db.CreatePostIt(postIt, postIt.WellKnown, models.Position{X: 750, Y: 350})
 }
