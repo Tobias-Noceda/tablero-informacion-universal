@@ -319,6 +319,13 @@ func (db *MongoDB) MovePostIt(boardID, postItID uuid.UUID, pos models.Position) 
 	)
 }
 
+func (db *MongoDB) EditTitlePostIt(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error {
+	return db.updateBoard(
+		bson.M{"_id": boardID, "postits.id": postItID},
+		bson.M{"$set": bson.M{"postits.$.title": title}},
+	)
+}
+
 func (db *MongoDB) ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error) {
 	strand := models.Strand{Id: uuid.New(), Source: source, Target: target}
 

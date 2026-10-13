@@ -34,6 +34,8 @@ type Database interface {
 	ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error)
 	// Move Post It
 	MovePostIt(boardID, postItID uuid.UUID, pos models.Position) error
+	// Change a Post It title
+	EditTitlePostIt(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error
 	// Update board's name
 	UpdateBoardName(id uuid.UUID, name string) error
 }

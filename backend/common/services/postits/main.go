@@ -140,6 +140,17 @@ func (srv *PostItsService) MovePostIt(id uuid.UUID, pos models.Position) error {
 	return srv.db.MovePostIt(postit.Board, postit.Id, pos)
 }
 
+func (srv *PostItsService) EditTitlePostIt(id uuid.UUID, title models.BoardPostItTitle) error {
+	postit, err := srv.GetPostIt(id)
+	if err != nil {
+		return err
+	}
+
+	title.Vars = titleVars(title.Text, outputsOf(postit))
+
+	return srv.db.EditTitlePostIt(postit.Board, postit.Id, title)
+}
+
 func (srv *PostItsService) DeletePostIt(id uuid.UUID) ([]models.Strand, error) {
 	return srv.db.DeletePostIt(id)
 }

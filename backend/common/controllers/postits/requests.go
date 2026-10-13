@@ -29,10 +29,13 @@ type MovePostItRequest struct {
 
 type UpdatePostItRequest struct {
 	CognitoID string                      `json:"cognito_id" binding:"required"`
-	Title     *models.BoardPostItTitle    `json:"title"`
 	Params    map[string]string           `json:"params"`
 	Bindings  map[string]models.SecretRef `json:"bindings"`
 	Query     map[string]string           `json:"query"`
 	Response  *string                     `json:"response"`
 	Rate      *int                        `json:"rate"`
+}
+
+type UpdatePostItTitleRequest struct {
+	Title models.BoardPostItTitle `json:"title" binding:"required"`
 }
