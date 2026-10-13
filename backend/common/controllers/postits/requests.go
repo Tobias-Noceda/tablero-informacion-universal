@@ -15,9 +15,9 @@ type CreatePostItRequest struct {
 	Title     *models.BoardPostItTitle    `json:"title" binding:"required_without=WellKnown"`
 	Resource  *url.URL                    `json:"resource" binding:"required_without=WellKnown"`
 	Request   models.Request              `json:"request" binding:"required_without=WellKnown"`
-	Response  string                      `json:"response" binding:"required_without=WellKnown,eq=json|eq=html"`
-	Query     map[string]string           `json:"query" binding:"required_without=WellKnown,gt=0,dive,keys,required,endkeys,required"`
-	Rate      int                         `json:"rate" binding:"required_without=WellKnown,gt=5"`
+	Response  string                      `json:"response" binding:"required_without=WellKnown,omitempty,eq=json|eq=html"`
+	Query     map[string]string           `json:"query" binding:"required_without=WellKnown,omitempty,gt=0,dive,keys,required,endkeys,required"`
+	Rate      int                         `json:"rate" binding:"required_without=WellKnown,omitempty,gt=5"`
 	Envs      []models.Envs               `json:"envs"`
 	Bindings  map[string]models.SecretRef `json:"bindings"`
 }

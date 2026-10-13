@@ -48,7 +48,7 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 
 		postIt = wk
 
-		if title != nil {
+		if title == nil {
 			title = wk_title
 		}
 	}

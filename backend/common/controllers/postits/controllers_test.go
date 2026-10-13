@@ -73,7 +73,7 @@ func TestCreatePostIt_OK(t *testing.T) {
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPost, "/post-its", `{"cognito_id":"`+owner+`","board":"`+board.String()+`","well-known":"dolar_oficial"}`)
+	w := do(r, http.MethodPost, "/post-its", `{"cognito_id":"`+owner+`","board":"`+board.String()+`","well_known":"dolar_oficial"}`)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201 (body: %s)", w.Code, w.Body.String())
 	}
@@ -322,7 +322,7 @@ func TestCreatePostIt_ServiceError(t *testing.T) {
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPost, "/post-its", `{"cognito_id":"`+owner+`","board":"`+uuid.New().String()+`"}`)
+	w := do(r, http.MethodPost, "/post-its", `{"cognito_id":"`+owner+`","board":"`+uuid.New().String()+`","well_known": "riesgo_pais"}`)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
 	}
@@ -404,7 +404,7 @@ func TestCreatePostIt_RequiresACaller(t *testing.T) {
 
 func TestCreatePostIt_OutsiderIsForbidden(t *testing.T) {
 	r := setupRouter(nil, nil, nil)
-	w := do(r, http.MethodPost, "/post-its", `{"cognito_id":"someone-else","board":"`+uuid.New().String()+`"}`)
+	w := do(r, http.MethodPost, "/post-its", `{"cognito_id":"someone-else","board":"`+uuid.New().String()+`","well_known": "dolar_oficial"}`)
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403 (body: %s)", w.Code, w.Body.String())
 	}
@@ -461,7 +461,7 @@ func TestCreatePostIt_ForbiddenBindingIs403(t *testing.T) {
 	r := setupRouterWith(nil, nil, nil, secrets)
 
 	board := uuid.New()
-	body := `{"cognito_id":"` + owner + `","board":"` + board.String() + `",
+	body := `{"cognito_id":"` + owner + `","board":"` + board.String() + `","well_known":"riesgo_pais",
 	         "bindings":{"X":{"scope":{"kind":"board","owner":"` + board.String() + `"},"name":"X"}}}`
 	w := do(r, http.MethodPost, "/post-its", body)
 	if w.Code != http.StatusForbidden {
