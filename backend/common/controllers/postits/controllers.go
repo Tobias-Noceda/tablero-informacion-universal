@@ -56,11 +56,9 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 	newPostIt := &models.PostIts{
 		Board:     req.Board,
 		WellKnown: req.WellKnown,
+		Title:     req.Title,
 		Params:    req.Params,
 		Bindings:  req.Bindings,
-	}
-	if req.Title != nil {
-		newPostIt.Title = *req.Title
 	}
 
 	postIt, err := ctrl.service.CreatePostIt(models.Principal{ID: req.CognitoID}, newPostIt)
