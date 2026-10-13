@@ -11,11 +11,16 @@ type Position struct {
 	Y float32 `bson:"y" json:"y"`
 }
 
+type BoardPostItTitle struct {
+	Text string `bson:"text" json:"text" binding:"required"`
+	Vars bool   `bson:"vars" json:"vars"`
+}
+
 type BoardPostIt struct {
-	Id       uuid.UUID `bson:"id" json:"id"`
-	Type     string    `bson:"type" json:"type"` // Reserved for future use
-	Title    Title     `bson:"title" json:"title"`
-	Position Position  `bson:"position" json:"position"`
+	Id       uuid.UUID        `bson:"id" json:"id"`
+	Type     string           `bson:"type" json:"type"` // Reserved for future use
+	Title    BoardPostItTitle `bson:"title" json:"title"`
+	Position Position         `bson:"position" json:"position"`
 }
 
 type Strand struct {

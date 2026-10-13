@@ -80,7 +80,7 @@ func nasaStub(t *testing.T) (*httptest.Server, *string) {
 // the stored post-it at the stub the way a persisted resource would be read.
 func createNasaPostIt(t *testing.T, svc *PostItsService, board uuid.UUID, resource string, params map[string]string) *models.PostIts {
 	t.Helper()
-	created, err := svc.CreatePostIt(boardOwner, &models.PostIts{Board: board, WellKnown: "nasa_apod", Params: params})
+	created, err := svc.CreatePostIt(boardOwner, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{Board: board, WellKnown: "nasa_apod", Params: params})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}

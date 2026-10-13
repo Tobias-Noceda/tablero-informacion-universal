@@ -10,20 +10,14 @@ type Request struct {
 	Method  string            `bson:"method" json:"method"`
 	Headers map[string]string `bson:"headers" json:"headers"`
 	Queries map[string]string `bson:"queries" json:"queries"`
-	Body    string            `bson:"body" json:"body"`
-}
-
-type Title struct {
-	Text string `bson:"text" json:"text"`
-	Vars bool   `bson:"vars" json:"vars"`
+	Body    string            `bson:"body,omitempty" json:"body"`
 }
 
 type PostIts struct {
 	Id        uuid.UUID         `bson:"_id" json:"id"`
 	Board     uuid.UUID         `bson:"board" json:"board"`
-	Title     Title             `bson:"title" json:"title"`
 	Params    map[string]string `bson:"params" json:"params"`
-	WellKnown string            `bson:"wellknown" json:"wellknown"`
+	WellKnown string            `bson:"wellknown,omitempty" json:"wellknown"`
 	Resource  *url.URL          `bson:"resource" json:"resource"`
 	Request   Request           `bson:"request" json:"request"`
 	Response  string            `bson:"response" json:"response"` // API response type, used to select the query parser

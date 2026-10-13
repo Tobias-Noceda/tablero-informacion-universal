@@ -22,13 +22,14 @@ type MockDB struct {
 	DeletePostItFn                func(id uuid.UUID) ([]models.Strand, error)
 	DeleteBoardFn                 func(id uuid.UUID) error
 	UpdatePostItFn                func(id uuid.UUID, set map[string]any) error
-	CreatePostItFn                func(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
+	CreatePostItFn                func(postIt *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error)
 	CreateBoardFn                 func(name, owner string) (*models.Board, error)
 	AddCollaboratorToBoardFn      func(boardID uuid.UUID, cognitoID string) error
 	RemoveCollaboratorFromBoardFn func(boardID uuid.UUID, cognitoID string) error
 	DisconnectPostItsFn           func(boardID, strandID uuid.UUID) error
 	ConnectPostItsFn              func(boardID, source, target uuid.UUID) (*models.Strand, error)
 	MovePostItFn                  func(boardID, postItID uuid.UUID, pos models.Position) error
+	EditTitlePostItFn             func(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error
 	UpdateBoardNameFn             func(id uuid.UUID, name string) error
 }
 
@@ -83,9 +84,9 @@ func (m *MockDB) UpdatePostIt(id uuid.UUID, set map[string]any) error {
 	return nil
 }
 
-func (m *MockDB) CreatePostIt(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error) {
+func (m *MockDB) CreatePostIt(postIt *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error) {
 	if m.CreatePostItFn != nil {
-		return m.CreatePostItFn(postIt, ptype, pos)
+		return m.CreatePostItFn(postIt, title, ptype, pos)
 	}
 	return postIt, nil
 }
@@ -128,6 +129,13 @@ func (m *MockDB) ConnectPostIts(boardID, source, target uuid.UUID) (*models.Stra
 func (m *MockDB) MovePostIt(boardID, postItID uuid.UUID, pos models.Position) error {
 	if m.MovePostItFn != nil {
 		return m.MovePostItFn(boardID, postItID, pos)
+	}
+	return nil
+}
+
+func (m *MockDB) EditTitlePostIt(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error {
+	if m.MovePostItFn != nil {
+		return m.EditTitlePostItFn(boardID, postItID, title)
 	}
 	return nil
 }

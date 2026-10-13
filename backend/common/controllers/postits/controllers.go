@@ -31,6 +31,7 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 		boardGroup.GET("/:id/settings", ctrl.GetPostIt)
 		boardGroup.PATCH("/:id/settings", ctrl.EditPostIt)
 		boardGroup.PATCH("/:id/position", ctrl.MovePostIt)
+		boardGroup.PATCH("/:id/title", ctrl.EditTitlePostIt)
 	}
 }
 
@@ -56,12 +57,17 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 	newPostIt := &models.PostIts{
 		Board:     req.Board,
 		WellKnown: req.WellKnown,
-		Title:     req.Title,
 		Params:    req.Params,
+		Resource:  req.Resource,
+		Request:   req.Request,
+		Response:  req.Response,
+		Query:     req.Query,
+		Rate:      req.Rate,
+		Envs:      req.Envs,
 		Bindings:  req.Bindings,
 	}
 
-	postIt, err := ctrl.service.CreatePostIt(models.Principal{ID: req.CognitoID}, newPostIt)
+	postIt, err := ctrl.service.CreatePostIt(models.Principal{ID: req.CognitoID}, req.Title, newPostIt)
 	if err != nil {
 		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
@@ -222,9 +228,6 @@ func (ctrl *Controller) EditPostIt(c *gin.Context) {
 	if req.Rate != nil {
 		set["rate"] = *req.Rate
 	}
-	if req.Title != nil {
-		set["title"] = req.Title
-	}
 
 	if len(set) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -276,6 +279,48 @@ func (ctrl *Controller) MovePostIt(c *gin.Context) {
 	}
 
 	err = ctrl.service.MovePostIt(id, models.Position{X: req.X, Y: req.Y})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+// EditTitlePostIt godoc
+// @Summary      Edit a post-it title
+// @Description  Changes the rendered title of a post-it.
+// @Tags         post-its
+// @Accept       json
+// @Param        id       path      string                    true  "Post-It UUID" format(uuid)
+// @Param        request  body      UpdatePostItTitleRequest  true  "Post-It name update payload"
+// @Success      204      "No Content"
+// @Failure      400      {object}  map[string]string{"error": "string"}
+// @Failure      500      {object}  map[string]string{"error": "string"}
+// @Router       /post-its/{id}/title [patch]
+func (ctrl *Controller) EditTitlePostIt(c *gin.Context) {
+	idParam := c.Param("id")
+
+	id, err := uuid.Parse(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid uuid",
+		})
+		return
+	}
+
+	var req UpdatePostItTitleRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	err = ctrl.service.EditTitlePostIt(id, req.Title)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": err.Error(),
