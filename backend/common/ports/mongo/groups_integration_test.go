@@ -36,7 +36,7 @@ func TestMongo_GroupsRoundTrip(t *testing.T) {
 	}
 
 	for _, user := range []string{"owner", "ana"} {
-		groups, err := db.FindUserGroups(user)
+		groups, err := db.FindUserGroups(user, nil)
 		if err != nil {
 			t.Fatalf("user groups: %v", err)
 		}
@@ -44,14 +44,14 @@ func TestMongo_GroupsRoundTrip(t *testing.T) {
 			t.Errorf("%s belongs to %v, want the group", user, groups)
 		}
 	}
-	if groups, _ := db.FindUserGroups("eve"); len(groups) != 0 {
+	if groups, _ := db.FindUserGroups("eve", nil); len(groups) != 0 {
 		t.Errorf("eve belongs to %v, want nothing", groups)
 	}
 
 	if err := db.RemoveGroupMember(group.Id, "ana"); err != nil {
 		t.Fatalf("remove member: %v", err)
 	}
-	if groups, _ := db.FindUserGroups("ana"); len(groups) != 0 {
+	if groups, _ := db.FindUserGroups("ana", nil); len(groups) != 0 {
 		t.Errorf("ana still belongs to %v", groups)
 	}
 

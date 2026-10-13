@@ -1,7 +1,7 @@
 <script lang="ts">
 	import './index.css';
 
-	import { getUser } from '$stores/user';
+	import { session } from '$modules/session.svelte';
 
 	import * as secretsApi from '$services/secrets';
 	import type { SecretMeta, UUID } from '$types/api';
@@ -10,7 +10,7 @@
 
 	import SidebarElement from './SidebarElement.svelte';
 	import Icon from '$components/Icon/Icon.svelte';
-	import { setManagingSecrets } from '$stores/sidebar';
+	import { isManagingSecrets, setManagingSecrets } from '$stores/sidebar';
 
 	let { board }: { board: UUID } = $props();
 
@@ -18,7 +18,7 @@
 	// for themselves; nobody else on the board can see or bind it.
 	const boardScopes = $derived({
 		board: secretsApi.boardScope(board),
-		...{ mine: $getUser?.id ? secretsApi.memberScope(board, $getUser?.id) : null }
+		mine: secretsApi.memberScope(board, session.userId)
 	});
 
 	let secrets = $state<{ board: SecretMeta[]; mine: SecretMeta[] }>({ board: [], mine: [] });
@@ -26,15 +26,18 @@
 	async function refresh() {
 		try {
 			secrets = {
-				board: await secretsApi.list(boardScopes.board, $getUser?.id ?? ''),
-				mine: boardScopes.mine ? await secretsApi.list(boardScopes.mine, $getUser?.id ?? '') : []
+				board: await secretsApi.list(boardScopes.board),
+				mine: await secretsApi.list(boardScopes.mine)
 			};
 		} catch (e) {
 			console.error(e);
 		}
 	}
 
-	refresh();
+	// Reloaded whenever the credentials panel closes, so what was added there shows up.
+	$effect(() => {
+		if (!$isManagingSecrets) refresh();
+	});
 </script>
 
 <div class="nodes-container items-start justify-start">

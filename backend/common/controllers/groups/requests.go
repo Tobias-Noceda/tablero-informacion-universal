@@ -1,11 +1,13 @@
 package groups
 
+import "github.com/google/uuid"
+
 type CreateGroupRequest struct {
-	CognitoID string `json:"cognito_id" binding:"required"`
-	Name      string `json:"name" binding:"required"`
+	Name string `json:"name" binding:"required"`
+	// Org puts the group in one of the caller's organizations.
+	Org *uuid.UUID `json:"org"`
 }
 
 type MemberRequest struct {
-	CognitoID string `json:"cognito_id" binding:"required"`
-	Member    string `json:"member" binding:"required"`
+	Member string `json:"member" binding:"required"`
 }
