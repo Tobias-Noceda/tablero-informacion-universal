@@ -10,7 +10,7 @@ import (
 type CreatePostItRequest struct {
 	CognitoID string                      `json:"cognito_id" binding:"required"`
 	Board     uuid.UUID                   `json:"board" binding:"required"`
-	Title     *models.Title               `json:"title"`
+	Title     models.Title                `json:"title"`
 	WellKnown string                      `json:"well_known"`
 	Params    map[string]string           `json:"params" binding:"dive,keys,required,endkeys,required"`
 	Title     models.Title                `json:"title" binding:"required_without=WellKnown"`

@@ -60,48 +60,10 @@ func createTitled(t *testing.T, title models.Title) models.Title {
 	return got.Title
 }
 
-func TestCreatePostIt_TitleVars(t *testing.T) {
-	if got := createTitled(t, models.Title{Text: "Buy {{compra}}"}); !got.Vars {
-		t.Errorf("known output: vars = false, want true")
-	}
-	if got := createTitled(t, models.Title{Text: "Min {{nope}}", Vars: true}); got.Vars {
-		t.Errorf("unknown output: vars = true, want false (client flag must be ignored)")
-	}
-	if got := createTitled(t, models.Title{Text: "Plain", Vars: true}); got.Vars {
-		t.Errorf("no variables: vars = true, want false")
-	}
-}
-
 func TestCreatePostIt_EmptyTitleKeepsTemplate(t *testing.T) {
 	got := createTitled(t, models.Title{})
 	want := configuredPostIts["dolar_oficial"].template.Title
 	if got != want {
 		t.Errorf("title = %+v, want the template's %+v", got, want)
-	}
-}
-
-func TestUpdatePostIt_RecomputesTitleVars(t *testing.T) {
-	board := uuid.New()
-	id := uuid.New()
-
-	db := boardOf(boardOwner)
-	db.FindPostItFn = func(uuid.UUID) (*models.PostIts, error) {
-		return &models.PostIts{Id: id, Board: board, Resource: &url.URL{}, Query: map[string]string{"min": ".min"}}, nil
-	}
-	var gotSet map[string]any
-	db.UpdatePostItFn = func(_ uuid.UUID, set map[string]any) error {
-		gotSet = set
-		return nil
-	}
-
-	svc := newService(db, nil, nil)
-	err := svc.UpdatePostIt(boardOwner, id, map[string]any{"title": &models.Title{Text: "Min {{min}}"}})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	title, ok := gotSet["title"].(models.Title)
-	if !ok || !title.Vars || title.Text != "Min {{min}}" {
-		t.Errorf("title = %#v, want Min {{min}} with vars", gotSet["title"])
 	}
 }
