@@ -66,6 +66,8 @@ func (m *MemoryUserStore) UpdateUser(id uuid.UUID, set map[string]any) error {
 			user.Name = value.(string)
 		case "picture":
 			user.Picture = value.(string)
+		case "locale":
+			user.Locale = value.(models.Locale)
 		case "admin":
 			user.Admin = value.(bool)
 		case "emailverified":
