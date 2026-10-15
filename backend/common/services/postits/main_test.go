@@ -338,7 +338,7 @@ func TestViewer_ReadsAndRunsButCannotChangeCards(t *testing.T) {
 			return &models.Board{Id: board, Owner: boardOwner.ID, Members: []models.BoardMember{{User: viewer.ID, Role: models.BoardViewer}}}, nil
 		},
 		FindPostItFn: existingCard(id),
-		CreatePostItFn: func(*models.PostIts, string, models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(*models.PostIts, models.BoardPostItTitle, string, models.Position) (*models.PostIts, error) {
 			t.Error("a viewer created a card")
 			return nil, nil
 		},
@@ -348,6 +348,10 @@ func TestViewer_ReadsAndRunsButCannotChangeCards(t *testing.T) {
 		},
 		MovePostItFn: func(_, _ uuid.UUID, _ models.Position) error {
 			t.Error("a viewer moved a card")
+			return nil
+		},
+		EditTitlePostItFn: func(_, _ uuid.UUID, _ models.BoardPostItTitle) error {
+			t.Error("a viewer renamed a card")
 			return nil
 		},
 		DeletePostItFn: func(uuid.UUID) ([]models.Strand, error) {
@@ -367,7 +371,8 @@ func TestViewer_ReadsAndRunsButCannotChangeCards(t *testing.T) {
 	}
 
 	changes := map[string]error{}
-	_, changes["create"] = svc.CreatePostIt(viewer, &models.PostIts{Board: uuid.New()})
+	_, changes["create"] = svc.CreatePostIt(viewer, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{Board: uuid.New()})
+	changes["title"] = svc.EditTitlePostIt(viewer, id, models.BoardPostItTitle{Text: "Hi"})
 	changes["update"] = svc.UpdatePostIt(viewer, id, map[string]any{"rate": 5})
 	changes["move"] = svc.MovePostIt(viewer, id, models.Position{})
 	_, changes["delete"] = svc.DeletePostIt(viewer, id)
