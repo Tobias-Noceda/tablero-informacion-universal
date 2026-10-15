@@ -4,11 +4,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Secreto31126/tesis/common/ports/mail"
 	"github.com/Secreto31126/tesis/common/ports/oidc"
 )
 
 func TestLoadConfig_Defaults(t *testing.T) {
-	for _, env := range []string{ENV_PLATFORM_ADMINS, ENV_AUTH_COOKIE_SECURE, ENV_ACCESS_TTL, ENV_REFRESH_TTL, ENV_GOOGLE_ISSUER, ENV_GOOGLE_CLIENT_ID, ENV_GOOGLE_CLIENT_SECRET} {
+	for _, env := range []string{ENV_PLATFORM_ADMINS, ENV_AUTH_COOKIE_SECURE, ENV_ACCESS_TTL, ENV_REFRESH_TTL, ENV_GOOGLE_ISSUER, ENV_GOOGLE_CLIENT_ID, ENV_GOOGLE_CLIENT_SECRET, ENV_RESEND_API_KEY, ENV_MAIL_FROM} {
 		t.Setenv(env, "")
 	}
 
@@ -21,6 +22,9 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	}
 	if cfg.identityProvider() != nil {
 		t.Error("google sign-in must be off without a client")
+	}
+	if _, logs := cfg.mailSender().(mail.LogSender); !logs {
+		t.Errorf("without a Resend key mails must go to the log, got %T", cfg.mailSender())
 	}
 }
 
@@ -64,6 +68,31 @@ func TestLoadConfig_GoogleClientNeedsBothHalves(t *testing.T) {
 		t.Setenv(half, "only-this")
 		if _, err := loadConfig(); err == nil {
 			t.Errorf("only %s set was accepted", half)
+		}
+	}
+}
+
+func TestLoadConfig_SendsThroughResendWithAKey(t *testing.T) {
+	t.Setenv(ENV_RESEND_API_KEY, "re_key")
+	t.Setenv(ENV_MAIL_FROM, "Tablero <no-reply@tiu.example>")
+
+	cfg, err := loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, resend := cfg.mailSender().(*mail.ResendSender); !resend {
+		t.Errorf("sender = %T", cfg.mailSender())
+	}
+}
+
+// A key without a sender address would only fail at the first sign-up, so it
+// stops the boot instead.
+func TestLoadConfig_ResendNeedsAValidSender(t *testing.T) {
+	t.Setenv(ENV_RESEND_API_KEY, "re_key")
+	for _, from := range []string{"", "not an address", "Tablero <no-reply@>"} {
+		t.Setenv(ENV_MAIL_FROM, from)
+		if _, err := loadConfig(); err == nil {
+			t.Errorf("%s=%q was accepted", ENV_MAIL_FROM, from)
 		}
 	}
 }

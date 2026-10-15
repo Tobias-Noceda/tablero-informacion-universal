@@ -52,7 +52,12 @@ func main() {
 		panic(err)
 	}
 
-	application := newApp(db, cache, kek, keys, cfg, mail.New(templates, mail.LogSender{}))
+	sender := cfg.mailSender()
+	if _, logs := sender.(mail.LogSender); logs {
+		log.Printf("%s is not set: mails are written to this log instead of being sent", ENV_RESEND_API_KEY)
+	}
+
+	application := newApp(db, cache, kek, keys, cfg, mail.New(templates, sender))
 
 	maintenance, err := parseMaintenance(os.Args[1:])
 	if err != nil {
