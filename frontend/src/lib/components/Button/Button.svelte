@@ -7,7 +7,8 @@
     skeleton?: boolean;
     disabled?: boolean;
     children: Snippet;
-    onclick: (event: MouseEvent) => void;
+    onclick?: (event: MouseEvent) => void;
+    type?: 'button' | 'submit';
     class?: string;
   }
 
@@ -41,6 +42,6 @@
   );
 </script>
 
-<button class={finalClass} {onclick} {disabled}>
+<button class={finalClass} type={props.type} {onclick} {disabled}>
   {@render children()}
 </button>

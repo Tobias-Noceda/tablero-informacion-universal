@@ -1,0 +1,42 @@
+name: Realtime tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - realtime/**
+      - .github/workflows/realtime-tests.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: lint & test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: realtime
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Same pinned pnpm as the Dockerfile (the lockfile was written by it)
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@12.4.2 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Test
+        run: pnpm test

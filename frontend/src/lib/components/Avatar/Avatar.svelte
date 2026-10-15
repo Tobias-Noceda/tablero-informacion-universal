@@ -58,6 +58,7 @@
     <img
       src={currentSrc}
       alt="Avatar"
+      referrerpolicy="no-referrer"
       style={imgStyle}
       onerror={handleError}
     />

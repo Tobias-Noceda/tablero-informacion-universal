@@ -6,14 +6,74 @@ export type Envs = {
     key: `${'global' | 'user' | 'board' | 'post-it'}:${UUID}:${string}`
 };
 
-// export type User = {
-//     cognito_id: string;
-//     boards: Board['id'][]
-//     // Future ideas:
-//     // plan: string;
-//     // team: UUID;
-//     // idk, i forgot
-// }
+export type IdentityProvider = 'google' | 'password';
+
+// The signed-in user as only they see it.
+export type Profile = {
+    id: UUID;
+    email: string;
+    email_verified: boolean;
+    name: string;
+    picture?: string;
+    admin: boolean;
+    identities: IdentityProvider[];
+    created_at: string;
+}
+
+// What anyone else gets to see about a user.
+export type UserSummary = {
+    id: UUID;
+    name: string;
+    email: string;
+    picture?: string;
+}
+
+// Every sign-in answers this; the refresh token only travels in its cookie.
+export type SessionResponse = {
+    access_token: string;
+    token_type: 'Bearer';
+    expires_in: number;
+    user: Profile;
+}
+
+export type GoogleSessionResponse = SessionResponse & {
+    next: string;
+}
+
+// What someone may do on a board: viewers look, editors work on the cards,
+// the owner also decides who else is on it.
+export type BoardRole = "owner" | "editor" | "viewer";
+
+export type BoardMember = {
+    user: UUID;
+    role: Exclude<BoardRole, "owner">;
+};
+
+export type BoardMemberSummary = {
+    user: UserSummary;
+    role: BoardRole;
+};
+
+// What someone is in an organization: admins own its boards and groups,
+// members look at them.
+export type OrgRole = "admin" | "member";
+
+export type Org = {
+    id: UUID;
+    name: string;
+    members: { user: UUID; role: OrgRole }[];
+    created_at: string;
+    role: OrgRole; // the caller's
+};
+
+export type OrgMemberSummary = {
+    user: UserSummary;
+    role: OrgRole;
+};
+
+export type OrgDetail = Omit<Org, "members"> & {
+    members: OrgMemberSummary[];
+};
 
 export type Paginated<T> = {
 	_links: {
@@ -46,8 +106,10 @@ export type PostIt = {
 export type Board = {
     id: UUID;
     name: string;
-    owner: string; // cognito_id
-    collaborators: string[]; // cognito_ids
+    owner: UUID; // user id
+    members: BoardMember[]; // everyone else on the board
+    org?: UUID; // the organization it belongs to; none for a personal board
+    role?: BoardRole; // the caller's
     postits: {
         id: UUID;
         type?: string;

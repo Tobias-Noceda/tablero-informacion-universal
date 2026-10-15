@@ -1,15 +1,26 @@
-import * as socket from "./socket.js";
-import * as mongo from "./mongo.js";
+import { createServer } from "node:http";
 
-mongo.setStreamCallback(socket.notify);
+import { boardRoles } from "./auth.js";
+import * as mongo from "./mongo.js";
+import * as presence from "./redis.js";
+import { attach } from "./socket.js";
+
+const api = process.env.API_URL;
+if (!api)
+    throw new Error("API_URL is required, e.g. http://backend:31126/api/v1");
+
+const server = createServer();
+const realtime = attach(server, { roleOn: boardRoles(api), presence });
+
+mongo.setStreamCallback(realtime.notify);
 
 if (import.meta.main) {
     const port = process.env.PORT ?? 3000;
-    socket.server.listen(port);
+    server.listen(port);
 }
 
 process.on("SIGTERM", () =>
-    Promise.allSettled([socket.close(), mongo.close()]),
+    Promise.allSettled([realtime.close(), presence.close(), mongo.close()]),
 );
 
-export default socket.server;
+export default server;

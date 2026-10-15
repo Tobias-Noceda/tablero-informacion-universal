@@ -17,6 +17,12 @@ services:
       MONGO_DATABASE: ${MONGO_DATABASE:-prod}
       REDIS_URL: *redis-url
       SECRETS_MASTER_KEYS: ${SECRETS_MASTER_KEYS:?set SECRETS_MASTER_KEYS in .env}
+      AUTH_SIGNING_KEYS: ${AUTH_SIGNING_KEYS:?set AUTH_SIGNING_KEYS in .env}
+      PLATFORM_ADMINS: ${PLATFORM_ADMINS:-}
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-true}
+      GOOGLE_ISSUER: ${GOOGLE_ISSUER:-}
+      GOOGLE_SIGNIN_CLIENT_ID: ${GOOGLE_SIGNIN_CLIENT_ID:-}
+      GOOGLE_SIGNIN_CLIENT_SECRET: ${GOOGLE_SIGNIN_CLIENT_SECRET:-}
     networks:
       - mongo
       - redis
@@ -29,14 +35,18 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      backend:
+        condition: service_started
     environment:
       MONGODB_URI: *mongo-uri
       MONGO_DATABASE: ${MONGO_DATABASE:-prod}
       REDIS_URL: *redis-url
+      API_URL: http://backend:31126/api/v1
       PORT: "3000"
     networks:
       - mongo
       - redis
+      - backend
       - realtime
 
   frontend:

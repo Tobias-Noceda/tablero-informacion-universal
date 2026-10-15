@@ -12,7 +12,7 @@
 	import { analyzeTitle, renderTitle } from '$lib/title';
 	import { mouses } from '$stores/mouses.svelte';
 
-	import { getUser } from '$stores/user';
+	import { session } from '$modules/session.svelte';
 	import Modal from '$components/Modal/Modal.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -34,7 +34,7 @@
         onCreateNode: (node: Node) => void;
 	} = $props();
 
-    const pickable = $derived(groupByOrigin(usableSecrets, boardId, $getUser?.id ?? ''));
+    const pickable = $derived(groupByOrigin(usableSecrets, boardId, session.userId));
 	const byKey = $derived(new Map(usableSecrets.map((s) => [refKey(s), s])));
 
 	let creatingTitle = $state<string>('');
@@ -103,7 +103,6 @@
 			{ text: title, vars: titleAnalysis.vars },
 			creatingNode.type!,
 			params,
-			$getUser?.id ?? '',
 			secrets.bindings
 		);
 		await postItsApi.move(newPostIt.id, creatingNode.position.x, creatingNode.position.y);
