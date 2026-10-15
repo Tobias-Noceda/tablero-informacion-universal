@@ -2,7 +2,8 @@
 	import { m } from '$lib/paraglide/messages';
 
 	import { onMount } from 'svelte';
-	import { locales, getLocale, setLocale } from '$lib/paraglide/runtime';
+	import { locales, getLocale } from '$lib/paraglide/runtime';
+	import { switchLocale } from '$modules/locale';
 	import logo from '$assets/logo.png';
 
 	import { SvelteFlowProvider } from '@xyflow/svelte';
@@ -170,8 +171,8 @@
 									role="menuitem"
 									class={dropdownOptionClass(getLocale() === locale)}
 									onclick={() => {
-										setLocale(locale);
 										userDataOpen = false;
+										void switchLocale(locale);
 									}}
 								>
 									{m[`user_info.language.${locale}`]()}
