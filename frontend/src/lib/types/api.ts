@@ -113,6 +113,7 @@ export type Board = {
     postits: {
         id: UUID;
         type?: string;
+        title?: { text: string; vars: boolean; };
         position: { x: number; y: number; };
         // data: { url: `/api/post-its/${UUID}` };
     }[];

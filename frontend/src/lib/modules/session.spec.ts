@@ -55,7 +55,7 @@ function newSession(channel = `tiu-session-test-${++channels}`) {
 
 describe('session', () => {
 	beforeEach(() => {
-		vi.stubGlobal('location', new URL('https://tiu.example/board/7?x=1'));
+		vi.stubGlobal('location', new URL('https://tiu.example/boards/7?x=1'));
 		goto.mockReset();
 	});
 
@@ -147,12 +147,12 @@ describe('session', () => {
 		backend({
 			'POST /v1/auth/google/callback': {
 				status: 200,
-				body: { ...sessionBody('g1'), next: '/board/9' }
+				body: { ...sessionBody('g1'), next: '/boards/9' }
 			}
 		});
 		const session = newSession();
 
-		expect(await session.googleCallback('code', 'state')).toBe('/board/9');
+		expect(await session.googleCallback('code', 'state')).toBe('/boards/9');
 		expect(session.header()).toBe('Bearer g1');
 	});
 
@@ -174,7 +174,7 @@ describe('session', () => {
 		session.expired();
 
 		expect(session.status).toBe('anonymous');
-		expect(goto).toHaveBeenCalledWith('/login?next=%2Fboard%2F7%3Fx%3D1');
+		expect(goto).toHaveBeenCalledWith('/login?next=%2Fboards%2F7%3Fx%3D1');
 	});
 
 	it('lends its bearer to the api client', async () => {

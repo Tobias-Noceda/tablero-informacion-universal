@@ -44,7 +44,7 @@ describe('api client', () => {
 	let auth: FakeAuthenticator;
 
 	beforeEach(() => {
-		vi.stubGlobal('location', new URL('https://tiu.example/board/1'));
+		vi.stubGlobal('location', new URL('https://tiu.example/boards/1'));
 		auth = new FakeAuthenticator();
 		api.authenticate(auth);
 	});
