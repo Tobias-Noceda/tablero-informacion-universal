@@ -103,6 +103,18 @@ export type PostIt = {
     } & Record<string, unknown>;
 }
 
+// What GET /post-its/:id/settings answers: the card as stored. Secret
+// values never travel, params only hold "$TOKEN" names.
+export type PostItSettings = {
+    id: UUID;
+    board: UUID;
+    params: Record<string, string> | null;
+    wellknown?: string;
+    rate: number;
+    run_as?: string;
+    bindings?: Record<string, SecretRef> | null;
+}
+
 export type Board = {
     id: UUID;
     name: string;

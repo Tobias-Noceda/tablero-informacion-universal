@@ -1,7 +1,7 @@
 <script lang="ts">
     import './index.css';
     import { Handle, Position, type NodeProps } from '@xyflow/svelte';
-    import * as postitAPI from '$services/post-it';
+    import { results } from '$stores/postit-results.svelte';
     import { renderTitle } from '$lib/title';
     import type { Snippet } from 'svelte';
 
@@ -10,7 +10,7 @@
     const title = $derived(data?.title as { text: string, vars: boolean } | undefined);
     // A plain title is all the card shows, so it needs no data.
     const plainTitle = $derived(!!title?.text && !title.vars);
-    const request = $derived(plainTitle ? null : postitAPI.execute(id));
+    const request = $derived(plainTitle ? null : results.get(id));
 
     const isSelected = $derived.by(() => data?.isSelected ?? false);
 </script>

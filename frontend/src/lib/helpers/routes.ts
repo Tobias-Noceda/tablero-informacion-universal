@@ -9,3 +9,8 @@ export function landingPath(orgId?: UUID) {
 export function boardPath(id: UUID, orgId?: UUID) {
 	return orgId ? (`/organizations/${orgId}/boards/${id}` as const) : (`/boards/${id}` as const);
 }
+
+// A card's detail, opened over its board.
+export function nodePath(boardId: UUID, nodeId: UUID, orgId?: UUID) {
+	return `${boardPath(boardId, orgId)}/nodes/${nodeId}` as const;
+}

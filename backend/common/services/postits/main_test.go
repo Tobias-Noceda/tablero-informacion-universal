@@ -243,6 +243,28 @@ func TestExecutePostIt_CacheMissRunsExecuter(t *testing.T) {
 	}
 }
 
+func TestRefreshPostIt_SkipsCache(t *testing.T) {
+	cache := &mocks.MockCache{
+		FindPostItResultFn: func(_ uuid.UUID) (any, error) {
+			return "cached", nil
+		},
+	}
+	run := &mocks.MockExecuter{
+		ExecuteFn: func(_ *models.PostIts) (any, error) {
+			return "fresh", nil
+		},
+	}
+
+	svc := newService(nil, cache, run)
+	data, err := svc.RefreshPostIt(&models.PostIts{Id: uuid.New()})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if data != "fresh" {
+		t.Errorf("data = %v, want fresh", data)
+	}
+}
+
 func TestExecutePostIt_ExecuterError(t *testing.T) {
 	run := &mocks.MockExecuter{
 		ExecuteFn: func(_ *models.PostIts) (any, error) {

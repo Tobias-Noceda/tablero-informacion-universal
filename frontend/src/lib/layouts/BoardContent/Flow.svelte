@@ -1,12 +1,16 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { SvelteFlow, Controls, useSvelteFlow, type Node, type Edge, ConnectionMode, type Connection } from '@xyflow/svelte';
+
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 
 	import { useDnD } from '$providers/DnDProvider.svelte';
 
 	import * as postItsApi from '$services/post-it';
 	import * as edgesApi from '$services/edge';
 	import type { Board, BoardRole } from '$types/api';
-	import Button from '$components/Button/Button.svelte';
 	import SecretsPanel from '$layouts/Secrets/SecretsPanel.svelte';
 	import * as secretsApi from '$services/secrets';
 	import type { SecretMeta } from '$types/api';
@@ -17,14 +21,18 @@
 	import Realtime from './Realtime.svelte';
 	import type { Update } from '$modules/sockets.svelte';
 	import { isManagingSecrets, setManagingSecrets } from '$stores/sidebar';
+	import { results } from '$stores/postit-results.svelte';
+	import { boardPath, nodePath } from '$lib/helpers/routes';
+	import NodeDetail from './NodeDetail.svelte';
 
 	import NodeCreationPanel from '$layouts/NodeCreation/NodeCreationPanel.svelte';
 
-	let { nodes, edges, role, boardId, boardUpdate }: {
+	let { nodes, edges, role, boardId, orgId, boardUpdate }: {
 		nodes: Node[],
 		edges: Edge[],
 		role: BoardRole,
 		boardId: string,
+		orgId?: string,
 		boardUpdate: (update: Update) => void
 	} = $props();
 
@@ -32,8 +40,19 @@
 	// layout hides the cards and credentials; the backend refuses it anyway).
 	const canEdit = $derived(role === 'owner' || role === 'editor');
 
-	let selectedNode: Node | null = $state(null);
+	// The open card lives in the URL (`.../nodes/:nodeId`), so its detail can
+	// be shared with a link and the browser's back button closes it.
+	const selectedNodeId = $derived(page.params.nodeId ?? null);
+	const selectedNode = $derived(nodes.find((n) => n.id === selectedNodeId) ?? null);
 	let selectedEdge: Edge | null = $state(null);
+
+	const navigation = { noScroll: true, keepFocus: true };
+
+	const openNode = (id: string) => goto(resolve(nodePath(boardId, id, orgId)), navigation);
+
+	const closeNode = () => {
+		if (selectedNodeId) goto(resolve(boardPath(boardId, orgId)), navigation);
+	};
 
 	// Everything this user may bind on this board, wherever it lives.
 	let usableSecrets = $state<SecretMeta[]>([]);
@@ -94,12 +113,9 @@
 	};
 
 	const onBoardClick = () => {
-		selectedNode = null;
+		closeNode();
 		selectedEdge = null;
 
-		nodes = nodes.map((n) => {
-			return { ...n, data: { ...n.data, isSelected: false } };
-		});
 		edges = edges.map((e) => {
 			return { ...e, data: { ...e.data, isSelected: false } };
 		});
@@ -117,22 +133,19 @@
 				edges = edges.filter((e) => !deletedEdges.map((edge) => edge.id).includes(e.id));
 			});
 		nodes = nodes.filter((n) => n.id !== node.id);
-		if (selectedNode?.id === node.id) {
-			selectedNode = null;
-		}
+		results.drop(node.id);
 	};
 
 	// Node handlers
 	const onNodeClick = async (event: { event: MouseEvent | TouchEvent, node: Node }) => {
 		event.event.preventDefault();
 		event.event.stopPropagation();
-		if (selectedNode?.id === event.node.id) {
-			selectedNode = null;
-			nodes = nodes.map((n) => { return { ...n, data: { ...n.data, isSelected: false } } });
+		if (selectedNodeId === event.node.id) {
+			closeNode();
 		} else {
-			selectedNode = event.node;
-			nodes = nodes.map((n) => { return { ...n, data: { ...n.data, isSelected: n.id === event.node.id } } });
+			openNode(event.node.id);
 		}
+		selectedEdge = null;
 		edges = edges.map((e) => { return { ...e, data: { ...e.data, isSelected: false } } });
 	};
 
@@ -153,7 +166,7 @@
 			selectedEdge = event.edge;
 			edges = edges.map((e) => { return { ...e, data: { ...e.data, isSelected: e.id === event.edge.id } } });
 		}
-		nodes = nodes.map((n) => { return { ...n, data: { ...n.data, isSelected: false } } });
+		closeNode();
 	};
 
 	const onConnect = async (connection: Connection) => {
@@ -176,6 +189,10 @@
 
 	// Keyboard shortcuts
 	const onKeyDown = (event: KeyboardEvent) => {
+		if (event.key === 'Escape') {
+			closeNode();
+			return;
+		}
 		if (!canEdit) return;
 		if (event.key === 'Delete' || event.key === 'Backspace') {
 			if (selectedEdge) {
@@ -184,7 +201,6 @@
 				selectedEdge = null;
 			} else if (selectedNode) {
 				deleteNode(selectedNode);
-				selectedNode = null;
 			}
 		}
 	};
@@ -195,27 +211,30 @@
 		return () => window.removeEventListener('keydown', onKeyDown);
 	});
 
+	// Highlights the open card, also after a live update replaced the nodes.
 	$effect(() => {
-		if (selectedNode) {
-			selectedEdge = null;
+		const id = selectedNodeId;
+		if (nodes.some((n) => (n.data?.isSelected ?? false) !== (n.id === id))) {
+			nodes = nodes.map((n) => ({ ...n, data: { ...n.data, isSelected: n.id === id } }));
 		}
 	});
 
+	// A link to a card that is not (or no longer) on the board opens the board.
 	$effect(() => {
-		if (selectedEdge) {
-			selectedNode = null;
+		if (selectedNodeId && !selectedNode) {
+			goto(resolve(boardPath(boardId, orgId)), { ...navigation, replaceState: true });
 		}
 	});
 
 	$effect(() => {
 		if (creatingNode) {
-			selectedNode = null;
 			selectedEdge = null;
+			untrack(closeNode);
 		}
 	});
 </script>
 
-<div class="flex flex-row h-full w-full">
+<div class="relative flex flex-row flex-1 min-h-0 h-full w-full">
 	<main class="dndflow">
 		<Realtime {boardId} {boardUpdate}>
 			<div class="reactflow-wrapper">
@@ -246,28 +265,7 @@
 		</Realtime>
 	</main>
 	{#if selectedNode}
-		<div
-			class="flex flex-col p-4 bg-tertiary border-l border-tertiary-border rounded-l-2xl w-70 h-full justify-between text-tertiary-text z-100!"
-		>
-			<div class="flex flex-col gap-2">
-				<h2 class="text-lg font-semibold">Selected Node</h2>
-				<p>ID: {selectedNode.id}</p>
-				<p>Type: {selectedNode.type}</p>
-				<p>Position: ({selectedNode.position.x}, {selectedNode.position.y})</p>
-			</div>
-			{#if canEdit}
-				<Button
-					variant="destructive"
-					onclick={() => {
-						if (selectedNode) {
-							deleteNode(selectedNode);
-						}
-					}}
-				>
-					Delete Node
-				</Button>
-			{/if}
-		</div>
+		<NodeDetail node={selectedNode} {canEdit} onback={closeNode} ondelete={deleteNode} />
 	{/if}
 
 	{#if $isManagingSecrets}

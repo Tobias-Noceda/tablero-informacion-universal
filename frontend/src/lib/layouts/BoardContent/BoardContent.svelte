@@ -3,6 +3,7 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 
 	import type { Node, Edge } from '@xyflow/svelte';
 	import type { Update } from '$modules/realtime.svelte.js';
@@ -33,6 +34,9 @@
 		if (!canEdit) setSidebar(null);
 	});
 
+	// On a phone an open card takes the whole board, its sidebar included.
+	const cardOpen = $derived(!!page.params.nodeId);
+
 	function boardUpdate(update: Update) {
 		data = {
 			...data,
@@ -50,10 +54,12 @@
 </script>
 
 <div class="flex flex-row flex-1 min-h-0">
-	<SideBar {canEdit} {boardId} />
-	<div class="flex flex-col flex-1 overflow-auto bg-background">
+	<div class={cardOpen ? 'hidden md:contents' : 'contents'}>
+		<SideBar {canEdit} {boardId} />
+	</div>
+	<div class="flex flex-col flex-1 min-h-0 overflow-auto bg-background">
 		{#key boardId}
-			<Flow {nodes} {edges} {role} {boardId} {boardUpdate} />
+			<Flow {nodes} {edges} {role} {boardId} {orgId} {boardUpdate} />
 		{/key}
 	</div>
 </div>

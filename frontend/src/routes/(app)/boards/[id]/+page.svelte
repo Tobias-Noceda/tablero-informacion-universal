@@ -1,8 +1,1 @@
-<script lang="ts">
-	import BoardContent from '$layouts/BoardContent/BoardContent.svelte';
-	import type { BoardData } from '$layouts/BoardContent/type';
-
-	let { data }: { data: BoardData } = $props();
-</script>
-
-<BoardContent {data} />
+<!-- The board layout renders the canvas and, from the URL, the card detail. -->

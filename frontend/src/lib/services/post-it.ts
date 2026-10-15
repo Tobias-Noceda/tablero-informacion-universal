@@ -1,4 +1,4 @@
-import type { PostIt, SecretRef, Strand, UUID } from "$types/api";
+import type { PostIt, PostItSettings, SecretRef, Strand, UUID } from "$types/api";
 
 import * as api from "$modules/api.svelte"
 import { mapPostitWithTitle, type PostItWithTitle } from "$lib/helpers/post-it";
@@ -25,14 +25,17 @@ export async function del(id: UUID): Promise<Strand[]> {
     return deletedEdges;
 }
 
-export async function execute(id: UUID) {
-    const res = await api.get(`/v1/post-its/${id}`);
+// `fresh` skips every cache on the way, so the card runs again now.
+export async function execute(id: UUID, { fresh = false }: { fresh?: boolean } = {}) {
+    const res = fresh
+        ? await api.get(`/v1/post-its/${id}?fresh=1`, { cache: "no-store" })
+        : await api.get(`/v1/post-its/${id}`);
     return await res.json() as Record<string, string>;
 }
 
 export async function get_settings(id: UUID) {
     const res = await api.get(`/v1/post-its/${id}/settings`);
-    return await res.json() as PostIt;
+    return await res.json() as PostItSettings;
 }
 
 export async function update_settings(
