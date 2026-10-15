@@ -21,8 +21,8 @@ async function expect<T>(response: Response, status: number): Promise<T> {
 	return body as T;
 }
 
-export async function register(email: string, password: string, name: string) {
-	await expect(await api.post('/v1/auth/register', { email, password, name }), 202);
+export async function register(email: string, password: string, name: string, locale: string) {
+	await expect(await api.post('/v1/auth/register', { email, password, name, locale }), 202);
 }
 
 export async function verifyEmail(token: string) {
@@ -52,10 +52,10 @@ export async function resetPassword(token: string, password: string) {
 	);
 }
 
-export async function googleStart(next: string) {
+export async function googleStart(next: string, locale: string) {
 	const response = await api.request(
 		'GET',
-		`/v1/auth/google/start?${new URLSearchParams({ next })}`
+		`/v1/auth/google/start?${new URLSearchParams({ next, locale })}`
 	);
 	const { authorization_url } = await expect<{ authorization_url: string }>(response, 200);
 	return authorization_url;
