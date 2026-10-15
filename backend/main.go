@@ -47,7 +47,12 @@ func main() {
 		panic(err)
 	}
 
-	application := newApp(db, cache, kek, keys, cfg, mail.Log{})
+	templates, err := mail.LoadTemplates()
+	if err != nil {
+		panic(err)
+	}
+
+	application := newApp(db, cache, kek, keys, cfg, mail.New(templates, mail.LogSender{}))
 
 	maintenance, err := parseMaintenance(os.Args[1:])
 	if err != nil {

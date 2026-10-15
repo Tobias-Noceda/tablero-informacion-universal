@@ -1,0 +1,18 @@
+{{define "subject"}}Verify your email{{end}}
+
+{{define "text"}}
+Hi {{.Name}},
+
+Confirm your address to finish creating your account:
+{{.Link}}
+
+The link is valid for 24 hours. If you did not sign up, ignore this mail.
+{{end}}
+
+{{define "html"}}
+<p>Hi {{.Name}},</p>
+<p>Confirm your address to finish creating your account.</p>
+<p><a class="button" href="{{.Link}}">Verify email</a></p>
+<p class="fallback">Or open this link: {{.Link}}</p>
+<p class="note">The link is valid for 24 hours. If you did not sign up, ignore this mail.</p>
+{{end}}

@@ -1,7 +1,0 @@
-package models
-
-type Mail struct {
-	To      string
-	Subject string
-	Text    string
-}

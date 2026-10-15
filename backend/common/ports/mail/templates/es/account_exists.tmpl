@@ -1,0 +1,18 @@
+{{define "subject"}}Ya tenés una cuenta{{end}}
+
+{{define "text"}}
+Hola {{.Name}}:
+
+Alguien intentó registrarse con esta dirección, que ya tiene una cuenta. Si fuiste vos y olvidaste tu contraseña, recuperala acá:
+{{.Link}}
+
+Si no fuiste vos, ignorá este mail: no cambió nada.
+{{end}}
+
+{{define "html"}}
+<p>Hola {{.Name}}:</p>
+<p>Alguien intentó registrarse con esta dirección, que ya tiene una cuenta. Si fuiste vos y olvidaste tu contraseña, podés recuperarla.</p>
+<p><a class="button" href="{{.Link}}">Recuperar contraseña</a></p>
+<p class="fallback">O abrí este link: {{.Link}}</p>
+<p class="note">Si no fuiste vos, ignorá este mail: no cambió nada.</p>
+{{end}}

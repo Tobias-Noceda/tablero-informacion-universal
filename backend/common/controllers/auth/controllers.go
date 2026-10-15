@@ -62,7 +62,7 @@ func (ctrl *Controller) Register(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.service.Register(req.Email, req.Password, req.Name, origin(c), c.ClientIP()); err != nil {
+	if err := ctrl.service.Register(req.Email, req.Password, req.Name, req.Locale, origin(c), c.ClientIP()); err != nil {
 		ctrl.fail(c, err)
 		return
 	}

@@ -1,0 +1,18 @@
+{{define "subject"}}Confirmá tu email{{end}}
+
+{{define "text"}}
+Hola {{.Name}}:
+
+Confirmá tu dirección para terminar de crear tu cuenta:
+{{.Link}}
+
+El link vale por 24 horas. Si no te registraste, ignorá este mail.
+{{end}}
+
+{{define "html"}}
+<p>Hola {{.Name}}:</p>
+<p>Confirmá tu dirección para terminar de crear tu cuenta.</p>
+<p><a class="button" href="{{.Link}}">Confirmar email</a></p>
+<p class="fallback">O abrí este link: {{.Link}}</p>
+<p class="note">El link vale por 24 horas. Si no te registraste, ignorá este mail.</p>
+{{end}}

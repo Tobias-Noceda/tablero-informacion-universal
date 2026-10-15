@@ -1,0 +1,18 @@
+{{define "subject"}}You already have an account{{end}}
+
+{{define "text"}}
+Hi {{.Name}},
+
+Someone tried to sign up with this address, which already has an account. If it was you and you forgot your password, reset it here:
+{{.Link}}
+
+If it was not you, ignore this mail: nothing changed.
+{{end}}
+
+{{define "html"}}
+<p>Hi {{.Name}},</p>
+<p>Someone tried to sign up with this address, which already has an account. If it was you and you forgot your password, you can reset it.</p>
+<p><a class="button" href="{{.Link}}">Reset password</a></p>
+<p class="fallback">Or open this link: {{.Link}}</p>
+<p class="note">If it was not you, ignore this mail: nothing changed.</p>
+{{end}}
