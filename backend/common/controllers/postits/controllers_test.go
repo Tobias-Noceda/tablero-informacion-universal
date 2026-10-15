@@ -76,14 +76,14 @@ func TestCreatePostIt_OK(t *testing.T) {
 	board := uuid.New()
 	newID := uuid.New()
 	db := &mocks.MockDB{
-		CreatePostItFn: func(p *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(p *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error) {
 			p.Id = newID
 			return p, nil
 		},
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPost, "/post-its", `{"board":"`+board.String()+`","well-known":"dolar_oficial"}`)
+	w := do(r, http.MethodPost, "/post-its", `{"board":"`+board.String()+`","well_known":"dolar_oficial"}`)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201 (body: %s)", w.Code, w.Body.String())
 	}
@@ -326,13 +326,13 @@ func TestDeletePostIt_ServiceError(t *testing.T) {
 
 func TestCreatePostIt_ServiceError(t *testing.T) {
 	db := &mocks.MockDB{
-		CreatePostItFn: func(_ *models.PostIts, _ string, _ models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(_ *models.PostIts, title models.BoardPostItTitle, _ string, _ models.Position) (*models.PostIts, error) {
 			return nil, errors.New("mongo: no documents in result")
 		},
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPost, "/post-its", `{"board":"`+uuid.New().String()+`"}`)
+	w := do(r, http.MethodPost, "/post-its", `{"board":"`+uuid.New().String()+`","well_known":"riesgo_pais"}`)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
 	}
@@ -416,7 +416,7 @@ func TestEveryRoute_RequiresAToken(t *testing.T) {
 
 func TestCreatePostIt_OutsiderGetsNotFound(t *testing.T) {
 	r := setupRouter(nil, nil, nil)
-	w := doAs(r, "someone-else", http.MethodPost, "/post-its", `{"board":"`+uuid.New().String()+`"}`)
+	w := doAs(r, "someone-else", http.MethodPost, "/post-its", `{"board":"`+uuid.New().String()+`","well_known":"dolar_oficial"}`)
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404 (body: %s)", w.Code, w.Body.String())
 	}
@@ -436,6 +436,7 @@ func TestCardRoutes_OutsiderGetsNotFound(t *testing.T) {
 		{http.MethodGet, card + "/settings", ""},
 		{http.MethodPatch, card + "/settings", `{"rate":1}`},
 		{http.MethodPatch, card + "/position", `{"x":1,"y":2}`},
+		{http.MethodPatch, card + "/title", `{"title":{"text":"x"}}`},
 		{http.MethodDelete, card, ""},
 	} {
 		if w := doAs(r, "someone-else", tc.method, tc.path, tc.body); w.Code != http.StatusNotFound {
@@ -455,7 +456,7 @@ func TestCreatePostIt_BindsAsTheCaller(t *testing.T) {
 		},
 	}
 	db := &mocks.MockDB{
-		CreatePostItFn: func(p *models.PostIts, _ string, _ models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(p *models.PostIts, title models.BoardPostItTitle, _ string, _ models.Position) (*models.PostIts, error) {
 			return p, nil
 		},
 	}
@@ -495,7 +496,7 @@ func TestCreatePostIt_ForbiddenBindingIs403(t *testing.T) {
 	r := setupRouterWith(nil, nil, nil, secrets)
 
 	board := uuid.New()
-	body := `{"board":"` + board.String() + `",
+	body := `{"board":"` + board.String() + `","well_known":"riesgo_pais",
 	         "bindings":{"X":{"scope":{"kind":"board","owner":"` + board.String() + `"},"name":"X"}}}`
 	w := do(r, http.MethodPost, "/post-its", body)
 	if w.Code != http.StatusForbidden {

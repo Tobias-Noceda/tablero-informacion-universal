@@ -28,7 +28,7 @@ func boardOf(owner models.Principal, editors ...models.Principal) *mocks.MockDB 
 			}
 			return board, nil
 		},
-		CreatePostItFn: func(p *models.PostIts, _ string, _ models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(p *models.PostIts, title models.BoardPostItTitle, _ string, _ models.Position) (*models.PostIts, error) {
 			return p, nil
 		},
 	}
@@ -38,13 +38,13 @@ func boardOf(owner models.Principal, editors ...models.Principal) *mocks.MockDB 
 func TestCreatePostIt_RequiresMembership(t *testing.T) {
 	db := boardOf(boardOwner)
 	created := false
-	db.CreatePostItFn = func(p *models.PostIts, _ string, _ models.Position) (*models.PostIts, error) {
+	db.CreatePostItFn = func(p *models.PostIts, title models.BoardPostItTitle, _ string, _ models.Position) (*models.PostIts, error) {
 		created = true
 		return p, nil
 	}
 	svc := newService(db, nil, nil)
 
-	_, err := svc.CreatePostIt(outsider, &models.PostIts{Board: uuid.New()})
+	_, err := svc.CreatePostIt(outsider, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{Board: uuid.New()})
 	if !errors.Is(err, ErrNotAMember) {
 		t.Errorf("got %v, want ErrNotAMember", err)
 	}
@@ -56,7 +56,7 @@ func TestCreatePostIt_RequiresMembership(t *testing.T) {
 func TestCreatePostIt_RunsAsItsCreator(t *testing.T) {
 	svc := newService(boardOf(boardOwner, member), nil, nil)
 
-	created, err := svc.CreatePostIt(member, &models.PostIts{Board: uuid.New()})
+	created, err := svc.CreatePostIt(member, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{Board: uuid.New()})
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestCreatePostIt_ValidatesBindingsAsTheCreator(t *testing.T) {
 	}
 	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil))
 
-	created, err := svc.CreatePostIt(member, &models.PostIts{
+	created, err := svc.CreatePostIt(member, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{
 		Board:     board,
 		WellKnown: "exchange_rate",
 		Params:    map[string]string{"$credential": "$MINE"},
@@ -105,7 +105,7 @@ func TestCreatePostIt_RefusesWhatCannotBeBound(t *testing.T) {
 	}
 	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil))
 
-	_, err := svc.CreatePostIt(member, &models.PostIts{
+	_, err := svc.CreatePostIt(member, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{
 		Board:    board,
 		Bindings: map[string]models.SecretRef{"THEIRS": {Scope: models.MemberScope(board, boardOwner.ID), Name: "THEIRS"}},
 	})
@@ -118,7 +118,7 @@ func TestCreatePostIt_BindingAliasesAreSecretNames(t *testing.T) {
 	board := uuid.New()
 	svc := newService(boardOf(boardOwner), nil, nil)
 
-	_, err := svc.CreatePostIt(boardOwner, &models.PostIts{
+	_, err := svc.CreatePostIt(boardOwner, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{
 		Board:    board,
 		Bindings: map[string]models.SecretRef{"lowercase": {Scope: models.BoardScope(board), Name: "KEY"}},
 	})

@@ -22,7 +22,7 @@ type Database interface {
 	// Updates a given PostIt
 	UpdatePostIt(id uuid.UUID, set map[string]any) error
 	// Creates a PostIt
-	CreatePostIt(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
+	CreatePostIt(postIt *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error)
 	// Creates a Board, in an organization when org is set
 	CreateBoard(name, owner string, org *uuid.UUID) (*models.Board, error)
 	// Adds a member to a board, or changes the role of one already on it
@@ -35,6 +35,8 @@ type Database interface {
 	ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error)
 	// Move Post It
 	MovePostIt(boardID, postItID uuid.UUID, pos models.Position) error
+	// Change a Post It title
+	EditTitlePostIt(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error
 	// Update board's name
 	UpdateBoardName(id uuid.UUID, name string) error
 }

@@ -262,14 +262,6 @@ func (db *MongoDB) UpdatePostIt(id uuid.UUID, set map[string]any) error {
 		return mongo.ErrNoDocuments
 	}
 
-	// The board keeps its own copy of the title to render the canvas.
-	if title, ok := set["title"]; ok {
-		return db.updateBoard(
-			bson.M{"postits.id": id},
-			bson.M{"$set": bson.M{"postits.$.title": title}},
-		)
-	}
-
 	return nil
 }
 
@@ -309,7 +301,7 @@ func (db *MongoDB) CreateBoard(name string, owner string, org *uuid.UUID) (*mode
 	return board, nil
 }
 
-func (db *MongoDB) CreatePostIt(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error) {
+func (db *MongoDB) CreatePostIt(postIt *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error) {
 	ctx, cancel := timeout()
 	defer cancel()
 
@@ -318,7 +310,7 @@ func (db *MongoDB) CreatePostIt(postIt *models.PostIts, ptype string, pos models
 		return nil, err
 	}
 
-	entry := models.BoardPostIt{Id: postIt.Id, Type: ptype, Title: postIt.Title, Position: pos}
+	entry := models.BoardPostIt{Id: postIt.Id, Title: title, Type: ptype, Position: pos}
 
 	res, err := db.boards.UpdateOne(
 		ctx,
@@ -340,6 +332,13 @@ func (db *MongoDB) MovePostIt(boardID, postItID uuid.UUID, pos models.Position) 
 	return db.updateBoard(
 		bson.M{"_id": boardID, "postits.id": postItID},
 		bson.M{"$set": bson.M{"postits.$.position": pos}},
+	)
+}
+
+func (db *MongoDB) EditTitlePostIt(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error {
+	return db.updateBoard(
+		bson.M{"_id": boardID, "postits.id": postItID},
+		bson.M{"$set": bson.M{"postits.$.title": title}},
 	)
 }
 

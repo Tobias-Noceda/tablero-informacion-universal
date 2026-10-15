@@ -50,14 +50,14 @@ func TestWellKnown_ExchangeRateAsksForACredential(t *testing.T) {
 	}
 
 	// Being required means creation fails until the user picks one.
-	if _, err := findWellKnown("exchange_rate", nil); err == nil {
+	if _, _, err := findWellKnown("exchange_rate", nil); err == nil {
 		t.Error("the post-it was created without a credential")
 	}
 }
 
 // Once the user picks one, it is the picked name that gets resolved.
 func TestWellKnown_ExchangeRateUsesTheChosenCredential(t *testing.T) {
-	wk, err := findWellKnown("exchange_rate", map[string]string{"$credential": "$MY_CURRENCY_KEY"})
+	wk, _, err := findWellKnown("exchange_rate", map[string]string{"$credential": "$MY_CURRENCY_KEY"})
 	if err != nil {
 		t.Fatalf("findWellKnown: %v", err)
 	}

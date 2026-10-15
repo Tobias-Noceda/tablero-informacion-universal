@@ -2,6 +2,7 @@ package postits
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"maps"
 	"strings"
@@ -34,33 +35,37 @@ func New(db infrastructure.Database, cache infrastructure.Cache, run infrastruct
 	return &PostItsService{db, cache, run, secrets, access}
 }
 
-func (srv *PostItsService) CreatePostIt(principal models.Principal, postIt *models.PostIts) (*models.PostIts, error) {
+func (srv *PostItsService) CreatePostIt(principal models.Principal, title *models.BoardPostItTitle, postIt *models.PostIts) (*models.PostIts, error) {
 	if err := srv.require(principal, postIt.Board, models.BoardEditor); err != nil {
 		return nil, err
 	}
 
 	if postIt.WellKnown != "" {
-		wk, err := findWellKnown(postIt.WellKnown, postIt.Params)
+		wk, wk_title, err := findWellKnown(postIt.WellKnown, postIt.Params)
 		if err != nil {
 			return nil, err
 		}
 
 		wk.Board = postIt.Board
 		wk.Bindings = postIt.Bindings
-		// An empty title keeps the well-known's default.
-		if postIt.Title.Text != "" {
-			wk.Title = postIt.Title
-		}
+
 		postIt = wk
+
+		if title == nil {
+			title = wk_title
+		}
+	}
+
+	if title == nil {
+		return nil, fmt.Errorf("Missing post-it title")
 	}
 
 	if err := srv.bind(principal, postIt.Board, postIt.Bindings); err != nil {
 		return nil, err
 	}
 	postIt.RunAs = principal.ID
-	postIt.Title.Vars = titleVars(postIt.Title.Text, outputsOf(postIt))
 
-	return srv.db.CreatePostIt(postIt, postIt.WellKnown, models.Position{X: 750, Y: 350})
+	return srv.db.CreatePostIt(postIt, *title, postIt.WellKnown, models.Position{X: 750, Y: 350})
 }
 
 // GetPostIt loads a card for anyone who may see its board. ExecutePostIt runs
@@ -104,17 +109,6 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 		set["runas"] = principal.ID
 	}
 
-	if title, ok := set["title"].(*models.Title); ok && title != nil {
-		edited := *postit
-		if params, ok := set["params"].(map[string]string); ok {
-			edited.Params = params
-		}
-		if query, ok := set["query"].(map[string]string); ok {
-			edited.Query = query
-		}
-		set["title"] = models.Title{Text: title.Text, Vars: titleVars(title.Text, outputsOf(&edited))}
-	}
-
 	if err := srv.db.UpdatePostIt(id, set); err != nil {
 		return err
 	}
@@ -156,6 +150,17 @@ func (srv *PostItsService) MovePostIt(principal models.Principal, id uuid.UUID, 
 	}
 
 	return srv.db.MovePostIt(postit.Board, postit.Id, pos)
+}
+
+func (srv *PostItsService) EditTitlePostIt(principal models.Principal, id uuid.UUID, title models.BoardPostItTitle) error {
+	postit, err := srv.load(principal, id, models.BoardEditor)
+	if err != nil {
+		return err
+	}
+
+	title.Vars = titleVars(title.Text, outputsOf(postit))
+
+	return srv.db.EditTitlePostIt(postit.Board, postit.Id, title)
 }
 
 func (srv *PostItsService) DeletePostIt(principal models.Principal, id uuid.UUID) ([]models.Strand, error) {
