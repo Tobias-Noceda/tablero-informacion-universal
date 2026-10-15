@@ -45,6 +45,27 @@ func TestRender_EveryTemplateInEveryLocaleCarriesItsValues(t *testing.T) {
 	}
 }
 
+func TestRender_EveryMailIsBrandedAndLinksItsAction(t *testing.T) {
+	templates := mustLoad(t)
+
+	for _, locale := range models.Locales {
+		for _, template := range models.MailTemplates {
+			rendered, err := templates.Render(models.Mail{Locale: locale, Template: template, Vars: vars()})
+			if err != nil {
+				t.Fatalf("%s/%s: %v", locale, template, err)
+			}
+			for part, body := range map[string]string{"text": rendered.Text, "html": rendered.HTML} {
+				if !strings.Contains(body, "Tablero de Información Universal") {
+					t.Errorf("%s/%s: %s is not signed by the brand", locale, template, part)
+				}
+			}
+			if strings.Count(rendered.HTML, `href="https://tiu.example/verify?token=abc"`) < 2 {
+				t.Errorf("%s/%s: html needs the button and the fallback to link the action", locale, template)
+			}
+		}
+	}
+}
+
 func TestRender_WritesInTheMailsLocale(t *testing.T) {
 	templates := mustLoad(t)
 

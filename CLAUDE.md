@@ -141,7 +141,7 @@ common/
     jwt/           access tokens: EdDSA keyring over AUTH_SIGNING_KEYS
     password/      argon2id hashing
     oidc/          Google sign-in (OIDC code flow)
-    mail/          Mailer: renders embedded templates (templates/<locale>/<name>.tmpl: subject, text, html) and hands them to a Sender (Resend, or the log without RESEND_API_KEY)
+    mail/          Mailer: renders embedded templates (templates/<locale>/<name>.tmpl: subject, preheader, heading, html, action, note, text; framed by layout.html.tmpl and the locale's common.tmpl: greeting, fallback, footer, signature) and hands them to a Sender (Resend, or the log without RESEND_API_KEY)
     crypto/        Sealer (master key ring = KEK) and Keyring (one wrapped data key per scope)
     oauth/         OAuth2 token endpoint client
     executer/      DewIt — HTTP fetch + gojq transform (json.go, html.go)

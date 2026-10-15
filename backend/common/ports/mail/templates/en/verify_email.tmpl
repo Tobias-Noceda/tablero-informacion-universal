@@ -1,18 +1,23 @@
-{{define "subject"}}Verify your email{{end}}
+{{define "subject"}}Confirm your email address{{end}}
 
-{{define "text"}}
-Hi {{.Name}},
+{{define "preheader"}}One click and your account is ready.{{end}}
 
-Confirm your address to finish creating your account:
-{{.Link}}
-
-The link is valid for 24 hours. If you did not sign up, ignore this mail.
-{{end}}
+{{define "heading"}}Confirm your email{{end}}
 
 {{define "html"}}
-<p>Hi {{.Name}},</p>
-<p>Confirm your address to finish creating your account.</p>
-<p><a class="button" href="{{.Link}}">Verify email</a></p>
-<p class="fallback">Or open this link: {{.Link}}</p>
-<p class="note">The link is valid for 24 hours. If you did not sign up, ignore this mail.</p>
+<p style="margin: 0 0 16px;">Thanks for signing up for Tablero de Información Universal. Confirm that this address is yours to activate your account and start building boards.</p>
+{{end}}
+
+{{define "action"}}Confirm email{{end}}
+
+{{define "note"}}This link expires in 24 hours. If you didn't create an account, you can ignore this email: the account won't be activated without your confirmation.{{end}}
+
+{{define "text"}}
+{{template "hello" .}}
+
+Thanks for signing up for Tablero de Información Universal. Confirm that this address is yours to activate your account:
+{{.Link}}
+
+{{template "note" .}}
+{{template "signature" .}}
 {{end}}

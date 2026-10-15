@@ -1,18 +1,24 @@
 {{define "subject"}}Ya tenés una cuenta{{end}}
 
-{{define "text"}}
-Hola {{.Name}}:
+{{define "preheader"}}Alguien intentó registrarse con esta dirección. Si fuiste vos, no hace falta registrarte de nuevo.{{end}}
 
-Alguien intentó registrarse con esta dirección, que ya tiene una cuenta. Si fuiste vos y olvidaste tu contraseña, recuperala acá:
-{{.Link}}
-
-Si no fuiste vos, ignorá este mail: no cambió nada.
-{{end}}
+{{define "heading"}}Ya tenés una cuenta{{end}}
 
 {{define "html"}}
-<p>Hola {{.Name}}:</p>
-<p>Alguien intentó registrarse con esta dirección, que ya tiene una cuenta. Si fuiste vos y olvidaste tu contraseña, podés recuperarla.</p>
-<p><a class="button" href="{{.Link}}">Recuperar contraseña</a></p>
-<p class="fallback">O abrí este link: {{.Link}}</p>
-<p class="note">Si no fuiste vos, ignorá este mail: no cambió nada.</p>
+<p style="margin: 0 0 16px;">Alguien intentó registrarse en Tablero de Información Universal con esta dirección de email, pero ya tiene una cuenta.</p>
+<p style="margin: 0 0 16px;">Si fuiste vos, no hace falta registrarte de nuevo: iniciá sesión, o restablecé tu contraseña si no la recordás.</p>
+{{end}}
+
+{{define "action"}}Restablecer mi contraseña{{end}}
+
+{{define "note"}}Si no fuiste vos, no tenés que hacer nada. Tu cuenta está segura y no cambió nada.{{end}}
+
+{{define "text"}}
+{{template "hello" .}}
+
+Alguien intentó registrarse en Tablero de Información Universal con esta dirección de email, pero ya tiene una cuenta. Si fuiste vos, no hace falta registrarte de nuevo: iniciá sesión, o restablecé tu contraseña acá:
+{{.Link}}
+
+{{template "note" .}}
+{{template "signature" .}}
 {{end}}

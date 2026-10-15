@@ -19,6 +19,10 @@ var embedded embed.FS
 
 const layoutFile = "templates/layout.html.tmpl"
 
+// Every mail fills these blocks; the layout and the locale's common.tmpl
+// (greeting, signature, footer) put them together.
+var requiredBlocks = []string{"subject", "text", "preheader", "heading", "html", "action", "note"}
+
 // Rendered is a mail written out in one language, ready to deliver.
 type Rendered struct {
 	Subject string
@@ -53,19 +57,20 @@ func LoadTemplates() (*Templates, error) {
 
 	for _, locale := range models.Locales {
 		for _, template := range models.MailTemplates {
+			common := path.Join("templates", string(locale), "common.tmpl")
 			file := path.Join("templates", string(locale), string(template)+".tmpl")
 			key := templateKey{locale, template}
 
-			text, err := texttemplate.New(path.Base(file)).Option("missingkey=error").ParseFS(embedded, file)
+			text, err := texttemplate.New(path.Base(file)).Option("missingkey=error").ParseFS(embedded, common, file)
 			if err != nil {
 				return nil, fmt.Errorf("mail template %s: %w", file, err)
 			}
-			html, err := htmltemplate.New(path.Base(file)).Option("missingkey=error").ParseFS(embedded, layoutFile, file)
+			html, err := htmltemplate.New(path.Base(file)).Option("missingkey=error").ParseFS(embedded, layoutFile, common, file)
 			if err != nil {
 				return nil, fmt.Errorf("mail template %s: %w", file, err)
 			}
 
-			for _, part := range []string{"subject", "text", "html"} {
+			for _, part := range requiredBlocks {
 				if text.Lookup(part) == nil {
 					return nil, fmt.Errorf("mail template %s: no %q block", file, part)
 				}
