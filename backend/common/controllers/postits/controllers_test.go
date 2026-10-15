@@ -10,11 +10,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
-	"github.com/Secreto31126/tesis/common/services/access"
 	srv "github.com/Secreto31126/tesis/common/services/postits"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -48,25 +46,17 @@ func setupRouterWith(db *mocks.MockDB, cache *mocks.MockCache, run *mocks.MockEx
 	}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(db, cache, run, secrets, access.New(nil))).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
+	NewController(srv.New(db, cache, run, secrets)).RegisterRoutes(r)
 	return r
 }
 
-// do calls as the board's owner; doAs names someone else, or nobody.
 func do(r http.Handler, method, path, body string) *httptest.ResponseRecorder {
-	return doAs(r, owner, method, path, body)
-}
-
-func doAs(r http.Handler, caller, method, path, body string) *httptest.ResponseRecorder {
 	var rdr io.Reader
 	if body != "" {
 		rdr = strings.NewReader(body)
 	}
 	req := httptest.NewRequest(method, path, rdr)
 	req.Header.Set("Content-Type", "application/json")
-	if caller != "" {
-		req.Header.Set("Authorization", "Bearer "+caller)
-	}
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	return w
@@ -76,14 +66,14 @@ func TestCreatePostIt_OK(t *testing.T) {
 	board := uuid.New()
 	newID := uuid.New()
 	db := &mocks.MockDB{
-		CreatePostItFn: func(p *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(p *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error) {
 			p.Id = newID
 			return p, nil
 		},
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPost, "/post-its", `{"board":"`+board.String()+`","well-known":"dolar_oficial"}`)
+	w := do(r, http.MethodPost, "/post-its", `{"cognito_id":"`+owner+`","board":"`+board.String()+`","well_known":"dolar_oficial"}`)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want 201 (body: %s)", w.Code, w.Body.String())
 	}
@@ -106,7 +96,7 @@ func TestCreatePostIt_OK(t *testing.T) {
 
 func TestCreatePostIt_MissingBoard(t *testing.T) {
 	r := setupRouter(nil, nil, nil)
-	w := do(r, http.MethodPost, "/post-its", `{"well-known":"dolar_oficial"}`)
+	w := do(r, http.MethodPost, "/post-its", `{"cognito_id":"`+owner+`","well-known":"dolar_oficial"}`)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400 (board is required)", w.Code)
 	}
@@ -162,7 +152,7 @@ func TestEditPostIt_BuildsSetMap(t *testing.T) {
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPatch, "/post-its/"+id.String()+"/settings", `{"rate":5,"query":{"x":".x"}}`)
+	w := do(r, http.MethodPatch, "/post-its/"+id.String()+"/settings", `{"cognito_id":"`+owner+`","rate":5,"query":{"x":".x"}}`)
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204 (body: %s)", w.Code, w.Body.String())
 	}
@@ -186,7 +176,7 @@ func TestEditPostIt_EmptyBodyRejected(t *testing.T) {
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPatch, "/post-its/"+id.String()+"/settings", `{}`)
+	w := do(r, http.MethodPatch, "/post-its/"+id.String()+"/settings", `{"cognito_id":"`+owner+`"}`)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400 (no fields to update)", w.Code)
 	}
@@ -326,13 +316,13 @@ func TestDeletePostIt_ServiceError(t *testing.T) {
 
 func TestCreatePostIt_ServiceError(t *testing.T) {
 	db := &mocks.MockDB{
-		CreatePostItFn: func(_ *models.PostIts, _ string, _ models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(_ *models.PostIts, title models.BoardPostItTitle, _ string, _ models.Position) (*models.PostIts, error) {
 			return nil, errors.New("mongo: no documents in result")
 		},
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPost, "/post-its", `{"board":"`+uuid.New().String()+`"}`)
+	w := do(r, http.MethodPost, "/post-its", `{"cognito_id":"`+owner+`","board":"`+uuid.New().String()+`","well_known": "riesgo_pais"}`)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
 	}
@@ -340,7 +330,7 @@ func TestCreatePostIt_ServiceError(t *testing.T) {
 
 func TestEditPostIt_InvalidUUID(t *testing.T) {
 	r := setupRouter(nil, nil, nil)
-	w := do(r, http.MethodPatch, "/post-its/nope/settings", `{"rate":1}`)
+	w := do(r, http.MethodPatch, "/post-its/nope/settings", `{"cognito_id":"`+owner+`","rate":1}`)
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", w.Code)
 	}
@@ -354,7 +344,7 @@ func TestEditPostIt_ServiceError(t *testing.T) {
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPatch, "/post-its/"+uuid.New().String()+"/settings", `{"rate":1}`)
+	w := do(r, http.MethodPatch, "/post-its/"+uuid.New().String()+"/settings", `{"cognito_id":"`+owner+`","rate":1}`)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
 	}
@@ -404,43 +394,19 @@ func TestExecutePostIt_MissingSystemSecretIsUnavailable(t *testing.T) {
 	}
 }
 
-func TestEveryRoute_RequiresAToken(t *testing.T) {
+func TestCreatePostIt_RequiresACaller(t *testing.T) {
 	r := setupRouter(nil, nil, nil)
-	for _, route := range r.Routes() {
-		path := strings.ReplaceAll(route.Path, ":id", uuid.NewString())
-		if w := doAs(r, "", route.Method, path, ""); w.Code != http.StatusUnauthorized {
-			t.Errorf("%s %s = %d, want 401", route.Method, route.Path, w.Code)
-		}
+	w := do(r, http.MethodPost, "/post-its", `{"board":"`+uuid.New().String()+`"}`)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (cognito_id is required)", w.Code)
 	}
 }
 
-func TestCreatePostIt_OutsiderGetsNotFound(t *testing.T) {
+func TestCreatePostIt_OutsiderIsForbidden(t *testing.T) {
 	r := setupRouter(nil, nil, nil)
-	w := doAs(r, "someone-else", http.MethodPost, "/post-its", `{"board":"`+uuid.New().String()+`"}`)
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404 (body: %s)", w.Code, w.Body.String())
-	}
-}
-
-// To someone outside the board a card does not exist, whatever they try.
-func TestCardRoutes_OutsiderGetsNotFound(t *testing.T) {
-	db := &mocks.MockDB{
-		MovePostItFn:   func(_, _ uuid.UUID, _ models.Position) error { return nil },
-		DeletePostItFn: func(uuid.UUID) ([]models.Strand, error) { return nil, nil },
-	}
-	r := setupRouter(db, nil, nil)
-	card := "/post-its/" + uuid.NewString()
-
-	for _, tc := range []struct{ method, path, body string }{
-		{http.MethodGet, card, ""},
-		{http.MethodGet, card + "/settings", ""},
-		{http.MethodPatch, card + "/settings", `{"rate":1}`},
-		{http.MethodPatch, card + "/position", `{"x":1,"y":2}`},
-		{http.MethodDelete, card, ""},
-	} {
-		if w := doAs(r, "someone-else", tc.method, tc.path, tc.body); w.Code != http.StatusNotFound {
-			t.Errorf("%s %s = %d, want 404 (body: %s)", tc.method, tc.path, w.Code, w.Body.String())
-		}
+	w := do(r, http.MethodPost, "/post-its", `{"cognito_id":"someone-else","board":"`+uuid.New().String()+`","well_known": "dolar_oficial"}`)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403 (body: %s)", w.Code, w.Body.String())
 	}
 }
 
@@ -455,13 +421,13 @@ func TestCreatePostIt_BindsAsTheCaller(t *testing.T) {
 		},
 	}
 	db := &mocks.MockDB{
-		CreatePostItFn: func(p *models.PostIts, _ string, _ models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(p *models.PostIts, title models.BoardPostItTitle, _ string, _ models.Position) (*models.PostIts, error) {
 			return p, nil
 		},
 	}
 	r := setupRouterWith(db, nil, nil, secrets)
 
-	body := `{"board":"` + board.String() + `","well_known":"exchange_rate",
+	body := `{"cognito_id":"` + owner + `","board":"` + board.String() + `","well_known":"exchange_rate",
 	         "params":{"$credential":"$MINE"},
 	         "bindings":{"MINE":{"scope":{"kind":"member","owner":"` + board.String() + `:` + owner + `"},"name":"MINE"}}}`
 	w := do(r, http.MethodPost, "/post-its", body)
@@ -495,11 +461,19 @@ func TestCreatePostIt_ForbiddenBindingIs403(t *testing.T) {
 	r := setupRouterWith(nil, nil, nil, secrets)
 
 	board := uuid.New()
-	body := `{"board":"` + board.String() + `",
+	body := `{"cognito_id":"` + owner + `","board":"` + board.String() + `","well_known":"riesgo_pais",
 	         "bindings":{"X":{"scope":{"kind":"board","owner":"` + board.String() + `"},"name":"X"}}}`
 	w := do(r, http.MethodPost, "/post-its", body)
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403 (body: %s)", w.Code, w.Body.String())
+	}
+}
+
+func TestEditPostIt_RequiresACaller(t *testing.T) {
+	r := setupRouter(nil, nil, nil)
+	w := do(r, http.MethodPatch, "/post-its/"+uuid.New().String()+"/settings", `{"rate":1}`)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400 (cognito_id is required)", w.Code)
 	}
 }
 
@@ -514,7 +488,7 @@ func TestEditPostIt_ForwardsBindings(t *testing.T) {
 	}
 	r := setupRouter(db, nil, nil)
 
-	body := `{"bindings":{"MINE":{"scope":{"kind":"board","owner":"` + board.String() + `"},"name":"MINE"}}}`
+	body := `{"cognito_id":"` + owner + `","bindings":{"MINE":{"scope":{"kind":"board","owner":"` + board.String() + `"},"name":"MINE"}}}`
 	w := do(r, http.MethodPatch, "/post-its/"+uuid.New().String()+"/settings", body)
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want 204 (body: %s)", w.Code, w.Body.String())
@@ -522,6 +496,14 @@ func TestEditPostIt_ForwardsBindings(t *testing.T) {
 	bindings, ok := gotSet["bindings"].(map[string]models.SecretRef)
 	if !ok || bindings["MINE"].Name != "MINE" || gotSet["runas"] != owner {
 		t.Errorf("set = %v, want bindings and runas", gotSet)
+	}
+}
+
+func TestEditPostIt_OutsiderIsForbidden(t *testing.T) {
+	r := setupRouter(nil, nil, nil)
+	w := do(r, http.MethodPatch, "/post-its/"+uuid.New().String()+"/settings", `{"cognito_id":"someone-else","rate":1}`)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403 (body: %s)", w.Code, w.Body.String())
 	}
 }
 

@@ -15,28 +15,29 @@ var ErrCacheMiss = errors.New("cache miss")
 
 // MockDB is a configurable test double for infrastructure.Database.
 type MockDB struct {
-	FindUserBoardsFn    func(user string, orgs []uuid.UUID) ([]models.Board, error)
-	FindBoardPostItsFn  func(id uuid.UUID) ([]models.PostIts, error)
-	FindPostItFn        func(id uuid.UUID) (*models.PostIts, error)
-	FindBoardFn         func(id uuid.UUID) (*models.Board, error)
-	DeletePostItFn      func(id uuid.UUID) ([]models.Strand, error)
-	DeleteBoardFn       func(id uuid.UUID) error
-	UpdatePostItFn      func(id uuid.UUID, set map[string]any) error
-	CreatePostItFn      func(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error)
-	CreateBoardFn       func(name, owner string, org *uuid.UUID) (*models.Board, error)
-	SetBoardMemberFn    func(boardID uuid.UUID, user string, role models.BoardRole) error
-	RemoveBoardMemberFn func(boardID uuid.UUID, user string) error
-	DisconnectPostItsFn func(boardID, strandID uuid.UUID) error
-	ConnectPostItsFn    func(boardID, source, target uuid.UUID) (*models.Strand, error)
-	MovePostItFn        func(boardID, postItID uuid.UUID, pos models.Position) error
-	UpdateBoardNameFn   func(id uuid.UUID, name string) error
+	FindUserBoardsFn              func(cognitoID string) ([]models.Board, error)
+	FindBoardPostItsFn            func(id uuid.UUID) ([]models.PostIts, error)
+	FindPostItFn                  func(id uuid.UUID) (*models.PostIts, error)
+	FindBoardFn                   func(id uuid.UUID) (*models.Board, error)
+	DeletePostItFn                func(id uuid.UUID) ([]models.Strand, error)
+	DeleteBoardFn                 func(id uuid.UUID) error
+	UpdatePostItFn                func(id uuid.UUID, set map[string]any) error
+	CreatePostItFn                func(postIt *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error)
+	CreateBoardFn                 func(name, owner string) (*models.Board, error)
+	AddCollaboratorToBoardFn      func(boardID uuid.UUID, cognitoID string) error
+	RemoveCollaboratorFromBoardFn func(boardID uuid.UUID, cognitoID string) error
+	DisconnectPostItsFn           func(boardID, strandID uuid.UUID) error
+	ConnectPostItsFn              func(boardID, source, target uuid.UUID) (*models.Strand, error)
+	MovePostItFn                  func(boardID, postItID uuid.UUID, pos models.Position) error
+	EditTitlePostItFn             func(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error
+	UpdateBoardNameFn             func(id uuid.UUID, name string) error
 }
 
 var _ infrastructure.Database = (*MockDB)(nil)
 
-func (m *MockDB) FindUserBoards(user string, orgs []uuid.UUID) ([]models.Board, error) {
+func (m *MockDB) FindUserBoards(cognitoID string) ([]models.Board, error) {
 	if m.FindUserBoardsFn != nil {
-		return m.FindUserBoardsFn(user, orgs)
+		return m.FindUserBoardsFn(cognitoID)
 	}
 	return nil, nil
 }
@@ -83,30 +84,30 @@ func (m *MockDB) UpdatePostIt(id uuid.UUID, set map[string]any) error {
 	return nil
 }
 
-func (m *MockDB) CreatePostIt(postIt *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error) {
+func (m *MockDB) CreatePostIt(postIt *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error) {
 	if m.CreatePostItFn != nil {
-		return m.CreatePostItFn(postIt, ptype, pos)
+		return m.CreatePostItFn(postIt, title, ptype, pos)
 	}
 	return postIt, nil
 }
 
-func (m *MockDB) CreateBoard(name, owner string, org *uuid.UUID) (*models.Board, error) {
+func (m *MockDB) CreateBoard(name, owner string) (*models.Board, error) {
 	if m.CreateBoardFn != nil {
-		return m.CreateBoardFn(name, owner, org)
+		return m.CreateBoardFn(name, owner)
 	}
 	return nil, nil
 }
 
-func (m *MockDB) SetBoardMember(boardID uuid.UUID, user string, role models.BoardRole) error {
-	if m.SetBoardMemberFn != nil {
-		return m.SetBoardMemberFn(boardID, user, role)
+func (m *MockDB) AddCollaboratorToBoard(boardID uuid.UUID, cognitoID string) error {
+	if m.AddCollaboratorToBoardFn != nil {
+		return m.AddCollaboratorToBoardFn(boardID, cognitoID)
 	}
 	return nil
 }
 
-func (m *MockDB) RemoveBoardMember(boardID uuid.UUID, user string) error {
-	if m.RemoveBoardMemberFn != nil {
-		return m.RemoveBoardMemberFn(boardID, user)
+func (m *MockDB) RemoveCollaboratorFromBoard(boardID uuid.UUID, cognitoID string) error {
+	if m.RemoveCollaboratorFromBoardFn != nil {
+		return m.RemoveCollaboratorFromBoardFn(boardID, cognitoID)
 	}
 	return nil
 }
@@ -132,6 +133,13 @@ func (m *MockDB) MovePostIt(boardID, postItID uuid.UUID, pos models.Position) er
 	return nil
 }
 
+func (m *MockDB) EditTitlePostIt(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error {
+	if m.MovePostItFn != nil {
+		return m.EditTitlePostItFn(boardID, postItID, title)
+	}
+	return nil
+}
+
 func (m *MockDB) UpdateBoardName(id uuid.UUID, name string) error {
 	if m.UpdateBoardNameFn != nil {
 		return m.UpdateBoardNameFn(id, name)
@@ -141,9 +149,11 @@ func (m *MockDB) UpdateBoardName(id uuid.UUID, name string) error {
 
 // MockCache is a configurable test double for infrastructure.Cache.
 type MockCache struct {
-	FindPostItResultFn func(id uuid.UUID) (any, error)
-	AddPostItResultFn  func(postit *models.PostIts, data any) error
-	DropPostItResultFn func(id uuid.UUID) error
+	FindPostItResultFn          func(id uuid.UUID) (any, error)
+	AddPostItResultFn           func(postit *models.PostIts, data any) error
+	DropPostItResultFn          func(id uuid.UUID) error
+	ConnectClientToBoardFn      func(board *models.Board, id uuid.UUID) ([]string, error)
+	DisconnectClientFromBoardFn func(board *models.Board, id uuid.UUID) error
 }
 
 var _ infrastructure.Cache = (*MockCache)(nil)
@@ -165,6 +175,20 @@ func (m *MockCache) AddPostItResult(postit *models.PostIts, data any) error {
 func (m *MockCache) DropPostItResult(id uuid.UUID) error {
 	if m.DropPostItResultFn != nil {
 		return m.DropPostItResultFn(id)
+	}
+	return nil
+}
+
+func (m *MockCache) ConnectClientToBoard(board *models.Board, id uuid.UUID) ([]string, error) {
+	if m.ConnectClientToBoardFn != nil {
+		return m.ConnectClientToBoardFn(board, id)
+	}
+	return nil, ErrCacheMiss
+}
+
+func (m *MockCache) DisconnectClientFromBoard(board *models.Board, id uuid.UUID) error {
+	if m.DisconnectClientFromBoardFn != nil {
+		return m.DisconnectClientFromBoardFn(board, id)
 	}
 	return nil
 }
@@ -408,10 +432,10 @@ func (m *MemoryGroupStore) FindGroup(id uuid.UUID) (*models.Group, error) {
 	return nil, infrastructure.ErrGroupNotFound
 }
 
-func (m *MemoryGroupStore) FindUserGroups(userID string, orgs []uuid.UUID) ([]models.Group, error) {
+func (m *MemoryGroupStore) FindUserGroups(userID string) ([]models.Group, error) {
 	var out []models.Group
 	for _, group := range m.Groups {
-		if group.IsMember(userID) || (group.Org != nil && slices.Contains(orgs, *group.Org)) {
+		if group.IsMember(userID) {
 			out = append(out, group)
 		}
 	}

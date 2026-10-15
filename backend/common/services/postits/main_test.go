@@ -34,7 +34,7 @@ func TestCreatePostIt_PlainPassesThrough(t *testing.T) {
 	var gotBoard uuid.UUID
 
 	db := &mocks.MockDB{
-		CreatePostItFn: func(p *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(p *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error) {
 			gotType = ptype
 			gotBoard = p.Board
 			return p, nil
@@ -42,7 +42,7 @@ func TestCreatePostIt_PlainPassesThrough(t *testing.T) {
 	}
 
 	svc := newService(db, nil, nil)
-	_, err := svc.CreatePostIt(boardOwner, &models.PostIts{Board: board})
+	_, err := svc.CreatePostIt(boardOwner, &models.BoardPostItTitle{Text: "Hi", Vars: false}, &models.PostIts{Board: board})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestCreatePostIt_ResolvesWellKnown(t *testing.T) {
 	var gotType string
 
 	db := &mocks.MockDB{
-		CreatePostItFn: func(p *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(p *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error) {
 			got = p
 			gotType = ptype
 			return p, nil
@@ -68,7 +68,7 @@ func TestCreatePostIt_ResolvesWellKnown(t *testing.T) {
 	}
 
 	svc := newService(db, nil, nil)
-	_, err := svc.CreatePostIt(boardOwner, &models.PostIts{Board: board, WellKnown: "dolar_oficial"})
+	_, err := svc.CreatePostIt(boardOwner, &models.BoardPostItTitle{Text: "Hi", Vars: false}, &models.PostIts{Board: board, WellKnown: "dolar_oficial"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -89,7 +89,7 @@ func TestCreatePostIt_ResolvesWellKnown(t *testing.T) {
 func TestCreatePostIt_MissingRequiredParam(t *testing.T) {
 	called := false
 	db := &mocks.MockDB{
-		CreatePostItFn: func(p *models.PostIts, ptype string, pos models.Position) (*models.PostIts, error) {
+		CreatePostItFn: func(p *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error) {
 			called = true
 			return p, nil
 		},
@@ -97,7 +97,7 @@ func TestCreatePostIt_MissingRequiredParam(t *testing.T) {
 
 	svc := newService(db, nil, nil)
 	// events_search requires a $keyword param; none provided.
-	_, err := svc.CreatePostIt(boardOwner, &models.PostIts{Board: uuid.New(), WellKnown: "events_search"})
+	_, err := svc.CreatePostIt(boardOwner, &models.BoardPostItTitle{Text: "Hi", Vars: false}, &models.PostIts{Board: uuid.New(), WellKnown: "events_search"})
 	if err == nil {
 		t.Fatal("expected error for missing required param, got nil")
 	}
@@ -108,7 +108,7 @@ func TestCreatePostIt_MissingRequiredParam(t *testing.T) {
 
 func TestCreatePostIt_UnknownWellKnown(t *testing.T) {
 	svc := newService(nil, nil, nil)
-	_, err := svc.CreatePostIt(boardOwner, &models.PostIts{Board: uuid.New(), WellKnown: "does_not_exist"})
+	_, err := svc.CreatePostIt(boardOwner, &models.BoardPostItTitle{Text: "Hi", Vars: false}, &models.PostIts{Board: uuid.New(), WellKnown: "does_not_exist"})
 	if err == nil {
 		t.Fatal("expected error for unknown well-known, got nil")
 	}
