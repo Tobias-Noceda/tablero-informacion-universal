@@ -59,6 +59,7 @@ func (h *harness) do(method, path, body string, headers ...string) response {
 	if body != "" {
 		rdr = strings.NewReader(body)
 	}
+
 	req := httptest.NewRequest(method, path, rdr)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-Forwarded-Proto", "https")

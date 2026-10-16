@@ -52,7 +52,8 @@ describe("boardRoles", () => {
             api.listen(0, "127.0.0.1", resolve),
         );
         const { port } = api.address() as AddressInfo;
-        roleOn = boardRoles(`http://127.0.0.1:${port}/api/v1`);
+        process.env.API_URL = `http://127.0.0.1:${port}/api/v1`;
+        roleOn = boardRoles();
     });
 
     after(() => new Promise((resolve) => api.close(resolve)));
@@ -89,7 +90,8 @@ describe("boardRoles", () => {
         const { port } = closed.address() as AddressInfo;
         await new Promise((resolve) => closed.close(resolve));
 
-        const down = boardRoles(`http://127.0.0.1:${port}/api/v1`);
+        process.env.API_URL = `http://127.0.0.1:${port}/api/v1`;
+        const down = boardRoles();
         assert.equal(await down("viewer", board), null);
     });
 });

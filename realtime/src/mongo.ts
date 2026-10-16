@@ -26,6 +26,7 @@ let closing = false;
 // The driver resumes the stream across brief failures by itself; one that
 // gives up (Mongo down for longer) is reopened from the last change seen.
 function watch() {
+    if (closing) return;
     stream = boards.watch([{ $match: { operationType: "update" } }], {
         fullDocument: "updateLookup",
         ...(resumeToken ? { resumeAfter: resumeToken } : {}),
