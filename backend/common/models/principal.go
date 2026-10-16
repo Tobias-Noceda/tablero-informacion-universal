@@ -1,9 +1,10 @@
 package models
 
-// Principal is whoever is making the request. Until authentication exists it
-// is the cognito_id the request carries; afterwards, the subject of the token.
+// Principal is whoever is making the request: the subject of the bearer
+// token, plus the one platform-wide flag policies need without a lookup.
 type Principal struct {
-	ID string
+	ID    string
+	Admin bool
 }
 
 func (p Principal) Anonymous() bool {

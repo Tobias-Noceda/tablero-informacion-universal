@@ -1,18 +1,23 @@
 package boards
 
-import "github.com/google/uuid"
+import (
+	"github.com/Secreto31126/tesis/common/models"
+	"github.com/google/uuid"
+)
 
 type CreateBoardRequest struct {
-	Name  string `json:"name" binding:"required"`
-	Owner string `json:"owner" binding:"required"`
+	Name string `json:"name" binding:"required"`
+	// Org puts the board in one of the caller's organizations.
+	Org *uuid.UUID `json:"org"`
 }
 
 type UpdateBoardNameRequest struct {
 	Name string `json:"name" binding:"required"`
 }
 
-type CollaboratorRequest struct {
-	CognitoID string `json:"cognito_id" binding:"required"`
+type SetMemberRequest struct {
+	Email string           `json:"email" binding:"required"`
+	Role  models.BoardRole `json:"role" binding:"required"`
 }
 
 type StrandRequest struct {

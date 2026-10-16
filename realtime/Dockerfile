@@ -37,5 +37,5 @@ USER node
 
 EXPOSE 3000
 
-# Requires MONGODB_URI and REDIS_URL
+# Requires MONGODB_URI, REDIS_URL and API_URL
 CMD ["node", "dist/server.js"]

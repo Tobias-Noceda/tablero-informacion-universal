@@ -172,7 +172,7 @@ func TestCallback_ExchangesAndStoresTokens(t *testing.T) {
 	parsed, _ := url.Parse(target)
 	state := parsed.Query().Get("state")
 
-	if err := srv.Callback(state, "the-code"); err != nil {
+	if err := srv.Callback(owner, state, "the-code"); err != nil {
 		t.Fatalf("callback: %v", err)
 	}
 
@@ -213,14 +213,42 @@ func TestCallback_StateIsSingleUse(t *testing.T) {
 	parsed, _ := url.Parse(target)
 	state := parsed.Query().Get("state")
 
-	if err := srv.Callback(state, "the-code"); err != nil {
+	if err := srv.Callback(owner, state, "the-code"); err != nil {
 		t.Fatalf("first callback: %v", err)
 	}
-	if err := srv.Callback(state, "the-code"); err == nil {
+	if err := srv.Callback(owner, state, "the-code"); err == nil {
 		t.Error("the same state was accepted twice")
 	}
 	if exchanges != 1 {
 		t.Errorf("exchanged %d times, want 1", exchanges)
+	}
+}
+
+// The consent is finished by whoever started it: a state that leaks to
+// another signed-in user (a shared link, a log) cannot be redeemed by them.
+func TestCallback_OnlyTheUserWhoStartedItMayFinishIt(t *testing.T) {
+	store := newStore()
+	exchanged := false
+	tokens := &mocks.MockTokenClient{
+		ExchangeFn: func(m *models.OAuth2Material, _, _, _ string) error {
+			exchanged = true
+			m.AccessToken = "at"
+			return nil
+		},
+	}
+
+	srv := handshakeService(t, store, &mocks.MockHandshakeStore{}, tokens)
+	board := models.BoardScope(uuid.New())
+	_ = srv.PutOAuth2(board, owner, "SPOTIFY", authCode())
+
+	target, _ := srv.Authorize(board, owner, "SPOTIFY", redirectURI)
+	parsed, _ := url.Parse(target)
+
+	if err := srv.Callback(collaborator, parsed.Query().Get("state"), "the-code"); err == nil {
+		t.Fatal("another user finished the owner's consent")
+	}
+	if exchanged {
+		t.Error("the code was exchanged for the wrong user")
 	}
 }
 
@@ -242,7 +270,7 @@ func TestCallback_RejectsUnknownState(t *testing.T) {
 		{"", "attacker-code"},
 		{"forged-state", ""},
 	} {
-		if err := srv.Callback(c.state, c.code); err == nil {
+		if err := srv.Callback(owner, c.state, c.code); err == nil {
 			t.Errorf("state=%q code=%q was accepted", c.state, c.code)
 		}
 	}

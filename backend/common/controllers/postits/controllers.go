@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
 	srv "github.com/Secreto31126/tesis/common/services/postits"
@@ -31,6 +32,7 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 		boardGroup.GET("/:id/settings", ctrl.GetPostIt)
 		boardGroup.PATCH("/:id/settings", ctrl.EditPostIt)
 		boardGroup.PATCH("/:id/position", ctrl.MovePostIt)
+		boardGroup.PATCH("/:id/title", ctrl.EditTitlePostIt)
 	}
 }
 
@@ -66,7 +68,7 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		Bindings:  req.Bindings,
 	}
 
-	postIt, err := ctrl.service.CreatePostIt(models.Principal{ID: req.CognitoID}, req.Title, newPostIt)
+	postIt, err := ctrl.service.CreatePostIt(middleware.Principal(c), req.Title, newPostIt)
 	if err != nil {
 		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
@@ -97,9 +99,9 @@ func (ctrl *Controller) GetPostIt(c *gin.Context) {
 		return
 	}
 
-	postIt, err := ctrl.service.GetPostIt(id)
+	postIt, err := ctrl.service.GetPostIt(middleware.Principal(c), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -128,9 +130,9 @@ func (ctrl *Controller) DeletePostIt(c *gin.Context) {
 		return
 	}
 
-	strands, err := ctrl.service.DeletePostIt(id)
+	strands, err := ctrl.service.DeletePostIt(middleware.Principal(c), id)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -160,9 +162,9 @@ func (ctrl *Controller) ExecutePostIt(c *gin.Context) {
 		return
 	}
 
-	postIt, err := ctrl.service.GetPostIt(id)
+	postIt, err := ctrl.service.GetPostIt(middleware.Principal(c), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
+		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -227,9 +229,6 @@ func (ctrl *Controller) EditPostIt(c *gin.Context) {
 	if req.Rate != nil {
 		set["rate"] = *req.Rate
 	}
-	if req.Title != nil {
-		set["title"] = req.Title
-	}
 
 	if len(set) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -238,7 +237,7 @@ func (ctrl *Controller) EditPostIt(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.service.UpdatePostIt(models.Principal{ID: req.CognitoID}, id, set)
+	err = ctrl.service.UpdatePostIt(middleware.Principal(c), id, set)
 	if err != nil {
 		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
@@ -280,9 +279,51 @@ func (ctrl *Controller) MovePostIt(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.service.MovePostIt(id, models.Position{X: req.X, Y: req.Y})
+	err = ctrl.service.MovePostIt(middleware.Principal(c), id, models.Position{X: req.X, Y: req.Y})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+		c.JSON(statusOf(err), gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+// EditTitlePostIt godoc
+// @Summary      Edit a post-it title
+// @Description  Changes the rendered title of a post-it.
+// @Tags         post-its
+// @Accept       json
+// @Param        id       path      string                    true  "Post-It UUID" format(uuid)
+// @Param        request  body      UpdatePostItTitleRequest  true  "Post-It name update payload"
+// @Success      204      "No Content"
+// @Failure      400      {object}  map[string]string{"error": "string"}
+// @Failure      500      {object}  map[string]string{"error": "string"}
+// @Router       /post-its/{id}/title [patch]
+func (ctrl *Controller) EditTitlePostIt(c *gin.Context) {
+	idParam := c.Param("id")
+
+	id, err := uuid.Parse(idParam)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "invalid uuid",
+		})
+		return
+	}
+
+	var req UpdatePostItTitleRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	err = ctrl.service.EditTitlePostIt(middleware.Principal(c), id, req.Title)
+	if err != nil {
+		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
 		})
 		return
@@ -293,8 +334,9 @@ func (ctrl *Controller) MovePostIt(c *gin.Context) {
 
 func statusOf(err error) int {
 	switch {
-	case errors.Is(err, srv.ErrNotAMember),
-		errors.Is(err, srv.ErrCredentialUnavailable),
+	case errors.Is(err, srv.ErrNotAMember):
+		return http.StatusNotFound
+	case errors.Is(err, srv.ErrCredentialUnavailable),
 		errors.Is(err, infrastructure.ErrForbidden):
 		return http.StatusForbidden
 	case errors.Is(err, srv.ErrInvalidBinding),

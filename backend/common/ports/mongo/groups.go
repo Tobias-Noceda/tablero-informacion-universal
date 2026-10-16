@@ -19,6 +19,7 @@ func (db *MongoDB) ensureGroupIndexes() error {
 	_, err := db.groups.Indexes().CreateMany(ctx, []mongo.IndexModel{
 		{Keys: bson.D{{Key: "owner", Value: 1}}},
 		{Keys: bson.D{{Key: "members", Value: 1}}},
+		{Keys: bson.D{{Key: "org", Value: 1}}},
 	})
 
 	return err
@@ -47,11 +48,11 @@ func (db *MongoDB) FindGroup(id uuid.UUID) (*models.Group, error) {
 	return group, nil
 }
 
-func (db *MongoDB) FindUserGroups(userID string) ([]models.Group, error) {
+func (db *MongoDB) FindUserGroups(userID string, orgs []uuid.UUID) ([]models.Group, error) {
 	ctx, cancel := timeout()
 	defer cancel()
 
-	cursor, err := db.groups.Find(ctx, bson.M{"$or": []bson.M{{"owner": userID}, {"members": userID}}})
+	cursor, err := db.groups.Find(ctx, reachedBy(bson.A{bson.M{"owner": userID}, bson.M{"members": userID}}, orgs))
 	if err != nil {
 		return nil, err
 	}

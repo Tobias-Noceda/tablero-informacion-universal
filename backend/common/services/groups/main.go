@@ -12,6 +12,7 @@ import (
 
 var (
 	ErrForbidden   = infrastructure.ErrForbidden
+	ErrOrgNotFound = infrastructure.ErrOrgNotFound
 	ErrInvalidName = errors.New("Group name cannot be empty")
 	ErrInvalidUser = errors.New("Member id cannot be empty")
 )
@@ -19,15 +20,21 @@ var (
 type GroupService struct {
 	store   infrastructure.GroupStore
 	secrets infrastructure.ScopePurger
+	access  infrastructure.Access
 }
 
-func New(store infrastructure.GroupStore, secrets infrastructure.ScopePurger) *GroupService {
-	return &GroupService{store, secrets}
+func New(store infrastructure.GroupStore, secrets infrastructure.ScopePurger, access infrastructure.Access) *GroupService {
+	return &GroupService{store, secrets, access}
 }
 
-func (srv *GroupService) Create(principal models.Principal, name string) (*models.Group, error) {
+// Create makes the caller the group's owner. A group created in an
+// organization the caller belongs to is also owned by its admins.
+func (srv *GroupService) Create(principal models.Principal, name string, org *uuid.UUID) (*models.Group, error) {
 	if principal.Anonymous() {
 		return nil, ErrForbidden
+	}
+	if org != nil && srv.access.OrgRole(principal, *org) == "" {
+		return nil, ErrOrgNotFound
 	}
 
 	name = strings.TrimSpace(name)
@@ -40,6 +47,7 @@ func (srv *GroupService) Create(principal models.Principal, name string) (*model
 		Name:      name,
 		Owner:     principal.ID,
 		Members:   []string{},
+		Org:       org,
 		CreatedAt: time.Now().UTC(),
 	}
 
@@ -47,11 +55,12 @@ func (srv *GroupService) Create(principal models.Principal, name string) (*model
 		return nil, err
 	}
 
+	group.Role = models.GroupOwner
 	return group, nil
 }
 
 func (srv *GroupService) Get(principal models.Principal, id uuid.UUID) (*models.Group, error) {
-	return srv.member(principal, id)
+	return srv.require(principal, id, models.GroupViewer)
 }
 
 func (srv *GroupService) ListMine(principal models.Principal) ([]models.Group, error) {
@@ -59,19 +68,26 @@ func (srv *GroupService) ListMine(principal models.Principal) ([]models.Group, e
 		return nil, ErrForbidden
 	}
 
-	groups, err := srv.store.FindUserGroups(principal.ID)
+	orgs, err := srv.access.Orgs(principal)
+	if err != nil {
+		return nil, err
+	}
+	groups, err := srv.store.FindUserGroups(principal.ID, orgs)
 	if err != nil {
 		return nil, err
 	}
 	if groups == nil {
 		groups = []models.Group{}
 	}
+	for i := range groups {
+		groups[i].Role = srv.access.GroupRole(principal, &groups[i])
+	}
 
 	return groups, nil
 }
 
 func (srv *GroupService) AddMember(principal models.Principal, id uuid.UUID, userID string) error {
-	if _, err := srv.owned(principal, id); err != nil {
+	if _, err := srv.require(principal, id, models.GroupOwner); err != nil {
 		return err
 	}
 	if userID == "" {
@@ -82,7 +98,7 @@ func (srv *GroupService) AddMember(principal models.Principal, id uuid.UUID, use
 }
 
 func (srv *GroupService) RemoveMember(principal models.Principal, id uuid.UUID, userID string) error {
-	if _, err := srv.owned(principal, id); err != nil {
+	if _, err := srv.require(principal, id, models.GroupOwner); err != nil {
 		return err
 	}
 
@@ -91,7 +107,7 @@ func (srv *GroupService) RemoveMember(principal models.Principal, id uuid.UUID, 
 
 // Delete removes the group and everything it owned in the vault.
 func (srv *GroupService) Delete(principal models.Principal, id uuid.UUID) error {
-	if _, err := srv.owned(principal, id); err != nil {
+	if _, err := srv.require(principal, id, models.GroupOwner); err != nil {
 		return err
 	}
 
@@ -102,27 +118,17 @@ func (srv *GroupService) Delete(principal models.Principal, id uuid.UUID) error 
 	return srv.secrets.Purge(models.GroupScope(id))
 }
 
-// member loads a group the principal belongs to. One that cannot be found is
-// indistinguishable from one the principal may not see.
-func (srv *GroupService) member(principal models.Principal, id uuid.UUID) (*models.Group, error) {
-	if principal.Anonymous() {
-		return nil, ErrForbidden
-	}
-
+// require loads a group in which the principal holds at least min, with the
+// principal's role filled in. One that cannot be found is indistinguishable
+// from one the principal may not see.
+func (srv *GroupService) require(principal models.Principal, id uuid.UUID, min models.GroupRole) (*models.Group, error) {
 	group, err := srv.store.FindGroup(id)
-	if err != nil || !group.IsMember(principal.ID) {
+	if err != nil {
 		return nil, ErrForbidden
 	}
 
-	return group, nil
-}
-
-func (srv *GroupService) owned(principal models.Principal, id uuid.UUID) (*models.Group, error) {
-	group, err := srv.member(principal, id)
-	if err != nil {
-		return nil, err
-	}
-	if group.Owner != principal.ID {
+	group.Role = srv.access.GroupRole(principal, group)
+	if !group.Role.AtLeast(min) {
 		return nil, ErrForbidden
 	}
 
