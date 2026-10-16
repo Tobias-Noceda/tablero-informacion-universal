@@ -5,7 +5,6 @@ import * as mongo from "./mongo.js";
 import * as presence from "./redis.js";
 import { attach } from "./socket.js";
 
-console.log(process.env.API_URL);
 const server = createServer();
 const realtime = attach(server, { roleOn: boardRoles(), presence });
 
