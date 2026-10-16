@@ -1,6 +1,12 @@
 import type { NavigationTarget } from '@sveltejs/kit';
+import { session } from './session.svelte';
 
 const history = $state({}) as Record<string, Record<string, unknown>>;
+
+// What a page kept was about the previous user.
+session.onUserChange(() => {
+	for (const key of Object.keys(history)) delete history[key];
+});
 
 export function preserve(
 	from: NavigationTarget | null,

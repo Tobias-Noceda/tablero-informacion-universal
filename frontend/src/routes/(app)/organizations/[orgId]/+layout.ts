@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { refreshBoards } from '$stores/boards';
 import { orgs } from '$stores/org.svelte';
-import type { PageLoad } from './$types';
+import type { LayoutLoad } from './$types';
 
 // An organization's landing, only for its members.
 export const load = (async ({ params, parent }) => {
@@ -15,4 +15,4 @@ export const load = (async ({ params, parent }) => {
 	refreshBoards().catch((err) => console.error('Failed to load boards', err));
 
 	return { org };
-}) satisfies PageLoad;
+}) satisfies LayoutLoad;

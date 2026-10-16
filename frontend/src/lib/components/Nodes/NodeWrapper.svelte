@@ -4,6 +4,7 @@
     import { results } from '$stores/postit-results.svelte';
     import { renderTitle } from '$lib/title';
     import type { Snippet } from 'svelte';
+	import { isImageLink, isLink } from '$lib/helpers/content-rendering';
 
     let { id, data, children }: NodeProps & { children: Snippet<[Record<string, string>]> } = $props();
 
@@ -13,6 +14,12 @@
     const request = $derived(plainTitle ? null : results.get(id));
 
     const isSelected = $derived.by(() => data?.isSelected ?? false);
+
+    function shouldRenderImage(title: string, response: Record<string, string> | null): boolean {
+        const renderedTitle = renderTitle(title, response);
+
+        return renderedTitle.split(/\s+/).length === 1 && isLink(renderedTitle) && isImageLink(renderedTitle);
+    }
 </script>
 
 <div
@@ -26,7 +33,15 @@
         {#await request then response}
             {#if title?.text}
                 <!-- Plain text interpolation: Svelte escapes whatever the values hold. -->
-                <h3 class="text-lg font-bold">{renderTitle(title.text, response)}</h3>
+                {#if shouldRenderImage(title.text, response)}
+                    <!-- An external address the card returned, not an app route. -->
+                    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+                    <a href={renderTitle(title.text, response)} target="_blank" rel="noopener noreferrer" class="underline">
+                        <img src={renderTitle(title.text, response)} alt={renderTitle(title.text, response)} class="max-h-40 max-w-full" />
+                    </a>
+                {:else}
+                    <h3 class="text-lg font-bold">{renderTitle(title.text, response)}</h3>
+                {/if}
             {:else if response}
                 {@render children(response)}
             {/if}

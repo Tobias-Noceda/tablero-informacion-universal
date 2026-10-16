@@ -1,14 +1,18 @@
+import { session } from '$modules/session.svelte';
 import * as orgsApi from '$services/orgs';
 import type { Board, UUID, Org } from '$types/api';
 
 // The switcher's value for boards under no organization.
 export const PERSONAL = 'personal';
 
-const STORAGE_KEY = 'tiu.org';
+// One entry per user, so another account signing in on this browser does
+// not start in the previous one's organization.
+const storageKey = (userId: UUID) => `tiu.org:${userId}`;
 
-function remembered(): UUID | undefined {
+function remembered(userId: UUID | null | undefined): UUID | undefined {
+	if (!userId) return undefined;
 	try {
-		return localStorage.getItem(STORAGE_KEY) || undefined;
+		return localStorage.getItem(storageKey(userId)) || undefined;
 	} catch {
 		return undefined;
 	}
@@ -19,20 +23,24 @@ function remembered(): UUID | undefined {
 class Organizations {
 	list = $state<Org[]>([]);
 	#loading: Promise<void> | undefined;
-	#last = $state<UUID | undefined>(remembered());
+	// Bumped on reset, so a list requested for the previous user is dropped.
+	#generation = 0;
+	#last = $state<UUID | undefined>(remembered(session.user?.id));
 
 	// The organization of the last landing or board opened, for pages that are
 	// about none (profile, organization management). Undefined for Personal,
-	// or once the user is no longer in it. Kept per browser in localStorage.
+	// or once the user is no longer in it. Kept per browser and user in localStorage.
 	get last() {
 		return this.byId(this.#last)?.id;
 	}
 
 	remember(orgId: UUID | undefined) {
 		this.#last = orgId;
+		const userId = session.user?.id;
+		if (!userId) return;
 		try {
-			if (orgId) localStorage.setItem(STORAGE_KEY, orgId);
-			else localStorage.removeItem(STORAGE_KEY);
+			if (orgId) localStorage.setItem(storageKey(userId), orgId);
+			else localStorage.removeItem(storageKey(userId));
 		} catch {
 			// Storage may be unavailable; the choice then lasts until a reload.
 		}
@@ -40,16 +48,25 @@ class Organizations {
 
 	// Loads the list once; route loads await it before deciding a 404.
 	ensure() {
+		const generation = this.#generation;
 		this.#loading ??= orgsApi.list().then(
 			(list) => {
-				this.list = list;
+				if (generation === this.#generation) this.list = list;
 			},
 			(err) => {
-				this.#loading = undefined;
+				if (generation === this.#generation) this.#loading = undefined;
 				throw err;
 			}
 		);
 		return this.#loading;
+	}
+
+	// Forgets everything about the previous user; the next ensure() loads anew.
+	reset(userId: UUID | null) {
+		this.#generation++;
+		this.#loading = undefined;
+		this.list = [];
+		this.#last = remembered(userId);
 	}
 
 	async refresh() {
@@ -74,3 +91,4 @@ class Organizations {
 }
 
 export const orgs = new Organizations();
+session.onUserChange((userId) => orgs.reset(userId));

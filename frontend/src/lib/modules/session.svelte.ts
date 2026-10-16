@@ -1,10 +1,12 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
 import * as auth from '$services/auth';
-import type { Profile, SessionResponse } from '$types/api';
+import type { Profile, SessionResponse, UUID } from '$types/api';
 import * as api from './api.svelte';
 
 export type SessionStatus = 'unknown' | 'anonymous' | 'authenticated';
+
+export type UserChangeListener = (userId: UUID | null) => void;
 
 type TabMessage = { type: 'signed-in'; session: SessionResponse } | { type: 'signed-out' };
 
@@ -20,6 +22,7 @@ export class Session implements api.Authenticator {
 	#booting: Promise<void> | null = null;
 	#refreshing: Promise<boolean> | null = null;
 	#channel: BroadcastChannel | null = null;
+	#listeners = new Set<UserChangeListener>();
 
 	constructor(private readonly channelName = 'tiu-session') {}
 
@@ -61,6 +64,16 @@ export class Session implements api.Authenticator {
 
 	renew() {
 		return this.refresh();
+	}
+
+	// Called whenever the signed-in user becomes someone else (or nobody), so
+	// stores keeping what the previous one could see start over. A renewal
+	// that keeps the same user does not call it.
+	onUserChange(listener: UserChangeListener) {
+		this.#listeners.add(listener);
+		return () => {
+			this.#listeners.delete(listener);
+		};
 	}
 
 	expired() {
@@ -143,6 +156,7 @@ export class Session implements api.Authenticator {
 	}
 
 	#adopt(session: SessionResponse) {
+		this.#switchTo(session.user.id);
 		this.#token = session.access_token;
 		this.#expiresAt = Date.now() + session.expires_in * 1000;
 		this.user = session.user;
@@ -150,10 +164,24 @@ export class Session implements api.Authenticator {
 	}
 
 	#clear() {
+		this.#switchTo(null);
 		this.#token = null;
 		this.#expiresAt = 0;
 		this.user = null;
 		this.status = 'anonymous';
+	}
+
+	// Runs before the new user is visible, so nothing reacting to the status
+	// reads the previous one's data.
+	#switchTo(userId: UUID | null) {
+		if ((this.user?.id ?? null) === userId) return;
+		for (const listener of this.#listeners) {
+			try {
+				listener(userId);
+			} catch (err) {
+				console.error('User change listener failed', err);
+			}
+		}
 	}
 
 	#listen() {

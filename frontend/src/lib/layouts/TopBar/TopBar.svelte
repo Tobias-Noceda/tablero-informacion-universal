@@ -20,6 +20,7 @@
 	import LocaleSwitcher from '$components/LocaleSwitcher/LocaleSwitcher.svelte';
 	import OrgSwitcher from '$components/OrgSwitcher/OrgSwitcher.svelte';
 	import { clickOutside } from '$lib/actions/clickOutside';
+	import { setCreatingBoard } from '$stores/creating';
 
 	// The organization comes from the URL; none means Personal.
 	const orgId = $derived(page.params.orgId);
@@ -42,16 +43,16 @@
 	}
 
 	const dropdownClass = cn(
-		'absolute z-50 mt-0.5 w-fit flex-col',
+		'absolute z-100 mt-0.5 w-fit flex-col',
 		'bg-main-hover border border-main-hover rounded shadow-lg',
-		'max-h-60 overflow-y-auto',
-		// Custom scrollbar styles
-		'scrollbar-thin scrollbar-thumb-tertiary scrollbar-track-transparent',
-		'[&::-webkit-scrollbar]:w-2',
-		'[&::-webkit-scrollbar-track]:bg-transparent',
-		'[&::-webkit-scrollbar-thumb]:bg-tertiary',
-		'[&::-webkit-scrollbar-thumb]:rounded-full',
-		'[&::-webkit-scrollbar-thumb]:hover:bg-tertiary-hover'
+		// 'max-h-60 overflow-y-auto',
+		// // Custom scrollbar styles
+		// 'scrollbar-thin scrollbar-thumb-tertiary scrollbar-track-transparent',
+		// '[&::-webkit-scrollbar]:w-2',
+		// '[&::-webkit-scrollbar-track]:bg-transparent',
+		// '[&::-webkit-scrollbar-thumb]:bg-tertiary',
+		// '[&::-webkit-scrollbar-thumb]:rounded-full',
+		// '[&::-webkit-scrollbar-thumb]:hover:bg-tertiary-hover'
 	);
 
 	const dropdownOptionClass = (isSelected: boolean) =>
@@ -67,6 +68,14 @@
 		'px-3 py-2.5 font-medium text-main-text',
 		'bg-sidebar-hover',
 		'border-b border-main-border'
+	);
+
+	const addButtonClass = cn(
+		'w-full justify-start flex items-center text-left',
+		'px-3 py-2.5 cursor-pointer transition-colors text-main-text',
+		'bg-sidebar hover:bg-sidebar-hover',
+		'focus:outline-none focus:ring-none focus:bg-sidebar-hover',
+		'overflow-x-hidden'
 	);
 </script>
 
@@ -96,7 +105,17 @@
 						goto(resolve(boardPath(value, orgId)));
 					}
 				}}
-			/>
+			>
+				{#if orgId === undefined || orgs.byId(orgId)?.role === 'admin'}
+					<button
+						class={addButtonClass}
+						onclick={() => setCreatingBoard(true)}
+					>
+						<Icon name="plus" class="w-5 h-5 text-main-text mb-0.5 mr-1" />
+						<span class="min-w-0 flex-1 truncate">Create new</span>
+					</button>
+				{/if}
+			</Dropdown>
 		{/if}
 	</div>
 

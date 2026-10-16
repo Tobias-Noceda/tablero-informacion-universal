@@ -7,6 +7,26 @@ const { list } = vi.hoisted(() => {
 });
 vi.mock('$services/orgs', () => ({ list }));
 
+const session = vi.hoisted(() => {
+	const listeners: ((id: string | null) => void)[] = [];
+	return {
+		user: { id: 'ana' } as { id: string } | null,
+		onUserChange: (fn: (id: string | null) => void) => listeners.push(fn),
+		switchTo(id: string | null) {
+			listeners.forEach((fn) => fn(id));
+			this.user = id ? { id } : null;
+		}
+	};
+});
+vi.mock('$modules/session.svelte', () => ({ session }));
+
+const stored = new Map<string, string>();
+vi.stubGlobal('localStorage', {
+	getItem: (key: string) => stored.get(key) ?? null,
+	setItem: (key: string, value: string) => void stored.set(key, value),
+	removeItem: (key: string) => void stored.delete(key)
+});
+
 const { orgs } = await import('./org.svelte');
 
 function board(org?: string): Board {
@@ -15,6 +35,8 @@ function board(org?: string): Board {
 
 describe('organizations', () => {
 	beforeEach(async () => {
+		stored.clear();
+		session.switchTo('ana');
 		await orgs.refresh();
 	});
 
@@ -50,5 +72,41 @@ describe('organizations', () => {
 		expect(list).not.toHaveBeenCalled();
 		await orgs.refresh();
 		expect(list).toHaveBeenCalledTimes(1);
+	});
+
+	it('forgets the previous user’s organizations when the user changes', async () => {
+		expect(orgs.list).toHaveLength(1);
+		list.mockClear();
+		list.mockResolvedValueOnce([]);
+
+		session.switchTo('bruno');
+		expect(orgs.list).toEqual([]);
+		await orgs.ensure();
+
+		expect(list).toHaveBeenCalledTimes(1);
+		expect(orgs.byId('acme')).toBeUndefined();
+	});
+
+	it('drops a list requested for the previous user', async () => {
+		let release!: (orgs: Org[]) => void;
+		list.mockImplementationOnce(() => new Promise<Org[]>((r) => (release = r)));
+		const stale = orgs.refresh();
+
+		session.switchTo('bruno');
+		release([{ id: 'old', name: 'Old', members: [], created_at: '', role: 'admin' }]);
+		await stale;
+
+		expect(orgs.byId('old')).toBeUndefined();
+	});
+
+	it('remembers the last organization per user', async () => {
+		orgs.remember('acme');
+		session.switchTo('bruno');
+		await orgs.ensure();
+		expect(orgs.last).toBeUndefined();
+
+		session.switchTo('ana');
+		await orgs.ensure();
+		expect(orgs.last).toBe('acme');
 	});
 });

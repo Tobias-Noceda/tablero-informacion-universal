@@ -18,8 +18,14 @@ const ana: Profile = {
 	created_at: '2026-10-04T00:00:00Z'
 };
 
-function sessionBody(token: string): SessionResponse {
-	return { access_token: token, token_type: 'Bearer', expires_in: 900, user: ana };
+const bruno: Profile = {
+	...ana,
+	id: '1c8b5d6f-2222-4333-8444-a55556666777',
+	email: 'bruno@example.com'
+};
+
+function sessionBody(token: string, user = ana): SessionResponse {
+	return { access_token: token, token_type: 'Bearer', expires_in: 900, user };
 }
 
 type Route = { status: number; body?: unknown };
@@ -213,5 +219,61 @@ describe('session', () => {
 		await there.logout();
 		await vi.waitFor(() => expect(here.status).toBe('anonymous'));
 		expect(here.header()).toBeNull();
+	});
+
+	it('tells listeners when the user changes, not when a renewal keeps it', async () => {
+		backend({
+			'POST /v1/auth/login': [
+				{ status: 200, body: sessionBody('t1') },
+				{ status: 200, body: sessionBody('t2', bruno) }
+			],
+			'POST /v1/auth/refresh': { status: 200, body: sessionBody('t1b') }
+		});
+		const session = newSession();
+		const changes: (string | null)[] = [];
+		const seen: (string | undefined)[] = [];
+		session.onUserChange((id) => {
+			changes.push(id);
+			seen.push(session.user?.id);
+		});
+
+		await session.login('ana@example.com', 'pw');
+		await session.refresh();
+		await session.logout();
+		await session.login('bruno@example.com', 'pw');
+
+		expect(changes).toEqual([ana.id, null, bruno.id]);
+		// Listeners run before the new user is visible.
+		expect(seen).toEqual([undefined, ana.id, undefined]);
+	});
+
+	it('tells listeners when another tab signs in as someone else', async () => {
+		backend({
+			'POST /v1/auth/login': [
+				{ status: 200, body: sessionBody('a') },
+				{ status: 200, body: sessionBody('b', bruno) }
+			]
+		});
+		const here = newSession('tiu-session-switch');
+		const there = newSession('tiu-session-switch');
+		await here.login('ana@example.com', 'pw');
+		const changes: (string | null)[] = [];
+		here.onUserChange((id) => changes.push(id));
+
+		await there.login('bruno@example.com', 'pw');
+
+		await vi.waitFor(() => expect(here.user?.id).toBe(bruno.id));
+		expect(changes).toEqual([bruno.id]);
+	});
+
+	it('stops telling a listener once it unsubscribes', async () => {
+		backend({ 'POST /v1/auth/login': { status: 200, body: sessionBody('t1') } });
+		const session = newSession();
+		const listener = vi.fn();
+		session.onUserChange(listener)();
+
+		await session.login('ana@example.com', 'pw');
+
+		expect(listener).not.toHaveBeenCalled();
 	});
 });

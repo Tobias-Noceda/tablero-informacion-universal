@@ -28,6 +28,12 @@
     drawerClass?: string;
     itemClass?: (isSelected: boolean) => string;
     onchange?: (value: string) => void;
+    /**
+     * Optional slot for rendering a last custom item in the dropdown, such as
+     * a "Create new" button. This slot will be rendered after all options and
+     * will not be affected by pagination.
+     */
+    children?: Snippet;
   }
 
   let {
@@ -43,7 +49,8 @@
     activatorClass,
     drawerClass,
     itemClass,
-    onchange
+    onchange,
+    children
   }: Props = $props();
 
   let isOpen = $state(false);
@@ -171,6 +178,9 @@
               <span class="min-w-0 flex-1 truncate">{option.label}</span>
             </button>
           {/each}
+        {/if}
+        {#if children}
+          {@render children()}
         {/if}
       </div>
     {/if}

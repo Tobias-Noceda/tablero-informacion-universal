@@ -1,4 +1,5 @@
 import { writable } from "svelte/store";
+import { session } from "$modules/session.svelte";
 
 const sidebarOpen = writable<'cards' | 'credentials' | null>(null);
 const managingSecrets = writable(false);
@@ -21,3 +22,9 @@ export const setSharing = (value: boolean) => {
 }
 
 export const isSharing = { subscribe: sharing.subscribe };
+
+session.onUserChange(() => {
+    sidebarOpen.set(null);
+    managingSecrets.set(false);
+    sharing.set(false);
+});

@@ -1,5 +1,6 @@
 import { SvelteMap } from 'svelte/reactivity';
 
+import { session } from '$modules/session.svelte';
 import * as postItsApi from '$services/post-it';
 import type { UUID } from '$types/api';
 
@@ -35,6 +36,13 @@ class PostItResults {
 		this.#requests.delete(id);
 		this.#versions.delete(id);
 	}
+
+	clear() {
+		this.#requests.clear();
+		this.#versions.clear();
+	}
 }
 
 export const results = new PostItResults();
+// What a card answered depends on who asked.
+session.onUserChange(() => results.clear());

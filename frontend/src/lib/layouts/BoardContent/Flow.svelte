@@ -1,6 +1,14 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { SvelteFlow, Controls, useSvelteFlow, type Node, type Edge, ConnectionMode, type Connection } from '@xyflow/svelte';
+	import {
+		SvelteFlow,
+		Controls,
+		useSvelteFlow,
+		type Node,
+		type Edge,
+		ConnectionMode,
+		type Connection
+	} from '@xyflow/svelte';
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -27,13 +35,20 @@
 
 	import NodeCreationPanel from '$layouts/NodeCreation/NodeCreationPanel.svelte';
 
-	let { nodes, edges, role, boardId, orgId, boardUpdate }: {
-		nodes: Node[],
-		edges: Edge[],
-		role: BoardRole,
-		boardId: string,
-		orgId?: string,
-		boardUpdate: (update: Update) => void
+	let {
+		nodes,
+		edges,
+		role,
+		boardId,
+		orgId,
+		boardUpdate
+	}: {
+		nodes: Node[];
+		edges: Edge[];
+		role: BoardRole;
+		boardId: string;
+		orgId?: string;
+		boardUpdate: (update: Update) => void;
 	} = $props();
 
 	// Viewers look: no dragging or connecting and no deleting (the board
@@ -61,7 +76,10 @@
 	// immediately pickable when creating a node.
 	$effect(() => {
 		if ($isManagingSecrets || !canEdit) return;
-		secretsApi.usable(boardId).then((s) => (usableSecrets = s)).catch(() => (usableSecrets = []));
+		secretsApi
+			.usable(boardId)
+			.then((s) => (usableSecrets = s))
+			.catch(() => (usableSecrets = []));
 	});
 	let creatingNode = $state<Board['postits'][number] | null>(null);
 	let paramValues = $state<Record<string, string>>({});
@@ -108,7 +126,7 @@
 		creatingNode = {
 			id: uuid(),
 			type: type.current,
-			position,
+			position
 		};
 	};
 
@@ -122,22 +140,23 @@
 	};
 
 	const createNode = (newNode: Node) => {
+		if (!canEdit) return;
 		nodes = [...nodes, { ...newNode }];
 		creatingNode = null;
 		paramValues = {};
 	};
 
 	const deleteNode = async (node: Node) => {
-		await postItsApi.del(node.id)
-			.then((deletedEdges) => {
-				edges = edges.filter((e) => !deletedEdges.map((edge) => edge.id).includes(e.id));
-			});
+		if (!canEdit) return;
+		await postItsApi.del(node.id).then((deletedEdges) => {
+			edges = edges.filter((e) => !deletedEdges.map((edge) => edge.id).includes(e.id));
+		});
 		nodes = nodes.filter((n) => n.id !== node.id);
 		results.drop(node.id);
 	};
 
 	// Node handlers
-	const onNodeClick = async (event: { event: MouseEvent | TouchEvent, node: Node }) => {
+	const onNodeClick = async (event: { event: MouseEvent | TouchEvent; node: Node }) => {
 		event.event.preventDefault();
 		event.event.stopPropagation();
 		if (selectedNodeId === event.node.id) {
@@ -146,25 +165,35 @@
 			openNode(event.node.id);
 		}
 		selectedEdge = null;
-		edges = edges.map((e) => { return { ...e, data: { ...e.data, isSelected: false } } });
+		edges = edges.map((e) => {
+			return { ...e, data: { ...e.data, isSelected: false } };
+		});
 	};
 
-	const onNodeDragStop = async (event: { targetNode: Node | null, nodes: Node[], event: MouseEvent | TouchEvent }) => {
+	const onNodeDragStop = async (event: {
+		targetNode: Node | null;
+		nodes: Node[];
+		event: MouseEvent | TouchEvent;
+	}) => {
 		const node = event.targetNode;
 		if (!node) return;
 		await postItsApi.move(node.id, node.position.x, node.position.y);
 	};
 
 	// Edge handlers
-	const onEdgeClick = async (event: {event: MouseEvent, edge: Edge}) => {
+	const onEdgeClick = async (event: { event: MouseEvent; edge: Edge }) => {
 		event.event.preventDefault();
 		event.event.stopPropagation();
 		if (selectedEdge?.target === event.edge.target && selectedEdge?.source === event.edge.source) {
 			selectedEdge = null;
-			edges = edges.map((e) => { return { ...e, data: { ...e.data, isSelected: false } } });
+			edges = edges.map((e) => {
+				return { ...e, data: { ...e.data, isSelected: false } };
+			});
 		} else {
 			selectedEdge = event.edge;
-			edges = edges.map((e) => { return { ...e, data: { ...e.data, isSelected: e.id === event.edge.id } } });
+			edges = edges.map((e) => {
+				return { ...e, data: { ...e.data, isSelected: e.id === event.edge.id } };
+			});
 		}
 		closeNode();
 	};
@@ -185,7 +214,7 @@
 
 		const newEdge = await edgesApi.connect(boardId, connection.source, connection.target);
 		edges = [...edges, { id: newEdge.id, source: connection.source, target: connection.target }];
-}	;
+	};
 
 	// Keyboard shortcuts
 	const onKeyDown = (event: KeyboardEvent) => {
@@ -277,7 +306,7 @@
 		{creatingNode}
 		{paramValues}
 		{usableSecrets}
-		onclose={() => creatingNode = null}
+		onclose={() => (creatingNode = null)}
 		onCreateNode={createNode}
 	/>
 </div>
