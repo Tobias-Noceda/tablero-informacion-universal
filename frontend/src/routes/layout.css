@@ -117,3 +117,20 @@ html {
 	background-color: var(--app-background);
 	color: var(--app-foreground);
 }
+
+/* No browser focus ring by default. It lives in the base layer, so any
+   utility opts back in: `focus-ring`, or `focus-visible:outline-*` / `focus:ring-*`. */
+@layer base {
+	*:focus,
+	*:focus-visible {
+		outline: none;
+	}
+}
+
+/* The app's focus ring, for elements that should show one on keyboard focus. */
+@utility focus-ring {
+	&:focus-visible {
+		outline: 2px solid var(--color-main);
+		outline-offset: 2px;
+	}
+}

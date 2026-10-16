@@ -216,13 +216,20 @@
 		edges = [...edges, { id: newEdge.id, source: connection.source, target: connection.target }];
 	};
 
-	// Keyboard shortcuts
+	// Backspace in a field of the detail drawer edits the field, not the board.
+	const isTyping = (target: EventTarget | null) =>
+		target instanceof HTMLElement &&
+		(target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
+
+	// Keyboard shortcuts. Svelte Flow's own delete key is off (`deleteKey`):
+	// it would remove cards and strands locally, for viewers too, without
+	// telling the backend.
 	const onKeyDown = (event: KeyboardEvent) => {
 		if (event.key === 'Escape') {
 			closeNode();
 			return;
 		}
-		if (!canEdit) return;
+		if (!canEdit || isTyping(event.target)) return;
 		if (event.key === 'Delete' || event.key === 'Backspace') {
 			if (selectedEdge) {
 				edgesApi.disconnect(boardId, selectedEdge.id);
@@ -277,6 +284,7 @@
 					connectionMode={ConnectionMode.Loose}
 					nodesDraggable={canEdit}
 					nodesConnectable={canEdit}
+					deleteKey={null}
 					ondragover={onDragOver}
 					ondrop={onDrop}
 					onnodeclick={onNodeClick}
