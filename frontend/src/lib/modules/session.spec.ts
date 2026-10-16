@@ -5,6 +5,10 @@ import * as api from './api.svelte';
 
 const goto = vi.hoisted(() => vi.fn());
 vi.mock('$app/navigation', () => ({ goto }));
+vi.mock('$lib/paraglide/runtime', async (original) => ({
+	...(await original<typeof import('$lib/paraglide/runtime')>()),
+	getLocale: () => 'es'
+}));
 
 const { Session } = await import('./session.svelte');
 
@@ -13,6 +17,7 @@ const ana: Profile = {
 	email: 'ana@example.com',
 	email_verified: true,
 	name: 'Ana',
+	locale: 'es',
 	admin: false,
 	identities: ['password'],
 	created_at: '2026-10-04T00:00:00Z'
@@ -147,6 +152,37 @@ describe('session', () => {
 		await session.login('ana@example.com', 'right');
 		expect(session.status).toBe('authenticated');
 		expect(session.header()).toBe('Bearer t1');
+	});
+
+	it('registers in the language the app is shown in', async () => {
+		const fetch = vi.fn(async () => new Response('{}', { status: 202 }));
+		vi.stubGlobal('fetch', fetch);
+		const session = newSession();
+
+		await session.register('ana@example.com', 'correct horse battery', 'Ana');
+
+		const [, init] = fetch.mock.calls[0] as unknown as [URL, RequestInit];
+		expect(JSON.parse(init.body as string)).toMatchObject({
+			email: 'ana@example.com',
+			locale: 'es'
+		});
+	});
+
+	it('starts a google sign-in in the language the app is shown in', async () => {
+		const fetch = vi.fn(
+			async () =>
+				new Response(JSON.stringify({ authorization_url: 'https://accounts.example/auth' }), {
+					status: 200
+				})
+		);
+		vi.stubGlobal('fetch', fetch);
+		const session = newSession();
+
+		expect(await session.googleStart('/board/9')).toBe('https://accounts.example/auth');
+
+		const [url] = fetch.mock.calls[0] as unknown as [URL];
+		expect(new URL(url).searchParams.get('locale')).toBe('es');
+		expect(new URL(url).searchParams.get('next')).toBe('/board/9');
 	});
 
 	it('finishes a google sign-in and hands back where to go', async () => {

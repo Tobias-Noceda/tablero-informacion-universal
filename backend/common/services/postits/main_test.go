@@ -397,6 +397,7 @@ func TestViewer_ReadsAndRunsButCannotChangeCards(t *testing.T) {
 	changes["title"] = svc.EditTitlePostIt(viewer, id, models.BoardPostItTitle{Text: "Hi"})
 	changes["update"] = svc.UpdatePostIt(viewer, id, map[string]any{"rate": 5})
 	changes["move"] = svc.MovePostIt(viewer, id, models.Position{})
+	changes["title"] = svc.EditTitlePostIt(viewer, id, models.BoardPostItTitle{Text: "Hi"})
 	_, changes["delete"] = svc.DeletePostIt(viewer, id)
 	for name, err := range changes {
 		if !errors.Is(err, ErrNotAMember) {

@@ -147,7 +147,9 @@
 		"identity_password": "Contraseña",
 		"add_password_hint": "Solo iniciás sesión con Google. Con una contraseña podés entrar sin Google; te mandamos un link por email para elegirla.",
 		"add_password": "Elegir una contraseña",
-		"save_failed": "No se pudo guardar el nombre."
+		"save_failed": "No se pudo guardar el nombre.",
+		"language": "Idioma",
+		"language_hint": "Los mails de la plataforma te llegan en este idioma."
 	},
 	"header": {
 		"profile": "Perfil",

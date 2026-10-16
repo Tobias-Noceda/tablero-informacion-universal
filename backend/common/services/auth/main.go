@@ -101,7 +101,9 @@ func New(config Config, users infrastructure.UserStore, sessions infrastructure.
 }
 
 // Register never says whether the email was known: the answer goes by mail.
-func (srv *AuthService) Register(email, password, name, origin, client string) error {
+// locale is the language the person is using; a bad one is not worth
+// failing a sign-up over, so it falls back to the default.
+func (srv *AuthService) Register(email, password, name, locale, origin, client string) error {
 	email = models.NormalizeEmail(email)
 	name = strings.TrimSpace(name)
 	if !models.ValidEmail(email) {
@@ -130,6 +132,7 @@ func (srv *AuthService) Register(email, password, name, origin, client string) e
 			Id:         uuid.New(),
 			Email:      email,
 			Name:       name,
+			Locale:     models.ParseLocale(locale),
 			Admin:      srv.admins[email],
 			Identities: []models.Identity{{Provider: models.IdentityPassword, Hash: hash}},
 			CreatedAt:  now,
@@ -142,16 +145,13 @@ func (srv *AuthService) Register(email, password, name, origin, client string) e
 	case err != nil:
 		return err
 	case existing.EmailVerified:
-		return srv.mailer.Send(models.Mail{
-			To:      email,
-			Subject: "You already have an account",
-			Text:    "Someone tried to sign up with this address, which already has an account. If it was you and you forgot your password, reset it at " + origin + "/forgot",
-		})
+		return srv.mail(existing, models.MailAccountExists, origin+"/forgot")
 	default:
 		if err := srv.users.ReplaceIdentities(existing.Id, withIdentity(existing.Identities, models.Identity{Provider: models.IdentityPassword, Hash: hash})); err != nil {
 			return err
 		}
-		if err := srv.users.UpdateUser(existing.Id, map[string]any{"name": name}); err != nil {
+		existing.Name, existing.Locale = name, models.ParseLocale(locale)
+		if err := srv.users.UpdateUser(existing.Id, map[string]any{"name": existing.Name, "locale": existing.Locale}); err != nil {
 			return err
 		}
 		return srv.sendVerification(existing, origin)
@@ -283,11 +283,7 @@ func (srv *AuthService) ForgotPassword(email, origin, client string) error {
 		return err
 	}
 
-	return srv.mailer.Send(models.Mail{
-		To:      user.Email,
-		Subject: "Reset your password",
-		Text:    "Choose a new password at " + origin + "/reset?token=" + token + " (valid for one hour). If you did not ask for this, ignore this mail.",
-	})
+	return srv.mail(user, models.MailResetPassword, origin+"/reset?token="+token)
 }
 
 // ResetPassword proves ownership of the mailbox, so it also verifies the
@@ -377,10 +373,16 @@ func (srv *AuthService) sendVerification(user *models.User, origin string) error
 		return err
 	}
 
+	return srv.mail(user, models.MailVerifyEmail, origin+"/verify?token="+token)
+}
+
+// mail writes to a user in their own language, whoever triggered it.
+func (srv *AuthService) mail(user *models.User, template models.MailTemplate, link string) error {
 	return srv.mailer.Send(models.Mail{
-		To:      user.Email,
-		Subject: "Verify your email",
-		Text:    "Welcome, " + user.Name + ". Confirm your address at " + origin + "/verify?token=" + token + " (valid for 24 hours).",
+		To:       user.Email,
+		Locale:   user.PreferredLocale(),
+		Template: template,
+		Vars:     map[string]string{"Name": user.Name, "Link": link},
 	})
 }
 

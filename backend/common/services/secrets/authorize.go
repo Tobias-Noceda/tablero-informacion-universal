@@ -81,7 +81,7 @@ func (srv *SecretsService) Authorize(scope models.SecretScope, principal models.
 		return "", err
 	}
 
-	if err := srv.handshakes.Put(handshakeKey(state), handshake, HANDSHAKE_TTL); err != nil {
+	if err := srv.handshakes.Put(handshakeKey(principal.ID, state), handshake, HANDSHAKE_TTL); err != nil {
 		return "", err
 	}
 
@@ -112,7 +112,11 @@ func (srv *SecretsService) Callback(principal models.Principal, state, code stri
 		return fmt.Errorf("Missing state or code")
 	}
 
-	raw, err := srv.handshakes.Take(handshakeKey(state))
+	if principal.Anonymous() {
+		return fmt.Errorf("Unknown or expired authorization")
+	}
+
+	raw, err := srv.handshakes.Take(handshakeKey(principal.ID, state))
 	if err != nil {
 		return fmt.Errorf("Unknown or expired authorization")
 	}
@@ -122,7 +126,7 @@ func (srv *SecretsService) Callback(principal models.Principal, state, code stri
 		return err
 	}
 
-	if principal.Anonymous() || handshake.Principal != principal.ID {
+	if handshake.Principal != principal.ID {
 		return fmt.Errorf("Unknown or expired authorization")
 	}
 
@@ -142,8 +146,10 @@ func (srv *SecretsService) Callback(principal models.Principal, state, code stri
 	return srv.sealMaterial(secret.Scope, secret.Name, material, true)
 }
 
-func handshakeKey(state string) string {
-	return "oauth-handshake:" + state
+// handshakeKey files the handshake under the user who started it, so a state
+// presented by anyone else finds nothing and cannot spend it.
+func handshakeKey(principal, state string) string {
+	return "oauth-handshake:" + principal + ":" + state
 }
 
 // material loads and decrypts an OAuth2 credential by name.

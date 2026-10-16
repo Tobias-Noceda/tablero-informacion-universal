@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
@@ -16,6 +17,7 @@ import (
 const (
 	origin   = "http://localhost"
 	client   = "10.0.0.1"
+	locale   = "en"
 	password = "correct horse battery"
 )
 
@@ -67,16 +69,16 @@ func (f *fixture) lastToken(t *testing.T) string {
 	if !ok {
 		t.Fatal("no mail sent")
 	}
-	m := linkToken.FindStringSubmatch(mail.Text)
+	m := linkToken.FindStringSubmatch(mail.Vars["Link"])
 	if m == nil {
-		t.Fatalf("no token in mail: %q", mail.Text)
+		t.Fatalf("no token in mail: %q", mail.Vars["Link"])
 	}
 	return m[1]
 }
 
 func (f *fixture) signUp(t *testing.T, email string) *Tokens {
 	t.Helper()
-	if err := f.svc.Register(email, password, "Ana", origin, client); err != nil {
+	if err := f.svc.Register(email, password, "Ana", locale, origin, client); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 	tokens, err := f.svc.VerifyEmail(f.lastToken(t))
@@ -89,7 +91,7 @@ func (f *fixture) signUp(t *testing.T, email string) *Tokens {
 func TestRegister_CreatesUnverifiedUserAndMailsALink(t *testing.T) {
 	f := newFixture(t)
 
-	if err := f.svc.Register("  Ana@Example.com ", password, " Ana ", origin, client); err != nil {
+	if err := f.svc.Register("  Ana@Example.com ", password, " Ana ", locale, origin, client); err != nil {
 		t.Fatalf("register: %v", err)
 	}
 
@@ -105,10 +107,10 @@ func TestRegister_CreatesUnverifiedUserAndMailsALink(t *testing.T) {
 	}
 
 	mail, _ := f.mailer.Last()
-	if mail.To != "ana@example.com" || !strings.Contains(mail.Text, origin+"/verify?token=") {
+	if mail.To != "ana@example.com" || !strings.Contains(mail.Vars["Link"], origin+"/verify?token=") {
 		t.Errorf("mail = %+v", mail)
 	}
-	if strings.Contains(mail.Text, password) {
+	if strings.Contains(fmt.Sprint(mail.Vars), password) {
 		t.Error("mail must not contain the password")
 	}
 }
@@ -126,7 +128,7 @@ func TestRegister_ValidatesInput(t *testing.T) {
 		{"empty name", "ana@example.com", password, "  ", ErrInvalidName},
 	}
 	for _, c := range cases {
-		if err := f.svc.Register(c.email, c.pw, c.display, origin, client); !errors.Is(err, c.want) {
+		if err := f.svc.Register(c.email, c.pw, c.display, locale, origin, client); !errors.Is(err, c.want) {
 			t.Errorf("%s: err = %v, want %v", c.name, err, c.want)
 		}
 	}
@@ -140,7 +142,7 @@ func TestRegister_DoesNotRevealExistingAccounts(t *testing.T) {
 	f.signUp(t, "ana@example.com")
 	sent := len(f.mailer.Mails)
 
-	if err := f.svc.Register("ana@example.com", "another password", "Eve", origin, client); err != nil {
+	if err := f.svc.Register("ana@example.com", "another password", "Eve", locale, origin, client); err != nil {
 		t.Fatalf("second register must look like success: %v", err)
 	}
 	if len(f.users.Users) != 1 {
@@ -150,8 +152,8 @@ func TestRegister_DoesNotRevealExistingAccounts(t *testing.T) {
 		t.Fatal("the existing account must be told, by mail only")
 	}
 	mail, _ := f.mailer.Last()
-	if !strings.Contains(mail.Text, "/forgot") || strings.Contains(mail.Text, "token=") {
-		t.Errorf("mail to a verified account must point at password reset, got %q", mail.Text)
+	if !strings.Contains(mail.Vars["Link"], "/forgot") || strings.Contains(mail.Vars["Link"], "token=") {
+		t.Errorf("mail to a verified account must point at password reset, got %q", mail.Vars["Link"])
 	}
 
 	if _, err := f.svc.Login("ana@example.com", "another password", client); !errors.Is(err, ErrInvalidCredentials) {
@@ -161,12 +163,12 @@ func TestRegister_DoesNotRevealExistingAccounts(t *testing.T) {
 
 func TestRegister_UnverifiedAccountCanBeReRegistered(t *testing.T) {
 	f := newFixture(t)
-	if err := f.svc.Register("ana@example.com", password, "Ana", origin, client); err != nil {
+	if err := f.svc.Register("ana@example.com", password, "Ana", locale, origin, client); err != nil {
 		t.Fatal(err)
 	}
 	first := f.lastToken(t)
 
-	if err := f.svc.Register("ana@example.com", "second password!", "Ana B", origin, client); err != nil {
+	if err := f.svc.Register("ana@example.com", "second password!", "Ana B", locale, origin, client); err != nil {
 		t.Fatal(err)
 	}
 	second := f.lastToken(t)
@@ -187,7 +189,7 @@ func TestRegister_UnverifiedAccountCanBeReRegistered(t *testing.T) {
 
 func TestVerifyEmail_IsSingleUseAndIssuesASession(t *testing.T) {
 	f := newFixture(t)
-	if err := f.svc.Register("ana@example.com", password, "Ana", origin, client); err != nil {
+	if err := f.svc.Register("ana@example.com", password, "Ana", locale, origin, client); err != nil {
 		t.Fatal(err)
 	}
 	token := f.lastToken(t)
@@ -255,7 +257,7 @@ func (h *countingHasher) Compare(encoded, pw string) (bool, error) {
 
 func TestLogin_RequiresVerifiedEmail(t *testing.T) {
 	f := newFixture(t)
-	if err := f.svc.Register("ana@example.com", password, "Ana", origin, client); err != nil {
+	if err := f.svc.Register("ana@example.com", password, "Ana", locale, origin, client); err != nil {
 		t.Fatal(err)
 	}
 
@@ -388,8 +390,8 @@ func TestForgotAndReset_RevokeEverySession(t *testing.T) {
 		t.Fatal("reset mail not sent")
 	}
 	mail, _ := f.mailer.Last()
-	if !strings.Contains(mail.Text, origin+"/reset?token=") {
-		t.Errorf("mail = %q", mail.Text)
+	if !strings.Contains(mail.Vars["Link"], origin+"/reset?token=") {
+		t.Errorf("mail = %q", mail.Vars["Link"])
 	}
 	token := f.lastToken(t)
 

@@ -14,7 +14,44 @@ import (
 
 var _ infrastructure.UserStore = (*MongoDB)(nil)
 
+// LEGACY_IDENTITY_INDEX indexed identities.provider + identities.subject.
+// Its partial filter admits whole documents, so the subject-less password
+// identity of every user with Google linked indexed (password, null) and the
+// second such user collided with the first.
+const LEGACY_IDENTITY_INDEX = "identities.provider_1_identities.subject_1"
+
+const (
+	NAMESPACE_NOT_FOUND = 26
+	INDEX_NOT_FOUND     = 27
+)
+
+// userDocument stores the user next to the keys of its external identities:
+// a top level array that holds only the identities with a subject, which is
+// what keeps them unique across users.
+type userDocument struct {
+	models.User  `bson:",inline"`
+	IdentityKeys []string `bson:"identitykeys,omitempty"`
+}
+
+func identityKey(provider models.IdentityProvider, subject string) string {
+	return string(provider) + ":" + subject
+}
+
+func identityKeys(identities []models.Identity) []string {
+	var keys []string
+	for _, identity := range identities {
+		if identity.Subject != "" {
+			keys = append(keys, identityKey(identity.Provider, identity.Subject))
+		}
+	}
+	return keys
+}
+
 func (db *MongoDB) ensureUserIndexes() error {
+	if err := db.upgradeIdentityIndex(); err != nil {
+		return err
+	}
+
 	ctx, cancel := timeout()
 	defer cancel()
 
@@ -24,20 +61,56 @@ func (db *MongoDB) ensureUserIndexes() error {
 			Options: options.Index().SetUnique(true),
 		},
 		{
-			Keys: bson.D{{Key: "identities.provider", Value: 1}, {Key: "identities.subject", Value: 1}},
+			Keys: bson.D{{Key: "identitykeys", Value: 1}},
 			Options: options.Index().SetUnique(true).
-				SetPartialFilterExpression(bson.M{"identities.subject": bson.M{"$exists": true}}),
+				SetPartialFilterExpression(bson.M{"identitykeys": bson.M{"$exists": true}}),
 		},
 	})
 
 	return err
 }
 
+// upgradeIdentityIndex drops LEGACY_IDENTITY_INDEX and fills identitykeys in
+// the users stored before it existed.
+func (db *MongoDB) upgradeIdentityIndex() error {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	if err := db.users.Indexes().DropOne(ctx, LEGACY_IDENTITY_INDEX); err != nil {
+		var command mongo.CommandError
+		if !errors.As(err, &command) || (command.Code != NAMESPACE_NOT_FOUND && command.Code != INDEX_NOT_FOUND) {
+			return err
+		}
+	}
+
+	cursor, err := db.users.Find(ctx, bson.M{
+		"identities.subject": bson.M{"$exists": true},
+		"identitykeys":       bson.M{"$exists": false},
+	})
+	if err != nil {
+		return err
+	}
+
+	var users []models.User
+	if err := cursor.All(ctx, &users); err != nil {
+		return err
+	}
+
+	for _, user := range users {
+		set := bson.M{"identitykeys": identityKeys(user.Identities)}
+		if _, err := db.users.UpdateOne(ctx, bson.M{"_id": user.Id}, bson.M{"$set": set}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (db *MongoDB) CreateUser(user *models.User) error {
 	ctx, cancel := timeout()
 	defer cancel()
 
-	_, err := db.users.InsertOne(ctx, user)
+	_, err := db.users.InsertOne(ctx, userDocument{User: *user, IdentityKeys: identityKeys(user.Identities)})
 	if mongo.IsDuplicateKeyError(err) {
 		return infrastructure.ErrEmailTaken
 	}
@@ -53,7 +126,7 @@ func (db *MongoDB) FindUserByEmail(email string) (*models.User, error) {
 }
 
 func (db *MongoDB) FindUserByIdentity(provider models.IdentityProvider, subject string) (*models.User, error) {
-	return db.findUser(bson.M{"identities": bson.M{"$elemMatch": bson.M{"provider": provider, "subject": subject}}})
+	return db.findUser(bson.M{"identitykeys": identityKey(provider, subject)})
 }
 
 func (db *MongoDB) findUser(filter bson.M) (*models.User, error) {
@@ -113,5 +186,24 @@ func (db *MongoDB) UpdateUser(id uuid.UUID, set map[string]any) error {
 }
 
 func (db *MongoDB) ReplaceIdentities(id uuid.UUID, identities []models.Identity) error {
-	return db.UpdateUser(id, map[string]any{"identities": identities})
+	ctx, cancel := timeout()
+	defer cancel()
+
+	set := bson.M{"identities": identities, "updatedat": time.Now().UTC()}
+	update := bson.M{"$set": set}
+	if keys := identityKeys(identities); len(keys) > 0 {
+		set["identitykeys"] = keys
+	} else {
+		update["$unset"] = bson.M{"identitykeys": ""}
+	}
+
+	res, err := db.users.UpdateOne(ctx, bson.M{"_id": id}, update)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return infrastructure.ErrUserNotFound
+	}
+
+	return nil
 }

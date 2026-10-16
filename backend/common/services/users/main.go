@@ -10,8 +10,10 @@ import (
 )
 
 var (
-	ErrForbidden   = infrastructure.ErrForbidden
-	ErrInvalidName = errors.New("invalid name")
+	ErrForbidden       = infrastructure.ErrForbidden
+	ErrInvalidName     = errors.New("invalid name")
+	ErrInvalidLocale   = errors.New("invalid_locale")
+	ErrNothingToUpdate = errors.New("no fields to update")
 )
 
 type UserService struct {
@@ -46,20 +48,47 @@ func (srv *UserService) Summary(principal models.Principal, id uuid.UUID) (*mode
 	return &summary, nil
 }
 
-func (srv *UserService) Rename(principal models.Principal, id uuid.UUID, name string) (*models.Profile, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		return nil, ErrInvalidName
+// Changes is what a user may edit about themselves; nil leaves a field as
+// it is.
+type Changes struct {
+	Name   *string
+	Locale *string
+}
+
+// Update validates every change before applying any.
+func (srv *UserService) Update(principal models.Principal, id uuid.UUID, changes Changes) (*models.Profile, error) {
+	set := map[string]any{}
+	if changes.Name != nil {
+		name := strings.TrimSpace(*changes.Name)
+		if name == "" {
+			return nil, ErrInvalidName
+		}
+		set["name"] = name
+	}
+	if changes.Locale != nil {
+		locale, ok := models.SupportedLocale(*changes.Locale)
+		if !ok {
+			return nil, ErrInvalidLocale
+		}
+		set["locale"] = locale
+	}
+	if len(set) == 0 {
+		return nil, ErrNothingToUpdate
 	}
 
 	user, err := srv.self(principal, id)
 	if err != nil {
 		return nil, err
 	}
-	if err := srv.users.UpdateUser(user.Id, map[string]any{"name": name}); err != nil {
+	if err := srv.users.UpdateUser(user.Id, set); err != nil {
 		return nil, err
 	}
-	user.Name = name
+	if name, ok := set["name"].(string); ok {
+		user.Name = name
+	}
+	if locale, ok := set["locale"].(models.Locale); ok {
+		user.Locale = locale
+	}
 
 	profile := user.Profile()
 	return &profile, nil

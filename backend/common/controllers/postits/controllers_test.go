@@ -332,7 +332,7 @@ func TestCreatePostIt_ServiceError(t *testing.T) {
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPost, "/post-its", `{"board":"`+uuid.New().String()+`","well_known": "riesgo_pais"}`)
+	w := do(r, http.MethodPost, "/post-its", `{"board":"`+uuid.New().String()+`","well_known":"riesgo_pais"}`)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
 	}
@@ -436,6 +436,7 @@ func TestCardRoutes_OutsiderGetsNotFound(t *testing.T) {
 		{http.MethodGet, card + "/settings", ""},
 		{http.MethodPatch, card + "/settings", `{"rate":1}`},
 		{http.MethodPatch, card + "/position", `{"x":1,"y":2}`},
+		{http.MethodPatch, card + "/title", `{"title":{"text":"x"}}`},
 		{http.MethodDelete, card, ""},
 	} {
 		if w := doAs(r, "someone-else", tc.method, tc.path, tc.body); w.Code != http.StatusNotFound {

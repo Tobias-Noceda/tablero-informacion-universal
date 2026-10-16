@@ -2,12 +2,15 @@ package main
 
 import (
 	"fmt"
+	netmail "net/mail"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
+	"github.com/Secreto31126/tesis/common/models"
+	"github.com/Secreto31126/tesis/common/ports/mail"
 	"github.com/Secreto31126/tesis/common/ports/oidc"
 )
 
@@ -19,6 +22,8 @@ const (
 	ENV_GOOGLE_ISSUER        = "GOOGLE_ISSUER"
 	ENV_GOOGLE_CLIENT_ID     = "GOOGLE_SIGNIN_CLIENT_ID"
 	ENV_GOOGLE_CLIENT_SECRET = "GOOGLE_SIGNIN_CLIENT_SECRET"
+	ENV_RESEND_API_KEY       = "RESEND_API_KEY"
+	ENV_MAIL_FROM            = "MAIL_FROM"
 
 	DEFAULT_ACCESS_TTL  = 15 * time.Minute
 	DEFAULT_REFRESH_TTL = 30 * 24 * time.Hour
@@ -33,6 +38,8 @@ type config struct {
 	accessTTL    time.Duration
 	refreshTTL   time.Duration
 	google       oidc.Config
+	resendAPIKey string
+	mailFrom     string
 }
 
 func loadConfig() (config, error) {
@@ -46,10 +53,16 @@ func loadConfig() (config, error) {
 			ClientID:     os.Getenv(ENV_GOOGLE_CLIENT_ID),
 			ClientSecret: os.Getenv(ENV_GOOGLE_CLIENT_SECRET),
 		},
+		resendAPIKey: strings.TrimSpace(os.Getenv(ENV_RESEND_API_KEY)),
+		mailFrom:     strings.TrimSpace(os.Getenv(ENV_MAIL_FROM)),
 	}
 
 	if (cfg.google.ClientID == "") != (cfg.google.ClientSecret == "") {
 		return cfg, fmt.Errorf("%s and %s go together: set both to enable Google sign-in, or neither", ENV_GOOGLE_CLIENT_ID, ENV_GOOGLE_CLIENT_SECRET)
+	}
+
+	if cfg.resendAPIKey != "" && !validSender(cfg.mailFrom) {
+		return cfg, fmt.Errorf("%s needs %s: an address on a domain verified in Resend, like \"Tablero <no-reply@example.com>\"", ENV_RESEND_API_KEY, ENV_MAIL_FROM)
 	}
 
 	if raw := os.Getenv(ENV_AUTH_COOKIE_SECURE); raw != "" {
@@ -84,6 +97,19 @@ func (cfg config) identityProvider() infrastructure.IdentityProvider {
 		return nil
 	}
 	return oidc.New(cfg.google)
+}
+
+// mailSender is Resend, or the log when no API key is configured.
+func (cfg config) mailSender() mail.Sender {
+	if cfg.resendAPIKey == "" {
+		return mail.LogSender{}
+	}
+	return mail.NewResendSender(cfg.resendAPIKey, cfg.mailFrom)
+}
+
+func validSender(from string) bool {
+	parsed, err := netmail.ParseAddress(from)
+	return err == nil && models.ValidEmail(parsed.Address)
 }
 
 func splitList(raw string) []string {

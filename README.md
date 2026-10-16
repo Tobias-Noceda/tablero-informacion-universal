@@ -36,6 +36,7 @@ Then fill in:
 | `AUTH_SIGNING_KEYS` | `echo "k1:$(openssl rand -base64 32)"`, the key ring that signs sessions |
 | `PLATFORM_ADMINS` | Your email: whoever signs in with it is a platform admin |
 | `AUTH_COOKIE_SECURE` | `false` over plain HTTP (`http://localhost`, a LAN IP); leave it `true` behind HTTPS |
+| `RESEND_API_KEY`, `MAIL_FROM` | Optional. A [Resend](https://resend.com) API key and a sender on a domain verified there, to actually send mail. Leave the key empty in development |
 
 Both take a comma-separated list so keys can rotate (see [Key rotation](#key-rotation)).
 
@@ -51,7 +52,7 @@ Mongo runs as a single-node replica set because the realtime service needs chang
 
 ### 4. Create your account
 
-1. **Register** at `/register`. There is no mail server in development: the verification link is written to the backend log.
+1. **Register** at `/register`. Without `RESEND_API_KEY` no mail is sent: the verification link is written to the backend log.
 
    ```bash
    docker compose logs backend | grep "mail to"

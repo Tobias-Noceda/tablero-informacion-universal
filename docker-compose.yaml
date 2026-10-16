@@ -23,6 +23,8 @@ services:
       GOOGLE_ISSUER: ${GOOGLE_ISSUER:-}
       GOOGLE_SIGNIN_CLIENT_ID: ${GOOGLE_SIGNIN_CLIENT_ID:-}
       GOOGLE_SIGNIN_CLIENT_SECRET: ${GOOGLE_SIGNIN_CLIENT_SECRET:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      MAIL_FROM: ${MAIL_FROM:-}
     networks:
       - mongo
       - redis

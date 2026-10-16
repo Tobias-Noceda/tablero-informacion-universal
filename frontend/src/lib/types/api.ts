@@ -1,3 +1,5 @@
+import type { Locale } from '$lib/paraglide/runtime';
+
 export type UUID = string;
 
 export type Envs = {
@@ -15,6 +17,8 @@ export type Profile = {
     email_verified: boolean;
     name: string;
     picture?: string;
+    // The language their mails arrive in.
+    locale: Locale;
     admin: boolean;
     identities: IdentityProvider[];
     created_at: string;
