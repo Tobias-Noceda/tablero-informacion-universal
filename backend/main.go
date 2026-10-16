@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/Secreto31126/tesis/common/ports/crypto"
+	"github.com/Secreto31126/tesis/common/ports/jwt"
+	"github.com/Secreto31126/tesis/common/ports/mail"
 	"github.com/Secreto31126/tesis/common/ports/mongo"
 	"github.com/Secreto31126/tesis/common/ports/redis"
 )
@@ -35,7 +37,17 @@ func main() {
 		panic(err)
 	}
 
-	application := newApp(db, cache, kek)
+	keys, err := jwt.New()
+	if err != nil {
+		panic(err)
+	}
+
+	cfg, err := loadConfig()
+	if err != nil {
+		panic(err)
+	}
+
+	application := newApp(db, cache, kek, keys, cfg, mail.Log{})
 
 	maintenance, err := parseMaintenance(os.Args[1:])
 	if err != nil {

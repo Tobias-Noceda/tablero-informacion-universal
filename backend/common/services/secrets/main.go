@@ -25,6 +25,7 @@ type SecretsService struct {
 	locks      infrastructure.Locker
 	handshakes infrastructure.HandshakeStore
 	groups     infrastructure.GroupReader
+	access     infrastructure.Access
 }
 
 func New(
@@ -35,8 +36,9 @@ func New(
 	locks infrastructure.Locker,
 	handshakes infrastructure.HandshakeStore,
 	groups infrastructure.GroupReader,
+	access infrastructure.Access,
 ) *SecretsService {
-	return &SecretsService{store, policy, keyring, tokens, locks, handshakes, groups}
+	return &SecretsService{store, policy, keyring, tokens, locks, handshakes, groups, access}
 }
 
 // aad binds a ciphertext to the scope and name it was created under.
@@ -193,7 +195,8 @@ func (srv *SecretsService) ListSystem(principal models.Principal) ([]models.Syst
 // MissingSystemSecrets names the platform credentials the code references
 // that nobody has provisioned yet. Meant for a startup warning.
 func (srv *SecretsService) MissingSystemSecrets() ([]models.SystemSecretName, error) {
-	statuses, err := srv.ListSystem(models.Principal{})
+	// The boot check runs as the platform itself.
+	statuses, err := srv.ListSystem(models.Principal{Admin: true})
 	if err != nil {
 		return nil, err
 	}

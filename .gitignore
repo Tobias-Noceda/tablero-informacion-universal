@@ -32,3 +32,4 @@ go.work.sum
 .vercel
 .env*
 !.env.example
+/.claude

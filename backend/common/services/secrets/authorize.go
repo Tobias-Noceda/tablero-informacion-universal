@@ -17,10 +17,12 @@ import (
 const HANDSHAKE_TTL = 10 * time.Minute
 
 type pending struct {
-	Scope    models.SecretScope `json:"scope"`
-	Name     string             `json:"name"`
-	Verifier string             `json:"verifier"`
-	Redirect string             `json:"redirect"`
+	// Principal started the consent and is the only one who may finish it.
+	Principal string             `json:"principal"`
+	Scope     models.SecretScope `json:"scope"`
+	Name      string             `json:"name"`
+	Verifier  string             `json:"verifier"`
+	Redirect  string             `json:"redirect"`
 }
 
 func randomURLSafe(bytes int) (string, error) {
@@ -69,16 +71,17 @@ func (srv *SecretsService) Authorize(scope models.SecretScope, principal models.
 	}
 
 	handshake, err := json.Marshal(&pending{
-		Scope:    scope,
-		Name:     name,
-		Verifier: verifier,
-		Redirect: redirectURI,
+		Principal: principal.ID,
+		Scope:     scope,
+		Name:      name,
+		Verifier:  verifier,
+		Redirect:  redirectURI,
 	})
 	if err != nil {
 		return "", err
 	}
 
-	if err := srv.handshakes.Put(handshakeKey(state), handshake, HANDSHAKE_TTL); err != nil {
+	if err := srv.handshakes.Put(handshakeKey(principal.ID, state), handshake, HANDSHAKE_TTL); err != nil {
 		return "", err
 	}
 
@@ -104,12 +107,16 @@ func (srv *SecretsService) Authorize(scope models.SecretScope, principal models.
 	return target.String(), nil
 }
 
-func (srv *SecretsService) Callback(state, code string) error {
+func (srv *SecretsService) Callback(principal models.Principal, state, code string) error {
 	if state == "" || code == "" {
 		return fmt.Errorf("Missing state or code")
 	}
 
-	raw, err := srv.handshakes.Take(handshakeKey(state))
+	if principal.Anonymous() {
+		return fmt.Errorf("Unknown or expired authorization")
+	}
+
+	raw, err := srv.handshakes.Take(handshakeKey(principal.ID, state))
 	if err != nil {
 		return fmt.Errorf("Unknown or expired authorization")
 	}
@@ -117,6 +124,10 @@ func (srv *SecretsService) Callback(state, code string) error {
 	var handshake pending
 	if err := json.Unmarshal(raw, &handshake); err != nil {
 		return err
+	}
+
+	if handshake.Principal != principal.ID {
+		return fmt.Errorf("Unknown or expired authorization")
 	}
 
 	material, secret, err := srv.material(handshake.Scope, handshake.Name)
@@ -135,8 +146,10 @@ func (srv *SecretsService) Callback(state, code string) error {
 	return srv.sealMaterial(secret.Scope, secret.Name, material, true)
 }
 
-func handshakeKey(state string) string {
-	return "oauth-handshake:" + state
+// handshakeKey files the handshake under the user who started it, so a state
+// presented by anyone else finds nothing and cannot spend it.
+func handshakeKey(principal, state string) string {
+	return "oauth-handshake:" + principal + ":" + state
 }
 
 // material loads and decrypts an OAuth2 credential by name.
