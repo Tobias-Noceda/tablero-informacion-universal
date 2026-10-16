@@ -26,14 +26,14 @@ export function claimsOf(token: string): Claims | null {
     }
 }
 
-// The caller's role on a board, as `GET /v1/boards/:id` answers it. Anything but
+// The caller's role on a board, as `GET /api/v1/boards/:id` answers it. Anything but
 // a 200 with a known role means no access, an outage included.
 export function boardRoles(timeoutMs = 5000): RoleLookup {
     return async (token, board) => {
         try {
             const res = await fetch(
                 new URL(
-                    `/v1/boards/${encodeURIComponent(board)}`,
+                    `/api/v1/boards/${encodeURIComponent(board)}`,
                     process.env.API_URL,
                 ),
                 {
