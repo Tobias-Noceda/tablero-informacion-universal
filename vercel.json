@@ -8,7 +8,15 @@
         },
         "realtime": {
             "root": "realtime/",
-            "framework": "node"
+            "framework": "node",
+            "bindings": [
+                {
+                    "type": "service",
+                    "service": "backend",
+                    "format": "url",
+                    "env": "API_URL"
+                }
+            ]
         },
         "frontend": {
             "root": "frontend/",
