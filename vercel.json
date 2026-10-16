@@ -10,9 +10,21 @@
             "root": "realtime/",
             "framework": "node"
         },
+        "mcp": {
+            "root": "mcp/",
+            "framework": "xmcp",
+            "bindings": [
+                {
+                    "type": "service",
+                    "service": "backend",
+                    "format": "url",
+                    "env": "API_URL"
+                }
+            ]
+        },
         "frontend": {
             "root": "frontend/",
-            "framework": "sveltekit"
+            "framework": "sveltekit-1"
         }
     },
     "rewrites": [
@@ -26,6 +38,12 @@
             "source": "/api/(.*)",
             "destination": {
                 "service": "backend"
+            }
+        },
+        {
+            "source": "/mcp/(.*)",
+            "destination": {
+                "service": "mcp"
             }
         },
         {
