@@ -1,5 +1,6 @@
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { getLocale } from '$lib/paraglide/runtime';
 import * as auth from '$services/auth';
 import type { Profile, SessionResponse } from '$types/api';
 import * as api from './api.svelte';
@@ -75,7 +76,7 @@ export class Session implements api.Authenticator {
 	}
 
 	register(email: string, password: string, name: string) {
-		return auth.register(email, password, name);
+		return auth.register(email, password, name, getLocale());
 	}
 
 	async verify(token: string) {
@@ -91,7 +92,7 @@ export class Session implements api.Authenticator {
 	}
 
 	googleStart(next: string) {
-		return auth.googleStart(next);
+		return auth.googleStart(next, getLocale());
 	}
 
 	async googleCallback(code: string, state: string) {

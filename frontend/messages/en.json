@@ -140,7 +140,9 @@
 		"identity_password": "Password",
 		"add_password_hint": "You sign in with Google only. A password lets you sign in without it; we email you a link to choose one.",
 		"add_password": "Set a password",
-		"save_failed": "The name could not be saved."
+		"save_failed": "The name could not be saved.",
+		"language": "Language",
+		"language_hint": "Emails from the platform arrive in this language."
 	},
 	"header": {
 		"profile": "Profile",

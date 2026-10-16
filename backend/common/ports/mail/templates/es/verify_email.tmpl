@@ -1,0 +1,23 @@
+{{define "subject"}}Confirmá tu dirección de email{{end}}
+
+{{define "preheader"}}Un clic y tu cuenta queda lista.{{end}}
+
+{{define "heading"}}Confirmá tu email{{end}}
+
+{{define "html"}}
+<p style="margin: 0 0 16px;">Gracias por registrarte en Tablero de Información Universal. Confirmá que esta dirección es tuya para activar tu cuenta y empezar a armar tus tableros.</p>
+{{end}}
+
+{{define "action"}}Confirmar email{{end}}
+
+{{define "note"}}Este link vence en 24 horas. Si no creaste una cuenta, podés ignorar este correo: la cuenta no se activa sin tu confirmación.{{end}}
+
+{{define "text"}}
+{{template "hello" .}}
+
+Gracias por registrarte en Tablero de Información Universal. Confirmá que esta dirección es tuya para activar tu cuenta:
+{{.Link}}
+
+{{template "note" .}}
+{{template "signature" .}}
+{{end}}

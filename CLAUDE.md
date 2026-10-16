@@ -76,11 +76,12 @@ pnpm dev                # Vite dev server
 | root (compose) | `REDIS_PASSWORD` | Required. Compose builds `REDIS_URL` from it |
 | root (compose) | `SECRETS_MASTER_KEYS` | Required (backend). `<version>:<base64 of 32 bytes>`, comma-separated for rotation; the highest version encrypts |
 | root (compose) | `AUTH_SIGNING_KEYS` | Required (backend). Ed25519 seeds `<kid>:<base64 of 32 bytes>`, comma-separated; the first signs, all verify |
-| root (compose) | `PLATFORM_ADMINS`, `AUTH_COOKIE_SECURE`, `GOOGLE_SIGNIN_CLIENT_ID`, `GOOGLE_SIGNIN_CLIENT_SECRET`, `GOOGLE_ISSUER` | Passed to the backend (below) |
+| root (compose) | `PLATFORM_ADMINS`, `AUTH_COOKIE_SECURE`, `GOOGLE_SIGNIN_CLIENT_ID`, `GOOGLE_SIGNIN_CLIENT_SECRET`, `GOOGLE_ISSUER`, `RESEND_API_KEY`, `MAIL_FROM` | Passed to the backend (below) |
 | backend | `PORT`, `MONGODB_URI`, `MONGO_DATABASE`, `REDIS_URL`, `SECRETS_MASTER_KEYS`, `AUTH_SIGNING_KEYS` | Defaults: `31126`, `mongo:27017`, `prod`, `redis:6379`. Keys are required |
 | backend | `PLATFORM_ADMINS` | Emails that are platform admins when they sign in |
 | backend | `AUTH_COOKIE_SECURE`, `ACCESS_TTL`, `REFRESH_TTL` | Defaults `true`, `15m`, `720h`. `false` only for plain-HTTP development; keep `true` on Vercel |
 | backend | `GOOGLE_SIGNIN_CLIENT_ID`, `GOOGLE_SIGNIN_CLIENT_SECRET`, `GOOGLE_ISSUER` | Optional "Sign in with Google" (redirect URI `<origin>/auth/google/callback`); empty turns it off |
+| backend | `RESEND_API_KEY`, `MAIL_FROM` | Optional mail delivery through Resend. No key: mails go to the log. A key needs `MAIL_FROM` (`Name <addr@verified-domain>`) or the backend refuses to start |
 | realtime | `MONGODB_URI`, `REDIS_URL`, `API_URL` | Required, no defaults. `API_URL` is the backend with `/api/v1` (compose: `http://backend:31126/api/v1`) |
 | realtime | `MONGO_DATABASE`, `PORT` | Defaults `prod`, `3000` |
 | frontend | `VITE_API_URL` | **Leave empty** (see below). Baked in at build time |
@@ -140,7 +141,7 @@ common/
     jwt/           access tokens: EdDSA keyring over AUTH_SIGNING_KEYS
     password/      argon2id hashing
     oidc/          Google sign-in (OIDC code flow)
-    mail/          mailer that writes to the log (development: verification and reset links)
+    mail/          Mailer: renders embedded templates (templates/<locale>/<name>.tmpl: subject, preheader, heading, html, action, note, text; framed by layout.html.tmpl and the locale's common.tmpl: greeting, fallback, footer, signature) and hands them to a Sender (Resend, or the log without RESEND_API_KEY)
     crypto/        Sealer (master key ring = KEK) and Keyring (one wrapped data key per scope)
     oauth/         OAuth2 token endpoint client
     executer/      DewIt — HTTP fetch + gojq transform (json.go, html.go)
@@ -165,7 +166,7 @@ common/
     secrets/       Gin routes /v1/{boards,users,groups}/:id/{secrets,oauth2}, /v1/boards/:id/members/:user/*, /v1/boards/:id/secrets/usable, /v1/system/*, /v1/oauth2/*
 ```
 
-**Authentication**: email/password (argon2id, email verified through a mailed link) or Google sign-in. A session is a 15-minute EdDSA access token, kept by the frontend in memory and sent as `Authorization: Bearer`, plus a rotating refresh token in Redis carried by the httpOnly cookie `tiu_refresh` (only `/auth/refresh` and `/auth/logout` read it, and refuse cross-site requests). The principal is `{ID: sub, Admin}`; `Admin` comes from `PLATFORM_ADMINS` at sign-in. Login, registration and reset mails are limited per client address and per account, adding people by email (boards and organizations share it) per user: `429 rate_limited`.
+**Authentication**: email/password (argon2id, email verified through a mailed link) or Google sign-in. A session is a 15-minute EdDSA access token, kept by the frontend in memory and sent as `Authorization: Bearer`, plus a rotating refresh token in Redis carried by the httpOnly cookie `tiu_refresh` (only `/auth/refresh` and `/auth/logout` read it, and refuse cross-site requests). The principal is `{ID: sub, Admin}`; `Admin` comes from `PLATFORM_ADMINS` at sign-in. Mails (`models.Mail{To, Locale, Template, Vars}`) go out in the recipient's `User.Locale` (`en|es`, set on registration or Google sign-up from the frontend's locale, changed with `PATCH /users/:id`); a new template needs a file per locale (`LoadTemplates` refuses to boot otherwise). Login, registration and reset mails are limited per client address and per account, adding people by email (boards and organizations share it) per user: `429 rate_limited`.
 
 **Post-it execution flow**: `ExecutePostIt` → check Redis cache → `prepare` (map every `$TOKEN` in params/headers/queries to a `SecretRef`: the post-it's `Bindings[TOKEN]` if present, else the board's own scope by name; resolve them as the post-it's `RunAs` principal through `ResolveAs`, which re-checks `CanUse`; then inject the well-known's **system secrets** last, into a clone) → `DewIt.Execute` (HTTP GET to `Resource`, apply query params/headers from `Params`, parse JSON, run `gojq` query) → store result in Redis for `Rate` seconds. A bound secret the principal may no longer use makes the card answer `403`; an unbound board token nobody stored is sent verbatim.
 
@@ -206,6 +207,7 @@ SvelteKit SPA (`ssr = false`, `prerender = false`). Svelte 5 **runes mode enforc
 
 - `$modules/api.svelte.ts` — HTTP helpers (`get`, `post`, `put`, `patch`, `del`) over one `request()`. Resolves relative paths against the page origin (see above), adds the session's `Authorization: Bearer`, renews once on a `401` (never for `/v1/auth/*`) and sends an expired session to `/login?next=`; `get` maps network errors to SvelteKit `error(503)`.
 - `$modules/session.svelte.ts` — `session`: `user`, `status` (`unknown | anonymous | authenticated`), the access token in memory only. `bootstrap()` trades the httpOnly refresh cookie for a session once; `refresh()` is single-flight (Web Locks across tabs when available); `BroadcastChannel('tiu-session')` shares sign-in and sign-out between tabs.
+- `$modules/locale.ts` — `switchLocale(locale)`: every language switch goes through it; for a signed-in user it first saves `locale` on the user (`PATCH /users/:id`, the language their mails arrive in), then calls Paraglide's `setLocale` (which reloads). `session.register` and `session.googleStart` send `getLocale()`.
 - `$modules/realtime.svelte.ts` — `connect(board, user, onChange)`: opens the socket and the PeerJS mesh (`user` is only the cursor's name and picture; the socket knows the user from the token); used by `routes/(app)/board/[id]/Realtime.svelte`.
 - `$modules/sockets.svelte.ts` — the board socket: sends `session.accessToken` on every handshake, answers `token_expiring` (renewing the session when its token is about to expire), reconnects when the server drops it and gives up after one refused handshake retried with a renewed session (the board keeps working without live updates).
 - `$modules/rtc.svelte.ts` — PeerJS cursor sharing.
