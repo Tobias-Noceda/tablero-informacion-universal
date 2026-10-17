@@ -1,4 +1,4 @@
-import { setLocale, type Locale } from '$lib/paraglide/runtime';
+import { type Locale } from '$lib/paraglide/runtime';
 import { session } from '$modules/session.svelte';
 import * as users from '$services/users';
 
@@ -14,5 +14,4 @@ export async function switchLocale(locale: Locale) {
 			console.error('Could not save the language', err);
 		}
 	}
-	await setLocale(locale);
 }
