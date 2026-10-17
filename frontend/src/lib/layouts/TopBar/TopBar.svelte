@@ -2,7 +2,7 @@
 	import { m } from '$lib/paraglide/messages';
 
 	import { locales, getLocale, setLocale } from '$lib/paraglide/runtime';
-	import logo from '$assets/logo.png';
+	import logo from '$assets/svgs/corcheria-m2-logo-fondo-oscuro.svg';
 
 	import { session } from '$modules/session.svelte';
 	import { setSidebar } from '$stores/sidebar';
@@ -90,7 +90,7 @@
 			goto(resolve(landingPath(showsBoards ? orgId : orgs.last)));
 		}}
 	>
-		<img src={logo} alt="logo" class="logo" />
+		<img src={logo} alt="Corcheria Company" class="logo" />
 	</button>
 	<div class="flex flex-row items-center gap-3">
 		{#if showsBoards}
