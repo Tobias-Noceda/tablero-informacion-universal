@@ -47,7 +47,7 @@ export function analyzeTitle(text: string, outputs: string[]): TitleAnalysis {
 	return { used, unknown, unsupported, vars: used.length > 0 && !unsupported };
 }
 
-function display(value: unknown): string {
+export function display(value: unknown): string {
 	if (value === null || value === undefined) return '';
 	if (Array.isArray(value)) return value.map(display).join(', ');
 	if (typeof value === 'object') return JSON.stringify(value);

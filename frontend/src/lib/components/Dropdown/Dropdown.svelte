@@ -24,7 +24,16 @@
     skeleton?: boolean;
     placeholder?: string;
     class?: string;
+    activatorClass?: string;
+    drawerClass?: string;
+    itemClass?: (isSelected: boolean) => string;
     onchange?: (value: string) => void;
+    /**
+     * Optional slot for rendering a last custom item in the dropdown, such as
+     * a "Create new" button. This slot will be rendered after all options and
+     * will not be affected by pagination.
+     */
+    children?: Snippet;
   }
 
   let {
@@ -37,7 +46,11 @@
     skeleton = false,
     placeholder = 'Select an option',
     class: selectClass,
-    onchange
+    activatorClass,
+    drawerClass,
+    itemClass,
+    onchange,
+    children
   }: Props = $props();
 
   let isOpen = $state(false);
@@ -60,16 +73,18 @@
   ));
 
   const buttonClass = $derived(cn(
-    'bg-main-hover text-main-text w-full',
+    'bg-main-hover text-main-text',
     'disabled:opacity-50 disabled:cursor-not-allowed',
     'px-3 py-2.5 rounded-xl transition-colors cursor-pointer',
     'border border-main-border hover:border-sidebar',
     isOpen ? 'border-sidebar' : '',
+    activatorClass ? activatorClass : 'w-full',
     'flex items-center justify-between',
+    'focus:outline-none focus:ring-none',
     skeleton ? 'bg-skeleton animate-pulse text-transparent cursor-default' : ''
   ));
 
-  const dropdownClass = cn(
+  const dropdownClass = $derived(cn(
     'absolute z-50 mt-0.5 w-full flex-col',
     'bg-main-hover border border-main-hover rounded-xl shadow-lg',
     'max-h-60 overflow-y-auto',
@@ -80,13 +95,16 @@
     '[&::-webkit-scrollbar-thumb]:bg-tertiary',
     '[&::-webkit-scrollbar-thumb]:rounded-full',
     '[&::-webkit-scrollbar-thumb]:hover:bg-tertiary-hover',
-  );
+    drawerClass,
+  ));
 
   const optionClass = (isSelected: boolean) => cn(
-    'w-full justify-start flex items-center',
+    'w-full justify-start flex items-center text-left',
     'px-3 py-2.5 cursor-pointer transition-colors text-main-text',
     'bg-sidebar hover:bg-sidebar-hover',
-    isSelected ? 'bg-sidebar-hover font-medium' : '',
+    itemClass
+      ? itemClass(isSelected)
+      : isSelected ? 'bg-sidebar-hover font-medium' : '',
     'overflow-x-hidden'
   );
 </script>
@@ -107,7 +125,7 @@
       {disabled}
       onclick={() => !disabled && !skeleton && (isOpen = !isOpen)}
     >
-      <span class={selectedOption ? '' : 'text-gray-400'}>
+      <span class={cn('min-w-0 flex-1 truncate', selectedOption ? '' : 'text-gray-400')}>
         {selectedOption ? selectedOption.label : placeholder}
       </span>
       <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} class="w-4 h-4 ml-2" />
@@ -139,7 +157,7 @@
                 {:else if option.avatarSrc}
                   <Avatar size="sm" src={option.avatarSrc} class="mr-2" />
                 {/if}
-                {option.label}
+                <span class="min-w-0 flex-1 truncate">{option.label}</span>
               </button>
             {/snippet}
           </ScrollPagination>
@@ -157,9 +175,12 @@
               {:else if option.avatarSrc}
                 <Avatar size="sm" src={option.avatarSrc} class="mr-2" />
               {/if}
-              {option.label}
+              <span class="min-w-0 flex-1 truncate">{option.label}</span>
             </button>
           {/each}
+        {/if}
+        {#if children}
+          {@render children()}
         {/if}
       </div>
     {/if}

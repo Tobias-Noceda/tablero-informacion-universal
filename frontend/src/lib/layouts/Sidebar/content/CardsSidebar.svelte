@@ -1,5 +1,5 @@
 <script lang="ts">
-  import './index.css';
+  import '../index.css';
 
 	import Icon from '$components/Icon/Icon.svelte';
 	import { m } from '$lib/paraglide/messages';

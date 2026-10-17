@@ -23,7 +23,6 @@
 		try {
 			const org = await orgsApi.create(name.trim());
 			await orgs.refresh();
-			orgs.select(org.id);
 			await goto(resolve(`/orgs/${org.id}`));
 		} catch (err) {
 			console.error(err);

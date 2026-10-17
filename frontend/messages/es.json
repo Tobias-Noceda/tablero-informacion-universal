@@ -2,13 +2,19 @@
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"hello_world": "Hola {name} desde es!",
 	"input_loading": "Cargando...",
-	"create_board": "Crear un nuevo tablero",
 	"board_dropdown_placeholder": "Seleccionar un tablero",
 	"board_name_label": "Nombre del tablero",
 	"board_name_placeholder": "Mi tablero",
 	"cancel": "Cancelar",
 	"create": "Crear",
 	"accept": "Aceptar",
+	"landing": {
+		"title_personal": "Tableros personales",
+		"empty": "Todavía no hay tableros. Creá uno para empezar.",
+		"cards": "{count} tarjetas",
+		"title_placeholder": "título",
+		"create_board": "Crear un nuevo tablero"
+	},
 	"user_info": {
 		"language": {
 			"title": "Idioma",
@@ -201,7 +207,7 @@
 	},
 	"card_title": {
 		"label": "Título",
-		"placeholder": "Opcional, ej. Dólar a {example}",
+		"placeholder": "ej. Dólar a {example}",
 		"variables": "Valores disponibles",
 		"variables_hint": "Hacé click en uno para insertarlo, o escribí {syntax}. Los valores se completan cuando carga la tarjeta.",
 		"sample": "Respuesta de ejemplo",
@@ -209,5 +215,16 @@
 		"unknown": "Valor desconocido: {names}",
 		"unsupported": "Solo se admiten valores simples {syntax}",
 		"none": "Esta tarjeta no tiene valores para usar en su título."
+	},
+	"node_detail": {
+		"back": "Volver al tablero",
+		"refresh": "Actualizar contenido",
+		"configuration": "Configuración",
+		"content": "Contenido",
+		"no_configuration": "Esta tarjeta no tiene ajustes.",
+		"no_content": "Esta tarjeta no tiene valores.",
+		"error": "No se pudo cargar la tarjeta.",
+		"forbidden": "La credencial que usa esta tarjeta ya no está disponible para vos.",
+		"delete": "Eliminar tarjeta"
 	}
 }

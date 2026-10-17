@@ -8,14 +8,7 @@ A universal information dashboard ("tablero de información universal") where us
 
 ## Monorepo layout
 
-```
-backend/     Go API (Gin + MongoDB + Redis), all routes under /api/v1
-realtime/    Node service (socket.io + Mongo change streams + Redis presence), path /ws
-frontend/    SvelteKit SPA (Svelte 5 runes, Tailwind CSS 4, TypeScript)
-nginx.conf   Docker ALB: /api/ → backend:31126, /ws/ → realtime:3000, / → frontend:80
-vercel.json  Vercel ALB equivalent: /api/ → backend, /ws/ → realtime, / → frontend
-docker-compose.yaml
-```
+`backend/` (Go API), `realtime/` (Node socket service) and `frontend/` (SvelteKit SPA). `frontend/CLAUDE.md` and `realtime/CLAUDE.md` hold the notes for those services; they load when working in that folder.
 
 ### Two deployment targets, one topology
 
@@ -100,21 +93,6 @@ Each folder has a `.env.example`. Real `.env*` files are git-ignored. On Vercel,
 Same-origin means one build works on any host (localhost, LAN IP, every Vercel preview URL), needs no CORS, and follows the page's `https` automatically (`wss`). Set them only to reach a service on a different origin.
 
 Over plain HTTP from a LAN address the page is **not a secure context**: `crypto.randomUUID()` is undefined there. Use `uuid()` from `$lib/utils` instead of calling it directly. WebRTC data channels (PeerJS) still work.
-
-## Frontend commands (all run from `frontend/`)
-
-| Command | Purpose |
-|---|---|
-| `pnpm dev` | Dev server |
-| `pnpm build` | Vercel build → `.vercel/output` (`ADAPTER=static pnpm build` → static `build/`) |
-| `pnpm check` | svelte-check + TypeScript |
-| `pnpm lint` | Prettier + ESLint |
-| `pnpm format` | Prettier write |
-| `pnpm test` | Vitest (all projects, headless) |
-| `pnpm test:unit` | Vitest watch mode |
-| `pnpm storybook` | Storybook on port 6006 |
-
-Vitest has three sub-projects: `client` (Playwright/Chromium, `*.svelte.spec.ts`), `server` (Node, `*.spec.ts`), `storybook`.
 
 ## Backend commands (run from `backend/`)
 

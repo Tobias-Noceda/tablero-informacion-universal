@@ -16,6 +16,7 @@ import logout from '$assets/icons/logout.svg';
 import manage from '$assets/icons/manage.svg';
 import menu from '$assets/icons/menu.svg';
 import plus from '$assets/icons/plus.svg';
+import refresh from '$assets/icons/refresh.svg';
 import rightArrow from '$assets/icons/right-arrow.svg';
 import search from '$assets/icons/search.svg';
 import trash from '$assets/icons/trash.svg';
@@ -40,6 +41,7 @@ export const iconMap: Record<string, string> = {
     manage: manage,
     menu: menu,
     plus: plus,
+    refresh: refresh,
     'right-arrow': rightArrow,
     search: search,
     trash: trash,
