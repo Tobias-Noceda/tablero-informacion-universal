@@ -1,6 +1,6 @@
 <script lang="ts">
 	import './layout.css';
-	import favicon from '$assets/favicon.svg';
+	import favicon from '$assets/svgs/corcheria-m2-icono-app.svg';
 
 	let { children } = $props();
 </script>
