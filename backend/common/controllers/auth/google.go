@@ -12,14 +12,15 @@ import (
 // @Description  Answers the consent URL to open and binds the attempt to this browser with the tiu_signin cookie. Google sends the user back to /auth/google/callback on this origin.
 // @Tags         auth
 // @Produce      json
-// @Param        next  query  string  false  "Path to land on afterwards, relative to this site"
+// @Param        next    query  string  false  "Path to land on afterwards, relative to this site"
+// @Param        locale  query  string  false  "Language of the account if the sign-in creates one (en, es)"
 // @Success      200  {object}  GoogleStartResponse
 // @Failure      400  "invalid_next"
 // @Failure      502  "provider_error"
 // @Failure      503  "google_not_configured"
 // @Router       /auth/google/start [get]
 func (ctrl *Controller) GoogleStart(c *gin.Context) {
-	start, err := ctrl.service.GoogleStart(origin(c), c.Query("next"))
+	start, err := ctrl.service.GoogleStart(origin(c), c.Query("next"), c.Query("locale"))
 	if err != nil {
 		ctrl.fail(c, err)
 		return

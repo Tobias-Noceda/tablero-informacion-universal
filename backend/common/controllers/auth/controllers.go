@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/Secreto31126/tesis/common/controllers/middleware"
@@ -62,7 +63,7 @@ func (ctrl *Controller) Register(c *gin.Context) {
 		return
 	}
 
-	if err := ctrl.service.Register(req.Email, req.Password, req.Name, origin(c), c.ClientIP()); err != nil {
+	if err := ctrl.service.Register(req.Email, req.Password, req.Name, req.Locale, origin(c), c.ClientIP()); err != nil {
 		ctrl.fail(c, err)
 		return
 	}
@@ -261,6 +262,7 @@ func (ctrl *Controller) fail(c *gin.Context, err error) {
 	case errors.Is(err, srv.ErrGoogleDisabled):
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "google_not_configured"})
 	default:
+		log.Printf("auth: %s %s: %v", c.Request.Method, c.FullPath(), err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal"})
 	}
 }

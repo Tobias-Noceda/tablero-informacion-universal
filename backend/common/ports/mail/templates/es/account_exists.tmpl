@@ -1,0 +1,24 @@
+{{define "subject"}}Ya tenés una cuenta{{end}}
+
+{{define "preheader"}}Alguien intentó registrarse con esta dirección. Si fuiste vos, no hace falta registrarte de nuevo.{{end}}
+
+{{define "heading"}}Ya tenés una cuenta{{end}}
+
+{{define "html"}}
+<p style="margin: 0 0 16px;">Alguien intentó registrarse en Tablero de Información Universal con esta dirección de email, pero ya tiene una cuenta.</p>
+<p style="margin: 0 0 16px;">Si fuiste vos, no hace falta registrarte de nuevo: iniciá sesión, o restablecé tu contraseña si no la recordás.</p>
+{{end}}
+
+{{define "action"}}Restablecer mi contraseña{{end}}
+
+{{define "note"}}Si no fuiste vos, no tenés que hacer nada. Tu cuenta está segura y no cambió nada.{{end}}
+
+{{define "text"}}
+{{template "hello" .}}
+
+Alguien intentó registrarse en Tablero de Información Universal con esta dirección de email, pero ya tiene una cuenta. Si fuiste vos, no hace falta registrarte de nuevo: iniciá sesión, o restablecé tu contraseña acá:
+{{.Link}}
+
+{{template "note" .}}
+{{template "signature" .}}
+{{end}}

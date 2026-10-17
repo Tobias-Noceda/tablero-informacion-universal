@@ -12,6 +12,7 @@ import (
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/mocks"
+	"github.com/Secreto31126/tesis/common/models"
 	srv "github.com/Secreto31126/tesis/common/services/auth"
 	"github.com/gin-gonic/gin"
 )
@@ -89,7 +90,7 @@ func (h *harness) lastToken(t *testing.T) string {
 	if !ok {
 		t.Fatal("no mail")
 	}
-	return linkToken.FindStringSubmatch(mail.Text)[1]
+	return linkToken.FindStringSubmatch(mail.Vars["Link"])[1]
 }
 
 func (h *harness) signUp(t *testing.T, email string) response {
@@ -108,6 +109,18 @@ func withCookie(cookie *http.Cookie) []string {
 	return []string{"Cookie", cookie.Name + "=" + cookie.Value}
 }
 
+func TestRegister_MailsInTheLanguageOfTheForm(t *testing.T) {
+	h := setup(t, true)
+
+	w := h.do(http.MethodPost, "/api/v1/auth/register", `{"email":"ana@example.com","password":"`+password+`","name":"Ana","locale":"es"}`)
+	if w.Code != http.StatusAccepted {
+		t.Fatalf("status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if mail, _ := h.mailer.Last(); mail.Locale != models.LocaleSpanish {
+		t.Errorf("mail locale = %q", mail.Locale)
+	}
+}
+
 func TestRegister_AcceptsAndMailsWithTheRequestOrigin(t *testing.T) {
 	h := setup(t, true)
 
@@ -116,8 +129,8 @@ func TestRegister_AcceptsAndMailsWithTheRequestOrigin(t *testing.T) {
 		t.Errorf("status = %d, body = %s", w.Code, w.Body.String())
 	}
 	mail, _ := h.mailer.Last()
-	if !strings.Contains(mail.Text, "https://tiu.example/verify?token=") {
-		t.Errorf("mail = %q", mail.Text)
+	if !strings.Contains(mail.Vars["Link"], "https://tiu.example/verify?token=") {
+		t.Errorf("mail = %q", mail.Vars["Link"])
 	}
 	if w.cookie != nil {
 		t.Error("register must not start a session")

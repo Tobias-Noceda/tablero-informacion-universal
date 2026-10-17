@@ -108,3 +108,15 @@ func TestPatchUser_RenamesOnlyOneself(t *testing.T) {
 		t.Errorf("missing: %d", w.Code)
 	}
 }
+
+func TestPatchUser_ChangesTheLanguage(t *testing.T) {
+	r := setup()
+
+	w := do(r, http.MethodPatch, "/users/"+ana.Id.String(), `{"locale":"es"}`, "ana")
+	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"locale":"es"`) {
+		t.Errorf("locale: %d %s", w.Code, w.Body.String())
+	}
+	if w := do(r, http.MethodPatch, "/users/"+ana.Id.String(), `{"locale":"fr"}`, "ana"); w.Code != http.StatusBadRequest {
+		t.Errorf("unsupported: %d %s", w.Code, w.Body.String())
+	}
+}

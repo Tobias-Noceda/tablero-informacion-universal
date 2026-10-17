@@ -65,7 +65,10 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 	}
 	postIt.RunAs = principal.ID
 
-	return srv.db.CreatePostIt(postIt, *title, postIt.WellKnown, models.Position{X: 750, Y: 350})
+	entry := *title
+	entry.Vars = titleVars(entry.Text, outputsOf(postIt))
+
+	return srv.db.CreatePostIt(postIt, entry, postIt.WellKnown, models.Position{X: 750, Y: 350})
 }
 
 // GetPostIt loads a card for anyone who may see its board. ExecutePostIt runs
@@ -330,6 +333,13 @@ func (srv *PostItsService) ExecutePostIt(postit *models.PostIts) (any, error) {
 		return cached, nil
 	}
 
+	return srv.RefreshPostIt(postit)
+}
+
+// RefreshPostIt runs the card without looking at the cache, and caches
+// the new result for the next readers.
+func (srv *PostItsService) RefreshPostIt(postit *models.PostIts) (any, error) {
+	var err error
 	prepared := postit
 	if postit.Resource != nil {
 		prepared, err = srv.prepare(postit)

@@ -35,7 +35,7 @@ func stateOf(t *testing.T, start *GoogleSignIn) url.Values {
 
 func (f *fixture) googleSignIn(t *testing.T, next string) (*Tokens, string, error) {
 	t.Helper()
-	start, err := f.svc.GoogleStart(origin, next)
+	start, err := f.svc.GoogleStart(origin, next, locale)
 	if err != nil {
 		t.Fatalf("start: %v", err)
 	}
@@ -55,7 +55,7 @@ func TestGoogleStart_BindsTheHandshakeToTheBrowserAndThePKCEVerifier(t *testing.
 	f := newFixture(t)
 	f.google.Identity = googleIdentity("sub-1", "ana@example.com")
 
-	start, err := f.svc.GoogleStart(origin, "/board/42")
+	start, err := f.svc.GoogleStart(origin, "/board/42", locale)
 	if err != nil {
 		t.Fatalf("start: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestGoogleStart_OnlyAcceptsARelativeNext(t *testing.T) {
 	f := newFixture(t)
 
 	for _, next := range []string{"https://evil.example", "//evil.example", "/\\evil.example", "evil", "/\t/evil.example", "javascript:alert(1)"} {
-		if _, err := f.svc.GoogleStart(origin, next); !errors.Is(err, ErrInvalidNext) {
+		if _, err := f.svc.GoogleStart(origin, next, locale); !errors.Is(err, ErrInvalidNext) {
 			t.Errorf("next %q: err = %v, want ErrInvalidNext", next, err)
 		}
 	}
@@ -109,7 +109,7 @@ func TestGoogle_DisabledWithoutAProvider(t *testing.T) {
 	f := newFixture(t)
 	f.svc.google = nil
 
-	if _, err := f.svc.GoogleStart(origin, "/"); !errors.Is(err, ErrGoogleDisabled) {
+	if _, err := f.svc.GoogleStart(origin, "/", locale); !errors.Is(err, ErrGoogleDisabled) {
 		t.Errorf("start: err = %v", err)
 	}
 	if _, _, err := f.svc.GoogleCallback("state", "code", hashToken("state")); !errors.Is(err, ErrGoogleDisabled) {
@@ -121,7 +121,7 @@ func TestGoogleCallback_RequiresTheBrowserThatStartedIt(t *testing.T) {
 	f := newFixture(t)
 	f.google.Identity = googleIdentity("sub-1", "ana@example.com")
 
-	start, _ := f.svc.GoogleStart(origin, "/")
+	start, _ := f.svc.GoogleStart(origin, "/", locale)
 	state := stateOf(t, start).Get("state")
 
 	for _, binding := range []string{"", hashToken("another-state"), state} {
@@ -233,7 +233,7 @@ func TestGoogleCallback_ReplacesAStaleGoogleIdentity(t *testing.T) {
 // address may not own it. Google does vouch for the mailbox, so it wins.
 func TestGoogleCallback_TakesOverAnUnverifiedRegistration(t *testing.T) {
 	f := newFixture(t)
-	if err := f.svc.Register("ana@example.com", "squatter password", "Squatter", origin, client); err != nil {
+	if err := f.svc.Register("ana@example.com", "squatter password", "Squatter", locale, origin, client); err != nil {
 		t.Fatal(err)
 	}
 	squatted, _ := f.users.FindUserByEmail("ana@example.com")

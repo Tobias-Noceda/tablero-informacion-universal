@@ -40,9 +40,12 @@ type pendingSignIn struct {
 	Nonce       string `json:"nonce"`
 	RedirectURI string `json:"redirect_uri"`
 	Next        string `json:"next"`
+	Locale      string `json:"locale,omitempty"`
 }
 
-func (srv *AuthService) GoogleStart(origin, next string) (*GoogleSignIn, error) {
+// GoogleStart takes the language the person is using, for the account the
+// sign-in may create.
+func (srv *AuthService) GoogleStart(origin, next, locale string) (*GoogleSignIn, error) {
 	if srv.google == nil {
 		return nil, ErrGoogleDisabled
 	}
@@ -64,7 +67,7 @@ func (srv *AuthService) GoogleStart(origin, next string) (*GoogleSignIn, error) 
 		return nil, err
 	}
 
-	pending := pendingSignIn{Verifier: verifier, Nonce: nonce, RedirectURI: origin + GOOGLE_CALLBACK_PATH, Next: next}
+	pending := pendingSignIn{Verifier: verifier, Nonce: nonce, RedirectURI: origin + GOOGLE_CALLBACK_PATH, Next: next, Locale: locale}
 	encoded, err := json.Marshal(pending)
 	if err != nil {
 		return nil, err
@@ -110,7 +113,7 @@ func (srv *AuthService) GoogleCallback(state, code, binding string) (*Tokens, st
 		return nil, "", ErrEmailNotVerified
 	}
 
-	user, err := srv.linkGoogle(identity)
+	user, err := srv.linkGoogle(identity, models.ParseLocale(pending.Locale))
 	if err != nil {
 		return nil, "", err
 	}
@@ -123,8 +126,9 @@ func (srv *AuthService) GoogleCallback(state, code, binding string) (*Tokens, st
 }
 
 // linkGoogle finds the account a Google identity belongs to, by subject
-// first and by verified email second, creating it when there is none.
-func (srv *AuthService) linkGoogle(external *infrastructure.ExternalIdentity) (*models.User, error) {
+// first and by verified email second, creating it in locale when there is
+// none. An account that already exists keeps its language.
+func (srv *AuthService) linkGoogle(external *infrastructure.ExternalIdentity, locale models.Locale) (*models.User, error) {
 	google := models.Identity{Provider: models.IdentityGoogle, Subject: external.Subject}
 
 	user, err := srv.users.FindUserByIdentity(models.IdentityGoogle, external.Subject)
@@ -143,7 +147,7 @@ func (srv *AuthService) linkGoogle(external *infrastructure.ExternalIdentity) (*
 	user, err = srv.users.FindUserByEmail(email)
 	switch {
 	case errors.Is(err, infrastructure.ErrUserNotFound):
-		return srv.createGoogleUser(email, external, google)
+		return srv.createGoogleUser(email, external, google, locale)
 	case err != nil:
 		return nil, err
 	case user.EmailVerified:
@@ -153,7 +157,7 @@ func (srv *AuthService) linkGoogle(external *infrastructure.ExternalIdentity) (*
 	}
 }
 
-func (srv *AuthService) createGoogleUser(email string, external *infrastructure.ExternalIdentity, google models.Identity) (*models.User, error) {
+func (srv *AuthService) createGoogleUser(email string, external *infrastructure.ExternalIdentity, google models.Identity, locale models.Locale) (*models.User, error) {
 	name := strings.TrimSpace(external.Name)
 	if name == "" {
 		name, _, _ = strings.Cut(email, "@")
@@ -166,6 +170,7 @@ func (srv *AuthService) createGoogleUser(email string, external *infrastructure.
 		EmailVerified: true,
 		Name:          name,
 		Picture:       external.Picture,
+		Locale:        locale,
 		Admin:         srv.admins[email],
 		Identities:    []models.Identity{google},
 		CreatedAt:     now,

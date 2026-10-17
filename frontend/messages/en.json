@@ -1,13 +1,19 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
 	"input_loading": "Loading...",
-	"create_board": "Create a new board",
 	"board_dropdown_placeholder": "Select a board",
 	"board_name_label": "Board name",
 	"board_name_placeholder": "My board",
 	"cancel": "Cancel",
 	"create": "Create",
 	"accept": "Accept",
+	"landing": {
+		"title_personal": "Personal boards",
+		"empty": "No boards yet. Create one to get started.",
+		"cards": "{count} cards",
+		"title_placeholder": "title",
+		"create_board": "Create a new board"
+	},
 	"user_info": {
 		"language": {
 			"title": "Language",
@@ -140,7 +146,9 @@
 		"identity_password": "Password",
 		"add_password_hint": "You sign in with Google only. A password lets you sign in without it; we email you a link to choose one.",
 		"add_password": "Set a password",
-		"save_failed": "The name could not be saved."
+		"save_failed": "The name could not be saved.",
+		"language": "Language",
+		"language_hint": "Emails from the platform arrive in this language."
 	},
 	"header": {
 		"profile": "Profile",
@@ -198,7 +206,7 @@
 	},
 	"card_title": {
 		"label": "Title",
-		"placeholder": "Optional, e.g. Dollar at {example}",
+		"placeholder": "e.g. Dollar at {example}",
 		"variables": "Available values",
 		"variables_hint": "Click one to insert it, or type {syntax}. Values are filled in when the card loads.",
 		"sample": "Example response",
@@ -206,5 +214,16 @@
 		"unknown": "Unknown value: {names}",
 		"unsupported": "Only plain {syntax} values are supported",
 		"none": "This card has no values to use in its title."
+	},
+	"node_detail": {
+		"back": "Back to the board",
+		"refresh": "Refresh content",
+		"configuration": "Configuration",
+		"content": "Content",
+		"no_configuration": "This card has no settings.",
+		"no_content": "This card has no values.",
+		"error": "The card could not be loaded.",
+		"forbidden": "The credential this card uses is no longer available to you.",
+		"delete": "Delete card"
 	}
 }

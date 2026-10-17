@@ -1,5 +1,5 @@
 <script lang="ts">
-	import './index.css';
+	import '../index.css';
 
 	import type { Snippet } from 'svelte';
 

@@ -29,6 +29,7 @@ type User struct {
 	EmailVerified bool       `bson:"emailverified" json:"email_verified"`
 	Name          string     `bson:"name" json:"name"`
 	Picture       string     `bson:"picture" json:"picture,omitempty"`
+	Locale        Locale     `bson:"locale,omitempty" json:"locale"`
 	Admin         bool       `bson:"admin" json:"admin"`
 	Identities    []Identity `bson:"identities" json:"-"`
 	CreatedAt     time.Time  `bson:"createdat" json:"created_at"`
@@ -49,6 +50,12 @@ func (u *User) Summary() UserSummary {
 
 func (u *User) Principal() Principal {
 	return Principal{ID: u.Id.String(), Admin: u.Admin}
+}
+
+// PreferredLocale is the language to write to the user in; accounts stored
+// before users had one read as the default.
+func (u *User) PreferredLocale() Locale {
+	return ParseLocale(string(u.Locale))
 }
 
 func (u *User) Identity(provider IdentityProvider) (Identity, bool) {
@@ -88,6 +95,7 @@ type Profile struct {
 	EmailVerified bool               `json:"email_verified"`
 	Name          string             `json:"name"`
 	Picture       string             `json:"picture,omitempty"`
+	Locale        Locale             `json:"locale"`
 	Admin         bool               `json:"admin"`
 	Identities    []IdentityProvider `json:"identities"`
 	CreatedAt     time.Time          `json:"created_at"`
@@ -100,6 +108,7 @@ func (u *User) Profile() Profile {
 		EmailVerified: u.EmailVerified,
 		Name:          u.Name,
 		Picture:       u.Picture,
+		Locale:        u.PreferredLocale(),
 		Admin:         u.Admin,
 		Identities:    u.Providers(),
 		CreatedAt:     u.CreatedAt,

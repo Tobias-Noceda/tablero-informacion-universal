@@ -1,0 +1,24 @@
+{{define "subject"}}You already have an account{{end}}
+
+{{define "preheader"}}Someone tried to sign up with this address. If it was you, there's no need to sign up again.{{end}}
+
+{{define "heading"}}You already have an account{{end}}
+
+{{define "html"}}
+<p style="margin: 0 0 16px;">Someone just tried to sign up for Tablero de Información Universal with this email address, but it already has an account.</p>
+<p style="margin: 0 0 16px;">If it was you, there's no need to sign up again: sign in, or reset your password if you don't remember it.</p>
+{{end}}
+
+{{define "action"}}Reset my password{{end}}
+
+{{define "note"}}If it wasn't you, you don't need to do anything. Your account is safe and nothing has changed.{{end}}
+
+{{define "text"}}
+{{template "hello" .}}
+
+Someone just tried to sign up for Tablero de Información Universal with this email address, but it already has an account. If it was you, there's no need to sign up again: sign in, or reset your password here:
+{{.Link}}
+
+{{template "note" .}}
+{{template "signature" .}}
+{{end}}

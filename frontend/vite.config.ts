@@ -15,6 +15,12 @@ export default defineConfig({
 	build: {
 		sourcemap: true
 	},
+	server: {
+		proxy: {
+			'/api': 'http://localhost',						// Docker ALB
+			'/ws': { target: 'http://localhost', ws: true }
+		}
+	},
 	plugins: [
 		tailwindcss(),
 		sveltekit(),

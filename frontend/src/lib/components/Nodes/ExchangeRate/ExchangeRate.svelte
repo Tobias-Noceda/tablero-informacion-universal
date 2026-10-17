@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
-	import * as postitAPI from '$services/post-it';
+	import { results } from '$stores/postit-results.svelte';
 
 	let { id }: NodeProps = $props();
 
-	const request = $derived(postitAPI.execute(id));
+	const request = $derived(results.get(id));
 </script>
 
 <div class="bg-main p-4 rounded-lg">

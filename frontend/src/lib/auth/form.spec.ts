@@ -39,7 +39,7 @@ describe('describeError', () => {
 
 describe('safeNext', () => {
 	it('keeps paths on this site and drops the rest', () => {
-		expect(safeNext('/board/1?x=2')).toBe('/board/1?x=2');
+		expect(safeNext('/boards/1?x=2')).toBe('/boards/1?x=2');
 		for (const next of [
 			null,
 			'',
