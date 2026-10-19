@@ -1,0 +1,17 @@
+{{define "hello"}}Hola, {{.Name}}:{{end}}
+
+{{define "greeting"}}<p style="margin: 0 0 16px;">{{template "hello" .}}</p>{{end}}
+
+{{define "fallback"}}Si el botón no funciona, copiá este link en tu navegador:{{end}}
+
+{{define "footer"}}
+<strong style="color: #005166;">Tablero de Información Universal</strong><br>
+Recibiste este correo por una acción en tu cuenta.<br>
+Es un mensaje automático: las respuestas no le llegan a nadie.
+{{end}}
+
+{{define "signature"}}
+--
+Tablero de Información Universal
+Recibiste este correo por una acción en tu cuenta. Es un mensaje automático: las respuestas no le llegan a nadie.
+{{end}}

@@ -59,10 +59,12 @@ func TestSummary_ForAnyAuthenticatedUser(t *testing.T) {
 	}
 }
 
-func TestRename_TrimsAndOnlyForOneself(t *testing.T) {
+func text(value string) *string { return &value }
+
+func TestUpdate_RenamesTrimmedAndOnlyForOneself(t *testing.T) {
 	svc, ana, bob := fixture()
 
-	profile, err := svc.Rename(ana.Principal(), ana.Id, "  Ana María ")
+	profile, err := svc.Update(ana.Principal(), ana.Id, Changes{Name: text("  Ana María ")})
 	if err != nil {
 		t.Fatalf("rename: %v", err)
 	}
@@ -70,10 +72,47 @@ func TestRename_TrimsAndOnlyForOneself(t *testing.T) {
 		t.Errorf("name = %q", profile.Name)
 	}
 
-	if _, err := svc.Rename(ana.Principal(), ana.Id, "   "); !errors.Is(err, ErrInvalidName) {
+	if _, err := svc.Update(ana.Principal(), ana.Id, Changes{Name: text("   ")}); !errors.Is(err, ErrInvalidName) {
 		t.Errorf("blank: err = %v", err)
 	}
-	if _, err := svc.Rename(ana.Principal(), bob.Id, "Eve"); !errors.Is(err, ErrForbidden) {
+	if _, err := svc.Update(ana.Principal(), bob.Id, Changes{Name: text("Eve")}); !errors.Is(err, ErrForbidden) {
 		t.Errorf("someone else: err = %v", err)
+	}
+}
+
+func TestUpdate_ChangesTheLanguage(t *testing.T) {
+	svc, ana, _ := fixture()
+
+	profile, err := svc.Update(ana.Principal(), ana.Id, Changes{Locale: text("es-AR")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.Locale != models.LocaleSpanish || profile.Name != "Ana" {
+		t.Errorf("profile = %+v", profile)
+	}
+	if stored, _ := svc.Profile(ana.Principal(), ana.Id); stored.Locale != models.LocaleSpanish {
+		t.Errorf("stored locale = %q", stored.Locale)
+	}
+}
+
+// An explicit choice is not guessed at: a language the platform cannot write
+// in is refused, and nothing else in the request is applied.
+func TestUpdate_RefusesAnUnsupportedLanguage(t *testing.T) {
+	svc, ana, _ := fixture()
+
+	_, err := svc.Update(ana.Principal(), ana.Id, Changes{Name: text("Eve"), Locale: text("fr")})
+	if !errors.Is(err, ErrInvalidLocale) {
+		t.Errorf("err = %v", err)
+	}
+	if stored, _ := svc.Profile(ana.Principal(), ana.Id); stored.Name != "Ana" {
+		t.Errorf("the name changed anyway: %q", stored.Name)
+	}
+}
+
+func TestUpdate_NeedsSomethingToChange(t *testing.T) {
+	svc, ana, _ := fixture()
+
+	if _, err := svc.Update(ana.Principal(), ana.Id, Changes{}); !errors.Is(err, ErrNothingToUpdate) {
+		t.Errorf("err = %v", err)
 	}
 }

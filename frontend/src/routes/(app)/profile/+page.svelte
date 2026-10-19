@@ -3,6 +3,8 @@
 	import Button from '$components/Button/Button.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import { locales } from '$lib/paraglide/runtime';
+	import { switchLocale } from '$modules/locale';
 	import { session } from '$modules/session.svelte';
 	import * as users from '$services/users';
 	import type { IdentityProvider } from '$types/api';
@@ -22,7 +24,7 @@
 		event.preventDefault();
 		status = 'saving';
 		try {
-			session.user = await users.rename(user.id, name.trim());
+			session.user = await users.update(user.id, { name: name.trim() });
 			status = 'saved';
 		} catch (err) {
 			console.error(err);
@@ -73,6 +75,22 @@
 				{user.email_verified ? m['profile.verified']() : m['profile.unverified']()}
 			</span>
 		</p>
+	</section>
+
+	<section class="flex flex-col gap-2">
+		<h2 class="text-sm font-medium">{m['profile.language']()}</h2>
+		<div class="flex gap-2">
+			{#each locales as locale (locale)}
+				<Button
+					type="button"
+					variant={user.locale === locale ? 'primary' : 'secondary'}
+					onclick={() => switchLocale(locale)}
+				>
+					{m[`user_info.language.${locale}`]()}
+				</Button>
+			{/each}
+		</div>
+		<p class="text-sm opacity-70">{m['profile.language_hint']()}</p>
 	</section>
 
 	<section class="flex flex-col gap-2">

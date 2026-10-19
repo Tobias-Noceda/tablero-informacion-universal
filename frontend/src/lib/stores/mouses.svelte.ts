@@ -1,4 +1,5 @@
 import { SvelteMap } from 'svelte/reactivity';
+import { session } from '$modules/session.svelte';
 
 export type Position = { x: number; y: number };
 
@@ -57,3 +58,4 @@ class MousePositions {
 }
 
 export const mouses = new MousePositions();
+session.onUserChange(() => mouses.clear());

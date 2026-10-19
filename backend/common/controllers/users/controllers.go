@@ -28,7 +28,8 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 }
 
 type UpdateUserRequest struct {
-	Name string `json:"name" binding:"required"`
+	Name   *string `json:"name"`
+	Locale *string `json:"locale"`
 }
 
 // GetUser godoc
@@ -65,12 +66,14 @@ func (ctrl *Controller) GetUser(c *gin.Context) {
 }
 
 // UpdateUser godoc
-// @Summary      Rename oneself
+// @Summary      Change one's name or language
+// @Description  Only the fields sent change. The language (en, es) is the one mails arrive in.
 // @Tags         users
 // @Accept       json
 // @Param        id    path  string             true  "User id"
-// @Param        body  body  UpdateUserRequest  true  "New name"
+// @Param        body  body  UpdateUserRequest  true  "New name and/or locale"
 // @Success      200
+// @Failure      400  "invalid name, invalid_locale or no fields to update"
 // @Failure      404  "Not one's own id"
 // @Router       /users/{id} [patch]
 func (ctrl *Controller) UpdateUser(c *gin.Context) {
@@ -85,7 +88,7 @@ func (ctrl *Controller) UpdateUser(c *gin.Context) {
 		return
 	}
 
-	profile, err := ctrl.service.Rename(middleware.Principal(c), id, req.Name)
+	profile, err := ctrl.service.Update(middleware.Principal(c), id, srv.Changes{Name: req.Name, Locale: req.Locale})
 	if err != nil {
 		fail(c, err)
 		return
@@ -108,7 +111,7 @@ func fail(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, srv.ErrForbidden), errors.Is(err, infrastructure.ErrUserNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-	case errors.Is(err, srv.ErrInvalidName):
+	case errors.Is(err, srv.ErrInvalidName), errors.Is(err, srv.ErrInvalidLocale), errors.Is(err, srv.ErrNothingToUpdate):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal"})

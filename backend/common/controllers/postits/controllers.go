@@ -170,7 +170,14 @@ func (ctrl *Controller) ExecutePostIt(c *gin.Context) {
 		return
 	}
 
-	data, err := ctrl.service.ExecutePostIt(postIt)
+	// ?fresh=1 skips the cached result (the card detail's refresh button).
+	fresh := c.Query("fresh") == "1"
+	execute := ctrl.service.ExecutePostIt
+	if fresh {
+		execute = ctrl.service.RefreshPostIt
+	}
+
+	data, err := execute(postIt)
 	if err != nil {
 		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
@@ -178,7 +185,11 @@ func (ctrl *Controller) ExecutePostIt(c *gin.Context) {
 		return
 	}
 
-	c.Writer.Header().Set("Cache-Control", "private, max-age=10")
+	if fresh {
+		c.Writer.Header().Set("Cache-Control", "no-store")
+	} else {
+		c.Writer.Header().Set("Cache-Control", "private, max-age=10")
+	}
 	c.JSON(http.StatusOK, data)
 }
 

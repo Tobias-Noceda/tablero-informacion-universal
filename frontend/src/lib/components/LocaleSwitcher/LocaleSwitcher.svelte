@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { getLocale, locales, setLocale, type Locale } from '$lib/paraglide/runtime';
+	import { getLocale, locales, type Locale } from '$lib/paraglide/runtime';
 	import { cn } from '$lib/utils';
+	import { switchLocale } from '$modules/locale';
 
 	const languageClass = (locale: Locale) =>
 		cn(
@@ -12,7 +13,7 @@
 
 <div class="flex flex-row items-center gap-3">
 	{#each locales as locale (locale)}
-		<button type="button" class={languageClass(locale)} onclick={() => setLocale(locale)}>
+		<button type="button" class={languageClass(locale)} onclick={() => switchLocale(locale)}>
 			{locale.toUpperCase()}
 		</button>
 	{/each}

@@ -20,9 +20,9 @@ func (s *stack) lastMailedToken() string {
 	if !ok {
 		s.t.Fatal("no mail was sent")
 	}
-	m := mailedToken.FindStringSubmatch(mail.Text)
+	m := mailedToken.FindStringSubmatch(mail.Vars["Link"])
 	if m == nil {
-		s.t.Fatalf("no token in %q", mail.Text)
+		s.t.Fatalf("no token in %q", mail.Vars["Link"])
 	}
 	return m[1]
 }
