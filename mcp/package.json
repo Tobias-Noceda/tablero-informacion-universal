@@ -16,6 +16,7 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@types/express": "4.17.21",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/mustache": "^4.2.6",
     "@types/node": "^26.6.5",

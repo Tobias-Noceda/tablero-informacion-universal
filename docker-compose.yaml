@@ -51,6 +51,15 @@ services:
       - backend
       - realtime
 
+  mcp:
+    build: ./mcp
+    depends_on:
+      - backend
+    environment:
+      API_URL: http://backend:31126
+    networks:
+      - backend
+
   frontend:
     build:
       context: ./frontend
@@ -125,6 +134,7 @@ services:
       - frontend
       - backend
       - realtime
+      - mcp
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     networks:

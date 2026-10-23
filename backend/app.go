@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	a_ctrl "github.com/Secreto31126/tesis/common/controllers/auth"
 	"github.com/Secreto31126/tesis/common/controllers/boards"
 	g_ctrl "github.com/Secreto31126/tesis/common/controllers/groups"
@@ -8,6 +10,7 @@ import (
 	o_ctrl "github.com/Secreto31126/tesis/common/controllers/orgs"
 	"github.com/Secreto31126/tesis/common/controllers/postits"
 	s_ctrl "github.com/Secreto31126/tesis/common/controllers/secrets"
+	t_ctrl "github.com/Secreto31126/tesis/common/controllers/tokens"
 	u_ctrl "github.com/Secreto31126/tesis/common/controllers/users"
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/ports/crypto"
@@ -24,6 +27,7 @@ import (
 	o_srv "github.com/Secreto31126/tesis/common/services/orgs"
 	p_srv "github.com/Secreto31126/tesis/common/services/postits"
 	s_srv "github.com/Secreto31126/tesis/common/services/secrets"
+	t_srv "github.com/Secreto31126/tesis/common/services/tokens"
 	u_srv "github.com/Secreto31126/tesis/common/services/users"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -55,6 +59,7 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	groupService := g_srv.New(db, secrets, resolver)
 	orgService := o_srv.New(db, db, secrets, cache)
 	postitService := p_srv.New(db, cache, executer.New(), secrets, resolver)
+	tokenService := t_srv.New(db, cache, time.Now)
 
 	router := gin.Default()
 	router.RedirectTrailingSlash = false
@@ -64,9 +69,11 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	a_ctrl.NewController(authService, a_ctrl.Cookies{Secure: cfg.cookieSecure, Path: AUTH_COOKIE_PATH}).RegisterRoutes(api)
 
 	// Everything but /auth needs a signed-in user; handlers read who it is
-	// from middleware.Principal.
-	private := api.Group("", middleware.RequireAuth(keys))
+	// from middleware.Principal. A personal access token signs in too, but
+	// only reaches the read routes RestrictAccessTokens allows.
+	private := api.Group("", middleware.RequireAuth(tokenService.Verifier(keys)), middleware.RestrictAccessTokens())
 	u_ctrl.NewController(userService).RegisterRoutes(private)
+	t_ctrl.NewController(tokenService).RegisterRoutes(private)
 	boards.NewController(boardService).RegisterRoutes(private)
 	postits.NewController(postitService).RegisterRoutes(private)
 	s_ctrl.NewController(secrets).RegisterRoutes(private)

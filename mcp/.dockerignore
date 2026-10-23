@@ -1,0 +1,7 @@
+node_modules
+dist
+.xmcp
+.git
+.env
+.env.*
+!.env.example

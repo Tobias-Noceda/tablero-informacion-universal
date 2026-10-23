@@ -1,4 +1,4 @@
-import type { Board } from "../types/api";
+import type { Board, PostItData } from "../types/api";
 
 import type { ToolMetadata, InferSchema } from "xmcp";
 
@@ -16,7 +16,8 @@ export const schema = {
 // Define tool metadata
 export const metadata: ToolMetadata = {
     name: "retrieve",
-    description: "Retrieve a memory",
+    description:
+        "Retrieve a memory: its title, its data and the memories connected to it",
     annotations: {
         title: "Retrieve a memory",
         readOnlyHint: true,
@@ -36,13 +37,15 @@ export default async function ({
     ]);
 
     const board = (await b_res.json()) as Board;
-    const data = (await d_res.json()) as Record<string, unknown>;
+    const data = (await d_res.json()) as PostItData;
 
     const postit = board.postits.find((p) => p.id === postit_id);
 
-    if (!postit) throw "Postit not found in board";
+    if (!postit) throw new Error("That memory is not on this board.");
 
-    const title = Mustache.render(postit.title.text!, data);
+    const title = postit.title.vars
+        ? Mustache.render(postit.title.text, data)
+        : postit.title.text;
 
     const related_ids = new Set(
         board.strands
@@ -60,5 +63,13 @@ export default async function ({
         .filter((p) => related_ids.has(p.id))
         .map(({ id, title }) => `${id} - ${title.text}`);
 
-    return `${title}\n\nRelated memories:\n${related.join("\n")}`;
+    return [
+        title,
+        "",
+        "Data:",
+        JSON.stringify(data, null, 2),
+        "",
+        "Related memories:",
+        related.join("\n") || "(none)",
+    ].join("\n");
 }

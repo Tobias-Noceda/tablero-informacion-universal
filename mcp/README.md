@@ -1,177 +1,33 @@
-# xmcp Application
+# MCP server
 
-This project was created with [create-xmcp-app](https://github.com/basementstudio/xmcp).
+An [xmcp](https://xmcp.dev) server (Streamable HTTP, `/mcp`) that lets an agent read a user's boards as "memories":
 
-## Getting Started
+| Tool | What it returns |
+|---|---|
+| `brains` | Every board the user can see (`id - name`) |
+| `memories` | The post-its of one board (`id - title`) |
+| `retrieve` | One post-it: its title, its data and the post-its connected to it |
 
-First, run the development server:
+Every request needs `Authorization: Bearer <token>`. The server forwards it unchanged to the backend, which decides what the caller may see. Nothing is stored here. For how this could grow into OAuth for non-technical users, see `AUTH.md`.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-```
+## Tokens (developers)
 
-This will start the MCP server with the selected transport method.
+1. Sign in to the app and open **Profile → Developer access tokens**.
+2. Create a token (7, 15 or 30 days; 15 by default). It is shown **once**.
+3. Add the server to your client, e.g. Claude Code:
+   ```bash
+   claude mcp add --transport http tiu http://localhost/mcp --header "Authorization: Bearer tiu_pat_…"
+   ```
+   or any client that takes JSON:
+   ```json
+   { "mcpServers": { "tiu": { "url": "http://localhost/mcp", "headers": { "Authorization": "Bearer tiu_pat_…" } } } }
+   ```
 
-## Project Structure
+Tokens are read-only: the backend lets them reach only the board, post-it, user and org reads (`middleware.RestrictAccessTokens`); anything else answers `403 token_not_allowed`. Revoking one in the profile stops it on its next request.
 
-This project uses the structured approach where tools, prompts, and resources are automatically discovered from their respective directories:
+## Running
 
-- `src/tools` - Tool definitions
-- `src/prompts` - Prompt templates
-- `src/resources` - Resource handlers
+- **Docker**: `docker compose up --build` from the repo root; the ALB routes `/mcp` here.
+- **Alone**: `pnpm install`, then `pnpm dev` (or `pnpm build && pnpm start`). Listens on `0.0.0.0:3001/mcp`. `API_URL` is the backend's **origin**: the server adds `/api` (`http://localhost` for the Docker stack, `http://localhost:31126` for a backend run by hand).
 
-### Tools
-
-Each tool is defined in its own file with the following structure:
-
-```typescript
-import { z } from "zod";
-import { type InferSchema, type ToolMetadata } from "xmcp";
-
-export const schema = {
-  name: z.string().describe("The name of the user to greet"),
-};
-
-export const metadata: ToolMetadata = {
-  name: "greet",
-  description: "Greet the user",
-  annotations: {
-    title: "Greet the user",
-    readOnlyHint: true,
-    destructiveHint: false,
-    idempotentHint: true,
-  },
-};
-
-export default function greet({ name }: InferSchema<typeof schema>) {
-  return `Hello, ${name}!`;
-}
-```
-
-### Prompts
-
-Prompts are template definitions for AI interactions:
-
-```typescript
-import { z } from "zod";
-import { type InferSchema, type PromptMetadata } from "xmcp";
-
-export const schema = {
-  code: z.string().describe("The code to review"),
-};
-
-export const metadata: PromptMetadata = {
-  name: "review-code",
-  title: "Review Code",
-  description: "Review code for best practices and potential issues",
-  role: "user",
-};
-
-export default function reviewCode({ code }: InferSchema<typeof schema>) {
-  return `Please review this code: ${code}`;
-}
-```
-
-### Resources
-
-Resources provide data or content with URI-based access:
-
-```typescript
-import { z } from "zod";
-import { type ResourceMetadata, type InferSchema } from "xmcp";
-
-export const schema = {
-  userId: z.string().describe("The ID of the user"),
-};
-
-export const metadata: ResourceMetadata = {
-  name: "user-profile",
-  title: "User Profile",
-  description: "User profile information",
-};
-
-export default function handler({ userId }: InferSchema<typeof schema>) {
-  return `Profile data for user ${userId}`;
-}
-```
-
-## Adding New Components
-
-### Adding New Tools
-
-To add a new tool:
-
-1. Create a new `.ts` file in the `src/tools` directory
-2. Export a `schema` object defining the tool parameters using Zod
-3. Export a `metadata` object with tool information
-4. Export a default function that implements the tool logic
-
-### Adding New Prompts
-
-To add a new prompt:
-
-1. Create a new `.ts` file in the `src/prompts` directory
-2. Export a `schema` object defining the prompt parameters using Zod
-3. Export a `metadata` object with prompt information and role
-4. Export a default function that returns the prompt text
-
-### Adding New Resources
-
-To add a new resource:
-
-1. Create a new `.ts` file in the `src/resources` directory
-2. Use folder structure to define the URI (e.g., `(users)/[userId]/profile.ts` → `users://{userId}/profile`)
-3. Export a `schema` object for dynamic parameters (optional for static resources)
-4. Export a `metadata` object with resource information
-5. Export a default function that returns the resource content
-
-## Building for Production
-
-To build your project for production:
-
-```bash
-npm run build
-# or
-yarn build
-# or
-pnpm build
-```
-
-This will compile your TypeScript code and output it to the `dist` directory.
-
-## Running the Server
-
-You can run the server for the transport built with:
-
-- HTTP: `node dist/http.js`
-- STDIO: `node dist/stdio.js`
-
-Given the selected transport method, you will have a custom start script added to the `package.json` file.
-
-For HTTP:
-
-```bash
-npm run start-http
-# or
-yarn start-http
-# or
-pnpm start-http
-```
-
-For STDIO:
-
-```bash
-npm run start-stdio
-# or
-yarn start-stdio
-# or
-pnpm start-stdio
-```
-
-## Learn More
-
-- [xmcp Documentation](https://xmcp.dev/docs)
+To try it without an agent: `npx @modelcontextprotocol/inspector`, transport "Streamable HTTP", URL `http://localhost/mcp`, header `Authorization: Bearer tiu_pat_…`.

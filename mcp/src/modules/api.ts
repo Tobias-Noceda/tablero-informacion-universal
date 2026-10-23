@@ -1,109 +1,87 @@
-import { current_user } from "./session";
+import { headers } from "xmcp/headers";
+
+// ApiError is a backend answer other than 2xx, with its `error` code.
+export class ApiError extends Error {
+    constructor(
+        readonly status: number,
+        readonly code: string,
+    ) {
+        super(describe(status, code));
+        this.name = "ApiError";
+    }
+}
+
+// What the agent (and the person behind it) should read for each failure.
+function describe(status: number, code: string) {
+    switch (status) {
+        case 401:
+            return "The access token is invalid, expired or revoked. Create a new one in your profile.";
+        case 403:
+            return code === "token_not_allowed"
+                ? "This access token can only read boards."
+                : `Not allowed (${code}).`;
+        case 404:
+            return "Not found, or you have no access to it.";
+        default:
+            return `The board service answered ${status} (${code}).`;
+    }
+}
 
 function resolvePath(path: `/${string}`) {
     const url = process.env.API_URL || "http://localhost:31126";
     return new URL("/api" + path, url);
 }
 
-export async function get(
-    path: `/${string}`,
-    options?: RequestInit,
-): Promise<Response> {
-    const url = resolvePath(path);
+// The caller's bearer, read from the request being served: never kept in
+// module state, which every concurrent client would share.
+function authorization() {
+    const value = headers().authorization;
+    return Array.isArray(value) ? value[0] : value;
+}
 
+async function request(
+    method: string,
+    path: `/${string}`,
+    body?: unknown,
+): Promise<Response> {
     let response: Response;
     try {
-        response = await fetch(new URL(url), {
-            ...options,
-            method: "GET",
+        response = await fetch(resolvePath(path), {
+            method,
             headers: {
-                ...options?.headers,
-                Authorization: `Bearer ${current_user}`,
+                Authorization: authorization() ?? "",
+                ...(body !== undefined && {
+                    "Content-Type": "application/json",
+                }),
             },
+            body: body !== undefined ? JSON.stringify(body) : undefined,
         });
     } catch (err) {
         console.error("Network error:", err);
-        throw `Network error: Unable to reach server`;
+        throw new Error("Network error: unable to reach the board service");
     }
 
     if (!response.ok) {
-        throw response.status;
+        const payload = await response.json().catch(() => ({}));
+        throw new ApiError(
+            response.status,
+            typeof payload?.error === "string" ? payload.error : "unknown",
+        );
     }
 
     return response;
 }
 
-export function post(
-    path: `/${string}`,
-    body: unknown,
-    options?: RequestInit,
-): Promise<Response> {
-    const url = resolvePath(path);
+export const get = (path: `/${string}`) => request("GET", path);
 
-    return fetch(url, {
-        ...options,
-        method: "POST",
-        headers: {
-            ...options?.headers,
-            Authorization: `Bearer ${current_user}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-    });
-}
+export const post = (path: `/${string}`, body: unknown) =>
+    request("POST", path, body);
 
-export function put(
-    path: `/${string}`,
-    body?: unknown,
-    options?: RequestInit,
-): Promise<Response> {
-    const url = resolvePath(path);
+export const put = (path: `/${string}`, body?: unknown) =>
+    request("PUT", path, body);
 
-    return fetch(url, {
-        ...options,
-        method: "PUT",
-        headers: {
-            ...options?.headers,
-            Authorization: `Bearer ${current_user}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-    });
-}
+export const patch = (path: `/${string}`, body: unknown) =>
+    request("PATCH", path, body);
 
-export function patch(
-    path: `/${string}`,
-    body: unknown,
-    options?: RequestInit,
-): Promise<Response> {
-    const url = resolvePath(path);
-
-    return fetch(url, {
-        ...options,
-        method: "PATCH",
-        headers: {
-            ...options?.headers,
-            Authorization: `Bearer ${current_user}`,
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-    });
-}
-
-export function del(
-    path: `/${string}`,
-    body?: unknown,
-    options?: RequestInit,
-): Promise<Response> {
-    const url = resolvePath(path);
-
-    return fetch(url, {
-        ...options,
-        method: "DELETE",
-        headers: {
-            ...options?.headers,
-            Authorization: `Bearer ${current_user}`,
-        },
-        body: body ? JSON.stringify(body) : undefined,
-    });
-}
+export const del = (path: `/${string}`, body?: unknown) =>
+    request("DELETE", path, body);

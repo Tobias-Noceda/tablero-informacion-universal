@@ -149,7 +149,31 @@
 		"add_password": "Elegir una contraseña",
 		"save_failed": "No se pudo guardar el nombre.",
 		"language": "Idioma",
-		"language_hint": "Los mails de la plataforma te llegan en este idioma."
+		"language_hint": "Los mails de la plataforma te llegan en este idioma.",
+		"tokens": {
+			"title": "Tokens de acceso para desarrolladores",
+			"hint": "Permití que una herramienta de desarrollo, como un cliente MCP, lea tus tableros como vos. Los tokens son de solo lectura y vencen.",
+			"name": "Nombre del token",
+			"name_placeholder": "Mi notebook",
+			"expiry": "Vence en",
+			"days": "{days} días",
+			"create": "Crear token",
+			"create_failed": "No se pudo crear el token.",
+			"too_many": "Ya tenés la cantidad máxima de tokens activos. Revocá uno primero.",
+			"rate_limited": "Creaste demasiados tokens hace poco. Probá más tarde.",
+			"created_title": "Copiá tu token ahora",
+			"created_hint": "Es la única vez que se muestra. Pegalo en tu cliente MCP:",
+			"copy": "Copiar",
+			"copied": "Copiado",
+			"done": "Listo",
+			"empty": "Todavía no tenés tokens.",
+			"expires": "Vence el {date}",
+			"last_used": "Último uso: {date}",
+			"never_used": "Nunca usado",
+			"revoke": "Revocar",
+			"revoke_confirm": "¿Revocar \"{name}\"? Las herramientas que lo usan dejan de funcionar enseguida.",
+			"revoke_failed": "No se pudo revocar el token."
+		}
 	},
 	"header": {
 		"profile": "Perfil",

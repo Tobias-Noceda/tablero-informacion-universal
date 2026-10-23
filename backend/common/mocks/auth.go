@@ -310,3 +310,64 @@ func (p *MockIdentityProvider) Complete(code, redirectURI, verifier, nonce strin
 	identity := *p.Identity
 	return &identity, nil
 }
+
+// MemoryAccessTokenStore keeps personal access tokens in a slice.
+type MemoryAccessTokenStore struct {
+	mu     sync.Mutex
+	Tokens []models.AccessToken
+}
+
+var _ infrastructure.AccessTokenStore = (*MemoryAccessTokenStore)(nil)
+
+func (m *MemoryAccessTokenStore) CreateAccessToken(token *models.AccessToken) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.Tokens = append(m.Tokens, *token)
+	return nil
+}
+
+func (m *MemoryAccessTokenStore) FindAccessTokenByHash(hash string) (*models.AccessToken, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, token := range m.Tokens {
+		if token.Hash == hash {
+			return &token, nil
+		}
+	}
+	return nil, infrastructure.ErrAccessTokenNotFound
+}
+
+func (m *MemoryAccessTokenStore) ListAccessTokens(user string) ([]models.AccessToken, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	tokens := []models.AccessToken{}
+	for _, token := range m.Tokens {
+		if token.User == user {
+			tokens = append(tokens, token)
+		}
+	}
+	return tokens, nil
+}
+
+func (m *MemoryAccessTokenStore) DeleteAccessToken(user string, id uuid.UUID) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i, token := range m.Tokens {
+		if token.Id == id && token.User == user {
+			m.Tokens = slices.Delete(m.Tokens, i, i+1)
+			return nil
+		}
+	}
+	return infrastructure.ErrAccessTokenNotFound
+}
+
+func (m *MemoryAccessTokenStore) TouchAccessToken(id uuid.UUID, at time.Time) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for i := range m.Tokens {
+		if m.Tokens[i].Id == id {
+			m.Tokens[i].LastUsedAt = &at
+		}
+	}
+	return nil
+}

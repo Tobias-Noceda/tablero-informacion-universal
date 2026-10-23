@@ -8,11 +8,11 @@ A universal information dashboard ("tablero de información universal") where us
 
 ## Monorepo layout
 
-`backend/` (Go API), `realtime/` (Node socket service) and `frontend/` (SvelteKit SPA). `frontend/CLAUDE.md` and `realtime/CLAUDE.md` hold the notes for those services; they load when working in that folder.
+`backend/` (Go API), `realtime/` (Node socket service), `frontend/` (SvelteKit SPA) and `mcp/` (xmcp MCP server, see `mcp/README.md`). `frontend/CLAUDE.md` and `realtime/CLAUDE.md` hold the notes for those services; they load when working in that folder.
 
 ### Two deployment targets, one topology
 
-The app runs on **Docker (compose)** and on **Vercel**. Both put the three services behind a single origin and route by path prefix (`/api`, `/ws`, `/`). The frontend relies on this: it never needs to know a backend host (see "How the frontend finds the backend").
+The app runs on **Docker (compose)** and on **Vercel**. Both put the services behind a single origin and route by path prefix (`/api`, `/ws`, `/mcp`, `/`). The frontend relies on this: it never needs to know a backend host (see "How the frontend finds the backend").
 
 | | Docker | Vercel |
 |---|---|---|
@@ -143,6 +143,8 @@ common/
     orgs/          Gin routes /v1/orgs
     secrets/       Gin routes /v1/{boards,users,groups}/:id/{secrets,oauth2}, /v1/boards/:id/members/:user/*, /v1/boards/:id/secrets/usable, /v1/system/*, /v1/oauth2/*
 ```
+
+**Personal access tokens** (`services/tokens`, collection `access_tokens`): a developer creates `tiu_pat_…` tokens (7/15/30 days, max 10 active) at `/users/:id/tokens` for tools such as the MCP server. Only the SHA-256 is stored. `tokens.Verifier` wraps the JWT keyring, so `RequireAuth` takes both; a token principal has `Token: true`, is never admin, and `RestrictAccessTokens` lets it reach only an allowlist of read routes (`403 token_not_allowed` otherwise), so a new route is closed to tokens by default.
 
 **Authentication**: email/password (argon2id, email verified through a mailed link) or Google sign-in. A session is a 15-minute EdDSA access token, kept by the frontend in memory and sent as `Authorization: Bearer`, plus a rotating refresh token in Redis carried by the httpOnly cookie `tiu_refresh` (only `/auth/refresh` and `/auth/logout` read it, and refuse cross-site requests). The principal is `{ID: sub, Admin}`; `Admin` comes from `PLATFORM_ADMINS` at sign-in. Mails (`models.Mail{To, Locale, Template, Vars}`) go out in the recipient's `User.Locale` (`en|es`, set on registration or Google sign-up from the frontend's locale, changed with `PATCH /users/:id`); a new template needs a file per locale (`LoadTemplates` refuses to boot otherwise). Login, registration and reset mails are limited per client address and per account, adding people by email (boards and organizations share it) per user: `429 rate_limited`.
 
