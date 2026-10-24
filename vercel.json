@@ -49,12 +49,6 @@
             }
         },
         {
-            "source": "/mcp/",
-            "destination": {
-                "service": "mcp"
-            }
-        },
-        {
             "source": "/mcp/(.*)",
             "destination": {
                 "service": "mcp"
