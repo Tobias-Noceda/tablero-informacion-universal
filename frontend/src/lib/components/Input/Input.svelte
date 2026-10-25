@@ -13,6 +13,7 @@
     autocomplete?: HTMLInputAttributes['autocomplete'];
     value?: string | number;
     min?: number;
+    max?: number;
     errorMessage?: string;
     disabled?: boolean;
     skeleton?: boolean;
@@ -35,6 +36,7 @@
     autocomplete,
     value = $bindable(''),
     min,
+    max,
     errorMessage,
     disabled = false,
     skeleton = false,
@@ -123,6 +125,7 @@
         disabled={disabled || skeleton}
         {required}
         {min}
+        {max}
         {oninput}
         onkeydown={(event) => {
           if (event.key === 'Enter') {

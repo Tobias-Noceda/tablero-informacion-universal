@@ -17,6 +17,7 @@
 	import Input from '$components/Input/Input.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { groupByOrigin } from '$lib/secrets/origin';
+	import { getLocale } from '$lib/paraglide/runtime';
 
 	let {
         boardId,
@@ -55,7 +56,7 @@
 	// with its own params, so those show what the user typed.
 	const sampleResponse = $derived(
 		Object.fromEntries(
-			creatingOutputs.map((o) => [o.key, (paramValues[o.key] ?? '').trim() || o.example])
+			creatingOutputs.map((o) => [o.key, (paramValues[o.key] ?? '').trim() || o[`example_${getLocale()}`]])
 		)
 	);
 
@@ -138,6 +139,7 @@
             placeholder={m['card_title.placeholder']({ example: '{{value}}' })}
             required
             bind:value={creatingTitle}
+            max={127}
             labelClass="font-semibold"
         />
         {#if titleAnalysis.unsupported}
@@ -157,7 +159,7 @@
                         <button
                             type="button"
                             class="rounded-md border border-main-border bg-background px-2 py-0.5 font-mono text-xs hover:bg-main-hover cursor-pointer"
-                            title={`${output.label}: ${JSON.stringify(sampleResponse[output.key])}`}
+                            title={`${output[`label_${getLocale()}`]}: ${JSON.stringify(sampleResponse[output.key])}`}
                             onclick={() => insertVariable(output.key)}
                         >
                             {`{{${output.key}}}`}
@@ -180,7 +182,7 @@
         {#each creatingParams as param (param.key)}
             {#if param.type === 'secret'}
                 <label class="flex flex-col gap-1 text-sm">
-                    <span class="font-semibold">{param.label}</span>
+                    <span class="font-semibold">{param[`label_${getLocale()}`]}</span>
                     {#if pickable.length === 0}
                         <span class="text-xs text-destructive">{m['secrets.no_credentials']()}</span>
                     {:else}
@@ -201,9 +203,9 @@
                 </label>
             {:else}
                 <Input
-                    label={param.label}
+                    label={param[`label_${getLocale()}`]!}
                     labelClass="font-semibold"
-                    placeholder={param.placeholder}
+                    placeholder={param[`placeholder_${getLocale()}`]}
                     type={param.type === 'number' ? 'number' : 'text'}
                     required={param.default === undefined}
                     bind:value={paramValues[param.key]}
