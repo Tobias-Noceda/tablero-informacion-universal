@@ -31,9 +31,9 @@
 	import { isManagingSecrets, setManagingSecrets } from '$stores/sidebar';
 	import { results } from '$stores/postit-results.svelte';
 	import { boardPath, nodePath } from '$lib/helpers/routes';
-	import NodeDetail from './NodeDetail.svelte';
+	import NodeDetail, { type PostItData } from './NodeDetail.svelte';
 
-	import NodeCreationPanel from '$layouts/NodeCreation/NodeCreationPanel.svelte';
+	import NodeConfigurationPanel from '$layouts/NodeConfiguration/NodeConfigurationPanel.svelte';
 
 	let {
 		nodes,
@@ -55,10 +55,12 @@
 	// layout hides the cards and credentials; the backend refuses it anyway).
 	const canEdit = $derived(role === 'owner' || role === 'editor');
 
+	let settingsVersion = $state(0);
+
 	// The open card lives in the URL (`.../nodes/:nodeId`), so its detail can
 	// be shared with a link and the browser's back button closes it.
 	const selectedNodeId = $derived(page.params.nodeId ?? null);
-	const selectedNode = $derived(nodes.find((n) => n.id === selectedNodeId) ?? null);
+	let selectedNode = $derived(nodes.find((n) => n.id === selectedNodeId) ?? null);
 	let selectedEdge: Edge | null = $state(null);
 
 	const navigation = { noScroll: true, keepFocus: true };
@@ -83,6 +85,8 @@
 	});
 	let creatingNode = $state<Board['postits'][number] | null>(null);
 	let paramValues = $state<Record<string, string>>({});
+
+	let editingNode = $state<PostItData | null>(null);
 
 	const { screenToFlowPosition, flowToScreenPosition } = useSvelteFlow();
 
@@ -139,10 +143,18 @@
 		});
 	};
 
-	const createNode = (newNode: Node) => {
+	const persistNode = (action: 'create' | 'update', newNode: Node) => {
 		if (!canEdit) return;
-		nodes = [...nodes, { ...newNode }];
+		if (action === 'update') {
+			nodes = nodes.map((n) => (n.id === newNode.id ? { ...newNode, data: { ...n.data, ...newNode.data } } : n));
+			selectedNode = newNode;
+			settingsVersion++;
+			results.refresh(newNode.id)
+		} else if (action === 'create') {
+			nodes = [...nodes, { ...newNode }];
+		}
 		creatingNode = null;
+		editingNode = null;
 		paramValues = {};
 	};
 
@@ -241,6 +253,12 @@
 		}
 	};
 
+	const onEditStart = (node: PostItData) => {
+		if (!canEdit) return;
+		editingNode = { ...node };
+		paramValues = node.paramValues;
+	};
+
 	// Effects
 	$effect(() => {
 		window.addEventListener('keydown', onKeyDown);
@@ -302,20 +320,24 @@
 		</Realtime>
 	</main>
 	{#if selectedNode}
-		<NodeDetail node={selectedNode} {canEdit} onback={closeNode} ondelete={deleteNode} />
+		<NodeDetail node={selectedNode} {canEdit} {settingsVersion} onedit={onEditStart} onback={closeNode} ondelete={deleteNode} />
 	{/if}
 
 	{#if $isManagingSecrets}
 		<SecretsPanel board={boardId} onclose={() => setManagingSecrets(false)} />
 	{/if}
 
-	<NodeCreationPanel
+	<NodeConfigurationPanel
 		{boardId}
 		{creatingNode}
+		currentPostIt={editingNode}
 		{paramValues}
 		{usableSecrets}
-		onclose={() => (creatingNode = null)}
-		onCreateNode={createNode}
+		onclose={() => {
+			creatingNode = null;
+			editingNode = null;
+		}}
+		onPersistNode={persistNode}
 	/>
 </div>
 

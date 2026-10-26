@@ -5,7 +5,7 @@
 	} from '@xyflow/svelte';
 
 	import * as postItsApi from '$services/post-it';
-	import type { Board } from '$types/api';
+	import type { Board, SecretRef } from '$types/api';
 	import { bindingsFor, refKey } from '$lib/secrets/binding';
 	import type { SecretMeta } from '$types/api';
 	import { outputs, parameters } from '$components/Nodes/node-map';
@@ -18,22 +18,36 @@
 	import { m } from '$lib/paraglide/messages';
 	import { groupByOrigin } from '$lib/secrets/origin';
 	import { getLocale } from '$lib/paraglide/runtime';
+	import type { PostItData } from '$layouts/BoardContent/NodeDetail.svelte';
+	import { sameBindings, sameParams } from './helpers';
+	import Dropdown from '$components/Dropdown/Dropdown.svelte';
+	import { cn } from '$lib/utils';
+
+    interface BoardConfigurationProps {
+        boardId: string;
+        creatingNode: Board['postits'][number] | null;
+        paramValues: Record<string, string>;
+        usableSecrets: SecretMeta[];
+        currentPostIt?: PostItData | null;
+        onclose: () => void;
+        onPersistNode: (action: 'create' | 'update', node: Node) => void;
+    }
 
 	let {
         boardId,
         creatingNode,
         paramValues,
         usableSecrets,
+        currentPostIt,
         onclose,
-        onCreateNode,
-	}: {
-        boardId: string;
-        creatingNode: Board['postits'][number] | null;
+        onPersistNode,
+	}: BoardConfigurationProps = $props();
+
+    let originalConfig = $state<{
+        title: string;
         paramValues: Record<string, string>;
-        usableSecrets: SecretMeta[];
-        onclose: () => void;
-        onCreateNode: (node: Node) => void;
-	} = $props();
+        bindings: Record<string, SecretRef>;
+    } | null>(null);
 
     const pickable = $derived(groupByOrigin(usableSecrets, boardId, session.userId));
 	const byKey = $derived(new Map(usableSecrets.map((s) => [refKey(s), s])));
@@ -42,7 +56,7 @@
 	// A secret parameter holds the picked secret's key, not its name.
 	let pickedKeys = $state<Record<string, string>>({});
 
-	const creatingParams = $derived(creatingNode ? (parameters[creatingNode.type!] ?? []) : []);
+	const creatingParams = $derived(creatingNode ? (parameters[creatingNode.type!] ?? []) : currentPostIt ? (parameters[currentPostIt.type!] ?? []) : []);
 	const missingRequired = $derived(
 		creatingParams.some((p) => {
 			const value = p.type === 'secret' ? pickedKeys[p.key] : paramValues[p.key];
@@ -51,7 +65,7 @@
 	);
 
     // What the card answers with, usable in its title as {{key}}.
-	const creatingOutputs = $derived(creatingNode ? (outputs[creatingNode.type!] ?? []) : []);
+	const creatingOutputs = $derived(creatingNode ? (outputs[creatingNode.type!] ?? []) : currentPostIt ? (outputs[currentPostIt.type!] ?? []) : []);
 	// Example values to preview the title; a card without a resource answers
 	// with its own params, so those show what the user typed.
 	const sampleResponse = $derived(
@@ -110,13 +124,79 @@
 
 		// The create response is the post-it itself: its title is top level.
 		const created = newPostIt as unknown as { title?: { text: string; vars: boolean } };
-        onCreateNode({ ...creatingNode, id: newPostIt.id, data: { title: created.title } } as Node);
+        onPersistNode('create', { ...creatingNode, id: newPostIt.id, data: { title: created.title } } as Node);
 		pickedKeys = {};
         creatingTitle = '';
 	};
+
+    const updateNode = async () => {
+        if (!currentPostIt || missingRequired || titleInvalid) return;
+
+        const picked = Object.fromEntries(
+            creatingParams
+                .filter((p) => p.type === 'secret' && byKey.has(pickedKeys[p.key]))
+                .map((p) => [p.key, byKey.get(pickedKeys[p.key])!])
+        );
+        const secrets = bindingsFor(picked, boardId);
+
+        const params = {
+            ...Object.fromEntries(
+                creatingParams
+                    .filter((p) => p.type !== 'secret')
+                    .map((p) => [p.key, (paramValues[p.key] ?? '').trim()])
+            ),
+            ...secrets.params
+        };
+
+        const title = creatingTitle.trim();
+
+        if (!sameParams(creatingParams, params, originalConfig?.paramValues ?? {}) || !sameBindings(secrets.bindings, originalConfig?.bindings ?? {})) {
+            await postItsApi.update_well_known_settings(
+                currentPostIt.id,
+                params,
+                secrets.bindings
+            );
+        }
+        if (title !== (currentPostIt.title?.text ?? '')) {
+            await postItsApi.update_well_known_title(
+                currentPostIt.id,
+                { text: title, vars: titleAnalysis.vars }
+            );
+        }
+        onPersistNode('update', { ...currentPostIt, data: { title: { text: title, vars: titleAnalysis.vars } } } as Node);
+        pickedKeys = {};
+        creatingTitle = '';
+    };
+
+    $effect(() => {
+        if (currentPostIt) {
+            originalConfig = {
+                title: currentPostIt.title?.text ?? '',
+                paramValues: { ...currentPostIt.paramValues },
+                bindings: { ...currentPostIt.bindings },
+            };
+
+            creatingTitle = currentPostIt.title?.text ?? '';
+            const refOf = (value: string) => {
+                const name = value.replace(/^\$/, '');
+                return refKey(
+                        currentPostIt.bindings?.[name] ?? { scope: { kind: 'board', owner: boardId }, name }
+                );
+            };
+            pickedKeys = Object.fromEntries(
+                creatingParams
+                        .filter((p) => p.type === 'secret' && currentPostIt.paramValues?.[p.key])
+                        .map((p) => [p.key, refOf(currentPostIt.paramValues![p.key])])
+            );
+        } else {
+            originalConfig = null;
+            creatingTitle = '';
+            pickedKeys = {};
+        }
+    });
 </script>
 
-{#if creatingNode}
+{#if creatingNode || currentPostIt}
     <Modal
         onclose={() => {
             creatingTitle = '';
@@ -126,17 +206,20 @@
         onaccept={() => {
             if (creatingNode) {
                 createNode();
+            } else if (currentPostIt) {
+                updateNode();
             }
         }}
-        acceptText="Create"
+        acceptText={creatingNode ? m['nodes.modify_modal.create.action']() : m['nodes.modify_modal.edit.action']()}
         acceptDisabled={missingRequired || titleInvalid}
     >
         <div class="flex w-full justify-center">
-            <h2 class="text-xl font-semibold">Create Node</h2>
+            <h2 class="text-xl font-semibold">{creatingNode ? m['nodes.modify_modal.create.title']() : m['nodes.modify_modal.edit.title']()}</h2>
         </div>
         <Input
             label={m['card_title.label']()}
             placeholder={m['card_title.placeholder']({ example: '{{value}}' })}
+            class="focus:*:ring-0! focus:border-red! focus:outline-none!"
             required
             bind:value={creatingTitle}
             max={127}
@@ -186,25 +269,38 @@
                     {#if pickable.length === 0}
                         <span class="text-xs text-destructive">{m['secrets.no_credentials']()}</span>
                     {:else}
-                        <select
-                            class="bg-background border border-main-border rounded-md px-2 py-1"
+                        <Dropdown
+                            labelClass="font-semibold"
+                            placeholder={m['secrets.pick_credential']()}
+                            options={Object.fromEntries(
+                                pickable.map((group) => [
+                                    group.origin,
+                                    {
+                                        label: m[`secrets.origin_${group.origin}`]() as string,
+                                        options: group.secrets.map((secret) => ({
+                                            label: `${secret.name} (${secret.provider ?? secret.kind})`,
+                                            value: refKey(secret)
+                                        }))
+                                    }
+                                ])
+                            )}
+                            class="w-full"
+                            activatorClass={(isOpen) => cn(
+                                "rounded-md border border-border bg-transparent px-3 py-2 w-full!",
+                                isOpen ? "outline-none ring-2 ring-main-border border-none" : ""
+                            )}
+                            drawerClass="rounded-md bg-background!"
+                            sectionClass="font-semibold text-foreground!"
+                            itemClass={() => "bg-background! rounded-md hover:bg-main-hover!"}
                             bind:value={pickedKeys[param.key]}
-                        >
-                            <option value="">{m['secrets.pick_credential']()}</option>
-                            {#each pickable as group (group.origin)}
-                                <optgroup label={m[`secrets.origin_${group.origin}`]()}>
-                                    {#each group.secrets as secret (refKey(secret))}
-                                        <option value={refKey(secret)}>{secret.name} ({secret.provider ?? secret.kind})</option>
-                                    {/each}
-                                </optgroup>
-                            {/each}
-                        </select>
+                        />
                     {/if}
                 </label>
             {:else}
                 <Input
                     label={param[`label_${getLocale()}`]!}
                     labelClass="font-semibold"
+                    class="focus:*:ring-0 focus:border-main-border focus:outline-none"
                     placeholder={param[`placeholder_${getLocale()}`]}
                     type={param.type === 'number' ? 'number' : 'text'}
                     required={param.default === undefined}

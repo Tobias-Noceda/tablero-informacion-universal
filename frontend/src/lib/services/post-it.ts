@@ -20,6 +20,21 @@ export async function create_well_known(
     return mapPostitWithTitle(await res.json() as PostItWithTitle);
 }
 
+export async function update_well_known_title(
+    postItId: UUID,
+    title: { text: string, vars: boolean },
+) {
+    await api.patch(`/v1/post-its/${postItId}/title`, { title });
+}
+
+export async function update_well_known_settings(
+    postItId: UUID,
+    params: Record<string, string>,
+    bindings: Record<string, SecretRef> = {},
+) {
+    await api.patch(`/v1/post-its/${postItId}/settings`, { params, bindings });
+}
+
 export async function del(id: UUID): Promise<Strand[]> {
     const deletedEdges = await api.del(`/v1/post-its/${id}`).then(async (res) => await res.json() as Strand[]);
     return deletedEdges;

@@ -59,7 +59,8 @@
     'px-3 py-2.5 rounded-md border bg-background text-foreground',
     'disabled:opacity-50 disabled:cursor-not-allowed',
     errorMessage ? 'border-destructive' : 'border-border',
-    'focus:border-main focus:outline-none',
+    'hover:border-sidebar focus:border-main focus:ring-1 focus:ring-main',
+    'focus:outline-none focus:ring-1 focus:ring-main focus:border-main',
     skeleton ? 'bg-skeleton animate-pulse text-transparent cursor-default' : '',
     multiline ? 'resize-none overflow-hidden' : '',
     type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''

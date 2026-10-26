@@ -37,7 +37,17 @@
 		"gmail_inbox": "Gmail Inbox",
 		"google_calendar": "Google Calendar",
 		"nasa_apod": "NASA Picture of the Day",
-		"create": "Create a new card"
+		"create": "Create a new card",
+		"modify_modal": {
+			"create": {
+				"title": "Create card",
+				"action": "Create"
+			},
+			"edit": {
+				"title": "Edit card",
+				"action": "Save changes"
+			}
+		}
 	},
 	"secrets": {
 		"title": "Board credentials",
@@ -241,6 +251,7 @@
 	},
 	"node_detail": {
 		"back": "Back to the board",
+		"edit": "Edit card",
 		"refresh": "Refresh content",
 		"configuration": "Configuration",
 		"content": "Content",
