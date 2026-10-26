@@ -27,7 +27,8 @@
 	import { edgesMap } from '$components/Edges/edge-map';
 	import { mouses } from '$stores/mouses.svelte';
 	import Realtime from './Realtime.svelte';
-	import type { Update } from '$modules/sockets.svelte';
+	import Cursors from './Cursors.svelte';
+	import type { NodeMoves, Update } from '$modules/realtime.svelte';
 	import { isManagingSecrets, setManagingSecrets } from '$stores/sidebar';
 	import { results } from '$stores/postit-results.svelte';
 	import { boardPath, nodePath } from '$lib/helpers/routes';
@@ -88,9 +89,9 @@
 
 	let editingNode = $state<PostItData | null>(null);
 
-	const { screenToFlowPosition, flowToScreenPosition } = useSvelteFlow();
+	const { screenToFlowPosition } = useSvelteFlow();
 
-	mouses.updateMappers(screenToFlowPosition, flowToScreenPosition);
+	mouses.updateMappers(screenToFlowPosition);
 
 	const type = useDnD();
 
@@ -179,6 +180,22 @@
 		selectedEdge = null;
 		edges = edges.map((e) => {
 			return { ...e, data: { ...e.data, isSelected: false } };
+		});
+	};
+
+	let realtime = $state<ReturnType<typeof Realtime>>();
+
+	// Others see the cards move while this user drags them; the drop saves.
+	const onNodeDrag = (event: { nodes: Node[] }) => {
+		realtime?.moveNodes(event.nodes.map((n) => [n.id, n.position.x, n.position.y]));
+	};
+
+	// Cards another user is dragging. One this user is dragging stays put.
+	const onNodeMoves = (moves: NodeMoves) => {
+		const moved = new Map(moves.map(([id, x, y]) => [id, { x, y }]));
+		nodes = nodes.map((n) => {
+			const position = moved.get(n.id);
+			return position && !n.dragging ? { ...n, position } : n;
 		});
 	};
 
@@ -290,7 +307,7 @@
 
 <div class="relative flex flex-row flex-1 min-h-0 h-full w-full">
 	<main class="dndflow">
-		<Realtime {boardId} {boardUpdate}>
+		<Realtime bind:this={realtime} {boardId} {boardUpdate} {onNodeMoves}>
 			<div class="reactflow-wrapper">
 				<SvelteFlow
 					bind:nodes
@@ -306,6 +323,7 @@
 					ondragover={onDragOver}
 					ondrop={onDrop}
 					onnodeclick={onNodeClick}
+					onnodedrag={onNodeDrag}
 					onnodedragstop={onNodeDragStop}
 					onedgeclick={onEdgeClick}
 					onconnect={onConnect}
@@ -315,6 +333,7 @@
 					attributionPosition={undefined}
 				>
 					<Controls />
+					<Cursors />
 				</SvelteFlow>
 			</div>
 		</Realtime>

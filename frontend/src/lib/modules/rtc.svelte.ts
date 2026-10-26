@@ -4,6 +4,9 @@ import { mouses, type ClientData } from '$stores/mouses.svelte';
 
 import { SvelteMap } from 'svelte/reactivity';
 
+// Where cards being dragged are right now, in flow coordinates: [id, x, y].
+export type NodeMoves = [string, number, number][];
+
 export class RTC {
 	private static readonly COLORS = [
 		'#FF0000',
@@ -20,7 +23,8 @@ export class RTC {
 	constructor(
 		id: string,
 		clients: Record<string, string>,
-		me: Pick<ClientData, 'username' | 'picture'>
+		me: Pick<ClientData, 'username' | 'picture'>,
+		private readonly onNodeMoves: (moves: NodeMoves) => void
 	) {
 		this.peer = new Peer(id);
 
@@ -47,6 +51,16 @@ export class RTC {
 	}
 
 	update(data: [number, number]) {
+		this.broadcast(data);
+	}
+
+	// Only a preview while dragging: the drop saves the position, and the
+	// board update that follows is what every client ends up with.
+	moveNodes(moves: NodeMoves) {
+		this.broadcast({ nodes: moves });
+	}
+
+	private broadcast(data: unknown) {
 		this.connections
 			.values()
 			.filter((c) => c.open)
@@ -70,6 +84,8 @@ export class RTC {
 				if (Array.isArray(data) && RTC.isNumber(data[0]) && RTC.isNumber(data[1])) {
 					const pos = { x: data[0], y: data[1] };
 					mouses.update(id, pos);
+				} else if (RTC.isNodeMoves(data)) {
+					this.onNodeMoves(data.nodes);
 				}
 			});
 		});
@@ -86,6 +102,17 @@ export class RTC {
 
 	private static isNumber(n: unknown): n is number {
 		return Number.isFinite(n);
+	}
+
+	private static isNodeMoves(data: unknown): data is { nodes: NodeMoves } {
+		const nodes = (data as { nodes?: unknown } | null)?.nodes;
+		return (
+			Array.isArray(nodes) &&
+			nodes.every(
+				(m) =>
+					Array.isArray(m) && typeof m[0] === 'string' && RTC.isNumber(m[1]) && RTC.isNumber(m[2])
+			)
+		);
 	}
 
 	private static getColor(i: number) {

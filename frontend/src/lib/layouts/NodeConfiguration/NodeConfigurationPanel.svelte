@@ -1,8 +1,5 @@
 <script lang="ts">
-	import {
-		useSvelteFlow,
-		type Node,
-	} from '@xyflow/svelte';
+	import type { Node } from '@xyflow/svelte';
 
 	import * as postItsApi from '$services/post-it';
 	import type { Board, SecretRef } from '$types/api';
@@ -10,7 +7,6 @@
 	import type { SecretMeta } from '$types/api';
 	import { outputs, parameters } from '$components/Nodes/node-map';
 	import { analyzeTitle, renderTitle } from '$lib/title';
-	import { mouses } from '$stores/mouses.svelte';
 
 	import { session } from '$modules/session.svelte';
 	import Modal from '$components/Modal/Modal.svelte';
@@ -106,10 +102,6 @@
 		const separator = creatingTitle && !creatingTitle.endsWith(' ') ? ' ' : '';
 		creatingTitle = `${creatingTitle}${separator}{{${key}}}`;
 	};
-
-	const { screenToFlowPosition, flowToScreenPosition } = useSvelteFlow();
-
-	mouses.updateMappers(screenToFlowPosition, flowToScreenPosition);
 
 	const createNode = async () => {
 		if (!creatingNode || missingRequired || titleInvalid) return;
