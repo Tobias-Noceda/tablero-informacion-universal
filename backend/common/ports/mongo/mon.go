@@ -28,6 +28,8 @@ type MongoDB struct {
 	dataKeys *mongo.Collection
 	groups   *mongo.Collection
 	orgs     *mongo.Collection
+
+	accessTokens *mongo.Collection
 }
 
 func New() (*MongoDB, error) {
@@ -68,6 +70,7 @@ func New() (*MongoDB, error) {
 	db.dataKeys = db.client.Database(name).Collection("data_keys")
 	db.groups = db.client.Database(name).Collection("groups")
 	db.orgs = db.client.Database(name).Collection("orgs")
+	db.accessTokens = db.client.Database(name).Collection("access_tokens")
 
 	return db, nil
 }
@@ -96,6 +99,10 @@ func (db *MongoDB) EnsureIndexes() error {
 	}
 
 	if err := db.ensureOrgIndexes(); err != nil {
+		return err
+	}
+
+	if err := db.ensureAccessTokenIndexes(); err != nil {
 		return err
 	}
 

@@ -38,7 +38,17 @@
 		"gmail_inbox": "Bandeja de Gmail",
 		"google_calendar": "Calendario de Google",
 		"nasa_apod": "Foto del Día de la NASA",
-		"create": "Crear una nueva tarjeta"
+		"create": "Crear una nueva tarjeta",
+		"modify_modal": {
+			"create": {
+				"title": "Crear tarjeta",
+				"action": "Crear"
+			},
+			"edit": {
+				"title": "Editar tarjeta",
+				"action": "Guardar cambios"
+			}
+		}
 	},
 	"secrets": {
 		"title": "Credenciales del tablero",
@@ -149,7 +159,31 @@
 		"add_password": "Elegir una contraseña",
 		"save_failed": "No se pudo guardar el nombre.",
 		"language": "Idioma",
-		"language_hint": "Los mails de la plataforma te llegan en este idioma."
+		"language_hint": "Los mails de la plataforma te llegan en este idioma.",
+		"tokens": {
+			"title": "Tokens de acceso para desarrolladores",
+			"hint": "Permití que una herramienta de desarrollo, como un cliente MCP, lea y edite tus tableros y tarjetas como vos. Los tokens nunca acceden a tus credenciales ni a lo compartido, y vencen.",
+			"name": "Nombre del token",
+			"name_placeholder": "Mi notebook",
+			"expiry": "Vence en",
+			"days": "{days} días",
+			"create": "Crear token",
+			"create_failed": "No se pudo crear el token.",
+			"too_many": "Ya tenés la cantidad máxima de tokens activos. Revocá uno primero.",
+			"rate_limited": "Creaste demasiados tokens hace poco. Probá más tarde.",
+			"created_title": "Copiá tu token ahora",
+			"created_hint": "Es la única vez que se muestra. Pegalo en tu cliente MCP:",
+			"copy": "Copiar",
+			"copied": "Copiado",
+			"done": "Listo",
+			"empty": "Todavía no tenés tokens.",
+			"expires": "Vence el {date}",
+			"last_used": "Último uso: {date}",
+			"never_used": "Nunca usado",
+			"revoke": "Revocar",
+			"revoke_confirm": "¿Revocar \"{name}\"? Las herramientas que lo usan dejan de funcionar enseguida.",
+			"revoke_failed": "No se pudo revocar el token."
+		}
 	},
 	"header": {
 		"profile": "Perfil",
@@ -218,6 +252,7 @@
 	},
 	"node_detail": {
 		"back": "Volver al tablero",
+		"edit": "Editar tarjeta",
 		"refresh": "Actualizar contenido",
 		"configuration": "Configuración",
 		"content": "Contenido",
@@ -226,5 +261,13 @@
 		"error": "No se pudo cargar la tarjeta.",
 		"forbidden": "La credencial que usa esta tarjeta ya no está disponible para vos.",
 		"delete": "Eliminar tarjeta"
+	},
+	"board": {
+		"title": "Configuración del tablero",
+		"viewer_hint": "Podés ver este tablero y sus tarjetas, pero no modificarlo.",
+		"title_label": "Nombre del tablero",
+		"modify_title": "Editar nombre",
+		"delete": "Eliminar tablero",
+		"delete_confirm": "¿Eliminar \"{name}\"? Se borran todas sus tarjetas y credenciales."
 	}
 }

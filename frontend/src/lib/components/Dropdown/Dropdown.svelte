@@ -14,18 +14,22 @@
     avatarSrc?: string;
   };
 
+  type GroupedOptions = Record<string, { label: string; options: SelectOption[] }>;
+
   interface Props {
     label?: string;
+    labelClass?: string;
     required?: boolean;
-    options?: SelectOption[] | Paginated<SelectOption>;
+    options?: SelectOption[] | Paginated<SelectOption> | GroupedOptions;
     fetchNextOptions?: () => Promise<Paginated<SelectOption>>;
     value?: string;
     disabled?: boolean;
     skeleton?: boolean;
     placeholder?: string;
     class?: string;
-    activatorClass?: string;
+    activatorClass?: (isOpen: boolean) => string;
     drawerClass?: string;
+    sectionClass?: string;
     itemClass?: (isSelected: boolean) => string;
     onchange?: (value: string) => void;
     /**
@@ -36,18 +40,29 @@
     children?: Snippet;
   }
 
+  function isGroupedOptions(options: Props['options']): options is GroupedOptions {
+      return (
+          typeof options === 'object' &&
+          options !== null &&
+          !Array.isArray(options) &&
+          !('results' in options)
+      );
+  }
+
   let {
     label = '',
+    labelClass = '',
     required = false,
     options = [],
     fetchNextOptions,
-    value = $bindable(''),
+    value = $bindable(),
     disabled = false,
     skeleton = false,
     placeholder = 'Select an option',
     class: selectClass,
     activatorClass,
     drawerClass,
+    sectionClass,
     itemClass,
     onchange,
     children
@@ -58,7 +73,9 @@
   const selectedOption = $derived(
     Array.isArray(options) ? 
       options.find(opt => opt.value === value)
-      : options.results.find(opt => opt.value === value)
+      : isGroupedOptions(options) ? 
+        Object.values(options).flatMap(group => group.options).find(opt => opt.value === value)
+        : options.results.find(opt => opt.value === value)
   );
 
   function handleSelect(optionValue: string) {
@@ -78,7 +95,7 @@
     'px-3 py-2.5 rounded-xl transition-colors cursor-pointer',
     'border border-main-border hover:border-sidebar',
     isOpen ? 'border-sidebar' : '',
-    activatorClass ? activatorClass : 'w-full',
+    activatorClass ? activatorClass(isOpen) : 'w-full',
     'flex items-center justify-between',
     'focus:outline-none focus:ring-none',
     skeleton ? 'bg-skeleton animate-pulse text-transparent cursor-default' : ''
@@ -111,7 +128,7 @@
 
 <div class="flex flex-col w-full gap-1">
   {#if label}
-    <label class="text-sm font-medium text-foreground" for="select">
+    <label class={cn("text-sm font-medium text-foreground", labelClass)} for="select">
       {label}
       {#if required}
         <span class="text-red-500">*</span>
@@ -125,7 +142,7 @@
       {disabled}
       onclick={() => !disabled && !skeleton && (isOpen = !isOpen)}
     >
-      <span class={cn('min-w-0 flex-1 truncate', selectedOption ? '' : 'text-gray-400')}>
+      <span class={cn('min-w-0 flex-1 truncate text-start!', selectedOption ? '' : 'text-gray-400')}>
         {selectedOption ? selectedOption.label : placeholder}
       </span>
       <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} class="w-4 h-4 ml-2" />
@@ -133,7 +150,7 @@
 
     {#if isOpen && !disabled && !skeleton}
       <div class={dropdownClass}>
-        {#if fetchNextOptions && !Array.isArray(options)}
+        {#if fetchNextOptions && !Array.isArray(options) && !isGroupedOptions(options)}
           <ScrollPagination
             initialItems={options}
             nextFetchFunction={fetchNextOptions}
@@ -177,6 +194,26 @@
               {/if}
               <span class="min-w-0 flex-1 truncate">{option.label}</span>
             </button>
+          {/each}
+        {:else if isGroupedOptions(options)}
+          {#each Object.entries(options) as [groupKey, group] (groupKey)}
+            <div class={cn("px-3 py-2 text-sm font-medium text-gray-500", sectionClass)}>{group.label}</div>
+            {#each group.options as option, index (option.value)}
+              <button
+                tabindex={index}
+                class={optionClass(option.value === value)}
+                onclick={() => handleSelect(option.value)}
+                role="option"
+                aria-selected={option.value === value}
+              >
+                {#if option.icon}
+                  {@render option.icon()}
+                {:else if option.avatarSrc}
+                  <Avatar size="sm" src={option.avatarSrc} class="mr-2" />
+                {/if}
+                <span class="min-w-0 flex-1 truncate">{option.label}</span>
+              </button>
+            {/each}
           {/each}
         {/if}
         {#if children}

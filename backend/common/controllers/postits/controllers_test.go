@@ -216,6 +216,15 @@ func TestMovePostIt_OK(t *testing.T) {
 	if gotPos.X != 150 || gotPos.Y != 250 {
 		t.Errorf("pos = %+v, want {150 250}", gotPos)
 	}
+
+	// The origin is a position, not a missing field.
+	w = do(r, http.MethodPatch, "/post-its/"+id.String()+"/position", `{"x":0,"y":0}`)
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("origin: status = %d, want 204 (body: %s)", w.Code, w.Body.String())
+	}
+	if gotPos.X != 0 || gotPos.Y != 0 {
+		t.Errorf("pos = %+v, want {0 0}", gotPos)
+	}
 }
 
 func TestExecutePostIt_OK(t *testing.T) {

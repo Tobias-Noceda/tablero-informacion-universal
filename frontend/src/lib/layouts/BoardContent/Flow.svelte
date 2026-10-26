@@ -27,13 +27,14 @@
 	import { edgesMap } from '$components/Edges/edge-map';
 	import { mouses } from '$stores/mouses.svelte';
 	import Realtime from './Realtime.svelte';
-	import type { Update } from '$modules/sockets.svelte';
+	import Cursors from './Cursors.svelte';
+	import type { NodeMoves, Update } from '$modules/realtime.svelte';
 	import { isManagingSecrets, setManagingSecrets } from '$stores/sidebar';
 	import { results } from '$stores/postit-results.svelte';
 	import { boardPath, nodePath } from '$lib/helpers/routes';
-	import NodeDetail from './NodeDetail.svelte';
+	import NodeDetail, { type PostItData } from './NodeDetail.svelte';
 
-	import NodeCreationPanel from '$layouts/NodeCreation/NodeCreationPanel.svelte';
+	import NodeConfigurationPanel from '$layouts/NodeConfiguration/NodeConfigurationPanel.svelte';
 
 	let {
 		nodes,
@@ -55,10 +56,12 @@
 	// layout hides the cards and credentials; the backend refuses it anyway).
 	const canEdit = $derived(role === 'owner' || role === 'editor');
 
+	let settingsVersion = $state(0);
+
 	// The open card lives in the URL (`.../nodes/:nodeId`), so its detail can
 	// be shared with a link and the browser's back button closes it.
 	const selectedNodeId = $derived(page.params.nodeId ?? null);
-	const selectedNode = $derived(nodes.find((n) => n.id === selectedNodeId) ?? null);
+	let selectedNode = $derived(nodes.find((n) => n.id === selectedNodeId) ?? null);
 	let selectedEdge: Edge | null = $state(null);
 
 	const navigation = { noScroll: true, keepFocus: true };
@@ -84,9 +87,11 @@
 	let creatingNode = $state<Board['postits'][number] | null>(null);
 	let paramValues = $state<Record<string, string>>({});
 
-	const { screenToFlowPosition, flowToScreenPosition } = useSvelteFlow();
+	let editingNode = $state<PostItData | null>(null);
 
-	mouses.updateMappers(screenToFlowPosition, flowToScreenPosition);
+	const { screenToFlowPosition } = useSvelteFlow();
+
+	mouses.updateMappers(screenToFlowPosition);
 
 	const type = useDnD();
 
@@ -139,10 +144,18 @@
 		});
 	};
 
-	const createNode = (newNode: Node) => {
+	const persistNode = (action: 'create' | 'update', newNode: Node) => {
 		if (!canEdit) return;
-		nodes = [...nodes, { ...newNode }];
+		if (action === 'update') {
+			nodes = nodes.map((n) => (n.id === newNode.id ? { ...newNode, data: { ...n.data, ...newNode.data } } : n));
+			selectedNode = newNode;
+			settingsVersion++;
+			results.refresh(newNode.id)
+		} else if (action === 'create') {
+			nodes = [...nodes, { ...newNode }];
+		}
 		creatingNode = null;
+		editingNode = null;
 		paramValues = {};
 	};
 
@@ -167,6 +180,22 @@
 		selectedEdge = null;
 		edges = edges.map((e) => {
 			return { ...e, data: { ...e.data, isSelected: false } };
+		});
+	};
+
+	let realtime = $state<ReturnType<typeof Realtime>>();
+
+	// Others see the cards move while this user drags them; the drop saves.
+	const onNodeDrag = (event: { nodes: Node[] }) => {
+		realtime?.moveNodes(event.nodes.map((n) => [n.id, n.position.x, n.position.y]));
+	};
+
+	// Cards another user is dragging. One this user is dragging stays put.
+	const onNodeMoves = (moves: NodeMoves) => {
+		const moved = new Map(moves.map(([id, x, y]) => [id, { x, y }]));
+		nodes = nodes.map((n) => {
+			const position = moved.get(n.id);
+			return position && !n.dragging ? { ...n, position } : n;
 		});
 	};
 
@@ -241,6 +270,12 @@
 		}
 	};
 
+	const onEditStart = (node: PostItData) => {
+		if (!canEdit) return;
+		editingNode = { ...node };
+		paramValues = node.paramValues;
+	};
+
 	// Effects
 	$effect(() => {
 		window.addEventListener('keydown', onKeyDown);
@@ -272,7 +307,7 @@
 
 <div class="relative flex flex-row flex-1 min-h-0 h-full w-full">
 	<main class="dndflow">
-		<Realtime {boardId} {boardUpdate}>
+		<Realtime bind:this={realtime} {boardId} {boardUpdate} {onNodeMoves}>
 			<div class="reactflow-wrapper">
 				<SvelteFlow
 					bind:nodes
@@ -288,6 +323,7 @@
 					ondragover={onDragOver}
 					ondrop={onDrop}
 					onnodeclick={onNodeClick}
+					onnodedrag={onNodeDrag}
 					onnodedragstop={onNodeDragStop}
 					onedgeclick={onEdgeClick}
 					onconnect={onConnect}
@@ -297,25 +333,30 @@
 					attributionPosition={undefined}
 				>
 					<Controls />
+					<Cursors />
 				</SvelteFlow>
 			</div>
 		</Realtime>
 	</main>
 	{#if selectedNode}
-		<NodeDetail node={selectedNode} {canEdit} onback={closeNode} ondelete={deleteNode} />
+		<NodeDetail node={selectedNode} {canEdit} {settingsVersion} onedit={onEditStart} onback={closeNode} ondelete={deleteNode} />
 	{/if}
 
 	{#if $isManagingSecrets}
 		<SecretsPanel board={boardId} onclose={() => setManagingSecrets(false)} />
 	{/if}
 
-	<NodeCreationPanel
+	<NodeConfigurationPanel
 		{boardId}
 		{creatingNode}
+		currentPostIt={editingNode}
 		{paramValues}
 		{usableSecrets}
-		onclose={() => (creatingNode = null)}
-		onCreateNode={createNode}
+		onclose={() => {
+			creatingNode = null;
+			editingNode = null;
+		}}
+		onPersistNode={persistNode}
 	/>
 </div>
 
@@ -330,5 +371,11 @@
 
 	:global(.svelte-flow__attribution) {
 		display: none;
+	}
+
+	/* The strand being drawn goes under the cards (it renders before them),
+	   like the finished floating edges, instead of over its own card. */
+	:global(.svelte-flow svg.svelte-flow__connectionline) {
+		z-index: 0;
 	}
 </style>

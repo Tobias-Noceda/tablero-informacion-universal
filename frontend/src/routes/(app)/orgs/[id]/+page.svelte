@@ -2,8 +2,10 @@
 	import { goto, invalidate } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import Button from '$components/Button/Button.svelte';
+	import Dropdown from '$components/Dropdown/Dropdown.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import { cn } from '$lib/utils';
 	import { session } from '$modules/session.svelte';
 	import * as orgsApi from '$services/orgs';
 	import { refreshBoards } from '$stores/boards';
@@ -63,10 +65,9 @@
 
 	// A refused change leaves the role as it was, so the select goes back to it
 	// (the reloaded data is the same and would not touch the element).
-	async function change(member: OrgMemberSummary, select: HTMLSelectElement) {
-		const to = select.value as OrgRole;
-		if (!(await attempt(() => orgsApi.setMember(org.id, member.user.email, to)))) {
-			select.value = member.role;
+	async function change(member: OrgMemberSummary, newRole: OrgRole) {
+		if (await attempt(() => orgsApi.setMember(org.id, member.user.email, newRole))) {
+			member.role = newRole;
 		}
 	}
 
@@ -139,17 +140,21 @@
 					</div>
 					<div class="flex items-center gap-2">
 						{#if isAdmin}
-							<select
-								class="rounded-md border border-main-border bg-background px-2 py-1 text-sm"
-								aria-label={m['orgs.members']()}
-								value={member.role}
-								onchange={(event) => change(member, event.currentTarget)}
-							>
-								{#each roles as option (option)}
-									<option value={option}>{m[`orgs.role_${option}`]()}</option>
-								{/each}
-							</select>
 							{#if member.user.id !== session.userId}
+								<Dropdown
+									labelClass="font-semibold"
+									options={roles.map((role) => ({ label: m[`orgs.role_${role}`](), value: role }))}
+									class="w-fit!"
+									activatorClass={(isOpen) => cn(
+										"rounded-md border border-border bg-transparent px-3 py-2 w-fit!",
+										isOpen ? "border-main-border hover:border-main-border" : ""
+									)}
+									value={member.role}
+									drawerClass="rounded-md bg-background!"
+									sectionClass="font-semibold text-foreground!"
+									itemClass={() => "bg-background! rounded-md hover:bg-main-hover!"}
+									onchange={(selectedId) => change(member, selectedId as OrgRole)}
+								/>
 								<Button variant="destructive" onclick={() => remove(member)}>
 									{m['orgs.remove']()}
 								</Button>

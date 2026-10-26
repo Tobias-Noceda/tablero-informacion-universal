@@ -44,7 +44,7 @@
 
 	const dropdownClass = cn(
 		'absolute z-100 mt-0.5 w-fit flex-col',
-		'bg-main-hover border border-main-hover rounded shadow-lg',
+		'bg-main-hover border border-main-hover rounded shadow-lg'
 		// 'max-h-60 overflow-y-auto',
 		// // Custom scrollbar styles
 		// 'scrollbar-thin scrollbar-thumb-tertiary scrollbar-track-transparent',
@@ -94,28 +94,27 @@
 	</button>
 	<div class="flex flex-row items-center gap-3">
 		{#if showsBoards}
-			<OrgSwitcher />
-			<Dropdown
-				placeholder={m['board_dropdown_placeholder']()}
-				options={visibleBoards.map((board) => ({ label: board.name, value: board.id }))}
-				value={currentBoardId}
-				onchange={(value) => {
-					if (value && value !== currentBoardId) {
-						setSidebar(null);
-						goto(resolve(boardPath(value, orgId)));
-					}
-				}}
-			>
-				{#if orgId === undefined || orgs.byId(orgId)?.role === 'admin'}
-					<button
-						class={addButtonClass}
-						onclick={() => setCreatingBoard(true)}
-					>
-						<Icon name="plus" class="w-5 h-5 text-main-text mb-0.5 mr-1" />
-						<span class="min-w-0 flex-1 truncate">Create new</span>
-					</button>
-				{/if}
-			</Dropdown>
+			<div class="hidden flex-row items-center gap-3 md:flex">
+				<OrgSwitcher />
+				<Dropdown
+					placeholder={m['board_dropdown_placeholder']()}
+					options={visibleBoards.map((board) => ({ label: board.name, value: board.id }))}
+					value={currentBoardId}
+					onchange={(value) => {
+						if (value && value !== currentBoardId) {
+							setSidebar(null);
+							goto(resolve(boardPath(value, orgId)));
+						}
+					}}
+				>
+					{#if orgId === undefined || orgs.byId(orgId)?.role === 'admin'}
+						<button class={addButtonClass} onclick={() => setCreatingBoard(true)}>
+							<Icon name="plus" class="w-5 h-5 text-main-text mb-0.5 mr-1" />
+							<span class="min-w-0 flex-1 truncate">Create new</span>
+						</button>
+					{/if}
+				</Dropdown>
+			</div>
 		{/if}
 	</div>
 
