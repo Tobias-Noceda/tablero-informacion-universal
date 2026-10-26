@@ -137,7 +137,6 @@
 				{:else}
 					{finalTitle}
 				{/if}
-				{finalTitle}
 			</h2>
 		</Tooltip>
 	{:else}

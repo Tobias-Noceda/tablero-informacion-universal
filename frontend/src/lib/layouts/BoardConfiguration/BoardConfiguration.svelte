@@ -13,7 +13,9 @@
 		ondelete,
 	}: { boardName: string; role: BoardRole; onclose: () => void; onedit: (name: string) => void; ondelete: () => void } = $props();
 
-    let newName = $derived(boardName);
+    // svelte-ignore state_referenced_locally
+    // Only the initial name: the field edits a copy until it is saved.
+    let newName = $state(boardName);
 
     let isDeleting = $state(false);
 </script>
@@ -24,12 +26,15 @@
 	{#if role !== 'owner'}
 		<p class="text-xs opacity-70">{m['board.viewer_hint']()}</p>
 	{:else}
-		<form class="flex flex-col gap-2 border-t border-main-border pt-3" onsubmit={() => onedit(newName)}>
+		<form class="flex flex-col gap-2 border-t border-main-border pt-3" onsubmit={(event) => {
+			event.preventDefault();
+			onedit(newName.trim());
+		}}>
 			<Input
 				label={m['board.title_label']()}
 				type="text"
 				autocomplete="off"
-				bind:value={boardName}
+				bind:value={newName}
 				required
 			/>
             <Button type="submit" variant="primary">{m['board.modify_title']()}</Button>

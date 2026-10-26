@@ -143,7 +143,6 @@
 							{#if member.user.id !== session.userId}
 								<Dropdown
 									labelClass="font-semibold"
-									placeholder={m['secrets.pick_credential']()}
 									options={roles.map((role) => ({ label: m[`orgs.role_${role}`](), value: role }))}
 									class="w-fit!"
 									activatorClass={(isOpen) => cn(

@@ -149,7 +149,6 @@
 			<div class="flex w-fit! gap-2">
 				<Dropdown
 					labelClass="font-semibold"
-					placeholder={m['secrets.pick_credential']()}
 					options={assignable.map((role) => ({ label: m[`members.role_${role}`](), value: role }))}
 					class="w-fit!"
 					activatorClass={(isOpen) => cn(
