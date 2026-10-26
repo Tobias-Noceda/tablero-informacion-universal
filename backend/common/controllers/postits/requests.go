@@ -22,8 +22,9 @@ type CreatePostItRequest struct {
 }
 
 type MovePostItRequest struct {
-	X float32 `json:"x" binding:"required,number"`
-	Y float32 `json:"y" binding:"required,number"`
+	// Pointers so 0 is a position: `required` refuses a zero value.
+	X *float32 `json:"x" binding:"required"`
+	Y *float32 `json:"y" binding:"required"`
 }
 
 type UpdatePostItRequest struct {

@@ -148,7 +148,31 @@
 		"add_password": "Set a password",
 		"save_failed": "The name could not be saved.",
 		"language": "Language",
-		"language_hint": "Emails from the platform arrive in this language."
+		"language_hint": "Emails from the platform arrive in this language.",
+		"tokens": {
+			"title": "Developer access tokens",
+			"hint": "Let a developer tool, such as an MCP client, read and edit your boards and cards as you. Tokens never reach your credentials or sharing, and they expire.",
+			"name": "Token name",
+			"name_placeholder": "My laptop",
+			"expiry": "Expires in",
+			"days": "{days} days",
+			"create": "Create token",
+			"create_failed": "The token could not be created.",
+			"too_many": "You already have the maximum number of active tokens. Revoke one first.",
+			"rate_limited": "Too many tokens created recently. Try again later.",
+			"created_title": "Copy your token now",
+			"created_hint": "This is the only time it is shown. Paste it into your MCP client:",
+			"copy": "Copy",
+			"copied": "Copied",
+			"done": "Done",
+			"empty": "No tokens yet.",
+			"expires": "Expires {date}",
+			"last_used": "Last used {date}",
+			"never_used": "Never used",
+			"revoke": "Revoke",
+			"revoke_confirm": "Revoke \"{name}\"? Tools using it stop working right away.",
+			"revoke_failed": "The token could not be revoked."
+		}
 	},
 	"header": {
 		"profile": "Profile",

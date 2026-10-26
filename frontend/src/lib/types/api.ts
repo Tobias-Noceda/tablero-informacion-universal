@@ -239,3 +239,19 @@ export type OAuth2Config = {
     auth_url?: string;
     scopes?: string;
 }
+
+// A personal access token as the profile lists it: never the token itself.
+export type AccessToken = {
+    id: UUID;
+    name: string;
+    // The first characters, to tell tokens apart.
+    prefix: string;
+    created_at: string;
+    expires_at: string;
+    last_used_at?: string;
+}
+
+// Only the creation response carries the token, once.
+export type CreatedAccessToken = AccessToken & {
+    token: string;
+}

@@ -5,6 +5,9 @@ package models
 type Principal struct {
 	ID    string
 	Admin bool
+	// Token marks a caller signed in with a personal access token, which
+	// only reaches the routes middleware.RestrictAccessTokens allows.
+	Token bool
 }
 
 func (p Principal) Anonymous() bool {
