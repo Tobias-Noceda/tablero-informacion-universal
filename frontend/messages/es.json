@@ -261,5 +261,13 @@
 		"error": "No se pudo cargar la tarjeta.",
 		"forbidden": "La credencial que usa esta tarjeta ya no está disponible para vos.",
 		"delete": "Eliminar tarjeta"
+	},
+	"board": {
+		"title": "Configuración del tablero",
+		"viewer_hint": "Podés ver este tablero y sus tarjetas, pero no modificarlo.",
+		"title_label": "Nombre del tablero",
+		"modify_title": "Editar nombre",
+		"delete": "Eliminar tablero",
+		"delete_confirm": "¿Eliminar \"{name}\"? Se borran todas sus tarjetas y credenciales."
 	}
 }

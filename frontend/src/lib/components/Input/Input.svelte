@@ -13,7 +13,8 @@
     autocomplete?: HTMLInputAttributes['autocomplete'];
     value?: string | number;
     min?: number;
-    max?: number;
+    minlength?: number;
+    maxlength?: number;
     errorMessage?: string;
     disabled?: boolean;
     skeleton?: boolean;
@@ -36,7 +37,8 @@
     autocomplete,
     value = $bindable(''),
     min,
-    max,
+    minlength,
+    maxlength,
     errorMessage,
     disabled = false,
     skeleton = false,
@@ -62,7 +64,7 @@
     'hover:border-sidebar focus:border-main focus:ring-1 focus:ring-main',
     'focus:outline-none focus:ring-1 focus:ring-main focus:border-main',
     skeleton ? 'bg-skeleton animate-pulse text-transparent cursor-default' : '',
-    multiline ? 'resize-none overflow-hidden' : '',
+    multiline ? 'resize-none overflow-y-auto' : '',
     type === 'number' ? '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none' : ''
   ));
 
@@ -70,12 +72,20 @@
 
   function autoResize(element: HTMLTextAreaElement) {
     element.style.height = 'auto';
-    element.style.height = element.scrollHeight + 'px';
+    // scrollHeight leaves out the border; border-box needs it, or a scrollbar shows on every line.
+    element.style.height = element.scrollHeight + element.offsetHeight - element.clientHeight + 'px';
   }
 
   $effect(() => {
     if (multiline && textareaElement && value !== undefined) {
       autoResize(textareaElement);
+    }
+  });
+
+  // `maxlength` only stops typing and pasting; a value set from code is cut here.
+  $effect(() => {
+    if (maxlength !== undefined && typeof value === 'string' && value.length > maxlength) {
+      value = value.slice(0, maxlength);
     }
   });
 
@@ -104,6 +114,8 @@
         bind:value
         disabled={disabled || skeleton}
         {required}
+        {minlength}
+        {maxlength}
         oninput={(e) => {
           autoResize(e.currentTarget);
           oninput?.(e);
@@ -126,7 +138,8 @@
         disabled={disabled || skeleton}
         {required}
         {min}
-        {max}
+        {minlength}
+        {maxlength}
         {oninput}
         onkeydown={(event) => {
           if (event.key === 'Enter') {

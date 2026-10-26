@@ -20,7 +20,7 @@ export async function get(id: UUID) {
     return await res.json() as Board;
 }
 
-export async function del(id: UUID) {
+export async function deleteBoard(id: UUID) {
     await api.del(`/v1/boards/${id}`);
 }
 
@@ -61,6 +61,6 @@ export async function removeMember(id: UUID, user: UUID) {
     if (!res.ok) throw await failed(res);
 }
 
-export async function rename(id: UUID, name: string) {
+export async function renameBoard(id: UUID, name: string) {
     await api.patch(`/v1/boards/${id}/name`, { name });
 }

@@ -43,6 +43,26 @@
         onPersistNode,
 	}: BoardConfigurationProps = $props();
 
+    const scrollClass = cn(
+		// Custom scrollbar styles
+		'scrollbar-thin scrollbar-thumb-main scrollbar-track-transparent',
+		'[&::-webkit-scrollbar]:w-2',
+		'[&::-webkit-scrollbar-track]:bg-transparent',
+		'[&::-webkit-scrollbar-thumb]:bg-main',
+		'[&::-webkit-scrollbar-thumb]:rounded-full',
+		'[&::-webkit-scrollbar-thumb]:hover:bg-main-hover'
+	);
+
+    const horizontalScrollClass = cn(
+		// Custom scrollbar styles
+		'scrollbar-thin scrollbar-thumb-main scrollbar-track-transparent',
+		'[&::-webkit-scrollbar]:h-2',
+		'[&::-webkit-scrollbar-track]:bg-transparent',
+		'[&::-webkit-scrollbar-thumb]:bg-main',
+		'[&::-webkit-scrollbar-thumb]:rounded-full',
+		'[&::-webkit-scrollbar-thumb]:hover:bg-main-hover'
+	);
+
     let originalConfig = $state<{
         title: string;
         paramValues: Record<string, string>;
@@ -222,7 +242,7 @@
             class="focus:*:ring-0! focus:border-red! focus:outline-none!"
             required
             bind:value={creatingTitle}
-            max={127}
+            maxlength={127}
             labelClass="font-semibold"
         />
         {#if titleAnalysis.unsupported}
@@ -251,7 +271,7 @@
                 </div>
                 <span class="text-xs opacity-70">{m['card_title.variables_hint']({ syntax: '{{name}}' })}</span>
             </div>
-            <details class="text-xs">
+            <details class={cn("text-xs", horizontalScrollClass)}>
                 <summary class="cursor-pointer">{m['card_title.sample']()}</summary>
                 <pre class="mt-1 max-h-40 overflow-auto rounded-md bg-background p-2">{JSON.stringify(sampleResponse, null, 2)}</pre>
             </details>
@@ -300,11 +320,12 @@
                 <Input
                     label={param[`label_${getLocale()}`]!}
                     labelClass="font-semibold"
-                    class="focus:*:ring-0 focus:border-main-border focus:outline-none"
+                    class={cn("focus:*:ring-0 focus:border-main-border focus:outline-none max-h-50!", scrollClass)}
                     placeholder={param[`placeholder_${getLocale()}`]}
                     type={param.type === 'number' ? 'number' : 'text'}
                     required={param.default === undefined}
                     bind:value={paramValues[param.key]}
+                    multiline={param.type !== 'number'}
                 />
             {/if}
         {/each}
