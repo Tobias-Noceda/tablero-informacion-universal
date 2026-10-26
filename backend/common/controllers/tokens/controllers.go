@@ -29,7 +29,7 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 }
 
 type CreateTokenRequest struct {
-	Name string `json:"name" binding:"required"`
+	Name string `json:"name"`
 	// Days is the lifetime: 7, 15 or 30. Omitted means 15.
 	Days int `json:"days"`
 }
@@ -64,7 +64,7 @@ func (ctrl *Controller) ListTokens(c *gin.Context) {
 // @Param        id    path  string              true  "Own user id"
 // @Param        body  body  CreateTokenRequest  true  "Name and lifetime in days"
 // @Success      201
-// @Failure      400  "invalid_name or invalid_expiry"
+// @Failure      400  "invalid_name, invalid_expiry or invalid_request"
 // @Failure      404  "Not one's own id"
 // @Failure      409  "too_many_tokens"
 // @Failure      429  "rate_limited"
@@ -75,8 +75,10 @@ func (ctrl *Controller) CreateToken(c *gin.Context) {
 	}
 
 	var req CreateTokenRequest
+	// A body that does not parse (e.g. days as a string) is not a bad name:
+	// the service validates the name and the lifetime itself.
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": srv.ErrInvalidName.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request"})
 		return
 	}
 

@@ -18,7 +18,7 @@ function describe(status: number, code: string) {
             return "The access token is invalid, expired or revoked. Create a new one in your profile.";
         case 403:
             return code === "token_not_allowed"
-                ? "This access token can only read boards."
+                ? "Access tokens can only read and edit boards and their cards."
                 : `Not allowed (${code}).`;
         case 404:
             return "Not found, or you have no access to it.";

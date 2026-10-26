@@ -50,10 +50,10 @@ func TestEndToEnd_AccessTokenReadsAsItsOwner(t *testing.T) {
 		t.Errorf("stranger's board: %d", w.Code)
 	}
 
-	// Read only: no writes, no secrets, no system routes, no more tokens.
+	// Boards and cards only: no sharing, no secrets, no system routes, no more tokens.
+	s.mustJSON(pat.do(http.MethodPost, "/api/v1/boards", map[string]string{"name": "From a tool"}), http.StatusCreated, nil)
 	refused := []struct{ method, path string }{
-		{http.MethodPost, "/api/v1/boards"},
-		{http.MethodDelete, "/api/v1/boards/" + board.Id.String()},
+		{http.MethodPut, "/api/v1/boards/" + board.Id.String() + "/members"},
 		{http.MethodGet, "/api/v1/boards/" + board.Id.String() + "/secrets"},
 		{http.MethodGet, "/api/v1/system/keys"},
 		{http.MethodGet, "/api/v1/users/" + ana.id + "/tokens"},
@@ -89,8 +89,20 @@ func TestEndToEnd_AccessTokenReadsAsItsOwner(t *testing.T) {
 	s.assertNoResponseContains(created.Token)
 }
 
-// Walk every mounted private route with a token: only the read allowlist
-// gets past the middleware.
+// Walk every mounted private route with a token: only the allowlist gets
+// past the middleware.
+// tokenWrites are the only writes a token may make: boards, cards and strands.
+var tokenWrites = map[string]bool{
+	"POST /api/v1/boards":                 true,
+	"DELETE /api/v1/boards/:id":           true,
+	"POST /api/v1/boards/:id/strands":     true,
+	"POST /api/v1/post-its":               true,
+	"DELETE /api/v1/post-its/:id":         true,
+	"PATCH /api/v1/post-its/:id/settings": true,
+	"PATCH /api/v1/post-its/:id/position": true,
+	"PATCH /api/v1/post-its/:id/title":    true,
+}
+
 func TestEndToEnd_AccessTokenReachesOnlyTheAllowlist(t *testing.T) {
 	s := newStack(t)
 	ana := s.signUp("ana")
@@ -103,7 +115,7 @@ func TestEndToEnd_AccessTokenReachesOnlyTheAllowlist(t *testing.T) {
 		}
 		w := s.request(token, route.Method, params.Replace(route.Path), nil)
 		allowed := w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "token_not_allowed")
-		if allowed && (route.Method != http.MethodGet) {
+		if allowed && route.Method != http.MethodGet && !tokenWrites[route.Method+" "+route.Path] {
 			t.Errorf("%s %s let a token through: %d", route.Method, route.Path, w.Code)
 		}
 	}

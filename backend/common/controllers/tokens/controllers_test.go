@@ -109,9 +109,10 @@ func TestTokens_Validation(t *testing.T) {
 	base := "/api/v1/users/" + ana + "/tokens"
 
 	cases := map[string]string{
-		`{}`:                      "invalid_name",
-		`{"name":"  "}`:           "invalid_name",
-		`{"name":"x","days":365}`: "invalid_expiry",
+		`{}`:                       "invalid_name",
+		`{"name":"  "}`:            "invalid_name",
+		`{"name":"x","days":365}`:  "invalid_expiry",
+		`{"name":"x","days":"15"}`: "invalid_request",
 	}
 	for body, want := range cases {
 		w := do(r, http.MethodPost, base, body, "ana")

@@ -11,7 +11,7 @@ export const schema = {
 
 // Define tool metadata
 export const metadata: ToolMetadata = {
-    name: "PKGs",
+    name: "delete_pkg",
     description:
         "This tool provides you a way to delete personal knowledge graph, or PKG.",
     annotations: {

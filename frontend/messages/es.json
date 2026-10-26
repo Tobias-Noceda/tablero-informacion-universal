@@ -162,7 +162,7 @@
 		"language_hint": "Los mails de la plataforma te llegan en este idioma.",
 		"tokens": {
 			"title": "Tokens de acceso para desarrolladores",
-			"hint": "Permití que una herramienta de desarrollo, como un cliente MCP, lea tus tableros como vos. Los tokens son de solo lectura y vencen.",
+			"hint": "Permití que una herramienta de desarrollo, como un cliente MCP, lea y edite tus tableros y tarjetas como vos. Los tokens nunca acceden a tus credenciales ni a lo compartido, y vencen.",
 			"name": "Nombre del token",
 			"name_placeholder": "Mi notebook",
 			"expiry": "Vence en",

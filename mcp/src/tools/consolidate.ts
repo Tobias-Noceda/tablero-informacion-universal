@@ -9,8 +9,8 @@ import { z } from "zod";
 // Define the schema for tool parameters
 export const schema = {
     board_id: z.uuid().describe("The memory PKG ID"),
-    title: z.string().trim().length(128).describe("The memory title"),
-    description: z.string().trim().describe("The memory description"),
+    title: z.string().trim().min(1).max(128).describe("The memory title"),
+    description: z.string().trim().min(1).describe("The memory description"),
     relevant: z.array(z.uuid()).describe("Related memories to this memory"),
     position: z
         .object({

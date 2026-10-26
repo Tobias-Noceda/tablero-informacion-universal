@@ -290,7 +290,7 @@ func (ctrl *Controller) MovePostIt(c *gin.Context) {
 		return
 	}
 
-	err = ctrl.service.MovePostIt(middleware.Principal(c), id, models.Position{X: req.X, Y: req.Y})
+	err = ctrl.service.MovePostIt(middleware.Principal(c), id, models.Position{X: *req.X, Y: *req.Y})
 	if err != nil {
 		c.JSON(statusOf(err), gin.H{
 			"error": err.Error(),
