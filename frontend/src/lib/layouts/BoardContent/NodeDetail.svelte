@@ -226,28 +226,34 @@
 
 	<!-- Only the details scroll: the header and the delete button stay put. -->
 	<div class={cn('flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4', scrollClass)}>
-		<section class="flex flex-col gap-2">
-			<h3 class="font-semibold text-xl">{m['node_detail.configuration']()}</h3>
-			<div class="text-xs">
-				{#await settings}
-					<p class="text-sm opacity-70">{m.input_loading()}</p>
-				{:then { params }}
-					{@render record(
-						Object.entries(params ?? {}).map(([key, value]) => [labelOf(key), value]),
-						m['node_detail.no_configuration']()
-					)}
-				{:catch err}
-					<p class="text-sm text-destructive">{failure(err)}</p>
-				{/await}
-			</div>
-		</section>
+		{#if node.type !== 'static_card'}
+			<section class="flex flex-col gap-2">
+				<h3 class="font-semibold text-xl">{m['node_detail.configuration']()}</h3>
+				<div class="text-xs">
+					{#await settings}
+						<p class="text-sm opacity-70">{m.input_loading()}</p>
+					{:then { params }}
+						{@render record(
+							Object.entries(params ?? {}).map(([key, value]) => [labelOf(key), value]),
+							m['node_detail.no_configuration']()
+						)}
+					{:catch err}
+						<p class="text-sm text-destructive">{failure(err)}</p>
+					{/await}
+				</div>
+			</section>
+		{/if}
 
 		<section class="flex flex-col gap-2">
 			<h3 class="font-semibold text-xl">{m['node_detail.content']()}</h3>
 			{#await output}
 				<p class="text-sm opacity-70">{m.input_loading()}</p>
 			{:then data}
-				{@render record(Object.entries(data ?? {}), m['node_detail.no_content']())}
+				{#if node.type === 'static_card'}
+					<p class="sm:text-sm md:text-[15px]">{data['text']}</p>
+				{:else}
+					{@render record(Object.entries(data ?? {}), m['node_detail.no_content']())}
+				{/if}
 			{:catch err}
 				<p class="text-sm text-destructive">{failure(err)}</p>
 			{/await}
