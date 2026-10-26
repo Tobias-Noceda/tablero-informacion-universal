@@ -372,4 +372,10 @@
 	:global(.svelte-flow__attribution) {
 		display: none;
 	}
+
+	/* The strand being drawn goes under the cards (it renders before them),
+	   like the finished floating edges, instead of over its own card. */
+	:global(.svelte-flow svg.svelte-flow__connectionline) {
+		z-index: 0;
+	}
 </style>
