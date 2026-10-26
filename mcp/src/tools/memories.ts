@@ -3,6 +3,7 @@ import type { Board } from "../types/api";
 import type { ToolMetadata, InferSchema } from "xmcp";
 
 import * as api from "../modules/api";
+import { lines } from "../modules/memory";
 
 import { z } from "zod";
 
@@ -29,10 +30,5 @@ export default async function ({ id }: InferSchema<typeof schema>) {
     const res = await api.get(`/v1/boards/${id}`);
     const board = (await res.json()) as Board;
 
-    const memories = board.postits.map(
-        ({ id, position, title }) =>
-            `${id} - (${position.x}; ${position.y}) - ${title.text}`,
-    );
-
-    return memories.join("\n");
+    return (await lines(board.postits)).join("\n");
 }

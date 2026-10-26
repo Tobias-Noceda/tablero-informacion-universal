@@ -151,7 +151,7 @@
 		"language_hint": "Emails from the platform arrive in this language.",
 		"tokens": {
 			"title": "Developer access tokens",
-			"hint": "Let a developer tool, such as an MCP client, read your boards as you. Tokens are read-only and expire.",
+			"hint": "Let a developer tool, such as an MCP client, read and edit your boards and cards as you. Tokens never reach your credentials or sharing, and they expire.",
 			"name": "Token name",
 			"name_placeholder": "My laptop",
 			"expiry": "Expires in",

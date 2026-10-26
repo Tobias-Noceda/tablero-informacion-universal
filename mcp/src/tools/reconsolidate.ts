@@ -12,7 +12,8 @@ export const schema = {
     title: z
         .string()
         .trim()
-        .length(128)
+        .min(1)
+        .max(128)
         .optional()
         .describe("The memory title"),
     description: z

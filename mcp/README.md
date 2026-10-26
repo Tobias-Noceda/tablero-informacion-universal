@@ -1,12 +1,16 @@
 # MCP server
 
-An [xmcp](https://xmcp.dev) server (Streamable HTTP, `/mcp`) that lets an agent read a user's boards as "memories":
+An [xmcp](https://xmcp.dev) server (Streamable HTTP, `/mcp`) that lets an agent keep its memories on a user's boards ("PKGs", personal knowledge graphs):
 
 | Tool | What it returns |
 |---|---|
-| `brains` | Every board the user can see (`id - name`) |
-| `memories` | The post-its of one board (`id - title`) |
+| `list_pkgs` | Every board the user can see (`id - organization - name`) |
+| `create_pkg` / `delete_pkg` | Create or delete a board |
+| `memories` | The post-its of one board (`id - (x; y) - title`) |
 | `retrieve` | One post-it: its title, its data and the post-its connected to it |
+| `consolidate` | Save a text memory (a `static_card`) at a position, connected to related ones |
+| `reconsolidate` | Change a memory's title or text |
+| `forget` | Delete a memory |
 
 Every request needs `Authorization: Bearer <token>`. The server forwards it unchanged to the backend, which decides what the caller may see. Nothing is stored here. For how this could grow into OAuth for non-technical users, see `AUTH.md`.
 
@@ -23,7 +27,7 @@ Every request needs `Authorization: Bearer <token>`. The server forwards it unch
    { "mcpServers": { "tiu": { "url": "http://localhost/mcp", "headers": { "Authorization": "Bearer tiu_pat_…" } } } }
    ```
 
-Tokens are read-only: the backend lets them reach only the board, post-it, user and org reads (`middleware.RestrictAccessTokens`); anything else answers `403 token_not_allowed`. Revoking one in the profile stops it on its next request.
+Tokens reach only boards and cards (`middleware.RestrictAccessTokens`): the reads, plus creating, editing and deleting boards, cards and strands, with the user's board roles. Secrets, sharing, organizations, tokens and system routes answer `403 token_not_allowed`. Revoking one in the profile stops it on its next request.
 
 ## Running
 

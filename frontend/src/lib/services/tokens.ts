@@ -26,7 +26,7 @@ export async function list(user: UUID) {
 }
 
 export async function create(user: UUID, name: string, days: Lifetime) {
-    const res = await api.post(`/v1/users/${user}/tokens`, { name, days });
+    const res = await api.post(`/v1/users/${user}/tokens`, { name, days: Number(days) });
     if (!res.ok) throw await failed(res);
     return await res.json() as CreatedAccessToken;
 }

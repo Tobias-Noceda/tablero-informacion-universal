@@ -22,6 +22,7 @@ func restricted() *gin.Engine {
 	api.GET("/boards", ok)
 	api.GET("/boards/:id", ok)
 	api.POST("/boards", ok)
+	api.PUT("/boards/:id/members", ok)
 	api.GET("/boards/:id/secrets", ok)
 	api.GET("/system/keys", ok)
 	api.GET("/post-its/:id/settings", ok)
@@ -37,7 +38,8 @@ func TestRestrictAccessTokens(t *testing.T) {
 	}{
 		{"pat", http.MethodGet, "/api/v1/boards", http.StatusNoContent},
 		{"pat", http.MethodGet, "/api/v1/boards/b1", http.StatusNoContent},
-		{"pat", http.MethodPost, "/api/v1/boards", http.StatusForbidden},
+		{"pat", http.MethodPost, "/api/v1/boards", http.StatusNoContent},
+		{"pat", http.MethodPut, "/api/v1/boards/b1/members", http.StatusForbidden},
 		{"pat", http.MethodGet, "/api/v1/boards/b1/secrets", http.StatusForbidden},
 		{"pat", http.MethodGet, "/api/v1/system/keys", http.StatusForbidden},
 		{"pat", http.MethodGet, "/api/v1/post-its/p1/settings", http.StatusForbidden},

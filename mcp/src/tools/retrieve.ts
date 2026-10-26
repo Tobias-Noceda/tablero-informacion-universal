@@ -1,11 +1,11 @@
-import type { Board, PostItData } from "../types/api";
+import type { Board } from "../types/api";
 
 import type { ToolMetadata, InferSchema } from "xmcp";
 
 import * as api from "../modules/api";
+import { dataOf, lines, titleOf } from "../modules/memory";
 
 import { z } from "zod";
-import Mustache from "mustache";
 
 // Define the schema for tool parameters
 export const schema = {
@@ -39,12 +39,8 @@ export default async function ({
 
     if (!postit) throw new Error("That memory is not on this board.");
 
-    const d_res = await api.get(`/v1/post-its/${postit_id}`);
-    const data = (await d_res.json()) as PostItData;
-
-    const title = postit.title.vars
-        ? Mustache.render(postit.title.text, data)
-        : postit.title.text;
+    const data = await dataOf(postit_id);
+    const title = await titleOf(postit, data);
 
     const related_ids = new Set(
         board.strands
@@ -58,12 +54,9 @@ export default async function ({
             .filter((id) => id !== null),
     );
 
-    const related = board.postits
-        .filter((p) => related_ids.has(p.id))
-        .map(
-            ({ id, position, title }) =>
-                `${id} - (${position.x}; ${position.y}) - ${title.text}`,
-        );
+    const related = await lines(
+        board.postits.filter((p) => related_ids.has(p.id)),
+    );
 
     return `${JSON.stringify(title)}
 

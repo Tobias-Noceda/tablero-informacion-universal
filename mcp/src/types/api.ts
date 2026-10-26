@@ -37,5 +37,11 @@ export type Board = {
     role?: BoardRole;
 };
 
+// GET /orgs: only what the tools read.
+export type Org = {
+    id: UUID;
+    name: string;
+};
+
 // What a card's query produced: GET /post-its/:id.
 export type PostItData = Record<string, unknown>;
