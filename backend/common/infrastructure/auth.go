@@ -20,6 +20,9 @@ type Claims struct {
 	IssuedAt  time.Time
 	ExpiresAt time.Time
 	ID        string
+	// AccessToken is set when the bearer was a personal access token rather
+	// than a signed session token. Never part of a JWT.
+	AccessToken bool
 }
 
 type TokenSigner interface {

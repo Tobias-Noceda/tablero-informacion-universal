@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import Button from '$components/Button/Button.svelte';
 	import Input from '$components/Input/Input.svelte';
+	import AccessTokens from '$components/Tokens/AccessTokens.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { locales } from '$lib/paraglide/runtime';
 	import { switchLocale } from '$modules/locale';
@@ -111,4 +112,6 @@
 			</p>
 		{/if}
 	</section>
+
+	<AccessTokens user={user.id} />
 </main>

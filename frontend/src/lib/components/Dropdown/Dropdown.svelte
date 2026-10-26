@@ -125,7 +125,7 @@
       {disabled}
       onclick={() => !disabled && !skeleton && (isOpen = !isOpen)}
     >
-      <span class={cn('min-w-0 flex-1 truncate', selectedOption ? '' : 'text-gray-400')}>
+      <span class={cn('min-w-0 flex-1 truncate text-start!', selectedOption ? '' : 'text-gray-400')}>
         {selectedOption ? selectedOption.label : placeholder}
       </span>
       <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} class="w-4 h-4 ml-2" />
