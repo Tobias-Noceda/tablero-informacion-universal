@@ -23,7 +23,7 @@
 
 <Dropdown
 	class="w-fit"
-	activatorClass="max-w-48! cursor-pointer truncate whitespace-nowrap rounded-md border border-main-border bg-main px-2 py-1.5 text-sm text-white transition-colors hover:bg-main-hover"
+	activatorClass={() => "w-48! cursor-pointer truncate whitespace-nowrap rounded-md border border-main-border bg-main px-2 py-1.5 text-sm text-white transition-colors hover:bg-main-hover"}
 	drawerClass="rounded-md"
 	itemClass={() =>
 		cn(

@@ -16,11 +16,9 @@ class MousePositions {
 	#map = new SvelteMap<string, ClientData>();
 
 	#toFlow = (p: Position) => p;
-	#toScreen = (p: Position) => p;
 
-	updateMappers(flow: Mapper, screen: Mapper) {
+	updateMappers(flow: Mapper) {
 		this.#toFlow = flow;
-		this.#toScreen = screen;
 	}
 
 	add(id: string, data: ClientData) {
@@ -36,10 +34,9 @@ class MousePositions {
 		const client = this.#map.get(id);
 		if (!client) return false;
 
-		this.#map.set(id, {
-			...client,
-			position: this.#toScreen(position)
-		});
+		// Kept in flow coordinates: the cursors are drawn inside the viewport,
+		// so they follow this user's pan and zoom.
+		this.#map.set(id, { ...client, position });
 
 		return true;
 	}

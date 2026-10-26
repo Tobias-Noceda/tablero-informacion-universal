@@ -11,12 +11,14 @@
 	import { mapPostitWithTitle, type PostItWithTitle } from '$lib/helpers/post-it.js';
 	import { landingPath } from '$lib/helpers/routes';
 
-	import { isSharing, setSharing, setSidebar } from '$stores/sidebar';
+	import { isConfiguringBoard, isSharing, setConfiguringBoard, setSharing, setSidebar } from '$stores/sidebar';
 	import { refreshBoards } from '$stores/boards';
 
-	import ShareDialog from '$components/Share/ShareDialog.svelte';
+	import ShareDialog from '$layouts/Share/ShareDialog.svelte';
 	import SideBar from '$layouts/Sidebar/SideBar.svelte';
 	import Flow from './Flow.svelte';
+	import BoardConfiguration from '$layouts/BoardConfiguration/BoardConfiguration.svelte';
+	import { deleteBoard, renameBoard } from '$services/board';
 
 	let { data }: { data: Awaited<ReturnType<typeof loadBoard>> } = $props();
 
@@ -46,6 +48,20 @@
 		};
 	}
 
+	const onUpdateBoard = async (name: string) => {
+		await renameBoard(data.boardId, name);
+		refreshBoards();
+		data = { ...data, boardName: name };
+		setConfiguringBoard(false);
+	}
+
+	const onDeleteBoard = async () => {
+		await deleteBoard(data.boardId);
+		await refreshBoards();
+		await goto(resolve(landingPath(orgId)));
+		setConfiguringBoard(false);
+	}
+
 	async function left() {
 		setSharing(false);
 		await refreshBoards();
@@ -55,7 +71,7 @@
 
 <div class="flex flex-row flex-1 min-h-0">
 	<div class={cardOpen ? 'hidden md:contents' : 'contents'}>
-		<SideBar {canEdit} {boardId} />
+		<SideBar {role} {boardId} />
 	</div>
 	<div class="flex flex-col flex-1 min-h-0 overflow-auto bg-background">
 		{#key boardId}
@@ -66,4 +82,14 @@
 
 {#if $isSharing}
 	<ShareDialog board={boardId} {role} onclose={() => setSharing(false)} onleave={left} />
+{/if}
+
+{#if $isConfiguringBoard}
+	<BoardConfiguration
+		boardName={data.boardName}
+		role={role}
+		onclose={() => setConfiguringBoard(false)}
+		onedit={onUpdateBoard}
+		ondelete={onDeleteBoard}
+	/>
 {/if}

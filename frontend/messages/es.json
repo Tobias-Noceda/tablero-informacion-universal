@@ -38,7 +38,17 @@
 		"gmail_inbox": "Bandeja de Gmail",
 		"google_calendar": "Calendario de Google",
 		"nasa_apod": "Foto del Día de la NASA",
-		"create": "Crear una nueva tarjeta"
+		"create": "Crear una nueva tarjeta",
+		"modify_modal": {
+			"create": {
+				"title": "Crear tarjeta",
+				"action": "Crear"
+			},
+			"edit": {
+				"title": "Editar tarjeta",
+				"action": "Guardar cambios"
+			}
+		}
 	},
 	"secrets": {
 		"title": "Credenciales del tablero",
@@ -242,6 +252,7 @@
 	},
 	"node_detail": {
 		"back": "Volver al tablero",
+		"edit": "Editar tarjeta",
 		"refresh": "Actualizar contenido",
 		"configuration": "Configuración",
 		"content": "Contenido",
@@ -250,5 +261,13 @@
 		"error": "No se pudo cargar la tarjeta.",
 		"forbidden": "La credencial que usa esta tarjeta ya no está disponible para vos.",
 		"delete": "Eliminar tarjeta"
+	},
+	"board": {
+		"title": "Configuración del tablero",
+		"viewer_hint": "Podés ver este tablero y sus tarjetas, pero no modificarlo.",
+		"title_label": "Nombre del tablero",
+		"modify_title": "Editar nombre",
+		"delete": "Eliminar tablero",
+		"delete_confirm": "¿Eliminar \"{name}\"? Se borran todas sus tarjetas y credenciales."
 	}
 }

@@ -1,11 +1,12 @@
 <script lang="ts">
-    import { getSidebar, isSharing, setSharing, setSidebar } from '$stores/sidebar';
+    import { getSidebar, isConfiguringBoard, isSharing, setConfiguringBoard, setSharing, setSidebar } from '$stores/sidebar';
     import { cn } from '$lib/utils';
     import Icon from '$components/Icon/Icon.svelte';
     import CardsSidebar from './content/CardsSidebar.svelte';
     import CredentialsSidebar from './content/CredentialsSidebar.svelte';
+	import type { BoardRole, UUID } from '$types/api';
 
-    const { canEdit, boardId } = $props();
+    const { role, boardId }: { role: BoardRole, boardId: UUID } = $props();
 </script>
 
 <div
@@ -23,7 +24,7 @@
         </button>
     {/snippet}
     <div class="flex flex-col gap-3">
-        {#if canEdit}
+        {#if role === 'owner' || role === 'editor'}
             {@render SidebarButton('card-stack', $getSidebar === 'cards', () =>
                 setSidebar($getSidebar === 'cards' ? null : 'cards')
             )}
@@ -34,7 +35,9 @@
     </div>
     <div class="flex flex-col gap-3">
         {@render SidebarButton('users', $isSharing, () => setSharing(true))}
-        {@render SidebarButton('configuration', false, () => console.log('Manage board settings'))}
+        {#if role === 'owner'}
+            {@render SidebarButton('configuration', $isConfiguringBoard, () => setConfiguringBoard(true))}
+        {/if}
     </div>
 </div>
 {#if $getSidebar !== null}

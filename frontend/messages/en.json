@@ -37,7 +37,17 @@
 		"gmail_inbox": "Gmail Inbox",
 		"google_calendar": "Google Calendar",
 		"nasa_apod": "NASA Picture of the Day",
-		"create": "Create a new card"
+		"create": "Create a new card",
+		"modify_modal": {
+			"create": {
+				"title": "Create card",
+				"action": "Create"
+			},
+			"edit": {
+				"title": "Edit card",
+				"action": "Save changes"
+			}
+		}
 	},
 	"secrets": {
 		"title": "Board credentials",
@@ -241,6 +251,7 @@
 	},
 	"node_detail": {
 		"back": "Back to the board",
+		"edit": "Edit card",
 		"refresh": "Refresh content",
 		"configuration": "Configuration",
 		"content": "Content",
@@ -249,5 +260,13 @@
 		"error": "The card could not be loaded.",
 		"forbidden": "The credential this card uses is no longer available to you.",
 		"delete": "Delete card"
+	},
+	"board": {
+		"title": "Board configuration",
+		"viewer_hint": "You can look at this board and its cards, but not change it.",
+		"title_label": "Board name",
+		"modify_title": "Edit name",
+		"delete": "Delete board",
+		"delete_confirm": "Delete \"{name}\"? All its cards and credentials are removed."
 	}
 }

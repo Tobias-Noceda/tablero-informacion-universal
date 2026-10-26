@@ -4,6 +4,7 @@ import { session } from "$modules/session.svelte";
 const sidebarOpen = writable<'cards' | 'credentials' | null>(null);
 const managingSecrets = writable(false);
 const sharing = writable(false);
+const configuringBoard = writable(false);
 
 export const setSidebar = (type: 'cards' | 'credentials' | null) => {
     sidebarOpen.set(type);
@@ -23,8 +24,15 @@ export const setSharing = (value: boolean) => {
 
 export const isSharing = { subscribe: sharing.subscribe };
 
+export const setConfiguringBoard = (value: boolean) => {
+    configuringBoard.set(value);
+}
+
+export const isConfiguringBoard = { subscribe: configuringBoard.subscribe };
+
 session.onUserChange(() => {
     sidebarOpen.set(null);
     managingSecrets.set(false);
     sharing.set(false);
+    configuringBoard.set(false);
 });

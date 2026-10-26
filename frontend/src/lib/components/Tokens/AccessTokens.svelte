@@ -147,7 +147,7 @@
 				label: m['profile.tokens.days']({ days: lifetime })
 			}))}
 			class="w-full"
-			activatorClass="rounded-md border border-border bg-transparent px-3 py-2 w-full!"
+			activatorClass={() => "rounded-md border border-border bg-transparent px-3 py-2 w-full!"}
 			drawerClass="rounded-md"
 		/>
 		<div class="flex items-center gap-3">
