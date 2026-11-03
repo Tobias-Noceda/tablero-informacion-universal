@@ -4,7 +4,7 @@
 
 	import Button from '$components/Button/Button.svelte';
 	import Icon from '$components/Icon/Icon.svelte';
-	import { parameters } from '$components/Nodes/node-map';
+	import { wellKnowns } from '$stores/well-knowns.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { display, renderTitle } from '$lib/title';
 	import * as postItsApi from '$services/post-it';
@@ -42,11 +42,10 @@
 	const title = $derived(node.data?.title as { text: string; vars: boolean } | undefined);
 
 	// What kind of card it is, as the cards sidebar names it.
-	const kind = $derived.by(() => {
-		const key = `nodes.${node.type}`;
-		const messages = m as unknown as Record<string, (() => string) | undefined>;
-		return messages[key]?.() ?? node.type ?? '';
-	});
+	const kind = $derived(wellKnowns.name(node.type));
+	// A card whose well-known was deleted keeps running, but there is no form
+	// left to edit it with.
+	const knownType = $derived(!!wellKnowns.byKey(node.type));
 
 	const scrollClass = cn(
 		// Custom scrollbar styles
@@ -82,7 +81,7 @@
 
 	function labelOf(key: string) {
 		return (
-			parameters[node.type ?? '']?.find((p) => p.key === key)?.[`label_${getLocale()}`] ??
+			wellKnowns.parameters(node.type).find((p) => p.key === key)?.[`label_${getLocale()}`] ??
 			key.replace(/^\$/, '')
 		);
 	}
@@ -179,9 +178,12 @@
 			{#if title?.text}
 				<span class="text-xs opacity-70">{kind}</span>
 			{/if}
+			{#if canEdit && !knownType}
+				<span class="text-xs opacity-70">{m['node_detail.unavailable_type']()}</span>
+			{/if}
 		</div>
 
-		{#if canEdit}
+		{#if canEdit && knownType}
 			<Tooltip
 				content={m['node_detail.edit']()}
 				placement="bottom"

@@ -2,9 +2,9 @@ import { type Locale } from '$lib/paraglide/runtime';
 import { session } from '$modules/session.svelte';
 import * as users from '$services/users';
 
-// The language a signed-in user picks is also the one their mails arrive in,
-// so it is saved first: switching reloads the page. Failing to save it must
-// not keep the app in a language the user just turned away from.
+// Saves the language a signed-in user picks, the one their mails arrive in.
+// It does not switch the UI language (Paraglide's setLocale does, reloading).
+// A failed save is only logged.
 export async function switchLocale(locale: Locale) {
 	const user = session.user;
 	if (user && user.locale !== locale) {

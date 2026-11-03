@@ -12,6 +12,7 @@ import (
 	s_ctrl "github.com/Secreto31126/tesis/common/controllers/secrets"
 	t_ctrl "github.com/Secreto31126/tesis/common/controllers/tokens"
 	u_ctrl "github.com/Secreto31126/tesis/common/controllers/users"
+	w_ctrl "github.com/Secreto31126/tesis/common/controllers/wellknowns"
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/ports/crypto"
 	"github.com/Secreto31126/tesis/common/ports/executer"
@@ -29,6 +30,7 @@ import (
 	s_srv "github.com/Secreto31126/tesis/common/services/secrets"
 	t_srv "github.com/Secreto31126/tesis/common/services/tokens"
 	u_srv "github.com/Secreto31126/tesis/common/services/users"
+	w_srv "github.com/Secreto31126/tesis/common/services/wellknowns"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -58,7 +60,8 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	boardService := b_srv.New(db, secrets, resolver, db, cache)
 	groupService := g_srv.New(db, secrets, resolver)
 	orgService := o_srv.New(db, db, secrets, cache)
-	postitService := p_srv.New(db, cache, executer.New(), secrets, resolver)
+	postitService := p_srv.New(db, cache, executer.New(), secrets, resolver, db)
+	wellKnownService := w_srv.New(db)
 	tokenService := t_srv.New(db, cache, time.Now)
 
 	router := gin.Default()
@@ -79,6 +82,7 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	s_ctrl.NewController(secrets).RegisterRoutes(private)
 	g_ctrl.NewController(groupService).RegisterRoutes(private)
 	o_ctrl.NewController(orgService).RegisterRoutes(private)
+	w_ctrl.NewController(wellKnownService).RegisterRoutes(private)
 
 	return &app{secrets: secrets, router: router}
 }

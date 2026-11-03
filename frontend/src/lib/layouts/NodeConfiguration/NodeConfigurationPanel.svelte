@@ -5,7 +5,7 @@
 	import type { Board, SecretRef } from '$types/api';
 	import { bindingsFor, refKey } from '$lib/secrets/binding';
 	import type { SecretMeta } from '$types/api';
-	import { outputs, parameters } from '$components/Nodes/node-map';
+	import { wellKnowns } from '$stores/well-knowns.svelte';
 	import { analyzeTitle, renderTitle } from '$lib/title';
 
 	import { session } from '$modules/session.svelte';
@@ -72,7 +72,7 @@
 	// A secret parameter holds the picked secret's key, not its name.
 	let pickedKeys = $state<Record<string, string>>({});
 
-	const creatingParams = $derived(creatingNode ? (parameters[creatingNode.type!] ?? []) : currentPostIt ? (parameters[currentPostIt.type!] ?? []) : []);
+	const creatingParams = $derived(wellKnowns.parameters((creatingNode ?? currentPostIt)?.type));
 	const missingRequired = $derived(
 		creatingParams.some((p) => {
 			const value = p.type === 'secret' ? pickedKeys[p.key] : paramValues[p.key];
@@ -81,7 +81,7 @@
 	);
 
     // What the card answers with, usable in its title as {{key}}.
-	const creatingOutputs = $derived(creatingNode ? (outputs[creatingNode.type!] ?? []) : currentPostIt ? (outputs[currentPostIt.type!] ?? []) : []);
+	const creatingOutputs = $derived(wellKnowns.outputs((creatingNode ?? currentPostIt)?.type));
 	// Example values to preview the title; a card without a resource answers
 	// with its own params, so those show what the user typed.
 	const sampleResponse = $derived(

@@ -255,3 +255,50 @@ export type AccessToken = {
 export type CreatedAccessToken = AccessToken & {
     token: string;
 }
+
+// A ready-made card, from GET /well-knowns. Admins also see the platform
+// credentials it uses (system_secrets) and who last changed it.
+export type WellKnownParameter = {
+	/** Exact key the backend expects in the card's params. */
+	key: string;
+	label_en: string;
+	label_es: string;
+	/** "secret" renders a picker over the board's stored credentials. */
+	type: 'string' | 'number' | 'secret';
+	placeholder_en?: string;
+	placeholder_es?: string;
+	/** Prefilled value. A parameter without one must be supplied by the user. */
+	default?: string;
+};
+
+export type WellKnownOutput = {
+	/** Key of the card's response, usable in its title as `{{key}}`. */
+	key: string;
+	label_en: string;
+	label_es: string;
+	/** Sample value, only to preview a title before the card exists. */
+	example_en: unknown;
+	example_es: unknown;
+};
+
+export type WellKnown = {
+	key: string;
+	name_en: string;
+	name_es: string;
+	description_en?: string;
+	description_es?: string;
+	order: number;
+	title: { text: string; vars: boolean };
+	/** Empty for a card without a request, which answers with its params. */
+	resource: string;
+	request: { method: string; headers: Record<string, string> | null; queries: Record<string, string> | null };
+	response: string;
+	query: Record<string, string> | null;
+	rate: number;
+	parameters: WellKnownParameter[] | null;
+	outputs: WellKnownOutput[] | null;
+	system_secrets?: Record<string, string>;
+	builtin: boolean;
+	updated_at?: string;
+	updated_by?: string;
+};

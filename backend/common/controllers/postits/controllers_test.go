@@ -16,6 +16,7 @@ import (
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/services/access"
 	srv "github.com/Secreto31126/tesis/common/services/postits"
+	"github.com/Secreto31126/tesis/common/services/wellknowns"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -48,7 +49,7 @@ func setupRouterWith(db *mocks.MockDB, cache *mocks.MockCache, run *mocks.MockEx
 	}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(db, cache, run, secrets, access.New(nil))).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
+	NewController(srv.New(db, cache, run, secrets, access.New(nil), builtins())).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
 	return r
 }
 
@@ -559,4 +560,9 @@ func TestExecutePostIt_UnavailableCredentialIs403(t *testing.T) {
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403 (body: %s)", w.Code, w.Body.String())
 	}
+}
+
+// builtins is the catalogue the platform seeds.
+func builtins() *mocks.MemoryWellKnownStore {
+	return mocks.NewMemoryWellKnownStore(wellknowns.Builtin()...)
 }

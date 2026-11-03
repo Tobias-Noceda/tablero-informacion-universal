@@ -29,6 +29,8 @@ type MongoDB struct {
 	groups   *mongo.Collection
 	orgs     *mongo.Collection
 
+	wellKnowns *mongo.Collection
+
 	accessTokens *mongo.Collection
 }
 
@@ -71,6 +73,7 @@ func New() (*MongoDB, error) {
 	db.groups = db.client.Database(name).Collection("groups")
 	db.orgs = db.client.Database(name).Collection("orgs")
 	db.accessTokens = db.client.Database(name).Collection("access_tokens")
+	db.wellKnowns = db.client.Database(name).Collection("well_knowns")
 
 	return db, nil
 }

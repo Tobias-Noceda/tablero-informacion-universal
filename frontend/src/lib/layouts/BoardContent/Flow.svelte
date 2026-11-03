@@ -23,7 +23,8 @@
 	import * as secretsApi from '$services/secrets';
 	import type { SecretMeta } from '$types/api';
 	import { uuid } from '$lib/utils';
-	import { nodesMap, parameters } from '$components/Nodes/node-map';
+	import { nodeTypesFor } from '$components/Nodes/node-map';
+	import { wellKnowns } from '$stores/well-knowns.svelte';
 	import { edgesMap } from '$components/Edges/edge-map';
 	import { mouses } from '$stores/mouses.svelte';
 	import Realtime from './Realtime.svelte';
@@ -89,6 +90,15 @@
 
 	let editingNode = $state<PostItData | null>(null);
 
+	// Recomputed only when the set of card types changes, not on every move.
+	const typeKeys = $derived(
+		[...new Set([...wellKnowns.list.map((wk) => wk.key), ...nodes.map((n) => n.type)])].join(',')
+	);
+	const nodeTypes = $derived.by(() => {
+		void typeKeys;
+		return untrack(() => nodeTypesFor(wellKnowns.list, nodes.map((n) => n.type)));
+	});
+
 	const { screenToFlowPosition } = useSvelteFlow();
 
 	mouses.updateMappers(screenToFlowPosition);
@@ -118,7 +128,7 @@
 			y: event.clientY
 		});
 
-		// if ((parameters[type.current] ?? []).length === 0) {
+		// if (wellKnowns.parameters(type.current).length === 0) {
 		// 	const newPostIt = await postItsApi.create_well_known(boardId, title, type.current, {});
 		// 	await postItsApi.move(newPostIt.id, position.x, position.y);
 		// 	nodes = [...nodes, { id: newPostIt.id, position, type: type.current } as Node];
@@ -126,7 +136,7 @@
 		// }
 
 		paramValues = Object.fromEntries(
-			(parameters[type.current] ?? []).map((p) => [p.key, p.default ?? ''])
+			wellKnowns.parameters(type.current).map((p) => [p.key, p.default ?? ''])
 		);
 		creatingNode = {
 			id: uuid(),
@@ -271,7 +281,7 @@
 	};
 
 	const onEditStart = (node: PostItData) => {
-		if (!canEdit) return;
+		if (!canEdit || !wellKnowns.byKey(node.type)) return;
 		editingNode = { ...node };
 		paramValues = node.paramValues;
 	};
@@ -312,7 +322,7 @@
 				<SvelteFlow
 					bind:nodes
 					bind:edges
-					nodeTypes={nodesMap}
+					{nodeTypes}
 					edgeTypes={edgesMap}
 					defaultEdgeOptions={{ type: 'floating' }}
 					fitView

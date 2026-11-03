@@ -24,19 +24,6 @@
 	},
 	"nodes": {
 		"title": "Cards",
-		"static_card": "Note",
-		"temperature": "Temperature",
-		"events_search": "Events Search",
-		"dog_facts": "Dog Facts",
-		"dolar_oficial": "Official Dollar",
-		"riesgo_pais": "Country Risk",
-		"crypto_price": "Crypto Price",
-		"air_quality": "Air Quality",
-		"github_repo": "GitHub Repository",
-		"exchange_rate": "Exchange Rate",
-		"gmail_inbox": "Gmail Inbox",
-		"google_calendar": "Google Calendar",
-		"nasa_apod": "NASA Picture of the Day",
 		"create": "Create a new card",
 		"modify_modal": {
 			"create": {
@@ -250,6 +237,7 @@
 		"none": "This card has no values to use in its title."
 	},
 	"node_detail": {
+		"unavailable_type": "This card's type is no longer available, so it can't be edited.",
 		"back": "Back to the board",
 		"edit": "Edit card",
 		"refresh": "Refresh content",

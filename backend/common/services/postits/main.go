@@ -19,8 +19,9 @@ var (
 	ErrCredentialUnavailable = errors.New("This card's credentials are no longer available")
 	// ErrNotAMember reads like a missing resource on purpose: to a stranger,
 	// a board and its cards do not exist.
-	ErrNotAMember     = errors.New("Not found")
-	ErrInvalidBinding = errors.New("Binding aliases must match [A-Z][A-Z0-9_]*")
+	ErrNotAMember       = errors.New("Not found")
+	ErrInvalidBinding   = errors.New("Binding aliases must match [A-Z][A-Z0-9_]*")
+	ErrUnknownWellKnown = errors.New("Well Known post-it not found")
 )
 
 type PostItsService struct {
@@ -29,10 +30,13 @@ type PostItsService struct {
 	run     infrastructure.Executer
 	secrets infrastructure.SecretResolver
 	access  infrastructure.Access
+	// The well-known catalogue; tombstoned definitions are still read so the
+	// cards made from them keep their platform credentials.
+	wellKnowns infrastructure.WellKnownReader
 }
 
-func New(db infrastructure.Database, cache infrastructure.Cache, run infrastructure.Executer, secrets infrastructure.SecretResolver, access infrastructure.Access) *PostItsService {
-	return &PostItsService{db, cache, run, secrets, access}
+func New(db infrastructure.Database, cache infrastructure.Cache, run infrastructure.Executer, secrets infrastructure.SecretResolver, access infrastructure.Access, wellKnowns infrastructure.WellKnownReader) *PostItsService {
+	return &PostItsService{db, cache, run, secrets, access, wellKnowns}
 }
 
 func (srv *PostItsService) CreatePostIt(principal models.Principal, title *models.BoardPostItTitle, postIt *models.PostIts) (*models.PostIts, error) {
@@ -41,7 +45,15 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 	}
 
 	if postIt.WellKnown != "" {
-		wk, wk_title, err := findWellKnown(postIt.WellKnown, postIt.Params)
+		def, err := srv.wellKnowns.FindWellKnown(postIt.WellKnown)
+		if errors.Is(err, infrastructure.ErrWellKnownNotFound) || (err == nil && def.Deleted) {
+			return nil, ErrUnknownWellKnown
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		wk, wk_title, err := def.Instantiate(postIt.Params)
 		if err != nil {
 			return nil, err
 		}
@@ -266,13 +278,23 @@ func (srv *PostItsService) userParams(postit *models.PostIts) (map[string]string
 // systemParams resolves the platform credentials a well-known declares, keyed
 // by the placeholder its template uses.
 func (srv *PostItsService) systemParams(postit *models.PostIts) (map[string]string, error) {
-	def, ok := configuredPostIts[postit.WellKnown]
-	if !ok || len(def.systemSecrets) == 0 {
+	if postit.WellKnown == "" {
 		return nil, nil
 	}
 
-	names := make([]string, 0, len(def.systemSecrets))
-	for _, name := range def.systemSecrets {
+	def, err := srv.wellKnowns.FindWellKnown(postit.WellKnown)
+	if errors.Is(err, infrastructure.ErrWellKnownNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(def.SystemSecrets) == 0 {
+		return nil, nil
+	}
+
+	names := make([]string, 0, len(def.SystemSecrets))
+	for _, name := range def.SystemSecrets {
 		names = append(names, string(name))
 	}
 
@@ -281,8 +303,8 @@ func (srv *PostItsService) systemParams(postit *models.PostIts) (map[string]stri
 		return nil, err
 	}
 
-	params := make(map[string]string, len(def.systemSecrets))
-	for placeholder, name := range def.systemSecrets {
+	params := make(map[string]string, len(def.SystemSecrets))
+	for placeholder, name := range def.SystemSecrets {
 		value, ok := resolved["$"+string(name)]
 		if !ok {
 			log.Printf("well-known %s: system secret %s is not configured", postit.WellKnown, name)

@@ -19,14 +19,22 @@ import (
 	"github.com/Secreto31126/tesis/common/ports/safehttp"
 	"github.com/Secreto31126/tesis/common/services/access"
 	secretsrv "github.com/Secreto31126/tesis/common/services/secrets"
+	"github.com/Secreto31126/tesis/common/services/wellknowns"
 	"github.com/google/uuid"
 )
 
 // No well-known may name a specific credential: which one to use is the
 // user's choice, made per post-it from the board's stored secrets.
 func TestWellKnowns_DoNotHardcodeACredential(t *testing.T) {
-	for key, wk := range configuredPostIts {
-		for _, source := range []map[string]string{wk.template.Params, wk.template.Request.Headers, wk.template.Request.Queries} {
+	for _, wk := range wellknowns.Builtin() {
+		key := wk.Key
+		defaults := map[string]string{}
+		for _, p := range wk.Parameters {
+			if p.Default != nil {
+				defaults[p.Key] = *p.Default
+			}
+		}
+		for _, source := range []map[string]string{defaults, wk.Request.Headers, wk.Request.Queries} {
 			for field, value := range source {
 				name, isRef := strings.CutPrefix(value, "$")
 				if isRef && models.ValidSecretName(name) {
@@ -40,26 +48,27 @@ func TestWellKnowns_DoNotHardcodeACredential(t *testing.T) {
 // A well-known that needs a credential asks for one, and wires it through a
 // param rather than naming a secret itself.
 func TestWellKnown_ExchangeRateAsksForACredential(t *testing.T) {
-	wk := configuredPostIts["exchange_rate"].template
+	wk := builtin(t, "exchange_rate")
 
 	if wk.Request.Headers["apikey"] != "$credential" {
 		t.Errorf("apikey header = %q, want it to defer to the user's choice", wk.Request.Headers["apikey"])
 	}
-	if def, declared := wk.Params["$credential"]; !declared || def != "" {
-		t.Errorf("credential param = %q/%v, want a required param", def, declared)
+	i := slices.IndexFunc(wk.Parameters, func(p models.WellKnownParameter) bool { return p.Key == "$credential" })
+	if i < 0 || wk.Parameters[i].Default != nil || wk.Parameters[i].Type != models.ParameterSecret {
+		t.Errorf("credential param = %+v, want a required secret param", wk.Parameters)
 	}
 
 	// Being required means creation fails until the user picks one.
-	if _, _, err := findWellKnown("exchange_rate", nil); err == nil {
+	if _, _, err := wk.Instantiate(nil); err == nil {
 		t.Error("the post-it was created without a credential")
 	}
 }
 
 // Once the user picks one, it is the picked name that gets resolved.
 func TestWellKnown_ExchangeRateUsesTheChosenCredential(t *testing.T) {
-	wk, _, err := findWellKnown("exchange_rate", map[string]string{"$credential": "$MY_CURRENCY_KEY"})
+	wk, _, err := builtin(t, "exchange_rate").Instantiate(map[string]string{"$credential": "$MY_CURRENCY_KEY"})
 	if err != nil {
-		t.Fatalf("findWellKnown: %v", err)
+		t.Fatalf("Instantiate: %v", err)
 	}
 
 	refs := secretRefs(wk)
@@ -151,7 +160,7 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 		},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, executer.New(), secrets, access.New(nil))
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, executer.New(), secrets, access.New(nil), builtins())
 
 	data, err := svc.ExecutePostIt(postit)
 	if err != nil {
@@ -213,7 +222,7 @@ func TestExecutePostIt_MissingSecretIsNotSubstituted(t *testing.T) {
 		Query:    map[string]string{"value": ".data[].value"},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, executer.New(), &mocks.MockSecretResolver{}, access.New(nil))
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, executer.New(), &mocks.MockSecretResolver{}, access.New(nil), builtins())
 
 	if _, err := svc.ExecutePostIt(postit); err == nil {
 		t.Fatal("expected an error when the provider rejects the credential")
@@ -221,4 +230,15 @@ func TestExecutePostIt_MissingSecretIsNotSubstituted(t *testing.T) {
 	if gotKey != "$CURRENCY_API_KEY" {
 		t.Errorf("provider saw apikey=%q, want the unresolved reference", gotKey)
 	}
+}
+
+func builtin(t *testing.T, key string) models.WellKnown {
+	t.Helper()
+	for _, wk := range wellknowns.Builtin() {
+		if wk.Key == key {
+			return wk
+		}
+	}
+	t.Fatalf("no built-in well-known %q", key)
+	return models.WellKnown{}
 }

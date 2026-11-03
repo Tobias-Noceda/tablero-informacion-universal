@@ -25,19 +25,6 @@
 	},
 	"nodes": {
 		"title": "Tarjetas",
-		"static_card": "Nota",
-		"temperature": "Temperatura",
-		"events_search": "Búsqueda de Eventos",
-		"dog_facts": "Hechos sobre Perros",
-		"dolar_oficial": "Dólar Oficial",
-		"riesgo_pais": "Riesgo País",
-		"crypto_price": "Precio Cripto",
-		"air_quality": "Calidad del Aire",
-		"github_repo": "Repositorio GitHub",
-		"exchange_rate": "Cotización",
-		"gmail_inbox": "Bandeja de Gmail",
-		"google_calendar": "Calendario de Google",
-		"nasa_apod": "Foto del Día de la NASA",
 		"create": "Crear una nueva tarjeta",
 		"modify_modal": {
 			"create": {
@@ -251,6 +238,7 @@
 		"none": "Esta tarjeta no tiene valores para usar en su título."
 	},
 	"node_detail": {
+		"unavailable_type": "El tipo de esta tarjeta ya no está disponible, por lo que no se puede editar.",
 		"back": "Volver al tablero",
 		"edit": "Editar tarjeta",
 		"refresh": "Actualizar contenido",

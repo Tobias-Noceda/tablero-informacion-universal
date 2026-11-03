@@ -351,6 +351,8 @@ func statusOf(err error) int {
 		errors.Is(err, infrastructure.ErrForbidden):
 		return http.StatusForbidden
 	case errors.Is(err, srv.ErrInvalidBinding),
+		errors.Is(err, srv.ErrUnknownWellKnown),
+		errors.Is(err, models.ErrWellKnownMissingVariable),
 		errors.Is(err, infrastructure.ErrUnknownCredential):
 		return http.StatusBadRequest
 	case errors.Is(err, srv.ErrSystemSecretMissing):
