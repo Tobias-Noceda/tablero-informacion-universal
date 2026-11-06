@@ -16,6 +16,7 @@ import NasaApodNode from './NasaApod/NasaApod.svelte';
 import RiesgoPaisNode from './RiesgoPais/RiesgoPais.svelte';
 import StaticCardNode from './StaticCard/StaticCard.svelte';
 import TemperatureNode from './Temperature/Temperature.svelte';
+import { ONE_OFF } from '$lib/well-knowns/one-off';
 
 // Well-knowns with a hand-made card. What each one is (its request, form and
 // outputs) comes from the backend: $stores/well-knowns.svelte.
@@ -32,7 +33,9 @@ export const nodesMap: Record<string, Component<NodeProps>> = {
 	exchange_rate: ExchangeRateNode,
 	gmail_inbox: GmailInboxNode,
 	google_calendar: GoogleCalendarNode,
-	nasa_apod: NasaApodNode
+	nasa_apod: NasaApodNode,
+	// A card with its own request: shows what it answered.
+	[ONE_OFF]: GenericNode
 };
 
 // The canvas' node types: a hand-made card when there is one, the generic

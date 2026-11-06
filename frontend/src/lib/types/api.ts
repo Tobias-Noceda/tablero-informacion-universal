@@ -117,7 +117,27 @@ export type PostItSettings = {
     rate: number;
     run_as?: string;
     bindings?: Record<string, SecretRef> | null;
+    // The request a card without a card type (a one-off card) runs; a card
+    // made from a card type carries its type's.
+    resource?: string | null;
+    request?: {
+        method: string;
+        headers: Record<string, string> | null;
+        queries: Record<string, string> | null;
+    };
+    response?: 'json' | 'html' | '';
+    query?: Record<string, string> | null;
 }
+
+// What a one-off card is created or edited with.
+export type OneOffRequest = {
+    resource: string;
+    request: { method: 'GET'; headers: Record<string, string>; queries: Record<string, string> };
+    response: 'json' | 'html';
+    query: Record<string, string>;
+    rate: number;
+    bindings: Record<string, SecretRef>;
+};
 
 export type Board = {
     id: UUID;

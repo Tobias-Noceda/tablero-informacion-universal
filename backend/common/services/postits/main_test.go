@@ -43,7 +43,7 @@ func TestCreatePostIt_PlainPassesThrough(t *testing.T) {
 	}
 
 	svc := newService(db, nil, nil)
-	_, err := svc.CreatePostIt(boardOwner, &models.BoardPostItTitle{Text: "Hi", Vars: false}, &models.PostIts{Board: board})
+	_, err := svc.CreatePostIt(boardOwner, &models.BoardPostItTitle{Text: "Hi", Vars: false}, oneOff(board, nil))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -394,7 +394,7 @@ func TestViewer_ReadsAndRunsButCannotChangeCards(t *testing.T) {
 	}
 
 	changes := map[string]error{}
-	_, changes["create"] = svc.CreatePostIt(viewer, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{Board: uuid.New()})
+	_, changes["create"] = svc.CreatePostIt(viewer, &models.BoardPostItTitle{Text: "Hi"}, oneOff(uuid.New(), nil))
 	changes["title"] = svc.EditTitlePostIt(viewer, id, models.BoardPostItTitle{Text: "Hi"})
 	changes["update"] = svc.UpdatePostIt(viewer, id, map[string]any{"rate": 5})
 	changes["move"] = svc.MovePostIt(viewer, id, models.Position{})

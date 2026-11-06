@@ -4,6 +4,7 @@ import { orgs } from '$stores/org.svelte';
 import { wellKnowns } from '$stores/well-knowns.svelte';
 import type { UUID } from '$types/api';
 import type { BoardData } from '$layouts/BoardContent/type';
+import { nodeType } from '$lib/well-knowns/one-off';
 
 // A board's page data, only under the organization it is filed under
 // (undefined for Personal); any other combination is not found.
@@ -24,7 +25,8 @@ export async function loadBoard(id: UUID, orgId?: UUID): Promise<BoardData> {
 		boardId: id,
 		boardName: board.name,
 		orgId,
-		nodes: board.postits,
+		// A card without a type is a one-off card.
+		nodes: board.postits.map((p) => ({ ...p, type: nodeType(p.type) })),
 		edges: board.strands,
 		role: board.role ?? 'viewer'
 	};

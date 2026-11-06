@@ -7,6 +7,7 @@
 	import { useDnD } from '$providers/DnDProvider.svelte';
 	import { setManagingCardTypes } from '$stores/sidebar';
 	import { wellKnowns } from '$stores/well-knowns.svelte';
+	import { ONE_OFF } from '$lib/well-knowns/one-off';
 	import SidebarElement from './SidebarElement.svelte';
 
 	const type = useDnD();
@@ -26,6 +27,17 @@
 </script>
 
 <div class="nodes-container items-start justify-start">
+  <!-- A card wired to any API, without a card type. -->
+  <SidebarElement
+    class="border-dashed! border-white/70! bg-transparent! font-semibold"
+    ondragstart={(event) => onDragStart(event, ONE_OFF)}
+  >
+    {#snippet tooltipContent()}
+      {m['one_off.sidebar_hint']()}
+    {/snippet}
+    <span class="mr-1 font-mono text-xs">{'{ }'}</span>
+    {m['one_off.sidebar']()}
+  </SidebarElement>
   {#each wellKnowns.pickable as wk (wk.key)}
     {@const description = wk[`description_${getLocale()}`]}
     <SidebarElement

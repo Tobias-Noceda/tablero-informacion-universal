@@ -13,12 +13,15 @@
 	import { capitalize, isImageLink, isLink } from '$lib/helpers/content-rendering';
 	import { getLocale } from '$lib/paraglide/runtime';
 	import Tooltip from '$components/Tooltip/Tooltip.svelte';
-	import type { PostIt, SecretRef } from '$types/api';
+	import type { PostIt, PostItSettings, SecretRef } from '$types/api';
+	import { ONE_OFF } from '$lib/well-knowns/one-off';
 
 	export type PostItData = PostIt & {
 		title?: { text: string; vars: boolean };
 		paramValues: Record<string, string>;
 		bindings: Record<string, SecretRef>;
+		/** What the card is stored with; a one-off card's form needs it all. */
+		settings?: PostItSettings;
 	};
 
 	interface NodeDetailProps {
@@ -38,7 +41,9 @@
 	const kind = $derived(wellKnowns.name(node.type));
 	// A card whose well-known was deleted keeps running, but there is no form
 	// left to edit it with.
-	const knownType = $derived(!!wellKnowns.byKey(node.type));
+	// A one-off card carries its own request, so it is always editable.
+	const isOneOff = $derived(node.type === ONE_OFF);
+	const knownType = $derived(isOneOff || !!wellKnowns.byKey(node.type));
 
 	const scrollClass = cn(
 		// Custom scrollbar styles
@@ -122,6 +127,39 @@
 	{/if}
 {/snippet}
 
+<!-- A one-off card's own request. A credential shows as its name, never its value. -->
+{#snippet oneOffConfiguration(s: PostItSettings)}
+	{@const shown = (value: string) => {
+		const name = /^\$([A-Z][A-Z0-9_]*)$/.exec(value)?.[1];
+		return name ? m['one_off.credential']({ name }) : value;
+	}}
+	<div class="flex flex-col gap-3">
+		{@render record(
+			[
+				[m['one_off.url'](), s.resource ?? ''],
+				[m['one_off.response'](), (s.response ?? '').toUpperCase()],
+				[m['one_off.rate'](), m['one_off.seconds']({ value: String(s.rate) })]
+			],
+			m['node_detail.no_configuration']()
+		)}
+		<!-- {#each [[m['custom_wk.queries'](), s.request?.queries], [m['custom_wk.headers'](), s.request?.headers]] as const as [label, values] (label)}
+			{#if values && Object.keys(values).length > 0}
+				<div class="flex flex-col gap-1">
+					<h4 class="font-semibold text-sm">{label}</h4>
+					{@render record(
+						Object.entries(values).map(([key, value]) => [key, shown(value)]),
+						''
+					)}
+				</div>
+			{/if}
+		{/each}
+		<div class="flex flex-col gap-1">
+			<h4 class="font-semibold text-sm">{m['one_off.outputs']()}</h4>
+			{@render record(Object.entries(s.query ?? {}), m['node_detail.no_configuration']())}
+		</div> -->
+	</div>
+{/snippet}
+
 {#snippet titleHeading(finalTitle: string)}
 	{#if finalTitle.length > MAX_TITLE_LENGTH}
 		<Tooltip content={finalTitle} placement="bottom" tooltipClass="max-w-60!">
@@ -194,7 +232,8 @@
 							...node,
 							title,
 							paramValues: s.params ?? {},
-							bindings: s.bindings ?? {}
+							bindings: s.bindings ?? {},
+							settings: s
 						});
 					}}
 				>
@@ -228,11 +267,15 @@
 				<div class="text-xs">
 					{#await settings}
 						<p class="text-sm opacity-70">{m.input_loading()}</p>
-					{:then { params }}
-						{@render record(
-							Object.entries(params ?? {}).map(([key, value]) => [parameterLabelOf(key), value]),
-							m['node_detail.no_configuration']()
-						)}
+					{:then s}
+						{#if isOneOff}
+							{@render oneOffConfiguration(s)}
+						{:else}
+							{@render record(
+								Object.entries(s.params ?? {}).map(([key, value]) => [parameterLabelOf(key), value]),
+								m['node_detail.no_configuration']()
+							)}
+						{/if}
 					{:catch err}
 						<p class="text-sm text-destructive">{failure(err)}</p>
 					{/await}

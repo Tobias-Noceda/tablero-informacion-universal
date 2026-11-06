@@ -71,6 +71,8 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 		if title == nil {
 			title = wk_title
 		}
+	} else if err := validateOneOff(postIt); err != nil {
+		return nil, err
 	}
 
 	if title == nil {
@@ -140,6 +142,10 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 		return err
 	}
 
+	if err := applyOneOff(postit, set); err != nil {
+		return err
+	}
+
 	if touchesCredentials(set) {
 		bindings := postit.Bindings
 		if edited, ok := set["bindings"].(map[string]models.SecretRef); ok {
@@ -160,7 +166,9 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 func touchesCredentials(set map[string]any) bool {
 	_, params := set["params"]
 	_, bindings := set["bindings"]
-	return params || bindings
+	// A one-off card's headers and queries can name "$TOKEN"s too.
+	_, request := set["request"]
+	return params || bindings || request
 }
 
 func (srv *PostItsService) require(principal models.Principal, boardID uuid.UUID, min models.BoardRole) error {

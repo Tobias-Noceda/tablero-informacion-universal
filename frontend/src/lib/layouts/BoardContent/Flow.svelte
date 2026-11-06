@@ -21,7 +21,7 @@
 	import type { Board, BoardRole } from '$types/api';
 	import SecretsPanel from '$layouts/Secrets/SecretsPanel.svelte';
 	import * as secretsApi from '$services/secrets';
-	import type { SecretMeta } from '$types/api';
+	import type { PostItSettings, SecretMeta } from '$types/api';
 	import { uuid } from '$lib/utils';
 	import { nodeTypesFor } from '$components/Nodes/node-map';
 	import { wellKnowns } from '$stores/well-knowns.svelte';
@@ -36,6 +36,8 @@
 	import NodeDetail, { type PostItData } from './NodeDetail.svelte';
 
 	import NodeConfigurationPanel from '$layouts/NodeConfiguration/NodeConfigurationPanel.svelte';
+	import OneOffCardPanel from '$layouts/OneOffCard/OneOffCardPanel.svelte';
+	import { ONE_OFF } from '$lib/well-knowns/one-off';
 
 	let {
 		nodes,
@@ -90,6 +92,10 @@
 
 	let editingNode = $state<PostItData | null>(null);
 
+	// A card with its own request (no card type) has its own form.
+	let creatingOneOff = $state<{ id: string; position: { x: number; y: number } } | null>(null);
+	let editingOneOff = $state<{ node: PostItData; settings: PostItSettings } | null>(null);
+
 	// Recomputed only when the set of card types changes, not on every move.
 	const typeKeys = $derived(
 		[...new Set([...wellKnowns.all.map((wk) => wk.key), ...nodes.map((n) => n.type)])].join(',')
@@ -135,6 +141,11 @@
 		// 	return;
 		// }
 
+		if (type.current === ONE_OFF) {
+			creatingOneOff = { id: uuid(), position };
+			return;
+		}
+
 		paramValues = Object.fromEntries(
 			wellKnowns.parameters(type.current).map((p) => [p.key, p.default ?? ''])
 		);
@@ -166,6 +177,8 @@
 		}
 		creatingNode = null;
 		editingNode = null;
+		creatingOneOff = null;
+		editingOneOff = null;
 		paramValues = {};
 	};
 
@@ -281,7 +294,12 @@
 	};
 
 	const onEditStart = (node: PostItData) => {
-		if (!canEdit || !wellKnowns.byKey(node.type)) return;
+		if (!canEdit) return;
+		if (node.type === ONE_OFF) {
+			if (node.settings) editingOneOff = { node: { ...node }, settings: node.settings };
+			return;
+		}
+		if (!wellKnowns.byKey(node.type)) return;
 		editingNode = { ...node };
 		paramValues = node.paramValues;
 	};
@@ -308,7 +326,7 @@
 	});
 
 	$effect(() => {
-		if (creatingNode) {
+		if (creatingNode || creatingOneOff) {
 			selectedEdge = null;
 			untrack(closeNode);
 		}
@@ -354,6 +372,22 @@
 
 	{#if $isManagingSecrets}
 		<SecretsPanel board={boardId} onclose={() => setManagingSecrets(false)} />
+	{/if}
+
+	{#if creatingOneOff || editingOneOff}
+		{#key creatingOneOff?.id ?? editingOneOff?.node.id}
+			<OneOffCardPanel
+				{boardId}
+				{usableSecrets}
+				creating={creatingOneOff}
+				editing={editingOneOff}
+				onclose={() => {
+					creatingOneOff = null;
+					editingOneOff = null;
+				}}
+				onPersistNode={persistNode}
+			/>
+		{/key}
 	{/if}
 
 	<NodeConfigurationPanel

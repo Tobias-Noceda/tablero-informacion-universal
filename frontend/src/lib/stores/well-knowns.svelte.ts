@@ -4,6 +4,7 @@ import { m } from '$lib/paraglide/messages';
 import * as wellKnownsApi from '$services/well-knowns';
 import * as customApi from '$services/custom-well-knowns';
 import { toWellKnown } from '$lib/well-knowns/normalize';
+import { ONE_OFF } from '$lib/well-knowns/one-off';
 import type { UUID, WellKnown, WellKnownOutput, WellKnownParameter } from '$types/api';
 
 // The card types: the platform's catalogue, loaded once per user (admins get
@@ -92,6 +93,7 @@ class WellKnowns {
 	name(key: string | undefined) {
 		const wk = this.byKey(key);
 		if (wk) return wk[`name_${getLocale()}`];
+		if (key === ONE_OFF) return m['one_off.kind']();
 		return key?.startsWith('custom_') ? m['custom_wk.deleted']() : (key ?? '');
 	}
 }

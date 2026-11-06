@@ -58,7 +58,7 @@
 		flex-direction: column;
 		background: var(--color-sidebar-hover);
 		padding: 8px;
-		width: 200px;
+		width: 240px;
 		min-height: 0;
 		height: 100%;
 		overflow-y: auto;

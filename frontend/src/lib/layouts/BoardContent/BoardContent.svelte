@@ -26,6 +26,7 @@
 	import CustomWellKnownsPanel from '$layouts/CustomWellKnowns/CustomWellKnownsPanel.svelte';
 	import SideBar from '$layouts/Sidebar/SideBar.svelte';
 	import Flow from './Flow.svelte';
+	import { nodeType } from '$lib/well-knowns/one-off';
 	import BoardConfiguration from '$layouts/BoardConfiguration/BoardConfiguration.svelte';
 	import { deleteBoard, renameBoard } from '$services/board';
 
@@ -52,7 +53,8 @@
 		data = {
 			...data,
 			boardName: update.board.name ?? data.boardName,
-			nodes: (update.board.postits ?? data.nodes) as typeof data.nodes,
+			nodes: (update.board.postits?.map((p) => ({ ...p, type: nodeType(p.type) })) ??
+				data.nodes) as typeof data.nodes,
 			edges: update.board.strands ?? data.edges
 		};
 	}

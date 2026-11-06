@@ -332,5 +332,28 @@
 		"org_elsewhere": "Este tablero no pertenece a esa organización: sus tipos de tarjeta solo se usan en sus propios tableros.",
 		"draft_kept": "Tu tipo de tarjeta sin guardar se conserva; pasá a una pestaña donde puedas crear para guardarlo.",
 		"creating_in": "Nuevo tipo de tarjeta en: {where}"
+	},
+	"one_off": {
+		"sidebar": "Tarjeta de API propia",
+		"sidebar_hint": "Soltala en el tablero y conectala a cualquier API, sin crear un tipo de tarjeta.",
+		"kind": "Tarjeta de API propia",
+		"create_title": "Nueva tarjeta de API propia",
+		"edit_title": "Editar tarjeta de API propia",
+		"hint": "Esta tarjeta existe solo acá. Para usar la misma API en otras tarjetas, creá un tipo de tarjeta.",
+		"value_mode": "Texto",
+		"credential_mode": "Credencial",
+		"toggle_credential": "Usar una credencial",
+		"toggle_value": "Escribir un valor",
+		"request_hint": "Valores fijos, o una de tus credenciales (nunca se muestra en la tarjeta).",
+		"outputs_hint": "Cada valor se toma de la respuesta con una expresión jq (como {example}).",
+		"credential": "credencial {name}",
+		"err_row_key": "Cada parámetro del query string y cada header necesita un nombre.",
+		"err_credential": "Elegí una credencial en cada fila que use una.",
+		"error": "No se pudo guardar la tarjeta: {detail}",
+		"url": "URL",
+		"response": "Respuesta",
+		"rate": "Se actualiza cada",
+		"seconds": "{value} s",
+		"outputs": "Valores"
 	}
 }

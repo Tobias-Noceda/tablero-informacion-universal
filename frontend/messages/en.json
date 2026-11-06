@@ -331,5 +331,28 @@
 		"org_elsewhere": "This board is not in that organization: its card types can only be used on its own boards.",
 		"draft_kept": "Your unsaved card type is kept; switch to a tab where you can create to save it.",
 		"creating_in": "New card type in: {where}"
+	},
+	"one_off": {
+		"sidebar": "Custom API card",
+		"sidebar_hint": "Drop it on the board and connect it to any API, without creating a card type.",
+		"kind": "Custom API card",
+		"create_title": "New custom API card",
+		"edit_title": "Edit custom API card",
+		"hint": "This card only exists here. To reuse the same API on other cards, create a card type instead.",
+		"value_mode": "Text",
+		"credential_mode": "Credential",
+		"toggle_credential": "Use a credential",
+		"toggle_value": "Type a value",
+		"request_hint": "Fixed values, or one of your credentials (it is never shown on the card).",
+		"outputs_hint": "Each value is picked from the response with a jq expression (like {example}).",
+		"credential": "credential {name}",
+		"err_row_key": "Every query string parameter and header needs a name.",
+		"err_credential": "Pick a credential for every row set to use one.",
+		"error": "The card could not be saved: {detail}",
+		"url": "URL",
+		"response": "Response",
+		"rate": "Refresh every",
+		"seconds": "{value} s",
+		"outputs": "Values"
 	}
 }
