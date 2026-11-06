@@ -6,6 +6,7 @@
 :root {
 	color-scheme: light;
 	--app-background: #ffffff;
+	--app-background-hover: #cfcfcf;
 	--app-foreground: #111827;
 	--app-main: #005166;
     --app-main-text: #ffffff;
@@ -56,6 +57,7 @@
 	:root {
 		color-scheme: dark;
 		--app-background: #0b1020;
+		--app-background-hover: #2b3040;
 		--app-foreground: #f9fafb;
 
 		--app-primary: var(--app-foreground);
@@ -70,6 +72,7 @@
 
 @theme {
 	--color-background: var(--app-background);
+	--color-background-hover: var(--app-background-hover);
 	--color-foreground: var(--app-foreground);
 
 	--color-main: var(--app-main);

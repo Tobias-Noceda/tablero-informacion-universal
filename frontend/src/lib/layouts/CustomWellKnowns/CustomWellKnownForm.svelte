@@ -1,9 +1,11 @@
 <script lang="ts">
 	import Button from '$components/Button/Button.svelte';
+	import Dropdown from '$components/Dropdown/Dropdown.svelte';
 	import Icon from '$components/Icon/Icon.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { renderTitle } from '$lib/title';
+	import { cn } from '$lib/utils';
 	import { bodyOf, problems, type Draft, type Problem, type Row } from '$lib/well-knowns/draft';
 	import type { CustomWellKnownBody } from '$types/api';
 
@@ -17,6 +19,8 @@
 
 	let { draft = $bindable(), onsave, oncancel }: Props = $props();
 
+	const PARAM_TYPES = ['string', 'number', 'secret'] as ('string' | 'number' | 'secret')[];
+
 	let saving = $state(false);
 	// Shown once the user tried to save, so an empty form is not all red.
 	let touched = $state(false);
@@ -29,8 +33,12 @@
 		)
 	);
 
-	const fieldClass =
-		'min-w-0 rounded-md border border-main-border bg-transparent px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-main-border';
+	const fieldClass = cn(
+		'min-w-0 bg-transparent px-2 py-1 rounded-md',
+		'text-sm text-foreground',
+		'border-border hover:border-sidebar focus:border-main focus:ring-1 focus:ring-main',
+		'focus:outline-none focus:ring-2 focus:ring-main-border',
+	);
 
 	function describe(problem: Problem) {
 		switch (problem.code) {
@@ -79,7 +87,7 @@
 {#snippet removeButton(onclick: () => void)}
 	<button
 		type="button"
-		class="shrink-0 cursor-pointer rounded-md p-1 hover:bg-main-hover"
+		class="shrink-0 cursor-pointer rounded-md p-1 hover:bg-background-hover"
 		aria-label={m['custom_wk.remove']()}
 		title={m['custom_wk.remove']()}
 		{onclick}
@@ -108,7 +116,7 @@
 			</div>
 		{/each}
 		<Button
-			variant="gray"
+			variant="secondary"
 			class="self-start px-2 py-0.5 text-xs"
 			onclick={() => rows.push({ key: '', value: '' })}
 		>
@@ -142,14 +150,34 @@
 	<div class="flex gap-2">
 		<label class="flex flex-1 flex-col gap-1 text-sm">
 			<span class="font-semibold">{m['custom_wk.response']()}</span>
-			<select class={fieldClass} bind:value={draft.response}>
-				<option value="json">JSON</option>
-				<option value="html">HTML</option>
-			</select>
+			<Dropdown
+				bind:value={draft.response}
+				options={['json', 'html'].map((response) => {
+					return {
+						value: response,
+						label: response.toUpperCase()
+					}
+				})}
+				class="w-full!"
+				activatorClass={(isOpen) => cn( 
+					fieldClass,
+					'w-full text-base hover:border-sidebar',
+					isOpen
+						? "outline-none ring-2 ring-main-border border-none"
+						: "focus:ring-0!"
+				)}
+				drawerClass={cn(fieldClass, 'bg-background mt-1 px-1')}
+				itemClass={(isSelected) => cn(
+					'hover:bg-background-hover text-foreground text-sm rounded-md',
+					isSelected
+						? 'bg-background-hover'
+						: 'bg-transparent'
+				)}
+			/>
 		</label>
 		<label class="flex flex-1 flex-col gap-1 text-sm">
 			<span class="font-semibold">{m['custom_wk.rate']()}</span>
-			<input class={fieldClass} type="number" min="600" bind:value={draft.rate} />
+			<input class={cn(fieldClass, 'px-2 py-1.5')} type="number" min="600" bind:value={draft.rate} />
 		</label>
 	</div>
 	<p class="text-xs opacity-70">{m['custom_wk.rate_hint']()}</p>
@@ -173,13 +201,34 @@
 					{@render removeButton(() => draft.parameters.splice(i, 1))}
 				</div>
 				<div class="flex items-center gap-1">
-					<select class={fieldClass} bind:value={param.type}>
-						<option value="string">{m['custom_wk.type_string']()}</option>
-						<option value="number">{m['custom_wk.type_number']()}</option>
-						<option value="secret">{m['custom_wk.type_secret']()}</option>
-					</select>
+					<div class="flex w-32">
+						<Dropdown
+							bind:value={param.type}
+							options={PARAM_TYPES.map((type) => {
+								return {
+									value: type,
+									label: m[`custom_wk.type_${type}`]()
+								}
+							})}
+							class="w-full!"
+							activatorClass={(isOpen) => cn( 
+								fieldClass,
+								'w-full text-base hover:border-sidebar',
+								isOpen
+									? "outline-none ring-2 ring-main-border border-none"
+									: "focus:ring-0!"
+							)}
+							drawerClass={cn(fieldClass, 'bg-background mt-1 px-1')}
+							itemClass={(isSelected) => cn(
+								'hover:bg-background-hover text-foreground text-sm rounded-md',
+								isSelected
+									? 'bg-background-hover'
+									: 'bg-transparent'
+							)}
+						/>
+					</div>
 					<input
-						class={fieldClass + ' flex-1'}
+						class={cn(fieldClass, 'flex-1 px-2 py-1.5')}
 						placeholder={m['custom_wk.placeholder']()}
 						bind:value={param.placeholder}
 					/>
@@ -194,7 +243,7 @@
 			</div>
 		{/each}
 		<Button
-			variant="gray"
+			variant="secondary"
 			class="self-start px-2 py-0.5 text-xs"
 			onclick={() =>
 				draft.parameters.push({ key: '', label: '', type: 'string', placeholder: '', default: '' })}
@@ -249,7 +298,7 @@
 			</div>
 		{/each}
 		<Button
-			variant="gray"
+			variant="secondary"
 			class="self-start px-2 py-0.5 text-xs"
 			onclick={() => draft.outputs.push({ key: '', label: '', query: '', example: '' })}
 		>
@@ -296,6 +345,6 @@
 		<Button variant="primary" disabled={saving || (touched && found.length > 0)} onclick={save}>
 			{m['custom_wk.save']()}
 		</Button>
-		<Button variant="gray" onclick={oncancel}>{m['custom_wk.cancel']()}</Button>
+		<Button variant="destructive" onclick={oncancel}>{m['custom_wk.cancel']()}</Button>
 	</div>
 </div>

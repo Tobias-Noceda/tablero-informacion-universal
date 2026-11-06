@@ -21,6 +21,16 @@
 
 	let { boardId, orgId, role, onclose }: Props = $props();
 
+	const scrollClass = cn(
+		// Custom scrollbar styles
+		'scrollbar-thin scrollbar-thumb-main scrollbar-track-transparent',
+		'[&::-webkit-scrollbar]:w-2',
+		'[&::-webkit-scrollbar-track]:bg-transparent',
+		'[&::-webkit-scrollbar-thumb]:bg-main',
+		'[&::-webkit-scrollbar-thumb]:rounded-full',
+		'[&::-webkit-scrollbar-thumb]:hover:bg-main-hover'
+	);
+
 	// "user": only the caller, on any board. "board": everyone on this board.
 	// "org": every member of an organization, on its boards. Any organization
 	// the user is in can be picked, not only the board's.
@@ -145,9 +155,10 @@
 
 <Modal
 	{onclose}
+	withCloseButton={false}
 	onaccept={onclose}
 	acceptText={m['custom_wk.close']()}
-	dialogClass="max-w-2xl max-h-[90vh] overflow-y-auto"
+	dialogClass={cn("max-w-2xl max-h-[90vh] overflow-y-auto", scrollClass)}
 >
 	<h2 class="text-lg font-semibold">{m['custom_wk.title']()}</h2>
 
