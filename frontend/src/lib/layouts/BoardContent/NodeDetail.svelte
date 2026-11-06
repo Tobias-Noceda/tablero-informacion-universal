@@ -62,6 +62,8 @@
 		return postItsApi.get_settings(id);
 	});
 	const output = $derived(results.get(id));
+	// Kept up to date while open, also for a card whose title needs no data.
+	$effect(() => results.watch(id));
 
 	let refreshing = $state(false);
 	const MAX_TITLE_LENGTH = 24;

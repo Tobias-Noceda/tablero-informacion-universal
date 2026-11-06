@@ -134,9 +134,14 @@
 		);
 		await postItsApi.move(newPostIt.id, creatingNode.position.x, creatingNode.position.y);
 
-		// The create response is the post-it itself: its title is top level.
-		const created = newPostIt as unknown as { title?: { text: string; vars: boolean } };
-        onPersistNode('create', { ...creatingNode, id: newPostIt.id, data: { title: created.title } } as Node);
+		// The create response is the stored post-it, which has no title (that
+		// lives on the board): show the one just sent instead of waiting for the
+		// board's live update.
+        onPersistNode('create', {
+            ...creatingNode,
+            id: newPostIt.id,
+            data: { title: { text: title, vars: titleAnalysis.vars } }
+        } as Node);
 		pickedKeys = {};
         creatingTitle = '';
 	};
