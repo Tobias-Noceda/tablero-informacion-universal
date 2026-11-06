@@ -26,7 +26,7 @@ func newService(db *mocks.MockDB, cache *mocks.MockCache, run *mocks.MockExecute
 	if run == nil {
 		run = &mocks.MockExecuter{}
 	}
-	return New(db, cache, run, &mocks.MockSecretResolver{}, access.New(nil), builtins())
+	return New(db, cache, run, &mocks.MockSecretResolver{}, access.New(nil), builtins(), nil)
 }
 
 func TestCreatePostIt_PlainPassesThrough(t *testing.T) {
@@ -383,7 +383,7 @@ func TestViewer_ReadsAndRunsButCannotChangeCards(t *testing.T) {
 		},
 	}
 	run := &mocks.MockExecuter{ExecuteFn: func(*models.PostIts) (any, error) { return "data", nil }}
-	svc := New(db, &mocks.MockCache{}, run, &mocks.MockSecretResolver{}, access.New(nil), builtins())
+	svc := New(db, &mocks.MockCache{}, run, &mocks.MockSecretResolver{}, access.New(nil), builtins(), nil)
 
 	postit, err := svc.GetPostIt(viewer, id)
 	if err != nil {
@@ -468,7 +468,7 @@ func TestExecutePostIt_DoesNotLeakSecretsOntoTheCaller(t *testing.T) {
 		},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver, access.New(nil), builtins())
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver, access.New(nil), builtins(), nil)
 
 	if _, err := svc.ExecutePostIt(postit); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -513,7 +513,7 @@ func TestExecutePostIt_ResourcelessPostItNeverResolvesSecrets(t *testing.T) {
 		},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver, access.New(nil), builtins())
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver, access.New(nil), builtins(), nil)
 
 	out, err := svc.ExecutePostIt(postit)
 	if err != nil {

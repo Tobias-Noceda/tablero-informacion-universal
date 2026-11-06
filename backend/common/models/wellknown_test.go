@@ -11,7 +11,8 @@ func validWellKnown() WellKnown {
 		Key:      "coin",
 		NameEn:   "Coin",
 		NameEs:   "Moneda",
-		Title:    BoardPostItTitle{Text: "{{price}}", Vars: true},
+		TitleEn:  "{{price}}",
+		TitleEs:  "{{price}}",
 		Resource: "https://api.example.com/price",
 		Request: Request{
 			Method:  "GET",
@@ -40,7 +41,7 @@ func TestWellKnownValidate(t *testing.T) {
 	cases := map[string]func(*WellKnown){
 		"bad key":               func(wk *WellKnown) { wk.Key = "Bad-Key" },
 		"missing name":          func(wk *WellKnown) { wk.NameEs = " " },
-		"missing title":         func(wk *WellKnown) { wk.Title.Text = "" },
+		"missing title":         func(wk *WellKnown) { wk.TitleEs = "" },
 		"negative rate":         func(wk *WellKnown) { wk.Rate = -1 },
 		"non-http resource":     func(wk *WellKnown) { wk.Resource = "file:///etc/passwd" },
 		"bad response":          func(wk *WellKnown) { wk.Response = "xml" },
@@ -84,7 +85,8 @@ func TestWellKnownValidate_StaticCardOutputsAreParams(t *testing.T) {
 	empty := ""
 	wk := WellKnown{
 		Key: "note", NameEn: "Note", NameEs: "Nota",
-		Title:      BoardPostItTitle{Text: "{{text}}", Vars: true},
+		TitleEn:    "{{text}}",
+		TitleEs:    "{{text}}",
 		Parameters: []WellKnownParameter{{Key: "text", LabelEn: "Text", LabelEs: "Texto", Type: ParameterString, Default: &empty}},
 		Outputs:    []WellKnownOutput{{Key: "text", LabelEn: "Text", LabelEs: "Texto"}},
 	}

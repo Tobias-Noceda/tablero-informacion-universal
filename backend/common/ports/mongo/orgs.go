@@ -163,7 +163,7 @@ func (db *MongoDB) DeleteOrg(id uuid.UUID) error {
 		return infrastructure.ErrOrgNotFound
 	}
 
-	return nil
+	return db.purgeCustomWellKnowns(models.CustomWellKnownScope{Kind: models.CustomScopeOrg, Owner: id.String()})
 }
 
 func (db *MongoDB) CountOrgBoards(id uuid.UUID) (int64, error) {

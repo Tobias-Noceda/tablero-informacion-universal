@@ -33,10 +33,18 @@ type PostItsService struct {
 	// The well-known catalogue; tombstoned definitions are still read so the
 	// cards made from them keep their platform credentials.
 	wellKnowns infrastructure.WellKnownReader
+	// The card types users define; nil leaves only the catalogue.
+	custom CustomWellKnowns
 }
 
-func New(db infrastructure.Database, cache infrastructure.Cache, run infrastructure.Executer, secrets infrastructure.SecretResolver, access infrastructure.Access, wellKnowns infrastructure.WellKnownReader) *PostItsService {
-	return &PostItsService{db, cache, run, secrets, access, wellKnowns}
+// CustomWellKnowns answers which user-defined card type a new card on a
+// board may be made from.
+type CustomWellKnowns interface {
+	Usable(principal models.Principal, board uuid.UUID, key string) (*models.WellKnown, error)
+}
+
+func New(db infrastructure.Database, cache infrastructure.Cache, run infrastructure.Executer, secrets infrastructure.SecretResolver, access infrastructure.Access, wellKnowns infrastructure.WellKnownReader, custom CustomWellKnowns) *PostItsService {
+	return &PostItsService{db, cache, run, secrets, access, wellKnowns, custom}
 }
 
 func (srv *PostItsService) CreatePostIt(principal models.Principal, title *models.BoardPostItTitle, postIt *models.PostIts) (*models.PostIts, error) {
@@ -45,10 +53,7 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 	}
 
 	if postIt.WellKnown != "" {
-		def, err := srv.wellKnowns.FindWellKnown(postIt.WellKnown)
-		if errors.Is(err, infrastructure.ErrWellKnownNotFound) || (err == nil && def.Deleted) {
-			return nil, ErrUnknownWellKnown
-		}
+		def, err := srv.definition(principal, postIt.Board, postIt.WellKnown)
 		if err != nil {
 			return nil, err
 		}
@@ -81,6 +86,28 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 	entry.Vars = titleVars(entry.Text, outputsOf(postIt))
 
 	return srv.db.CreatePostIt(postIt, entry, postIt.WellKnown, models.Position{X: 750, Y: 350})
+}
+
+// definition is the live well-known a new card is made from: one of the
+// catalogue, or a custom card type the principal may use on board.
+func (srv *PostItsService) definition(principal models.Principal, board uuid.UUID, key string) (*models.WellKnown, error) {
+	if models.IsCustomWellKnownKey(key) {
+		if srv.custom == nil {
+			return nil, ErrUnknownWellKnown
+		}
+		def, err := srv.custom.Usable(principal, board, key)
+		if err != nil {
+			// Missing and not usable here read the same.
+			return nil, ErrUnknownWellKnown
+		}
+		return def, nil
+	}
+
+	def, err := srv.wellKnowns.FindWellKnown(key)
+	if errors.Is(err, infrastructure.ErrWellKnownNotFound) || (err == nil && def.Deleted) {
+		return nil, ErrUnknownWellKnown
+	}
+	return def, err
 }
 
 // GetPostIt loads a card for anyone who may see its board. ExecutePostIt runs

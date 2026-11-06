@@ -8,8 +8,14 @@ import type { BoardData } from '$layouts/BoardContent/type';
 // A board's page data, only under the organization it is filed under
 // (undefined for Personal); any other combination is not found.
 export async function loadBoard(id: UUID, orgId?: UUID): Promise<BoardData> {
-	// The catalogue decides how each card renders and what its form asks.
-	const [board] = await Promise.all([boardApi.get(id), orgs.ensure(), wellKnowns.ensure()]);
+	// The card types (catalogue and the board's custom ones) decide how each
+	// card renders and what its form asks.
+	const [board] = await Promise.all([
+		boardApi.get(id),
+		orgs.ensure(),
+		wellKnowns.ensure(),
+		wellKnowns.loadBoard(id)
+	]);
 
 	if (orgs.orgOf(board) !== orgId) error(404);
 	orgs.remember(orgId);

@@ -6,7 +6,7 @@
     import CredentialsSidebar from './content/CredentialsSidebar.svelte';
 	import type { BoardRole, UUID } from '$types/api';
 
-    const { role, boardId }: { role: BoardRole, boardId: UUID } = $props();
+    const { role, boardId }: { role: BoardRole; boardId: UUID } = $props();
 </script>
 
 <div

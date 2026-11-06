@@ -12,9 +12,11 @@
     acceptDisabled?: boolean;
     onaccept: () => void;
     class?: string;
+    /** Classes for the dialog box itself, e.g. a wider max-w-*. */
+    dialogClass?: string;
   }
 
-  let { children, onclose, acceptText, acceptClass, acceptDisabled, onaccept, class: modalClass }: Props = $props();
+  let { children, onclose, acceptText, acceptClass, acceptDisabled, onaccept, class: modalClass, dialogClass }: Props = $props();
 
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape') onclose();
@@ -34,7 +36,7 @@
 >
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <div
-    class="bg-background border border-main-border rounded-lg p-6 w-full max-w-md shadow-xl flex flex-col gap-4"
+    class={cn("bg-background border border-main-border rounded-lg p-6 w-full max-w-md shadow-xl flex flex-col gap-4", dialogClass)}
     role="dialog"
     aria-modal="true"
     onclick={(e) => e.stopPropagation()}

@@ -23,8 +23,10 @@ type WellKnown struct {
 	// Position in the card picker, lowest first (ties by key).
 	Order int `bson:"order" json:"order"`
 
-	// Default title of a new card, may use the outputs as {{key}}.
-	Title BoardPostItTitle `bson:"title" json:"title"`
+	// An example title for a new card, in each language, may use the outputs
+	// as {{key}}. Only a suggestion: a card stores the one title it is given.
+	TitleEn string `bson:"title_en" json:"title_en"`
+	TitleEs string `bson:"title_es" json:"title_es"`
 
 	// Empty for a card without a request (static_card), which answers with
 	// its own params.
@@ -50,6 +52,10 @@ type WellKnown struct {
 	Deleted   bool      `bson:"deleted" json:"-"`
 	UpdatedAt time.Time `bson:"updated_at,omitempty" json:"updated_at,omitzero"`
 	UpdatedBy string    `bson:"updated_by,omitempty" json:"updated_by,omitempty"`
+
+	// custom marks a CustomWellKnown seen through AsWellKnown, the only
+	// definition allowed a custom_ key.
+	custom bool
 }
 
 type WellKnownParameterType string
@@ -91,7 +97,8 @@ var (
 )
 
 // Instantiate builds the post-it a new card stores, with params overriding
-// the parameters' defaults.
+// the parameters' defaults. The title is the English example, for a caller
+// that sends none (the frontend always does).
 func (wk WellKnown) Instantiate(params map[string]string) (*PostIts, *BoardPostItTitle, error) {
 	postit := &PostIts{
 		WellKnown: wk.Key,
@@ -129,8 +136,7 @@ func (wk WellKnown) Instantiate(params map[string]string) (*PostIts, *BoardPostI
 		return nil, nil, ErrWellKnownMissingVariable
 	}
 
-	title := wk.Title
-	return postit, &title, nil
+	return postit, &BoardPostItTitle{Text: wk.TitleEn}, nil
 }
 
 // Validate checks a definition is consistent before it is stored: every
@@ -140,11 +146,14 @@ func (wk WellKnown) Validate() error {
 	if !wellKnownKey.MatchString(wk.Key) {
 		return fmt.Errorf("key must match %s", wellKnownKey)
 	}
+	if IsCustomWellKnownKey(wk.Key) && !wk.custom {
+		return fmt.Errorf("keys starting with %q are reserved for custom card types", CustomWellKnownPrefix)
+	}
 	if strings.TrimSpace(wk.NameEn) == "" || strings.TrimSpace(wk.NameEs) == "" {
 		return errors.New("name_en and name_es are required")
 	}
-	if strings.TrimSpace(wk.Title.Text) == "" {
-		return errors.New("title is required")
+	if strings.TrimSpace(wk.TitleEn) == "" || strings.TrimSpace(wk.TitleEs) == "" {
+		return errors.New("title_en and title_es are required")
 	}
 	if wk.Rate < 0 {
 		return errors.New("rate must not be negative")

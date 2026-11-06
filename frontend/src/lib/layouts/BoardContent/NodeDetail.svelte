@@ -19,7 +19,7 @@
 		title?: { text: string; vars: boolean };
 		paramValues: Record<string, string>;
 		bindings: Record<string, SecretRef>;
-	}
+	};
 
 	interface NodeDetailProps {
 		node: Node;
@@ -30,14 +30,7 @@
 		ondelete: (node: Node) => void;
 	}
 
-	let {
-		node,
-		canEdit,
-		settingsVersion,
-		onback,
-		onedit,
-		ondelete
-	}: NodeDetailProps = $props();
+	let { node, canEdit, settingsVersion, onback, onedit, ondelete }: NodeDetailProps = $props();
 
 	const title = $derived(node.data?.title as { text: string; vars: boolean } | undefined);
 
@@ -79,10 +72,16 @@
 		}
 	}
 
-	function labelOf(key: string) {
+	function parameterLabelOf(key: string) {
 		return (
 			wellKnowns.parameters(node.type).find((p) => p.key === key)?.[`label_${getLocale()}`] ??
 			key.replace(/^\$/, '')
+		);
+	}
+
+	function contentLabelOf(key: string) {
+		return (
+			wellKnowns.outputs(node.type).find((c) => c.key === key)?.[`label_${getLocale()}`] ?? key
 		);
 	}
 
@@ -184,11 +183,7 @@
 		</div>
 
 		{#if canEdit && knownType}
-			<Tooltip
-				content={m['node_detail.edit']()}
-				placement="bottom"
-				tooltipClass="max-w-60! -mt-1"
-			>
+			<Tooltip content={m['node_detail.edit']()} placement="bottom" tooltipClass="max-w-60! -mt-1">
 				<button
 					type="button"
 					class="cursor-pointer rounded-md p-2 hover:bg-tertiary-hover disabled:cursor-wait disabled:opacity-60"
@@ -200,10 +195,10 @@
 							title,
 							paramValues: s.params ?? {},
 							bindings: s.bindings ?? {}
-						})
+						});
 					}}
 				>
-					<Icon name="edit" class='stroke-2 w-5 h-5' />
+					<Icon name="edit" class="stroke-2 w-5 h-5" />
 				</button>
 			</Tooltip>
 		{/if}
@@ -235,7 +230,7 @@
 						<p class="text-sm opacity-70">{m.input_loading()}</p>
 					{:then { params }}
 						{@render record(
-							Object.entries(params ?? {}).map(([key, value]) => [labelOf(key), value]),
+							Object.entries(params ?? {}).map(([key, value]) => [parameterLabelOf(key), value]),
 							m['node_detail.no_configuration']()
 						)}
 					{:catch err}
@@ -253,7 +248,10 @@
 				{#if node.type === 'static_card'}
 					<p class="sm:text-sm md:text-[15px]">{data['text']}</p>
 				{:else}
-					{@render record(Object.entries(data ?? {}), m['node_detail.no_content']())}
+					{@render record(
+						Object.entries(data ?? {}).map(([key, value]) => [contentLabelOf(key), value]),
+						m['node_detail.no_content']()
+					)}
 				{/if}
 			{:catch err}
 				<p class="text-sm text-destructive">{failure(err)}</p>

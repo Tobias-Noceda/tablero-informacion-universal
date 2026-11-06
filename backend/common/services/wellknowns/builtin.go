@@ -10,7 +10,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "static_card",
 			NameEn: "Note", NameEs: "Nota",
-			Title: models.BoardPostItTitle{Text: "{{text}}", Vars: true},
+			TitleEn: "{{text}}",
+			TitleEs: "{{text}}",
 			Parameters: []models.WellKnownParameter{
 				{Key: "text", LabelEn: "Content", LabelEs: "Contenido", Type: models.ParameterString, PlaceholderEn: ptr("Enter text"), PlaceholderEs: ptr("Ingrese texto"), Default: ptr("")},
 			},
@@ -21,7 +22,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "temperature",
 			NameEn: "Temperature", NameEs: "Temperatura",
-			Title:    models.BoardPostItTitle{Text: "Today's temps are between {{min}}°C and {{max}}°C", Vars: true},
+			TitleEn:  "Today's temps are between {{min}}°C and {{max}}°C",
+			TitleEs:  "Hoy la temperatura va de {{min}}°C a {{max}}°C",
 			Resource: "https://api.open-meteo.com/v1/forecast",
 			Request: models.Request{
 				Method: "GET",
@@ -54,7 +56,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "events_search",
 			NameEn: "Events Search", NameEs: "Búsqueda de Eventos",
-			Title:    models.BoardPostItTitle{Text: "{{sales}}: {{name}}", Vars: true},
+			TitleEn:  "{{sales}}: {{name}}",
+			TitleEs:  "{{sales}}: {{name}}",
 			Resource: "https://app.ticketmaster.com/discovery/v2/events.json",
 			Request: models.Request{
 				Method: "GET",
@@ -93,7 +96,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "dog_facts",
 			NameEn: "Dog Facts", NameEs: "Hechos sobre Perros",
-			Title:    models.BoardPostItTitle{Text: "{{body}}", Vars: true},
+			TitleEn:  "{{body}}",
+			TitleEs:  "{{body}}",
 			Resource: "https://dogapi.dog/api/v2/facts",
 			Request:  models.Request{Method: "GET"},
 			Response: "json",
@@ -106,7 +110,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "dolar_oficial",
 			NameEn: "Official Dollar", NameEs: "Dólar Oficial",
-			Title:    models.BoardPostItTitle{Text: "Dolar at {{compra}}", Vars: true},
+			TitleEn:  "Dolar at {{compra}}",
+			TitleEs:  "Dólar a {{compra}}",
 			Resource: "https://dolarapi.com/v1/dolares/oficial",
 			Request:  models.Request{Method: "GET"},
 			Response: "json",
@@ -123,7 +128,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "riesgo_pais",
 			NameEn: "Country Risk", NameEs: "Riesgo País",
-			Title:    models.BoardPostItTitle{Text: "Argentine's country risk: {{valor}}", Vars: true},
+			TitleEn:  "Argentine's country risk: {{valor}}",
+			TitleEs:  "Riesgo país: {{valor}}",
 			Resource: "https://api.argentinadatos.com/v1/finanzas/indices/riesgo-pais/ultimo",
 			Request: models.Request{
 				Method:  "GET",
@@ -143,7 +149,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "crypto_price",
 			NameEn: "Crypto Price", NameEs: "Precio Cripto",
-			Title:    models.BoardPostItTitle{Text: "Let's go gambling! {{coin}} at {{price}}", Vars: true},
+			TitleEn:  "Let's go gambling! {{coin}} at {{price}}",
+			TitleEs:  "¡A apostar! {{coin}} a {{price}}",
 			Resource: "https://api.coingecko.com/api/v3/simple/price",
 			Request: models.Request{
 				Method: "GET",
@@ -174,7 +181,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "air_quality",
 			NameEn: "Air Quality", NameEs: "Calidad del Aire",
-			Title:    models.BoardPostItTitle{Text: "Today's air is {{pm25}}", Vars: true},
+			TitleEn:  "Today's air is {{pm25}}",
+			TitleEs:  "Calidad del aire hoy: {{pm25}}",
 			Resource: "https://air-quality-api.open-meteo.com/v1/air-quality",
 			Request: models.Request{
 				Method: "GET",
@@ -205,7 +213,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "github_repo",
 			NameEn: "GitHub Repository", NameEs: "Repositorio GitHub",
-			Title:    models.BoardPostItTitle{Text: "The repo {{name}} has {{stars}} stars and {{issues}} open issues", Vars: true},
+			TitleEn:  "The repo {{name}} has {{stars}} stars and {{issues}} open issues",
+			TitleEs:  "El repo {{name}} tiene {{stars}} estrellas y {{issues}} issues abiertos",
 			Resource: "https://api.github.com/search/repositories",
 			Request: models.Request{
 				Method: "GET",
@@ -240,7 +249,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "exchange_rate",
 			NameEn: "Exchange Rate", NameEs: "Cotización",
-			Title:    models.BoardPostItTitle{Text: "{{code}} at {{value}}", Vars: true},
+			TitleEn:  "{{code}} at {{value}}",
+			TitleEs:  "{{code}} a {{value}}",
 			Resource: "https://api.currencyapi.com/v3/latest",
 			Request: models.Request{
 				Method: "GET",
@@ -274,7 +284,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "gmail_inbox",
 			NameEn: "Gmail Inbox", NameEs: "Bandeja de Gmail",
-			Title:    models.BoardPostItTitle{Text: "You have {{unread}} new emails", Vars: true},
+			TitleEn:  "You have {{unread}} new emails",
+			TitleEs:  "Tenés {{unread}} mails nuevos",
 			Resource: "https://gmail.googleapis.com/gmail/v1/users/me/labels/INBOX",
 			Request: models.Request{
 				Method: "GET",
@@ -300,7 +311,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "google_calendar",
 			NameEn: "Google Calendar", NameEs: "Calendario de Google",
-			Title:    models.BoardPostItTitle{Text: "{{summary}} starts at {{start}}", Vars: true},
+			TitleEn:  "{{summary}} starts at {{start}}",
+			TitleEs:  "{{summary}} empieza a las {{start}}",
 			Resource: "https://www.googleapis.com/calendar/v3/calendars/primary/events",
 			Request: models.Request{
 				Method: "GET",
@@ -333,7 +345,8 @@ func Builtin() []models.WellKnown {
 		{
 			Key:    "nasa_apod",
 			NameEn: "NASA Picture of the Day", NameEs: "Foto del Día de la NASA",
-			Title:    models.BoardPostItTitle{Text: "Today's NASA's picture: {{title}}: {{explanation}}", Vars: true},
+			TitleEn:  "Today's NASA's picture: {{title}}: {{explanation}}",
+			TitleEs:  "La foto de hoy de la NASA: {{title}}: {{explanation}}",
 			Resource: "https://api.nasa.gov/planetary/apod",
 			Request: models.Request{
 				Method:  "GET",

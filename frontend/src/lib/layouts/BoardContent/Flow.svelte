@@ -92,11 +92,11 @@
 
 	// Recomputed only when the set of card types changes, not on every move.
 	const typeKeys = $derived(
-		[...new Set([...wellKnowns.list.map((wk) => wk.key), ...nodes.map((n) => n.type)])].join(',')
+		[...new Set([...wellKnowns.all.map((wk) => wk.key), ...nodes.map((n) => n.type)])].join(',')
 	);
 	const nodeTypes = $derived.by(() => {
 		void typeKeys;
-		return untrack(() => nodeTypesFor(wellKnowns.list, nodes.map((n) => n.type)));
+		return untrack(() => nodeTypesFor(wellKnowns.all, nodes.map((n) => n.type)));
 	});
 
 	const { screenToFlowPosition } = useSvelteFlow();

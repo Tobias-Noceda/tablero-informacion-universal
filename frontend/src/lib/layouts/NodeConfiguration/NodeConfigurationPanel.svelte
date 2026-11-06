@@ -180,6 +180,12 @@
         creatingTitle = '';
     };
 
+    function placeholder() {
+        // The card type's example title, in the UI's language.
+        const example = creatingNode ? wellKnowns.title(creatingNode.type) : '';
+        return example || m['card_title.placeholder']({ example: '{{value}}' });
+	}
+
     $effect(() => {
         if (currentPostIt) {
             originalConfig = {
@@ -230,7 +236,7 @@
         </div>
         <Input
             label={m['card_title.label']()}
-            placeholder={m['card_title.placeholder']({ example: '{{value}}' })}
+            placeholder={placeholder()}
             class="focus:*:ring-0! focus:border-red! focus:outline-none!"
             required
             bind:value={creatingTitle}

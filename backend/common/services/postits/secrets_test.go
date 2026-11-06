@@ -160,7 +160,7 @@ func TestExecutePostIt_InjectsTheStoredApiKey(t *testing.T) {
 		},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, executer.New(), secrets, access.New(nil), builtins())
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, executer.New(), secrets, access.New(nil), builtins(), nil)
 
 	data, err := svc.ExecutePostIt(postit)
 	if err != nil {
@@ -222,7 +222,7 @@ func TestExecutePostIt_MissingSecretIsNotSubstituted(t *testing.T) {
 		Query:    map[string]string{"value": ".data[].value"},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, executer.New(), &mocks.MockSecretResolver{}, access.New(nil), builtins())
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, executer.New(), &mocks.MockSecretResolver{}, access.New(nil), builtins(), nil)
 
 	if _, err := svc.ExecutePostIt(postit); err == nil {
 		t.Fatal("expected an error when the provider rejects the credential")

@@ -29,7 +29,8 @@ type MongoDB struct {
 	groups   *mongo.Collection
 	orgs     *mongo.Collection
 
-	wellKnowns *mongo.Collection
+	wellKnowns       *mongo.Collection
+	customWellKnowns *mongo.Collection
 
 	accessTokens *mongo.Collection
 }
@@ -74,6 +75,7 @@ func New() (*MongoDB, error) {
 	db.orgs = db.client.Database(name).Collection("orgs")
 	db.accessTokens = db.client.Database(name).Collection("access_tokens")
 	db.wellKnowns = db.client.Database(name).Collection("well_knowns")
+	db.customWellKnowns = db.client.Database(name).Collection("custom_well_knowns")
 
 	return db, nil
 }
@@ -106,6 +108,10 @@ func (db *MongoDB) EnsureIndexes() error {
 	}
 
 	if err := db.ensureAccessTokenIndexes(); err != nil {
+		return err
+	}
+
+	if err := db.ensureCustomWellKnownIndexes(); err != nil {
 		return err
 	}
 
@@ -255,8 +261,11 @@ func (db *MongoDB) DeleteBoard(id uuid.UUID) error {
 		return err
 	}
 
-	_, err = db.boards.DeleteOne(ctx, bson.M{"_id": id})
-	return err
+	if _, err = db.boards.DeleteOne(ctx, bson.M{"_id": id}); err != nil {
+		return err
+	}
+
+	return db.purgeCustomWellKnowns(models.CustomWellKnownScope{Kind: models.CustomScopeBoard, Owner: id.String()})
 }
 
 func (db *MongoDB) UpdatePostIt(id uuid.UUID, set map[string]any) error {

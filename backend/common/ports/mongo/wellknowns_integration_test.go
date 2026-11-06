@@ -18,7 +18,8 @@ func TestMongo_WellKnownsSeedAndTombstones(t *testing.T) {
 	def := "x"
 	seed := models.WellKnown{
 		Key: key, NameEn: "Seeded", NameEs: "Sembrado", Builtin: true, Order: 5,
-		Title:      models.BoardPostItTitle{Text: "{{text}}", Vars: true},
+		TitleEn:    "{{text}}",
+		TitleEs:    "{{text}}",
 		Parameters: []models.WellKnownParameter{{Key: "text", LabelEn: "Text", LabelEs: "Texto", Type: models.ParameterString, Default: &def}},
 		Outputs:    []models.WellKnownOutput{{Key: "text", LabelEn: "Text", LabelEs: "Texto", ExampleEn: "a", ExampleEs: 1.5}},
 	}
