@@ -40,6 +40,9 @@ type PostItsService struct {
 // CustomWellKnowns answers which user-defined card type a new card on a
 // board may be made from.
 type CustomWellKnowns interface {
+	// Usable is the definition a new card on boardID is made from, if the
+	// principal may use it there. Whether they may edit the board is the
+	// post-its service's call.
 	Usable(principal models.Principal, board uuid.UUID, key string) (*models.WellKnown, error)
 }
 
@@ -166,7 +169,7 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 func touchesCredentials(set map[string]any) bool {
 	_, params := set["params"]
 	_, bindings := set["bindings"]
-	// A one-off card's headers and queries can name "$TOKEN"s too.
+
 	_, request := set["request"]
 	return params || bindings || request
 }

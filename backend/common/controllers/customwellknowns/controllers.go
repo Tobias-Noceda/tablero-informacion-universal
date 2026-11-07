@@ -21,8 +21,6 @@ func NewController(service *srv.Service) *Controller {
 	return &Controller{service}
 }
 
-// Request is what a client sends to create or replace a custom card type:
-// the key, scope and stamps are the server's.
 type Request struct {
 	Name        string                            `json:"name"`
 	Description string                            `json:"description"`

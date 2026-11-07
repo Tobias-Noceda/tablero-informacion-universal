@@ -3,7 +3,6 @@ package postits
 import (
 	"errors"
 	"net/http"
-	"net/url"
 
 	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/infrastructure"
@@ -56,23 +55,11 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		return
 	}
 
-	var resource *url.URL
-	if req.Resource != "" {
-		parsed, err := url.Parse(req.Resource)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": srv.ErrInvalidOneOff.Error(),
-			})
-			return
-		}
-		resource = parsed
-	}
-
 	newPostIt := &models.PostIts{
 		Board:     req.Board,
 		WellKnown: req.WellKnown,
 		Params:    req.Params,
-		Resource:  resource,
+		Resource:  req.Resource.URL,
 		Request:   req.Request,
 		Response:  req.Response,
 		Query:     req.Query,

@@ -163,9 +163,6 @@ func (srv *Service) ForBoard(principal models.Principal, boardID uuid.UUID) ([]B
 	return result, nil
 }
 
-// Usable is the definition a new card on boardID is made from, if the
-// principal may use it there. Whether they may edit the board is the
-// post-its service's call.
 func (srv *Service) Usable(principal models.Principal, boardID uuid.UUID, key string) (*models.WellKnown, error) {
 	c, err := srv.find(key)
 	if err != nil {
