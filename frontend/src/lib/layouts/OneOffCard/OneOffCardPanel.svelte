@@ -91,21 +91,21 @@
 	function describe(problem: OneOffProblem) {
 		switch (problem.code) {
 			case 'resource':
-				return m['custom_wk.err_resource']();
+				return m['postit_templates.err_resource']();
 			case 'outputs':
-				return m['custom_wk.err_outputs']();
+				return m['postit_templates.err_outputs']();
 			case 'output_key':
-				return m['custom_wk.err_output_key']();
+				return m['postit_templates.err_output_key']();
 			case 'output_query':
-				return m['custom_wk.err_output_query']();
+				return m['postit_templates.err_output_query']();
 			case 'row_key':
 				return m['one_off.err_row_key']();
 			case 'credential':
 				return m['one_off.err_credential']();
 			case 'duplicate':
-				return m['custom_wk.err_duplicate']({ key: problem.value });
+				return m['postit_templates.err_duplicate']({ key: problem.value });
 			case 'title':
-				return m['custom_wk.err_title']({ syntax: '{{name}}' });
+				return m['postit_templates.err_title']({ syntax: '{{name}}' });
 		}
 	}
 
@@ -141,7 +141,8 @@
 			}
 		} catch (e) {
 			error = m['one_off.error']({
-				detail: e instanceof postItsApi.PostItError ? e.message : m['custom_wk.error_generic']()
+				detail:
+					e instanceof postItsApi.PostItError ? e.message : m['postit_templates.error_generic']()
 			});
 		} finally {
 			saving = false;
@@ -153,8 +154,8 @@
 	<button
 		type="button"
 		class="shrink-0 cursor-pointer rounded-md p-1 hover:bg-background-hover"
-		aria-label={m['custom_wk.remove']()}
-		title={m['custom_wk.remove']()}
+		aria-label={m['postit_templates.remove']()}
+		title={m['postit_templates.remove']()}
 		{onclick}
 	>
 		<Icon name="trash" class="h-4 w-4 mx-1 -mt-0.5 text-destructive!" />
@@ -169,7 +170,7 @@
 			<div class="flex items-center gap-1">
 				<input
 					class={fieldClass + ' flex-1'}
-					placeholder={m['custom_wk.key']()}
+					placeholder={m['postit_templates.key']()}
 					bind:value={row.key}
 				/>
 				{#if row.credential}
@@ -197,7 +198,7 @@
 				{:else}
 					<input
 						class={fieldClass + ' flex-1'}
-						placeholder={m['custom_wk.value']()}
+						placeholder={m['postit_templates.value']()}
 						bind:value={row.value}
 					/>
 				{/if}
@@ -217,7 +218,7 @@
 			class="self-start px-2 py-0.5 text-xs"
 			onclick={() => rows.push({ key: '', value: '', credential: false, secret: '' })}
 		>
-			{m['custom_wk.add_row']()}
+			{m['postit_templates.add_row']()}
 		</Button>
 	</fieldset>
 {/snippet}
@@ -238,7 +239,7 @@
 
 	<div class="flex flex-col gap-3 border-t border-main-border pt-3">
 		<Input
-			label={m['custom_wk.resource']()}
+			label={m['postit_templates.resource']()}
 			labelClass="font-semibold"
 			placeholder="https://api.example.com/v1/data"
 			bind:value={draft.resource}
@@ -246,7 +247,7 @@
 		/>
 		<div class="flex gap-2">
 			<label class="flex flex-1 flex-col gap-1 text-sm">
-				<span class="font-semibold">{m['custom_wk.response']()}</span>
+				<span class="font-semibold">{m['postit_templates.response']()}</span>
 				<Dropdown
 					bind:value={draft.response}
 					options={['json', 'html'].map((response) => ({
@@ -269,7 +270,7 @@
 				/>
 			</label>
 			<label class="flex flex-1 flex-col gap-1 text-sm">
-				<span class="font-semibold">{m['custom_wk.rate']()}</span>
+				<span class="font-semibold">{m['postit_templates.rate']()}</span>
 				<input
 					class={cn(fieldClass, 'px-2 py-1.5')}
 					type="number"
@@ -278,13 +279,21 @@
 				/>
 			</label>
 		</div>
-		<p class="text-xs opacity-70">{m['custom_wk.rate_hint']()}</p>
+		<p class="text-xs opacity-70">{m['postit_templates.rate_hint']()}</p>
 
-		{@render rowsEditor(m['custom_wk.queries'](), m['one_off.request_hint'](), draft.queries)}
-		{@render rowsEditor(m['custom_wk.headers'](), m['one_off.request_hint'](), draft.headers)}
+		{@render rowsEditor(
+			m['postit_templates.queries'](),
+			m['one_off.request_hint'](),
+			draft.queries
+		)}
+		{@render rowsEditor(
+			m['postit_templates.headers'](),
+			m['one_off.request_hint'](),
+			draft.headers
+		)}
 
 		<fieldset class="flex flex-col gap-1">
-			<legend class="text-sm font-semibold">{m['custom_wk.outputs']()}</legend>
+			<legend class="text-sm font-semibold">{m['postit_templates.outputs']()}</legend>
 			<p class="text-xs opacity-70">
 				{m['one_off.outputs_hint']({ example: '.data.temperature' })}
 			</p>
@@ -293,12 +302,12 @@
 					<div class="flex items-center gap-1">
 						<input
 							class={fieldClass + ' w-28 font-mono'}
-							placeholder={m['custom_wk.field_name']()}
+							placeholder={m['postit_templates.field_name']()}
 							bind:value={output.key}
 						/>
 						<input
 							class={fieldClass + ' flex-1 font-mono'}
-							placeholder={m['custom_wk.query']()}
+							placeholder={m['postit_templates.query']()}
 							bind:value={output.query}
 						/>
 						{@render removeButton(() => draft.outputs.splice(i, 1))}
@@ -310,7 +319,7 @@
 				class="self-start px-2 py-0.5 text-xs"
 				onclick={() => draft.outputs.push({ key: '', query: '' })}
 			>
-				{m['custom_wk.add_output']()}
+				{m['postit_templates.add_output']()}
 			</Button>
 		</fieldset>
 

@@ -1,26 +1,26 @@
-import type { BoardWellKnown, CustomWellKnown, WellKnown } from '$types/api';
+import type { BoardPostitTemplate, PostitTemplate, WellKnown } from '$types/api';
 
-// Custom card types come after the whole catalogue in the picker.
-export const CUSTOM_ORDER = 1_000_000;
+// Post-it templates come after the whole catalogue in the picker.
+export const TEMPLATE_ORDER = 1_000_000;
 
-// A custom card type in the catalogue's shape, its one language in both, so
+// A post-it template in the catalogue's shape, its one language in both, so
 // every component that renders a well-known renders it too.
-export function toWellKnown(custom: CustomWellKnown | BoardWellKnown): WellKnown {
+export function toWellKnown(template: PostitTemplate | BoardPostitTemplate): WellKnown {
 	return {
-		key: custom.key,
-		name_en: custom.name,
-		name_es: custom.name,
-		description_en: custom.description || undefined,
-		description_es: custom.description || undefined,
-		order: CUSTOM_ORDER,
-		title_en: custom.title.text,
-		title_es: custom.title.text,
-		resource: custom.resource,
-		request: custom.request,
-		response: custom.response,
-		query: custom.query,
-		rate: custom.rate,
-		parameters: (custom.parameters ?? []).map((p) => ({
+		key: template.key,
+		name_en: template.name,
+		name_es: template.name,
+		description_en: template.description || undefined,
+		description_es: template.description || undefined,
+		order: TEMPLATE_ORDER,
+		title_en: template.title.text,
+		title_es: template.title.text,
+		resource: template.resource,
+		request: template.request,
+		response: template.response,
+		query: template.query,
+		rate: template.rate,
+		parameters: (template.parameters ?? []).map((p) => ({
 			key: p.key,
 			label_en: p.label,
 			label_es: p.label,
@@ -29,7 +29,7 @@ export function toWellKnown(custom: CustomWellKnown | BoardWellKnown): WellKnown
 			placeholder_es: p.placeholder,
 			default: p.default
 		})),
-		outputs: (custom.outputs ?? []).map((o) => ({
+		outputs: (template.outputs ?? []).map((o) => ({
 			key: o.key,
 			label_en: o.label,
 			label_es: o.label,
@@ -37,9 +37,9 @@ export function toWellKnown(custom: CustomWellKnown | BoardWellKnown): WellKnown
 			example_es: o.example
 		})),
 		builtin: false,
-		updated_at: custom.updated_at,
-		updated_by: custom.updated_by,
-		scope: custom.scope,
-		usable: 'usable' in custom ? custom.usable : true
+		updated_at: template.updated_at,
+		updated_by: template.updated_by,
+		scope: template.scope,
+		usable: 'usable' in template ? template.usable : true
 	};
 }

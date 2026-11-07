@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { BoardWellKnown } from '$types/api';
-import { CUSTOM_ORDER, toWellKnown } from './normalize';
+import type { BoardPostitTemplate } from '$types/api';
+import { TEMPLATE_ORDER, toWellKnown } from './normalize';
 
-const custom: BoardWellKnown = {
+const template: BoardPostitTemplate = {
 	key: 'custom_abc',
 	scope: { kind: 'user', owner: 'ana' },
 	name: 'Dato de gato',
@@ -24,7 +24,7 @@ const custom: BoardWellKnown = {
 
 describe('toWellKnown', () => {
 	it('copies its one language into both', () => {
-		const wk = toWellKnown(custom);
+		const wk = toWellKnown(template);
 		expect(wk.name_en).toBe('Dato de gato');
 		expect(wk.name_es).toBe('Dato de gato');
 		expect(wk.title_en).toBe('{{fact}}');
@@ -53,15 +53,15 @@ describe('toWellKnown', () => {
 	});
 
 	it('keeps where it comes from and sorts after the catalogue', () => {
-		const wk = toWellKnown(custom);
+		const wk = toWellKnown(template);
 		expect(wk.scope).toEqual({ kind: 'user', owner: 'ana' });
 		expect(wk.usable).toBe(false);
 		expect(wk.builtin).toBe(false);
-		expect(wk.order).toBe(CUSTOM_ORDER);
+		expect(wk.order).toBe(TEMPLATE_ORDER);
 	});
 
 	it('treats a type without a board as usable and tolerates null lists', () => {
-		const plain: Omit<BoardWellKnown, 'usable'> & { usable?: boolean } = { ...custom };
+		const plain: Omit<BoardPostitTemplate, 'usable'> & { usable?: boolean } = { ...template };
 		delete plain.usable;
 		const wk = toWellKnown({ ...plain, parameters: null, outputs: null });
 		expect(wk.usable).toBe(true);

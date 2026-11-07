@@ -47,11 +47,11 @@
       {#snippet tooltipContent()}
         {wk[`name_${getLocale()}`]}{#if description}: {description}{/if}
         {#if wk.scope}
-          ({m[`custom_wk.scope_${wk.scope.kind}`]()})
+          ({m[`postit_templates.scope_${wk.scope.kind}`]()})
         {/if}
       {/snippet}
       {#if wk.scope}
-        <span class="mr-1 rounded bg-white/20 px-1 text-[10px] uppercase">{m[`custom_wk.badge_${wk.scope.kind}`]()}</span>
+        <span class="mr-1 rounded bg-white/20 px-1 text-[10px] uppercase">{m[`postit_templates.badge_${wk.scope.kind}`]()}</span>
       {/if}
       {wk[`name_${getLocale()}`]}
     </SidebarElement>

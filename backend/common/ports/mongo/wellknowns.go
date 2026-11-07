@@ -65,9 +65,8 @@ func (db *MongoDB) RestoreWellKnown(key string) error {
 		return err
 	}
 
-	// Tell a live definition from a missing one.
-	if _, findErr := db.FindWellKnown(key); findErr != nil {
-		return findErr
+	if _, err = db.FindWellKnown(key); err != nil {
+		return err
 	}
 	return infrastructure.ErrWellKnownNotDeleted
 }

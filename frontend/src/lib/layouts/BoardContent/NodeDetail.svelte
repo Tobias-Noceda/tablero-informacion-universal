@@ -140,7 +140,7 @@
 			],
 			m['node_detail.no_configuration']()
 		)}
-		<!-- {#each [[m['custom_wk.queries'](), s.request?.queries], [m['custom_wk.headers'](), s.request?.headers]] as const as [label, values] (label)}
+		<!-- {#each [[m['postit_templates.queries'](), s.request?.queries], [m['postit_templates.headers'](), s.request?.headers]] as const as [label, values] (label)}
 			{#if values && Object.keys(values).length > 0}
 				<div class="flex flex-col gap-1">
 					<h4 class="font-semibold text-sm">{label}</h4>

@@ -23,7 +23,7 @@
 	import { refreshBoards } from '$stores/boards';
 
 	import ShareDialog from '$layouts/Share/ShareDialog.svelte';
-	import CustomWellKnownsPanel from '$layouts/CustomWellKnowns/CustomWellKnownsPanel.svelte';
+	import PostitTemplatesPanel from '$layouts/PostitTemplates/PostitTemplatesPanel.svelte';
 	import SideBar from '$layouts/Sidebar/SideBar.svelte';
 	import Flow from './Flow.svelte';
 	import { nodeType } from '$lib/well-knowns/one-off';
@@ -96,7 +96,7 @@
 {/if}
 
 {#if $isManagingCardTypes}
-	<CustomWellKnownsPanel {boardId} {orgId} {role} onclose={() => setManagingCardTypes(false)} />
+	<PostitTemplatesPanel {boardId} {orgId} {role} onclose={() => setManagingCardTypes(false)} />
 {/if}
 
 {#if $isConfiguringBoard}

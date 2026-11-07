@@ -107,3 +107,24 @@ func TestEditPostIt_CardTypeRequestIsFixed(t *testing.T) {
 		t.Errorf("status = %d, want 400", w.Code)
 	}
 }
+
+func TestCreatePostIt_OneOffRefusesAMalformedResource(t *testing.T) {
+	db := &mocks.MockDB{
+		CreatePostItFn: func(*models.PostIts, models.BoardPostItTitle, string, models.Position) (*models.PostIts, error) {
+			t.Error("stored anyway")
+			return nil, nil
+		},
+	}
+	r := setupRouter(db, nil, nil)
+
+	for name, resource := range map[string]string{
+		"bad escape": "https://example.com/%zz",
+		"missing":    "",
+		"not http":   "file:///etc/passwd",
+	} {
+		w := do(r, http.MethodPost, "/post-its", oneOffBody(uuid.New(), resource, "GET", `{"fact":".fact"}`))
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("%s: status = %d, want 400", name, w.Code)
+		}
+	}
+}
