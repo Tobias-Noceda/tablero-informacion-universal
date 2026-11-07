@@ -85,14 +85,14 @@
 	class="flex flex-row bg-main items-center justify-between border-b border-main-border px-2 py-1 z-100!"
 >
 	<button
-		class="flex flex-row items-center gap-4 cursor-pointer"
+		class="flex shrink-0 flex-row items-center gap-4 cursor-pointer"
 		onclick={() => {
 			setSidebar(null);
 			// Off a board or landing, back to the organization last opened.
 			goto(resolve(landingPath(showsBoards ? orgId : orgs.last)));
 		}}
 	>
-		<img src={logo} alt="Corcheria Company" class="logo" />
+		<img src={logo} alt="Corcheria Company" class="h-auto w-28 md:w-45" />
 	</button>
 	<div class="flex flex-row items-center gap-3">
 		{#if showsBoards}
@@ -121,13 +121,13 @@
 	</div>
 
 	{#if session.user}
-		<div class="relative flex w-fit flex-col gap-1">
+		<div class="relative flex w-fit min-w-0 max-w-[45vw] flex-col gap-1 md:max-w-none">
 			<button
 				class={cn(
-					'relative flex flex-row items-center gap-2',
-					'px-4 py-2 rounded-md',
+					'relative flex min-w-0 flex-row items-center gap-1 md:gap-2',
+					'px-2 py-1 md:px-4 md:py-2 rounded-md',
 					'hover:bg-main-hover transition-colors',
-					'text-main-text text-sm font-medium',
+					'text-main-text text-xs md:text-sm font-medium',
 					'focus:outline-none focus:ring-none',
 					'cursor-pointer',
 					userDataOpen ? 'bg-main-hover' : ''
@@ -143,15 +143,18 @@
 					userDataOpen = !userDataOpen;
 				}}
 			>
-				<span class="max-w-40 truncate">{session.user.name}</span>
-				<Avatar src={session.user.picture} class="w-6 h-6" />
-				<Icon name={userDataOpen ? 'chevron-up' : 'chevron-down'} class="w-4 h-4 text-main-text" />
+				<span class="min-w-0 max-w-40 truncate">{session.user.name}</span>
+				<Avatar src={session.user.picture} class="h-5 w-5 shrink-0 md:h-6 md:w-6" />
+				<Icon
+						name={userDataOpen ? 'chevron-up' : 'chevron-down'}
+						class="h-3 w-3 shrink-0 text-main-text md:h-4 md:w-4"
+					/>
 			</button>
 
 			{#if userDataOpen}
 				<div
 					role="menu"
-					class={cn(dropdownClass, 'left-0 top-full w-full')}
+					class={cn(dropdownClass, 'right-0 top-full w-full min-w-48')}
 					use:clickOutside={() => {
 						clickedOutside = true;
 						userDataOpen = false;
@@ -231,10 +234,3 @@
 		<LocaleSwitcher />
 	{/if}
 </div>
-
-<style>
-	.logo {
-		width: 180px;
-		height: auto;
-	}
-</style>
