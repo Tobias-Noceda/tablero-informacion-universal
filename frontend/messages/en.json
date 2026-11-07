@@ -180,7 +180,9 @@
 	"header": {
 		"profile": "Profile",
 		"logout": "Sign out",
-		"menu": "Account menu"
+		"menu": "Account menu",
+		"navigation": "Boards and organizations",
+		"members": "People on this board"
 	},
 	"members": {
 		"share": "Share",
