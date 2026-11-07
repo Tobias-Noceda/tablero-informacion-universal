@@ -1,14 +1,14 @@
 import { analyzeTitle } from '$lib/title';
-import type { CustomWellKnown, CustomWellKnownBody, CustomWellKnownParameter } from '$types/api';
+import type { PostitTemplate, PostitTemplateBody, PostitTemplateParameter } from '$types/api';
 
-// The custom card type form's state, and what it sends. Kept apart from the
+// The post-it template form's state, and what it sends. Kept apart from the
 // component so the rules the backend enforces can be mirrored and tested.
 
 export type Row = { key: string; value: string };
 export type ParameterRow = {
 	key: string;
 	label: string;
-	type: CustomWellKnownParameter['type'];
+	type: PostitTemplateParameter['type'];
 	placeholder: string;
 	default: string;
 };
@@ -50,33 +50,33 @@ const rows = (record: Record<string, string> | null | undefined): Row[] =>
 const record = (list: Row[]) =>
 	Object.fromEntries(list.filter((r) => r.key.trim()).map((r) => [r.key.trim(), r.value.trim()]));
 
-export function draftFrom(custom: CustomWellKnown): Draft {
+export function draftFrom(template: PostitTemplate): Draft {
 	return {
-		name: custom.name,
-		description: custom.description ?? '',
-		resource: custom.resource,
-		response: custom.response,
-		rate: custom.rate,
-		headers: rows(custom.request.headers),
-		queries: rows(custom.request.queries),
-		parameters: (custom.parameters ?? []).map((p) => ({
+		name: template.name,
+		description: template.description ?? '',
+		resource: template.resource,
+		response: template.response,
+		rate: template.rate,
+		headers: rows(template.request.headers),
+		queries: rows(template.request.queries),
+		parameters: (template.parameters ?? []).map((p) => ({
 			key: p.key,
 			label: p.label,
 			type: p.type,
 			placeholder: p.placeholder ?? '',
 			default: p.default ?? ''
 		})),
-		outputs: (custom.outputs ?? []).map((o) => ({
+		outputs: (template.outputs ?? []).map((o) => ({
 			key: o.key,
 			label: o.label,
-			query: custom.query?.[o.key] ?? '',
+			query: template.query?.[o.key] ?? '',
 			example: o.example === undefined || o.example === null ? '' : String(o.example)
 		})),
-		title: custom.title.text
+		title: template.title.text
 	};
 }
 
-export function bodyOf(draft: Draft): CustomWellKnownBody {
+export function bodyOf(draft: Draft): PostitTemplateBody {
 	const outputs = draft.outputs.map((o) => ({ ...o, key: o.key.trim() }));
 	const title = draft.title.trim();
 	return {

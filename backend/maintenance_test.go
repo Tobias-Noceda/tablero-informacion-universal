@@ -111,6 +111,11 @@ type schemaSpy struct {
 	seeded   []models.WellKnown
 }
 
+func (s *schemaSpy) RenameLegacyCollections() error {
+	s.steps = append(s.steps, "rename")
+	return nil
+}
+
 func (s *schemaSpy) EnsureIndexes() error {
 	s.steps = append(s.steps, "indexes")
 	return s.indexErr
@@ -135,14 +140,14 @@ func TestMaintenance_MigrateIsNotAKeyCommand(t *testing.T) {
 	}
 }
 
-func TestMaintenance_MigrateIndexesThenSeeds(t *testing.T) {
+func TestMaintenance_MigrateRenamesThenIndexesThenSeeds(t *testing.T) {
 	spy := &schemaSpy{}
 
 	if err := migrate(spy); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	if strings.Join(spy.steps, ",") != "indexes,seed" {
-		t.Errorf("steps = %v, want indexes then seed", spy.steps)
+	if strings.Join(spy.steps, ",") != "rename,indexes,seed" {
+		t.Errorf("steps = %v, want rename, indexes, then seed", spy.steps)
 	}
 	if len(spy.seeded) == 0 {
 		t.Error("no built-in well-known was seeded")
@@ -155,7 +160,7 @@ func TestMaintenance_MigrateStopsWhenIndexesFail(t *testing.T) {
 	if err := migrate(spy); err == nil {
 		t.Fatal("a failed index went unnoticed")
 	}
-	if strings.Join(spy.steps, ",") != "indexes" {
+	if strings.Join(spy.steps, ",") != "rename,indexes" {
 		t.Errorf("steps = %v, seeded after a failed index", spy.steps)
 	}
 }

@@ -53,9 +53,9 @@ type WellKnown struct {
 	UpdatedAt time.Time `bson:"updated_at,omitempty" json:"updated_at,omitzero"`
 	UpdatedBy string    `bson:"updated_by,omitempty" json:"updated_by,omitempty"`
 
-	// custom marks a CustomWellKnown seen through AsWellKnown, the only
+	// template marks a PostitTemplate seen through AsWellKnown, the only
 	// definition allowed a custom_ key.
-	custom bool
+	template bool
 }
 
 type WellKnownParameterType string
@@ -146,8 +146,8 @@ func (wk WellKnown) Validate() error {
 	if !wellKnownKey.MatchString(wk.Key) {
 		return fmt.Errorf("key must match %s", wellKnownKey)
 	}
-	if IsCustomWellKnownKey(wk.Key) && !wk.custom {
-		return fmt.Errorf("keys starting with %q are reserved for custom card types", CustomWellKnownPrefix)
+	if IsPostitTemplateKey(wk.Key) && !wk.template {
+		return fmt.Errorf("keys starting with %q are reserved for post-it templates", PostitTemplatePrefix)
 	}
 	if strings.TrimSpace(wk.NameEn) == "" || strings.TrimSpace(wk.NameEs) == "" {
 		return errors.New("name_en and name_es are required")

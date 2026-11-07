@@ -8,7 +8,7 @@
 	let props: NodeProps = $props();
 
 	// A well-known without a hand-made card: each output, labelled. A card
-	// whose custom type was deleted has no labels left, so it shows what it
+	// whose template was deleted has no labels left, so it shows what it
 	// answered as is.
 	const known = $derived(!!wellKnowns.byKey(props.type));
 	const outputs = $derived(wellKnowns.outputs(props.type));

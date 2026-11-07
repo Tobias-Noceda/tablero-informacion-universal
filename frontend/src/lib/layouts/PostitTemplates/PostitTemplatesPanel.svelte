@@ -4,12 +4,12 @@
 	import { m } from '$lib/paraglide/messages';
 	import { cn } from '$lib/utils';
 	import { session } from '$modules/session.svelte';
-	import * as customApi from '$services/custom-well-knowns';
+	import * as templatesApi from '$services/postit-templates';
 	import { orgs } from '$stores/org.svelte';
 	import { wellKnowns } from '$stores/well-knowns.svelte';
 	import { draftFrom, emptyDraft, type Draft } from '$lib/well-knowns/draft';
-	import type { BoardRole, CustomWellKnown, CustomWellKnownBody, UUID } from '$types/api';
-	import CustomWellKnownForm from './CustomWellKnownForm.svelte';
+	import type { BoardRole, PostitTemplate, PostitTemplateBody, UUID } from '$types/api';
+	import PostitTemplateForm from './PostitTemplateForm.svelte';
 
 	interface Props {
 		boardId: UUID;
@@ -46,10 +46,10 @@
 
 	const scope = $derived(
 		tab === 'user'
-			? customApi.userScope(session.userId ?? '')
+			? templatesApi.userScope(session.userId ?? '')
 			: tab === 'board'
-				? customApi.boardScope(boardId)
-				: customApi.orgScope(org)
+				? templatesApi.boardScope(boardId)
+				: templatesApi.orgScope(org)
 	);
 	// Who may change what the tab lists; the backend checks it again.
 	const canManage = $derived(
@@ -58,11 +58,11 @@
 			(tab === 'org' && orgs.byId(org)?.role === 'admin')
 	);
 
-	let list = $state<CustomWellKnown[]>([]);
+	let list = $state<PostitTemplate[]>([]);
 	let loading = $state(true);
 	let error = $state('');
 	// null: nothing open; 'new': a new one; otherwise the one being edited.
-	let editing = $state<CustomWellKnown | 'new' | null>(null);
+	let editing = $state<PostitTemplate | 'new' | null>(null);
 	// A new card type being written. Kept across tabs: it is created in
 	// whichever scope is shown when it is saved.
 	let newDraft = $state<Draft>(emptyDraft());
@@ -72,9 +72,9 @@
 		editing = 'new';
 	}
 
-	function startEdit(custom: CustomWellKnown) {
-		editDraft = draftFrom(custom);
-		editing = custom;
+	function startEdit(template: PostitTemplate) {
+		editDraft = draftFrom(template);
+		editing = template;
 	}
 
 	function close(created: boolean) {
@@ -83,12 +83,12 @@
 	}
 
 	function explain(e: unknown) {
-		if (e instanceof customApi.CustomWellKnownError) {
-			if (e.code === 'limit_reached') return m['custom_wk.error_limit']();
-			if (e.code === 'invalid_well_known')
-				return m['custom_wk.error_invalid']({ detail: e.detail ?? '' });
+		if (e instanceof templatesApi.PostitTemplateError) {
+			if (e.code === 'limit_reached') return m['postit_templates.error_limit']();
+			if (e.code === 'invalid_postit_template')
+				return m['postit_templates.error_invalid']({ detail: e.detail ?? '' });
 		}
-		return m['custom_wk.error_generic']();
+		return m['postit_templates.error_generic']();
 	}
 
 	async function refresh() {
@@ -97,7 +97,7 @@
 		loading = true;
 		error = '';
 		try {
-			const found = await customApi.list(scope);
+			const found = await templatesApi.list(scope);
 			if (asked === tab) list = found;
 		} catch (e) {
 			if (asked !== tab) return;
@@ -108,11 +108,11 @@
 		}
 	}
 
-	async function save(body: CustomWellKnownBody) {
+	async function save(body: PostitTemplateBody) {
 		error = '';
 		try {
-			if (editing === 'new') await customApi.create(scope, body);
-			else if (editing) await customApi.update(editing.key, body);
+			if (editing === 'new') await templatesApi.create(scope, body);
+			else if (editing) await templatesApi.update(editing.key, body);
 			close(true);
 			await Promise.all([refresh(), wellKnowns.refreshBoard()]);
 		} catch (e) {
@@ -120,11 +120,11 @@
 		}
 	}
 
-	async function remove(custom: CustomWellKnown) {
-		if (!confirm(m['custom_wk.confirm_delete']({ name: custom.name }))) return;
+	async function remove(template: PostitTemplate) {
+		if (!confirm(m['postit_templates.confirm_delete']({ name: template.name }))) return;
 		error = '';
 		try {
-			await customApi.remove(custom.key);
+			await templatesApi.remove(template.key);
 			await Promise.all([refresh(), wellKnowns.refreshBoard()]);
 		} catch (e) {
 			error = explain(e);
@@ -147,7 +147,7 @@
 
 	// Where saving a new one puts it, in the tab's words.
 	function where() {
-		return tab === 'org' ? (orgs.byId(org)?.name ?? '') : m[`custom_wk.tab_${tab}`]();
+		return tab === 'org' ? (orgs.byId(org)?.name ?? '') : m[`postit_templates.tab_${tab}`]();
 	}
 
 	refresh();
@@ -157,10 +157,10 @@
 	{onclose}
 	withCloseButton={false}
 	onaccept={onclose}
-	acceptText={m['custom_wk.close']()}
+	acceptText={m['postit_templates.close']()}
 	dialogClass={cn("max-w-2xl max-h-[90vh] overflow-y-auto", scrollClass)}
 >
-	<h2 class="text-lg font-semibold">{m['custom_wk.title']()}</h2>
+	<h2 class="text-lg font-semibold">{m['postit_templates.title']()}</h2>
 
 	<div class="flex gap-1 border-b border-main-border" role="tablist">
 		{#each tabs as key (key)}
@@ -174,13 +174,13 @@
 				)}
 				onclick={() => show(key)}
 			>
-				{m[`custom_wk.tab_${key}`]()}
+				{m[`postit_templates.tab_${key}`]()}
 			</button>
 		{/each}
 	</div>
 	{#if tab === 'org'}
 		<label class="flex flex-col gap-1 text-sm">
-			<span class="font-semibold">{m['custom_wk.org_pick']()}</span>
+			<span class="font-semibold">{m['postit_templates.org_pick']()}</span>
 			<select
 				class="rounded-md border border-main-border bg-background px-2 py-1"
 				value={org}
@@ -192,44 +192,44 @@
 			</select>
 		</label>
 		{#if org !== orgId}
-			<p class="text-xs opacity-70">{m['custom_wk.org_elsewhere']()}</p>
+			<p class="text-xs opacity-70">{m['postit_templates.org_elsewhere']()}</p>
 		{/if}
 	{/if}
-	<p class="text-xs opacity-70">{m[`custom_wk.hint_${tab}`]()}</p>
+	<p class="text-xs opacity-70">{m[`postit_templates.hint_${tab}`]()}</p>
 
 	{#if error}
 		<p class="text-sm text-destructive">{error}</p>
 	{/if}
 
 	{#if loading}
-		<p class="text-sm opacity-70">{m['custom_wk.loading']()}</p>
+		<p class="text-sm opacity-70">{m['postit_templates.loading']()}</p>
 	{:else if list.length === 0}
-		<p class="text-sm opacity-70">{m['custom_wk.empty']()}</p>
+		<p class="text-sm opacity-70">{m['postit_templates.empty']()}</p>
 	{:else}
 		<ul class="flex flex-col gap-2">
-			{#each list as custom (custom.key)}
+			{#each list as template (template.key)}
 				<li
 					class="flex items-center justify-between gap-2 rounded-md border border-main-border px-3 py-2"
 				>
 					<div class="flex min-w-0 flex-col">
-						<span class="truncate text-sm font-semibold">{custom.name}</span>
-						<span class="truncate text-xs opacity-60">{custom.resource}</span>
+						<span class="truncate text-sm font-semibold">{template.name}</span>
+						<span class="truncate text-xs opacity-60">{template.resource}</span>
 					</div>
 					{#if canManage}
 						<div class="flex shrink-0 gap-2">
 							<Button
 								variant="secondary"
 								class="px-2 py-1 text-xs"
-								onclick={() => startEdit(custom)}
+								onclick={() => startEdit(template)}
 							>
-								{m['custom_wk.edit']()}
+								{m['postit_templates.edit']()}
 							</Button>
 							<Button
 								variant="destructive"
 								class="px-2 py-1 text-xs"
-								onclick={() => remove(custom)}
+								onclick={() => remove(template)}
 							>
-								{m['custom_wk.delete']()}
+								{m['postit_templates.delete']()}
 							</Button>
 						</div>
 					{/if}
@@ -239,20 +239,20 @@
 	{/if}
 
 	{#if !canManage}
-		<p class="text-xs opacity-70">{m['custom_wk.read_only']()}</p>
+		<p class="text-xs opacity-70">{m['postit_templates.read_only']()}</p>
 		{#if editing === 'new'}
-			<p class="text-xs opacity-70">{m['custom_wk.draft_kept']()}</p>
+			<p class="text-xs opacity-70">{m['postit_templates.draft_kept']()}</p>
 		{/if}
 	{:else if editing === null}
 		<Button variant="primary" class="self-start" onclick={startNew}>
-			{m['custom_wk.new']()}
+			{m['postit_templates.new']()}
 		</Button>
 	{:else if editing === 'new'}
-		<p class="text-sm font-semibold">{m['custom_wk.creating_in']({ where: where() })}</p>
-		<CustomWellKnownForm bind:draft={newDraft} onsave={save} oncancel={() => close(false)} />
+		<p class="text-sm font-semibold">{m['postit_templates.creating_in']({ where: where() })}</p>
+		<PostitTemplateForm bind:draft={newDraft} onsave={save} oncancel={() => close(false)} />
 	{:else}
 		{#key editing}
-			<CustomWellKnownForm bind:draft={editDraft} onsave={save} oncancel={() => close(false)} />
+			<PostitTemplateForm bind:draft={editDraft} onsave={save} oncancel={() => close(false)} />
 		{/key}
 	{/if}
 </Modal>

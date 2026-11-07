@@ -34,20 +34,20 @@ type PostItsService struct {
 	// cards made from them keep their platform credentials.
 	wellKnowns infrastructure.WellKnownReader
 	// The card types users define; nil leaves only the catalogue.
-	custom CustomWellKnowns
+	templates PostitTemplates
 }
 
-// CustomWellKnowns answers which user-defined card type a new card on a
+// PostitTemplates answers which user-defined card type a new card on a
 // board may be made from.
-type CustomWellKnowns interface {
+type PostitTemplates interface {
 	// Usable is the definition a new card on boardID is made from, if the
 	// principal may use it there. Whether they may edit the board is the
 	// post-its service's call.
 	Usable(principal models.Principal, board uuid.UUID, key string) (*models.WellKnown, error)
 }
 
-func New(db infrastructure.Database, cache infrastructure.Cache, run infrastructure.Executer, secrets infrastructure.SecretResolver, access infrastructure.Access, wellKnowns infrastructure.WellKnownReader, custom CustomWellKnowns) *PostItsService {
-	return &PostItsService{db, cache, run, secrets, access, wellKnowns, custom}
+func New(db infrastructure.Database, cache infrastructure.Cache, run infrastructure.Executer, secrets infrastructure.SecretResolver, access infrastructure.Access, wellKnowns infrastructure.WellKnownReader, templates PostitTemplates) *PostItsService {
+	return &PostItsService{db, cache, run, secrets, access, wellKnowns, templates}
 }
 
 func (srv *PostItsService) CreatePostIt(principal models.Principal, title *models.BoardPostItTitle, postIt *models.PostIts) (*models.PostIts, error) {
@@ -94,13 +94,13 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 }
 
 // definition is the live well-known a new card is made from: one of the
-// catalogue, or a custom card type the principal may use on board.
+// catalogue, or a post-it template the principal may use on board.
 func (srv *PostItsService) definition(principal models.Principal, board uuid.UUID, key string) (*models.WellKnown, error) {
-	if models.IsCustomWellKnownKey(key) {
-		if srv.custom == nil {
+	if models.IsPostitTemplateKey(key) {
+		if srv.templates == nil {
 			return nil, ErrUnknownWellKnown
 		}
-		def, err := srv.custom.Usable(principal, board, key)
+		def, err := srv.templates.Usable(principal, board, key)
 		if err != nil {
 			// Missing and not usable here read the same.
 			return nil, ErrUnknownWellKnown

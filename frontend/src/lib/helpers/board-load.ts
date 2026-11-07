@@ -9,7 +9,7 @@ import { nodeType } from '$lib/well-knowns/one-off';
 // A board's page data, only under the organization it is filed under
 // (undefined for Personal); any other combination is not found.
 export async function loadBoard(id: UUID, orgId?: UUID): Promise<BoardData> {
-	// The card types (catalogue and the board's custom ones) decide how each
+	// The card types (catalogue and the board's post-it templates) decide how each
 	// card renders and what its form asks.
 	const [board] = await Promise.all([
 		boardApi.get(id),

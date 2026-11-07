@@ -5,10 +5,10 @@ import (
 	"testing"
 )
 
-func catFact() CustomWellKnown {
-	return CustomWellKnown{
-		Key:      NewCustomWellKnownKey(),
-		Scope:    CustomWellKnownScope{Kind: CustomScopeUser, Owner: "ana"},
+func catFact() PostitTemplate {
+	return PostitTemplate{
+		Key:      NewPostitTemplateKey(),
+		Scope:    PostitTemplateScope{Kind: TemplateScopeUser, Owner: "ana"},
 		Name:     "Cat fact",
 		Title:    BoardPostItTitle{Text: "{{fact}}", Vars: true},
 		Resource: "https://catfact.ninja/fact",
@@ -16,14 +16,14 @@ func catFact() CustomWellKnown {
 		Response: "json",
 		Query:    map[string]string{"fact": ".fact"},
 		Rate:     60,
-		Parameters: []CustomWellKnownParameter{
+		Parameters: []PostitTemplateParameter{
 			{Key: "$max", Label: "Largo máximo", Type: ParameterNumber},
 		},
-		Outputs: []CustomWellKnownOutput{{Key: "fact", Label: "Dato", Example: "Cats sleep"}},
+		Outputs: []PostitTemplateOutput{{Key: "fact", Label: "Dato", Example: "Cats sleep"}},
 	}
 }
 
-func TestCustomWellKnown_AsWellKnown(t *testing.T) {
+func TestPostitTemplate_AsWellKnown(t *testing.T) {
 	c := catFact()
 	wk := c.AsWellKnown()
 
@@ -37,7 +37,7 @@ func TestCustomWellKnown_AsWellKnown(t *testing.T) {
 		t.Errorf("output: %+v", o)
 	}
 	if len(wk.SystemSecrets) != 0 {
-		t.Error("a custom type never uses platform credentials")
+		t.Error("a template never uses platform credentials")
 	}
 
 	if wk.TitleEn != "{{fact}}" || wk.TitleEs != "{{fact}}" {
@@ -56,27 +56,27 @@ func TestCustomWellKnown_AsWellKnown(t *testing.T) {
 	}
 }
 
-func TestCustomWellKnown_Validate(t *testing.T) {
+func TestPostitTemplate_Validate(t *testing.T) {
 	if err := catFact().Validate(); err != nil {
 		t.Fatalf("valid: %v", err)
 	}
 
 	cases := map[string]struct {
-		edit func(*CustomWellKnown)
+		edit func(*PostitTemplate)
 		want string
 	}{
-		"client key":       {func(c *CustomWellKnown) { c.Key = "cat_fact" }, "generated"},
-		"bad scope":        {func(c *CustomWellKnown) { c.Scope.Kind = "system" }, "scope"},
-		"no owner":         {func(c *CustomWellKnown) { c.Scope.Owner = "" }, "scope"},
-		"no resource":      {func(c *CustomWellKnown) { c.Resource = "" }, "resource"},
-		"not http":         {func(c *CustomWellKnown) { c.Resource = "file:///etc/passwd" }, "http"},
-		"no name":          {func(c *CustomWellKnown) { c.Name = " " }, "name is required"},
-		"long name":        {func(c *CustomWellKnown) { c.Name = strings.Repeat("a", 65) }, "name"},
-		"no label":         {func(c *CustomWellKnown) { c.Parameters[0].Label = "" }, "needs a label"},
-		"undeclared param": {func(c *CustomWellKnown) { c.Request.Queries["x"] = "$other" }, "not a parameter"},
-		"uppercase param":  {func(c *CustomWellKnown) { c.Parameters[0].Key = "$MAX" }, "lowercase"},
-		"output mismatch":  {func(c *CustomWellKnown) { c.Outputs[0].Key = "other" }, "query key"},
-		"too many outputs": {func(c *CustomWellKnown) { c.Outputs = make([]CustomWellKnownOutput, 21) }, "at most"},
+		"client key":       {func(c *PostitTemplate) { c.Key = "cat_fact" }, "generated"},
+		"bad scope":        {func(c *PostitTemplate) { c.Scope.Kind = "system" }, "scope"},
+		"no owner":         {func(c *PostitTemplate) { c.Scope.Owner = "" }, "scope"},
+		"no resource":      {func(c *PostitTemplate) { c.Resource = "" }, "resource"},
+		"not http":         {func(c *PostitTemplate) { c.Resource = "file:///etc/passwd" }, "http"},
+		"no name":          {func(c *PostitTemplate) { c.Name = " " }, "name is required"},
+		"long name":        {func(c *PostitTemplate) { c.Name = strings.Repeat("a", 65) }, "name"},
+		"no label":         {func(c *PostitTemplate) { c.Parameters[0].Label = "" }, "needs a label"},
+		"undeclared param": {func(c *PostitTemplate) { c.Request.Queries["x"] = "$other" }, "not a parameter"},
+		"uppercase param":  {func(c *PostitTemplate) { c.Parameters[0].Key = "$MAX" }, "lowercase"},
+		"output mismatch":  {func(c *PostitTemplate) { c.Outputs[0].Key = "other" }, "query key"},
+		"too many outputs": {func(c *PostitTemplate) { c.Outputs = make([]PostitTemplateOutput, 21) }, "at most"},
 	}
 	for name, tc := range cases {
 		c := catFact()
@@ -88,9 +88,9 @@ func TestCustomWellKnown_Validate(t *testing.T) {
 	}
 }
 
-func TestWellKnown_RefusesCustomKeys(t *testing.T) {
+func TestWellKnown_RefusesTemplateKeys(t *testing.T) {
 	wk := catFact().AsWellKnown()
-	wk.custom = false
+	wk.template = false
 	if err := wk.Validate(); err == nil || !strings.Contains(err.Error(), "reserved") {
 		t.Errorf("catalogue key %q: err = %v", wk.Key, err)
 	}

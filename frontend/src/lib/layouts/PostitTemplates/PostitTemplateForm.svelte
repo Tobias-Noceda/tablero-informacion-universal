@@ -7,13 +7,13 @@
 	import { renderTitle } from '$lib/title';
 	import { cn } from '$lib/utils';
 	import { bodyOf, problems, type Draft, type Problem, type Row } from '$lib/well-knowns/draft';
-	import type { CustomWellKnownBody } from '$types/api';
+	import type { PostitTemplateBody } from '$types/api';
 
 	interface Props {
 		/** What is being written. The parent owns it, so it outlives the form
 		 * (switching tabs keeps a half-written card type). */
 		draft: Draft;
-		onsave: (body: CustomWellKnownBody) => Promise<void>;
+		onsave: (body: PostitTemplateBody) => Promise<void>;
 		oncancel: () => void;
 	}
 
@@ -43,27 +43,27 @@
 	function describe(problem: Problem) {
 		switch (problem.code) {
 			case 'name':
-				return m['custom_wk.err_name']();
+				return m['postit_templates.err_name']();
 			case 'resource':
-				return m['custom_wk.err_resource']();
+				return m['postit_templates.err_resource']();
 			case 'outputs':
-				return m['custom_wk.err_outputs']();
+				return m['postit_templates.err_outputs']();
 			case 'output_key':
-				return m['custom_wk.err_output_key']();
+				return m['postit_templates.err_output_key']();
 			case 'output_label':
-				return m['custom_wk.err_output_label']();
+				return m['postit_templates.err_output_label']();
 			case 'output_query':
-				return m['custom_wk.err_output_query']();
+				return m['postit_templates.err_output_query']();
 			case 'param_key':
-				return m['custom_wk.err_param_key']({ key: problem.value || '…' });
+				return m['postit_templates.err_param_key']({ key: problem.value || '…' });
 			case 'param_label':
-				return m['custom_wk.err_param_label']();
+				return m['postit_templates.err_param_label']();
 			case 'duplicate':
-				return m['custom_wk.err_duplicate']({ key: problem.value });
+				return m['postit_templates.err_duplicate']({ key: problem.value });
 			case 'undeclared':
-				return m['custom_wk.err_undeclared']({ value: problem.value });
+				return m['postit_templates.err_undeclared']({ value: problem.value });
 			case 'title':
-				return m['custom_wk.err_title']({ syntax: '{{name}}' });
+				return m['postit_templates.err_title']({ syntax: '{{name}}' });
 		}
 	}
 
@@ -88,8 +88,8 @@
 	<button
 		type="button"
 		class="shrink-0 cursor-pointer rounded-md p-1 hover:bg-background-hover"
-		aria-label={m['custom_wk.remove']()}
-		title={m['custom_wk.remove']()}
+		aria-label={m['postit_templates.remove']()}
+		title={m['postit_templates.remove']()}
 		{onclick}
 	>
 		<Icon name="trash" class="h-4 w-4 mx-1 -mt-0.5 text-destructive!" />
@@ -104,12 +104,12 @@
 			<div class="flex items-center gap-1">
 				<input
 					class={fieldClass + ' flex-1'}
-					placeholder={m['custom_wk.key']()}
+					placeholder={m['postit_templates.key']()}
 					bind:value={row.key}
 				/>
 				<input
 					class={fieldClass + ' flex-1'}
-					placeholder={m['custom_wk.value_variable']()}
+					placeholder={m['postit_templates.value_variable']()}
 					bind:value={row.value}
 				/>
 				{@render removeButton(() => rows.splice(i, 1))}
@@ -120,28 +120,28 @@
 			class="self-start px-2 py-0.5 text-xs"
 			onclick={() => rows.push({ key: '', value: '' })}
 		>
-			{m['custom_wk.add_row']()}
+			{m['postit_templates.add_row']()}
 		</Button>
 	</fieldset>
 {/snippet}
 
 <div class="flex flex-col gap-3 border-t border-main-border pt-3">
 	<Input
-		label={m['custom_wk.name']()}
+		label={m['postit_templates.name']()}
 		labelClass="font-semibold"
 		bind:value={draft.name}
 		maxlength={64}
 		required
 	/>
 	<Input
-		label={m['custom_wk.description']()}
+		label={m['postit_templates.description']()}
 		labelClass="font-semibold"
 		bind:value={draft.description}
 		maxlength={200}
 	/>
 
 	<Input
-		label={m['custom_wk.resource']()}
+		label={m['postit_templates.resource']()}
 		labelClass="font-semibold"
 		placeholder="https://api.example.com/v1/data"
 		bind:value={draft.resource}
@@ -149,7 +149,7 @@
 	/>
 	<div class="flex gap-2">
 		<label class="flex flex-1 flex-col gap-1 text-sm">
-			<span class="font-semibold">{m['custom_wk.response']()}</span>
+			<span class="font-semibold">{m['postit_templates.response']()}</span>
 			<Dropdown
 				bind:value={draft.response}
 				options={['json', 'html'].map((response) => {
@@ -176,26 +176,26 @@
 			/>
 		</label>
 		<label class="flex flex-1 flex-col gap-1 text-sm">
-			<span class="font-semibold">{m['custom_wk.rate']()}</span>
+			<span class="font-semibold">{m['postit_templates.rate']()}</span>
 			<input class={cn(fieldClass, 'px-2 py-1.5')} type="number" min="600" bind:value={draft.rate} />
 		</label>
 	</div>
-	<p class="text-xs opacity-70">{m['custom_wk.rate_hint']()}</p>
+	<p class="text-xs opacity-70">{m['postit_templates.rate_hint']()}</p>
 
 	<fieldset class="flex flex-col gap-1">
-		<legend class="text-sm font-semibold">{m['custom_wk.parameters']()}</legend>
-		<p class="text-xs opacity-70">{m['custom_wk.parameters_hint']({ example: m['custom_wk.var_example']() })}</p>
+		<legend class="text-sm font-semibold">{m['postit_templates.parameters']()}</legend>
+		<p class="text-xs opacity-70">{m['postit_templates.parameters_hint']({ example: m['postit_templates.var_example']() })}</p>
 		{#each draft.parameters as param, i (i)}
 			<div class="flex flex-col gap-1 rounded-md border border-main-border p-2">
 				<div class="flex items-center gap-1">
 					<input
 						class={fieldClass + ' w-28 font-mono'}
-						placeholder={m['custom_wk.var_example']()}
+						placeholder={m['postit_templates.var_example']()}
 						bind:value={param.key}
 					/>
 					<input
 						class={fieldClass + ' flex-1'}
-						placeholder={m['custom_wk.label']()}
+						placeholder={m['postit_templates.label']()}
 						bind:value={param.label}
 					/>
 					{@render removeButton(() => draft.parameters.splice(i, 1))}
@@ -207,7 +207,7 @@
 							options={PARAM_TYPES.map((type) => {
 								return {
 									value: type,
-									label: m[`custom_wk.type_${type}`]()
+									label: m[`postit_templates.type_${type}`]()
 								}
 							})}
 							class="w-full!"
@@ -229,13 +229,13 @@
 					</div>
 					<input
 						class={cn(fieldClass, 'flex-1 px-2 py-1.5')}
-						placeholder={m['custom_wk.placeholder']()}
+						placeholder={m['postit_templates.placeholder']()}
 						bind:value={param.placeholder}
 					/>
 					{#if param.type !== 'secret'}
 						<input
 							class={fieldClass + ' flex-1'}
-							placeholder={m['custom_wk.default']()}
+							placeholder={m['postit_templates.default']()}
 							bind:value={param.default}
 						/>
 					{/if}
@@ -248,37 +248,37 @@
 			onclick={() =>
 				draft.parameters.push({ key: '', label: '', type: 'string', placeholder: '', default: '' })}
 		>
-			{m['custom_wk.add_parameter']()}
+			{m['postit_templates.add_parameter']()}
 		</Button>
 	</fieldset>
 
 	{@render rowsEditor(
-		m['custom_wk.queries'](),
-		m['custom_wk.request_hint']({ example: m['custom_wk.var_example']() }),
+		m['postit_templates.queries'](),
+		m['postit_templates.request_hint']({ example: m['postit_templates.var_example']() }),
 		draft.queries
 	)}
 	{@render rowsEditor(
-		m['custom_wk.headers'](),
-		m['custom_wk.request_hint']({ example: '$api_key' }),
+		m['postit_templates.headers'](),
+		m['postit_templates.request_hint']({ example: '$api_key' }),
 		draft.headers
 	)}
 
 	<fieldset class="flex flex-col gap-1">
-		<legend class="text-sm font-semibold">{m['custom_wk.outputs']()}</legend>
+		<legend class="text-sm font-semibold">{m['postit_templates.outputs']()}</legend>
 		<p class="text-xs opacity-70">
-			{m['custom_wk.outputs_hint']({ example: '.data.temperature' })}
+			{m['postit_templates.outputs_hint']({ example: '.data.temperature' })}
 		</p>
 		{#each draft.outputs as output, i (i)}
 			<div class="flex flex-col gap-1 rounded-md border border-main-border p-2">
 				<div class="flex items-center gap-1">
 					<input
 						class={fieldClass + ' w-28 font-mono'}
-						placeholder={m['custom_wk.field_name']()}
+						placeholder={m['postit_templates.field_name']()}
 						bind:value={output.key}
 					/>
 					<input
 						class={fieldClass + ' flex-1'}
-						placeholder={m['custom_wk.label']()}
+						placeholder={m['postit_templates.label']()}
 						bind:value={output.label}
 					/>
 					{@render removeButton(() => draft.outputs.splice(i, 1))}
@@ -286,12 +286,12 @@
 				<div class="flex items-center gap-1">
 					<input
 						class={fieldClass + ' flex-1 font-mono'}
-						placeholder={m['custom_wk.query']()}
+						placeholder={m['postit_templates.query']()}
 						bind:value={output.query}
 					/>
 					<input
 						class={fieldClass + ' flex-1'}
-						placeholder={m['custom_wk.example']()}
+						placeholder={m['postit_templates.example']()}
 						bind:value={output.example}
 					/>
 				</div>
@@ -302,12 +302,12 @@
 			class="self-start px-2 py-0.5 text-xs"
 			onclick={() => draft.outputs.push({ key: '', label: '', query: '', example: '' })}
 		>
-			{m['custom_wk.add_output']()}
+			{m['postit_templates.add_output']()}
 		</Button>
 	</fieldset>
 
 	<Input
-		label={m['custom_wk.card_title']()}
+		label={m['postit_templates.card_title']()}
 		labelClass="font-semibold"
 		placeholder={m['card_title.placeholder']({ example: '{{value}}' })}
 		bind:value={draft.title}
@@ -343,8 +343,8 @@
 
 	<div class="flex gap-2">
 		<Button variant="primary" disabled={saving || (touched && found.length > 0)} onclick={save}>
-			{m['custom_wk.save']()}
+			{m['postit_templates.save']()}
 		</Button>
-		<Button variant="destructive" onclick={oncancel}>{m['custom_wk.cancel']()}</Button>
+		<Button variant="destructive" onclick={oncancel}>{m['postit_templates.cancel']()}</Button>
 	</div>
 </div>

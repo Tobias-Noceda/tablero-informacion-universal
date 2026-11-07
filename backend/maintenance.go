@@ -27,17 +27,22 @@ type maintenanceFlags struct {
 	rotateAllKeys bool
 }
 
-// schema is what migrate needs from the database: its indexes and the
-// well-known catalogue to seed.
+// schema is what migrate needs from the database: its collections, their
+// indexes and the well-known catalogue to seed.
 type schema interface {
+	RenameLegacyCollections() error
 	EnsureIndexes() error
 	infrastructure.WellKnownStore
 }
 
-// migrate creates the indexes the stores rely on and inserts the built-in
-// well-knowns not stored yet (edited or deleted ones are left alone). Both
-// are idempotent.
+// migrate moves renamed collections to their current name, creates the
+// indexes the stores rely on and inserts the built-in well-knowns not stored
+// yet (edited or deleted ones are left alone). All three are idempotent, and
+// the renames go first so the indexes land on the moved collections.
 func migrate(db schema) error {
+	if err := db.RenameLegacyCollections(); err != nil {
+		return fmt.Errorf("rename collections: %w", err)
+	}
 	if err := db.EnsureIndexes(); err != nil {
 		return fmt.Errorf("ensure indexes: %w", err)
 	}

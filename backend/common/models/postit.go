@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/url"
 
 	"github.com/google/uuid"
@@ -46,4 +47,28 @@ func (p PostIts) MarshalJSON() ([]byte, error) {
 		plain
 		Resource *string `json:"resource"`
 	}{plain(p), resource})
+}
+
+// UnmarshalJSON reads the resource back from the URL string MarshalJSON
+// writes; null or "" leave it nil.
+func (p *PostIts) UnmarshalJSON(data []byte) error {
+	type plain PostIts
+	var wire struct {
+		*plain
+		Resource *string `json:"resource"`
+	}
+	wire.plain = (*plain)(p)
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+
+	p.Resource = nil
+	if wire.Resource != nil && *wire.Resource != "" {
+		resource, err := url.Parse(*wire.Resource)
+		if err != nil {
+			return fmt.Errorf("resource: %w", err)
+		}
+		p.Resource = resource
+	}
+	return nil
 }
