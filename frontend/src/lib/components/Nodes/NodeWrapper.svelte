@@ -15,6 +15,10 @@
 	// A plain title is all the card shows, so it needs no data.
 	const plainTitle = $derived(!!title?.text && !title.vars);
 	const request = $derived(plainTitle ? null : results.get(id));
+	// Fetched again now and then while the card shows its data.
+	$effect(() => {
+		if (!plainTitle) return results.watch(id);
+	});
 
 	const isSelected = $derived.by(() => data?.isSelected ?? false);
 

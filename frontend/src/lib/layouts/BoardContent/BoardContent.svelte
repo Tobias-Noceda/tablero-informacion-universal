@@ -11,12 +11,22 @@
 	import { mapPostitWithTitle, type PostItWithTitle } from '$lib/helpers/post-it.js';
 	import { landingPath } from '$lib/helpers/routes';
 
-	import { isConfiguringBoard, isSharing, setConfiguringBoard, setSharing, setSidebar } from '$stores/sidebar';
+	import {
+		isConfiguringBoard,
+		isManagingCardTypes,
+		isSharing,
+		setConfiguringBoard,
+		setManagingCardTypes,
+		setSharing,
+		setSidebar
+	} from '$stores/sidebar';
 	import { refreshBoards } from '$stores/boards';
 
 	import ShareDialog from '$layouts/Share/ShareDialog.svelte';
+	import CustomWellKnownsPanel from '$layouts/CustomWellKnowns/CustomWellKnownsPanel.svelte';
 	import SideBar from '$layouts/Sidebar/SideBar.svelte';
 	import Flow from './Flow.svelte';
+	import { nodeType } from '$lib/well-knowns/one-off';
 	import BoardConfiguration from '$layouts/BoardConfiguration/BoardConfiguration.svelte';
 	import { deleteBoard, renameBoard } from '$services/board';
 
@@ -43,7 +53,8 @@
 		data = {
 			...data,
 			boardName: update.board.name ?? data.boardName,
-			nodes: (update.board.postits ?? data.nodes) as typeof data.nodes,
+			nodes: (update.board.postits?.map((p) => ({ ...p, type: nodeType(p.type) })) ??
+				data.nodes) as typeof data.nodes,
 			edges: update.board.strands ?? data.edges
 		};
 	}
@@ -82,6 +93,10 @@
 
 {#if $isSharing}
 	<ShareDialog board={boardId} {role} onclose={() => setSharing(false)} onleave={left} />
+{/if}
+
+{#if $isManagingCardTypes}
+	<CustomWellKnownsPanel {boardId} {orgId} {role} onclose={() => setManagingCardTypes(false)} />
 {/if}
 
 {#if $isConfiguringBoard}

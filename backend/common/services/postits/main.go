@@ -19,8 +19,9 @@ var (
 	ErrCredentialUnavailable = errors.New("This card's credentials are no longer available")
 	// ErrNotAMember reads like a missing resource on purpose: to a stranger,
 	// a board and its cards do not exist.
-	ErrNotAMember     = errors.New("Not found")
-	ErrInvalidBinding = errors.New("Binding aliases must match [A-Z][A-Z0-9_]*")
+	ErrNotAMember       = errors.New("Not found")
+	ErrInvalidBinding   = errors.New("Binding aliases must match [A-Z][A-Z0-9_]*")
+	ErrUnknownWellKnown = errors.New("Well Known post-it not found")
 )
 
 type PostItsService struct {
@@ -29,10 +30,21 @@ type PostItsService struct {
 	run     infrastructure.Executer
 	secrets infrastructure.SecretResolver
 	access  infrastructure.Access
+	// The well-known catalogue; tombstoned definitions are still read so the
+	// cards made from them keep their platform credentials.
+	wellKnowns infrastructure.WellKnownReader
+	// The card types users define; nil leaves only the catalogue.
+	custom CustomWellKnowns
 }
 
-func New(db infrastructure.Database, cache infrastructure.Cache, run infrastructure.Executer, secrets infrastructure.SecretResolver, access infrastructure.Access) *PostItsService {
-	return &PostItsService{db, cache, run, secrets, access}
+// CustomWellKnowns answers which user-defined card type a new card on a
+// board may be made from.
+type CustomWellKnowns interface {
+	Usable(principal models.Principal, board uuid.UUID, key string) (*models.WellKnown, error)
+}
+
+func New(db infrastructure.Database, cache infrastructure.Cache, run infrastructure.Executer, secrets infrastructure.SecretResolver, access infrastructure.Access, wellKnowns infrastructure.WellKnownReader, custom CustomWellKnowns) *PostItsService {
+	return &PostItsService{db, cache, run, secrets, access, wellKnowns, custom}
 }
 
 func (srv *PostItsService) CreatePostIt(principal models.Principal, title *models.BoardPostItTitle, postIt *models.PostIts) (*models.PostIts, error) {
@@ -41,7 +53,12 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 	}
 
 	if postIt.WellKnown != "" {
-		wk, wk_title, err := findWellKnown(postIt.WellKnown, postIt.Params)
+		def, err := srv.definition(principal, postIt.Board, postIt.WellKnown)
+		if err != nil {
+			return nil, err
+		}
+
+		wk, wk_title, err := def.Instantiate(postIt.Params)
 		if err != nil {
 			return nil, err
 		}
@@ -54,6 +71,8 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 		if title == nil {
 			title = wk_title
 		}
+	} else if err := validateOneOff(postIt); err != nil {
+		return nil, err
 	}
 
 	if title == nil {
@@ -69,6 +88,28 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 	entry.Vars = titleVars(entry.Text, outputsOf(postIt))
 
 	return srv.db.CreatePostIt(postIt, entry, postIt.WellKnown, models.Position{X: 750, Y: 350})
+}
+
+// definition is the live well-known a new card is made from: one of the
+// catalogue, or a custom card type the principal may use on board.
+func (srv *PostItsService) definition(principal models.Principal, board uuid.UUID, key string) (*models.WellKnown, error) {
+	if models.IsCustomWellKnownKey(key) {
+		if srv.custom == nil {
+			return nil, ErrUnknownWellKnown
+		}
+		def, err := srv.custom.Usable(principal, board, key)
+		if err != nil {
+			// Missing and not usable here read the same.
+			return nil, ErrUnknownWellKnown
+		}
+		return def, nil
+	}
+
+	def, err := srv.wellKnowns.FindWellKnown(key)
+	if errors.Is(err, infrastructure.ErrWellKnownNotFound) || (err == nil && def.Deleted) {
+		return nil, ErrUnknownWellKnown
+	}
+	return def, err
 }
 
 // GetPostIt loads a card for anyone who may see its board. ExecutePostIt runs
@@ -101,6 +142,10 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 		return err
 	}
 
+	if err := applyOneOff(postit, set); err != nil {
+		return err
+	}
+
 	if touchesCredentials(set) {
 		bindings := postit.Bindings
 		if edited, ok := set["bindings"].(map[string]models.SecretRef); ok {
@@ -121,7 +166,9 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 func touchesCredentials(set map[string]any) bool {
 	_, params := set["params"]
 	_, bindings := set["bindings"]
-	return params || bindings
+	// A one-off card's headers and queries can name "$TOKEN"s too.
+	_, request := set["request"]
+	return params || bindings || request
 }
 
 func (srv *PostItsService) require(principal models.Principal, boardID uuid.UUID, min models.BoardRole) error {
@@ -266,13 +313,23 @@ func (srv *PostItsService) userParams(postit *models.PostIts) (map[string]string
 // systemParams resolves the platform credentials a well-known declares, keyed
 // by the placeholder its template uses.
 func (srv *PostItsService) systemParams(postit *models.PostIts) (map[string]string, error) {
-	def, ok := configuredPostIts[postit.WellKnown]
-	if !ok || len(def.systemSecrets) == 0 {
+	if postit.WellKnown == "" {
 		return nil, nil
 	}
 
-	names := make([]string, 0, len(def.systemSecrets))
-	for _, name := range def.systemSecrets {
+	def, err := srv.wellKnowns.FindWellKnown(postit.WellKnown)
+	if errors.Is(err, infrastructure.ErrWellKnownNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(def.SystemSecrets) == 0 {
+		return nil, nil
+	}
+
+	names := make([]string, 0, len(def.SystemSecrets))
+	for _, name := range def.SystemSecrets {
 		names = append(names, string(name))
 	}
 
@@ -281,8 +338,8 @@ func (srv *PostItsService) systemParams(postit *models.PostIts) (map[string]stri
 		return nil, err
 	}
 
-	params := make(map[string]string, len(def.systemSecrets))
-	for placeholder, name := range def.systemSecrets {
+	params := make(map[string]string, len(def.SystemSecrets))
+	for placeholder, name := range def.SystemSecrets {
 		value, ok := resolved["$"+string(name)]
 		if !ok {
 			log.Printf("well-known %s: system secret %s is not configured", postit.WellKnown, name)

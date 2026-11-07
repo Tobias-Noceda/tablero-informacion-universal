@@ -117,7 +117,27 @@ export type PostItSettings = {
     rate: number;
     run_as?: string;
     bindings?: Record<string, SecretRef> | null;
+    // The request a card without a card type (a one-off card) runs; a card
+    // made from a card type carries its type's.
+    resource?: string | null;
+    request?: {
+        method: string;
+        headers: Record<string, string> | null;
+        queries: Record<string, string> | null;
+    };
+    response?: 'json' | 'html' | '';
+    query?: Record<string, string> | null;
 }
+
+// What a one-off card is created or edited with.
+export type OneOffRequest = {
+    resource: string;
+    request: { method: 'GET'; headers: Record<string, string>; queries: Record<string, string> };
+    response: 'json' | 'html';
+    query: Record<string, string>;
+    rate: number;
+    bindings: Record<string, SecretRef>;
+};
 
 export type Board = {
     id: UUID;
@@ -255,3 +275,108 @@ export type AccessToken = {
 export type CreatedAccessToken = AccessToken & {
     token: string;
 }
+
+// A ready-made card, from GET /well-knowns. Admins also see the platform
+// credentials it uses (system_secrets) and who last changed it.
+export type WellKnownParameter = {
+	/** Exact key the backend expects in the card's params. */
+	key: string;
+	label_en: string;
+	label_es: string;
+	/** "secret" renders a picker over the board's stored credentials. */
+	type: 'string' | 'number' | 'secret';
+	placeholder_en?: string;
+	placeholder_es?: string;
+	/** Prefilled value. A parameter without one must be supplied by the user. */
+	default?: string;
+};
+
+export type WellKnownOutput = {
+	/** Key of the card's response, usable in its title as `{{key}}`. */
+	key: string;
+	label_en: string;
+	label_es: string;
+	/** Sample value, only to preview a title before the card exists. */
+	example_en: unknown;
+	example_es: unknown;
+};
+
+export type WellKnown = {
+	key: string;
+	name_en: string;
+	name_es: string;
+	description_en?: string;
+	description_es?: string;
+	order: number;
+	/** An example title for a new card, per language; may use `{{output}}`. */
+	title_en: string;
+	title_es: string;
+	/** Empty for a card without a request, which answers with its params. */
+	resource: string;
+	request: { method: string; headers: Record<string, string> | null; queries: Record<string, string> | null };
+	response: string;
+	query: Record<string, string> | null;
+	rate: number;
+	parameters: WellKnownParameter[] | null;
+	outputs: WellKnownOutput[] | null;
+	system_secrets?: Record<string, string>;
+	builtin: boolean;
+	updated_at?: string;
+	updated_by?: string;
+	/** Only on a custom card type seen as a well-known: who it belongs to. */
+	scope?: CustomWellKnownScope;
+	/** Only on a custom card type: whether it may be dropped on this board. */
+	usable?: boolean;
+};
+
+// A card type a user defines for themselves, a board or an organization. One
+// language only: whichever its author writes it in.
+export type CustomWellKnownScope = {
+	kind: 'user' | 'board' | 'org';
+	/** User id, board id or organization id. */
+	owner: string;
+};
+
+export type CustomWellKnownParameter = {
+	key: string;
+	label: string;
+	type: WellKnownParameter['type'];
+	placeholder?: string;
+	default?: string;
+};
+
+export type CustomWellKnownOutput = {
+	key: string;
+	label: string;
+	example?: unknown;
+};
+
+/** What a client sends to create or replace a custom card type. */
+export type CustomWellKnownBody = {
+	name: string;
+	description?: string;
+	title: { text: string; vars: boolean };
+	resource: string;
+	request: { method: string; headers: Record<string, string>; queries: Record<string, string> };
+	response: 'json' | 'html';
+	query: Record<string, string>;
+	rate: number;
+	parameters: CustomWellKnownParameter[];
+	outputs: CustomWellKnownOutput[];
+};
+
+export type CustomWellKnown = Omit<CustomWellKnownBody, 'request' | 'query' | 'parameters' | 'outputs'> & {
+	key: string;
+	scope: CustomWellKnownScope;
+	request: WellKnown['request'];
+	query: Record<string, string> | null;
+	parameters: CustomWellKnownParameter[] | null;
+	outputs: CustomWellKnownOutput[] | null;
+	created_by: string;
+	created_at: string;
+	updated_by: string;
+	updated_at: string;
+};
+
+/** A custom card type as a board sees it (GET /boards/:id/well-knowns/usable). */
+export type BoardWellKnown = CustomWellKnown & { usable: boolean };

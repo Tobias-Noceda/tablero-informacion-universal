@@ -6,7 +6,7 @@
     import CredentialsSidebar from './content/CredentialsSidebar.svelte';
 	import type { BoardRole, UUID } from '$types/api';
 
-    const { role, boardId }: { role: BoardRole, boardId: UUID } = $props();
+    const { role, boardId }: { role: BoardRole; boardId: UUID } = $props();
 </script>
 
 <div
@@ -58,7 +58,7 @@
 		flex-direction: column;
 		background: var(--color-sidebar-hover);
 		padding: 8px;
-		width: 200px;
+		width: 240px;
 		min-height: 0;
 		height: 100%;
 		overflow-y: auto;

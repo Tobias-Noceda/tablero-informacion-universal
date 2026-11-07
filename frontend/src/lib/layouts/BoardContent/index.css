@@ -26,19 +26,29 @@ body {
   height: 100%;
 }
 
-/* Sidebar is outside .react-flow so it doesn't get theme variables in dark mode. */
+/* Sidebar is outside .react-flow so it doesn't get theme variables in dark mode.
+   Dark: the system's unless the app is set to light, or the app's own choice
+   (data-theme, see routes/layout.css). Keep both blocks equal. */
 @media (prefers-color-scheme: dark) {
-  .dndflow aside {
-    /* background: #141519; */
+  :root:not([data-theme='light']) .dndflow aside {
     color: #f3f4f6;
     border-right-color: #3f434c;
   }
 
-  .dndflow .node {
+  :root:not([data-theme='light']) .dndflow .node {
     border-color: #3f434c;
-    /* background: #1a1b1e; */
     color: #f3f4f6;
   }
+}
+
+:root[data-theme='dark'] .dndflow aside {
+  color: #f3f4f6;
+  border-right-color: #3f434c;
+}
+
+:root[data-theme='dark'] .dndflow .node {
+  border-color: #3f434c;
+  color: #f3f4f6;
 }
 
 @media screen and (min-width: 768px) {

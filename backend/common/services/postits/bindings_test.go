@@ -44,7 +44,7 @@ func TestCreatePostIt_RequiresMembership(t *testing.T) {
 	}
 	svc := newService(db, nil, nil)
 
-	_, err := svc.CreatePostIt(outsider, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{Board: uuid.New()})
+	_, err := svc.CreatePostIt(outsider, &models.BoardPostItTitle{Text: "Hi"}, oneOff(uuid.New(), nil))
 	if !errors.Is(err, ErrNotAMember) {
 		t.Errorf("got %v, want ErrNotAMember", err)
 	}
@@ -56,7 +56,7 @@ func TestCreatePostIt_RequiresMembership(t *testing.T) {
 func TestCreatePostIt_RunsAsItsCreator(t *testing.T) {
 	svc := newService(boardOf(boardOwner, member), nil, nil)
 
-	created, err := svc.CreatePostIt(member, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{Board: uuid.New()})
+	created, err := svc.CreatePostIt(member, &models.BoardPostItTitle{Text: "Hi"}, oneOff(uuid.New(), nil))
 	if err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestCreatePostIt_ValidatesBindingsAsTheCreator(t *testing.T) {
 			return nil
 		},
 	}
-	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil))
+	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil)
 
 	created, err := svc.CreatePostIt(member, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{
 		Board:     board,
@@ -103,12 +103,9 @@ func TestCreatePostIt_RefusesWhatCannotBeBound(t *testing.T) {
 			return infrastructure.ErrForbidden
 		},
 	}
-	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil))
+	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil)
 
-	_, err := svc.CreatePostIt(member, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{
-		Board:    board,
-		Bindings: map[string]models.SecretRef{"THEIRS": {Scope: models.MemberScope(board, boardOwner.ID), Name: "THEIRS"}},
-	})
+	_, err := svc.CreatePostIt(member, &models.BoardPostItTitle{Text: "Hi"}, oneOff(board, map[string]models.SecretRef{"THEIRS": {Scope: models.MemberScope(board, boardOwner.ID), Name: "THEIRS"}}))
 	if !errors.Is(err, infrastructure.ErrForbidden) {
 		t.Errorf("got %v, want ErrForbidden", err)
 	}
@@ -118,10 +115,7 @@ func TestCreatePostIt_BindingAliasesAreSecretNames(t *testing.T) {
 	board := uuid.New()
 	svc := newService(boardOf(boardOwner), nil, nil)
 
-	_, err := svc.CreatePostIt(boardOwner, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{
-		Board:    board,
-		Bindings: map[string]models.SecretRef{"lowercase": {Scope: models.BoardScope(board), Name: "KEY"}},
-	})
+	_, err := svc.CreatePostIt(boardOwner, &models.BoardPostItTitle{Text: "Hi"}, oneOff(board, map[string]models.SecretRef{"lowercase": {Scope: models.BoardScope(board), Name: "KEY"}}))
 	if !errors.Is(err, ErrInvalidBinding) {
 		t.Errorf("got %v, want ErrInvalidBinding", err)
 	}
@@ -149,7 +143,7 @@ func TestUpdatePostIt_RebindsAsTheEditor(t *testing.T) {
 			return nil
 		},
 	}
-	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil))
+	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil)
 
 	err := svc.UpdatePostIt(member, id, map[string]any{
 		"params":   map[string]string{"$credential": "$MINE"},
@@ -182,7 +176,7 @@ func TestUpdatePostIt_KeepsBindingsWhenOnlyParamsChange(t *testing.T) {
 			return nil
 		},
 	}
-	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil))
+	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil)
 
 	if err := svc.UpdatePostIt(member, id, map[string]any{"params": map[string]string{"$base": "EUR"}}); err != nil {
 		t.Fatalf("update: %v", err)
@@ -272,7 +266,7 @@ func TestExecutePostIt_ResolvesEveryTokenAsWhoTheCardRunsAs(t *testing.T) {
 			return map[string]any{}, nil
 		},
 	}
-	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, run, resolver, access.New(nil))
+	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, run, resolver, access.New(nil), builtins(), nil)
 
 	if _, err := svc.ExecutePostIt(postit); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -300,7 +294,7 @@ func TestExecutePostIt_CardsWithoutRunAsRunAsTheBoardOwner(t *testing.T) {
 			return map[models.SecretRef]string{postit.Bindings["MINE"]: "v"}, nil
 		},
 	}
-	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil))
+	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil)
 
 	if _, err := svc.ExecutePostIt(postit); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -338,7 +332,7 @@ func TestExecutePostIt_UnavailableBindingStopsTheCard(t *testing.T) {
 			ran = true
 			return nil, nil
 		}}
-		svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, run, c.resolver, access.New(nil))
+		svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, run, c.resolver, access.New(nil), builtins(), nil)
 
 		_, err := svc.ExecutePostIt(boundCard(board, member.ID))
 		if !errors.Is(err, ErrCredentialUnavailable) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeTitle, renderTitle, titleVariables } from './title';
+import { analyzeTitle, display, renderTitle, titleVariables } from './title';
 
 describe('titleVariables', () => {
 	it('lists plain variables once', () => {
@@ -71,5 +71,14 @@ describe('renderTitle', () => {
 	it('returns unsupported or broken titles as they are', () => {
 		expect(renderTitle('{{#min}}x{{/min}}', { min: 1 })).toBe('{{#min}}x{{/min}}');
 		expect(renderTitle('{{#min}} never closed', { min: 1 })).toBe('{{#min}} never closed');
+	});
+});
+
+describe('display', () => {
+	it('formats ISO timestamps as dates and leaves anything else alone', () => {
+		expect(display('2026-11-06T05:52:11-03:00')).not.toContain('2026-11-06T');
+		expect(display(12.4)).toBe('12.4');
+		expect(display('12.4')).toBe('12.4');
+		expect(display('2026')).toBe('2026');
 	});
 });

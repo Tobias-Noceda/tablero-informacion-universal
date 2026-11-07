@@ -4,7 +4,7 @@
 
 	import Button from '$components/Button/Button.svelte';
 	import Icon from '$components/Icon/Icon.svelte';
-	import { parameters } from '$components/Nodes/node-map';
+	import { wellKnowns } from '$stores/well-knowns.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { display, renderTitle } from '$lib/title';
 	import * as postItsApi from '$services/post-it';
@@ -13,13 +13,16 @@
 	import { capitalize, isImageLink, isLink } from '$lib/helpers/content-rendering';
 	import { getLocale } from '$lib/paraglide/runtime';
 	import Tooltip from '$components/Tooltip/Tooltip.svelte';
-	import type { PostIt, SecretRef } from '$types/api';
+	import type { PostIt, PostItSettings, SecretRef } from '$types/api';
+	import { ONE_OFF } from '$lib/well-knowns/one-off';
 
 	export type PostItData = PostIt & {
 		title?: { text: string; vars: boolean };
 		paramValues: Record<string, string>;
 		bindings: Record<string, SecretRef>;
-	}
+		/** What the card is stored with; a one-off card's form needs it all. */
+		settings?: PostItSettings;
+	};
 
 	interface NodeDetailProps {
 		node: Node;
@@ -30,23 +33,17 @@
 		ondelete: (node: Node) => void;
 	}
 
-	let {
-		node,
-		canEdit,
-		settingsVersion,
-		onback,
-		onedit,
-		ondelete
-	}: NodeDetailProps = $props();
+	let { node, canEdit, settingsVersion, onback, onedit, ondelete }: NodeDetailProps = $props();
 
 	const title = $derived(node.data?.title as { text: string; vars: boolean } | undefined);
 
 	// What kind of card it is, as the cards sidebar names it.
-	const kind = $derived.by(() => {
-		const key = `nodes.${node.type}`;
-		const messages = m as unknown as Record<string, (() => string) | undefined>;
-		return messages[key]?.() ?? node.type ?? '';
-	});
+	const kind = $derived(wellKnowns.name(node.type));
+	// A card whose well-known was deleted keeps running, but there is no form
+	// left to edit it with.
+	// A one-off card carries its own request, so it is always editable.
+	const isOneOff = $derived(node.type === ONE_OFF);
+	const knownType = $derived(isOneOff || !!wellKnowns.byKey(node.type));
 
 	const scrollClass = cn(
 		// Custom scrollbar styles
@@ -65,6 +62,8 @@
 		return postItsApi.get_settings(id);
 	});
 	const output = $derived(results.get(id));
+	// Kept up to date while open, also for a card whose title needs no data.
+	$effect(() => results.watch(id));
 
 	let refreshing = $state(false);
 	const MAX_TITLE_LENGTH = 24;
@@ -80,10 +79,16 @@
 		}
 	}
 
-	function labelOf(key: string) {
+	function parameterLabelOf(key: string) {
 		return (
-			parameters[node.type ?? '']?.find((p) => p.key === key)?.[`label_${getLocale()}`] ??
+			wellKnowns.parameters(node.type).find((p) => p.key === key)?.[`label_${getLocale()}`] ??
 			key.replace(/^\$/, '')
+		);
+	}
+
+	function contentLabelOf(key: string) {
+		return (
+			wellKnowns.outputs(node.type).find((c) => c.key === key)?.[`label_${getLocale()}`] ?? key
 		);
 	}
 
@@ -122,6 +127,35 @@
 			{/each}
 		</dl>
 	{/if}
+{/snippet}
+
+<!-- A one-off card's own request. A credential shows as its name, never its value. -->
+{#snippet oneOffConfiguration(s: PostItSettings)}
+	<div class="flex flex-col gap-3">
+		{@render record(
+			[
+				[m['one_off.url'](), s.resource ?? ''],
+				[m['one_off.response'](), (s.response ?? '').toUpperCase()],
+				[m['one_off.rate'](), m['one_off.seconds']({ value: String(s.rate) })]
+			],
+			m['node_detail.no_configuration']()
+		)}
+		<!-- {#each [[m['custom_wk.queries'](), s.request?.queries], [m['custom_wk.headers'](), s.request?.headers]] as const as [label, values] (label)}
+			{#if values && Object.keys(values).length > 0}
+				<div class="flex flex-col gap-1">
+					<h4 class="font-semibold text-sm">{label}</h4>
+					{@render record(
+						Object.entries(values).map(([key, value]) => [key, shown(value)]),
+						''
+					)}
+				</div>
+			{/if}
+		{/each}
+		<div class="flex flex-col gap-1">
+			<h4 class="font-semibold text-sm">{m['one_off.outputs']()}</h4>
+			{@render record(Object.entries(s.query ?? {}), m['node_detail.no_configuration']())}
+		</div> -->
+	</div>
 {/snippet}
 
 {#snippet titleHeading(finalTitle: string)}
@@ -179,14 +213,13 @@
 			{#if title?.text}
 				<span class="text-xs opacity-70">{kind}</span>
 			{/if}
+			{#if canEdit && !knownType}
+				<span class="text-xs opacity-70">{m['node_detail.unavailable_type']()}</span>
+			{/if}
 		</div>
 
-		{#if canEdit}
-			<Tooltip
-				content={m['node_detail.edit']()}
-				placement="bottom"
-				tooltipClass="max-w-60! -mt-1"
-			>
+		{#if canEdit && knownType}
+			<Tooltip content={m['node_detail.edit']()} placement="bottom" tooltipClass="max-w-60! -mt-1">
 				<button
 					type="button"
 					class="cursor-pointer rounded-md p-2 hover:bg-tertiary-hover disabled:cursor-wait disabled:opacity-60"
@@ -197,11 +230,12 @@
 							...node,
 							title,
 							paramValues: s.params ?? {},
-							bindings: s.bindings ?? {}
-						})
+							bindings: s.bindings ?? {},
+							settings: s
+						});
 					}}
 				>
-					<Icon name="edit" class='stroke-2 w-5 h-5' />
+					<Icon name="edit" class="stroke-2 w-5 h-5" />
 				</button>
 			</Tooltip>
 		{/if}
@@ -231,11 +265,15 @@
 				<div class="text-xs">
 					{#await settings}
 						<p class="text-sm opacity-70">{m.input_loading()}</p>
-					{:then { params }}
-						{@render record(
-							Object.entries(params ?? {}).map(([key, value]) => [labelOf(key), value]),
-							m['node_detail.no_configuration']()
-						)}
+					{:then s}
+						{#if isOneOff}
+							{@render oneOffConfiguration(s)}
+						{:else}
+							{@render record(
+								Object.entries(s.params ?? {}).map(([key, value]) => [parameterLabelOf(key), value]),
+								m['node_detail.no_configuration']()
+							)}
+						{/if}
 					{:catch err}
 						<p class="text-sm text-destructive">{failure(err)}</p>
 					{/await}
@@ -251,7 +289,10 @@
 				{#if node.type === 'static_card'}
 					<p class="sm:text-sm md:text-[15px]">{data['text']}</p>
 				{:else}
-					{@render record(Object.entries(data ?? {}), m['node_detail.no_content']())}
+					{@render record(
+						Object.entries(data ?? {}).map(([key, value]) => [contentLabelOf(key), value]),
+						m['node_detail.no_content']()
+					)}
 				{/if}
 			{:catch err}
 				<p class="text-sm text-destructive">{failure(err)}</p>

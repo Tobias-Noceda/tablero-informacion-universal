@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/json"
 	"net/url"
 
 	"github.com/google/uuid"
@@ -31,4 +32,18 @@ type PostIts struct {
 	// A "$TOKEN" the card uses that does not live in the board's own scope.
 	// Keyed by the token name without the dollar sign.
 	Bindings map[string]SecretRef `bson:"bindings" json:"bindings"`
+}
+
+// MarshalJSON sends the resource as the URL it is, not as url.URL's fields.
+func (p PostIts) MarshalJSON() ([]byte, error) {
+	type plain PostIts
+	var resource *string
+	if p.Resource != nil {
+		text := p.Resource.String()
+		resource = &text
+	}
+	return json.Marshal(struct {
+		plain
+		Resource *string `json:"resource"`
+	}{plain(p), resource})
 }

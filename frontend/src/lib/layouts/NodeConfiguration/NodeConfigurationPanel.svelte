@@ -5,7 +5,7 @@
 	import type { Board, SecretRef } from '$types/api';
 	import { bindingsFor, refKey } from '$lib/secrets/binding';
 	import type { SecretMeta } from '$types/api';
-	import { outputs, parameters } from '$components/Nodes/node-map';
+	import { wellKnowns } from '$stores/well-knowns.svelte';
 	import { analyzeTitle, renderTitle } from '$lib/title';
 
 	import { session } from '$modules/session.svelte';
@@ -72,7 +72,7 @@
 	// A secret parameter holds the picked secret's key, not its name.
 	let pickedKeys = $state<Record<string, string>>({});
 
-	const creatingParams = $derived(creatingNode ? (parameters[creatingNode.type!] ?? []) : currentPostIt ? (parameters[currentPostIt.type!] ?? []) : []);
+	const creatingParams = $derived(wellKnowns.parameters((creatingNode ?? currentPostIt)?.type));
 	const missingRequired = $derived(
 		creatingParams.some((p) => {
 			const value = p.type === 'secret' ? pickedKeys[p.key] : paramValues[p.key];
@@ -81,7 +81,7 @@
 	);
 
     // What the card answers with, usable in its title as {{key}}.
-	const creatingOutputs = $derived(creatingNode ? (outputs[creatingNode.type!] ?? []) : currentPostIt ? (outputs[currentPostIt.type!] ?? []) : []);
+	const creatingOutputs = $derived(wellKnowns.outputs((creatingNode ?? currentPostIt)?.type));
 	// Example values to preview the title; a card without a resource answers
 	// with its own params, so those show what the user typed.
 	const sampleResponse = $derived(
@@ -134,9 +134,14 @@
 		);
 		await postItsApi.move(newPostIt.id, creatingNode.position.x, creatingNode.position.y);
 
-		// The create response is the post-it itself: its title is top level.
-		const created = newPostIt as unknown as { title?: { text: string; vars: boolean } };
-        onPersistNode('create', { ...creatingNode, id: newPostIt.id, data: { title: created.title } } as Node);
+		// The create response is the stored post-it, which has no title (that
+		// lives on the board): show the one just sent instead of waiting for the
+		// board's live update.
+        onPersistNode('create', {
+            ...creatingNode,
+            id: newPostIt.id,
+            data: { title: { text: title, vars: titleAnalysis.vars } }
+        } as Node);
 		pickedKeys = {};
         creatingTitle = '';
 	};
@@ -179,6 +184,12 @@
         pickedKeys = {};
         creatingTitle = '';
     };
+
+    function placeholder() {
+        // The card type's example title, in the UI's language.
+        const example = creatingNode ? wellKnowns.title(creatingNode.type) : '';
+        return example || m['card_title.placeholder']({ example: '{{value}}' });
+	}
 
     $effect(() => {
         if (currentPostIt) {
@@ -230,7 +241,7 @@
         </div>
         <Input
             label={m['card_title.label']()}
-            placeholder={m['card_title.placeholder']({ example: '{{value}}' })}
+            placeholder={placeholder()}
             class="focus:*:ring-0! focus:border-red! focus:outline-none!"
             required
             bind:value={creatingTitle}

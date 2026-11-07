@@ -1,8 +1,6 @@
 package postits
 
 import (
-	"net/url"
-
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/google/uuid"
 )
@@ -12,7 +10,7 @@ type CreatePostItRequest struct {
 	WellKnown string                      `json:"well_known"`
 	Params    map[string]string           `json:"params" binding:"dive,keys,required,endkeys,required"`
 	Title     *models.BoardPostItTitle    `json:"title" binding:"required_without=WellKnown"`
-	Resource  *url.URL                    `json:"resource" binding:"required_without=WellKnown"`
+	Resource  string                      `json:"resource" binding:"required_without=WellKnown"`
 	Request   models.Request              `json:"request" binding:"required_without=WellKnown"`
 	Response  string                      `json:"response" binding:"required_without=WellKnown,omitempty,eq=json|eq=html"`
 	Query     map[string]string           `json:"query" binding:"required_without=WellKnown,omitempty,gt=0,dive,keys,required,endkeys,required"`
@@ -33,6 +31,9 @@ type UpdatePostItRequest struct {
 	Query    map[string]string           `json:"query"`
 	Response *string                     `json:"response"`
 	Rate     *int                        `json:"rate"`
+	// Only on a card without a card type (a one-off card).
+	Resource *string         `json:"resource"`
+	Request  *models.Request `json:"request"`
 }
 
 type UpdatePostItTitleRequest struct {

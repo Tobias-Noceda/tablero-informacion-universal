@@ -5,6 +5,7 @@ import (
 
 	a_ctrl "github.com/Secreto31126/tesis/common/controllers/auth"
 	"github.com/Secreto31126/tesis/common/controllers/boards"
+	cw_ctrl "github.com/Secreto31126/tesis/common/controllers/customwellknowns"
 	g_ctrl "github.com/Secreto31126/tesis/common/controllers/groups"
 	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	o_ctrl "github.com/Secreto31126/tesis/common/controllers/orgs"
@@ -12,6 +13,7 @@ import (
 	s_ctrl "github.com/Secreto31126/tesis/common/controllers/secrets"
 	t_ctrl "github.com/Secreto31126/tesis/common/controllers/tokens"
 	u_ctrl "github.com/Secreto31126/tesis/common/controllers/users"
+	w_ctrl "github.com/Secreto31126/tesis/common/controllers/wellknowns"
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/ports/crypto"
 	"github.com/Secreto31126/tesis/common/ports/executer"
@@ -23,12 +25,14 @@ import (
 	"github.com/Secreto31126/tesis/common/services/access"
 	a_srv "github.com/Secreto31126/tesis/common/services/auth"
 	b_srv "github.com/Secreto31126/tesis/common/services/boards"
+	cw_srv "github.com/Secreto31126/tesis/common/services/customwellknowns"
 	g_srv "github.com/Secreto31126/tesis/common/services/groups"
 	o_srv "github.com/Secreto31126/tesis/common/services/orgs"
 	p_srv "github.com/Secreto31126/tesis/common/services/postits"
 	s_srv "github.com/Secreto31126/tesis/common/services/secrets"
 	t_srv "github.com/Secreto31126/tesis/common/services/tokens"
 	u_srv "github.com/Secreto31126/tesis/common/services/users"
+	w_srv "github.com/Secreto31126/tesis/common/services/wellknowns"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -58,7 +62,9 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	boardService := b_srv.New(db, secrets, resolver, db, cache)
 	groupService := g_srv.New(db, secrets, resolver)
 	orgService := o_srv.New(db, db, secrets, cache)
-	postitService := p_srv.New(db, cache, executer.New(), secrets, resolver)
+	customWellKnownService := cw_srv.New(db, db, resolver)
+	postitService := p_srv.New(db, cache, executer.New(), secrets, resolver, db, customWellKnownService)
+	wellKnownService := w_srv.New(db)
 	tokenService := t_srv.New(db, cache, time.Now)
 
 	router := gin.Default()
@@ -79,6 +85,8 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	s_ctrl.NewController(secrets).RegisterRoutes(private)
 	g_ctrl.NewController(groupService).RegisterRoutes(private)
 	o_ctrl.NewController(orgService).RegisterRoutes(private)
+	w_ctrl.NewController(wellKnownService).RegisterRoutes(private)
+	cw_ctrl.NewController(customWellKnownService).RegisterRoutes(private)
 
 	return &app{secrets: secrets, router: router}
 }

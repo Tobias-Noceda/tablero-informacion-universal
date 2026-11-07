@@ -1,12 +1,34 @@
-import type { PostIt, PostItSettings, SecretRef, Strand, UUID } from "$types/api";
+import type { OneOffRequest, PostItSettings, SecretRef, Strand, UUID } from "$types/api";
 
 import * as api from "$modules/api.svelte"
 import { mapPostitWithTitle, type PostItWithTitle } from "$lib/helpers/post-it";
 
-// TODO: support custom post its
-export async function create_custom(board: UUID) {
-    const res = await api.post("/v1/post-its", { board });
-    return await res.json() as PostIt;
+// A refused card change, with the backend's `error` text.
+export class PostItError extends Error {
+    constructor(readonly status: number, message: string) {
+        super(message);
+        this.name = 'PostItError';
+    }
+}
+
+async function ensure(response: Response) {
+    if (response.ok) return response;
+    const body = await response.json().catch(() => ({}));
+    throw new PostItError(response.status, typeof body?.error === 'string' ? body.error : response.statusText);
+}
+
+// A card with its own request, without a card type.
+export async function create_one_off(
+    board: UUID,
+    title: { text: string, vars: boolean },
+    body: OneOffRequest,
+) {
+    const res = await ensure(await api.post("/v1/post-its", { board, title, ...body }));
+    return mapPostitWithTitle(await res.json() as PostItWithTitle);
+}
+
+export async function update_one_off(postItId: UUID, body: OneOffRequest) {
+    await ensure(await api.patch(`/v1/post-its/${postItId}/settings`, body));
 }
 
 export async function create_well_known(

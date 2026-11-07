@@ -1,4 +1,5 @@
 import Mustache from 'mustache';
+import { getLocale } from './paraglide/runtime';
 
 /**
  * Card titles may embed the card's outputs as `{{key}}`. Only plain
@@ -47,9 +48,19 @@ export function analyzeTitle(text: string, outputs: string[]): TitleAnalysis {
 	return { used, unknown, unsupported, vars: used.length > 0 && !unsupported };
 }
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
 export function display(value: unknown): string {
 	if (value === null || value === undefined) return '';
 	if (Array.isArray(value)) return value.map(display).join(', ');
+	// Only ISO timestamps are dates: Date() also accepts numbers and loose
+	// strings ("12.4" would become December 4th).
+	if (typeof value === 'string' && ISO_DATE.test(value)) {
+		const date = new Date(value);
+		if (!Number.isNaN(date.getTime())) {
+			return date.toLocaleString(getLocale(), { dateStyle: 'long', timeStyle: 'short' });
+		}
+	}
 	if (typeof value === 'object') return JSON.stringify(value);
 	return String(value);
 }
