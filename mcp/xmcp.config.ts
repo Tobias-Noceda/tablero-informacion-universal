@@ -2,7 +2,10 @@ import type { XmcpConfig } from "xmcp";
 
 const config: XmcpConfig = {
     // xmcp binds 127.0.0.1 by default, unreachable from the alb container
-    http: true,
+    http: {
+        host: "0.0.0.0",
+        port: 3001,
+    },
     paths: {
         tools: "./src/tools",
         prompts: false,

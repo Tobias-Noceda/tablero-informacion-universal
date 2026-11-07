@@ -252,6 +252,7 @@
 		"refresh": "Actualizar contenido",
 		"configuration": "Configuración",
 		"content": "Contenido",
+		"render_markdown": "Renderizar Markdown",
 		"no_configuration": "Esta tarjeta no tiene ajustes.",
 		"no_content": "Esta tarjeta no tiene valores.",
 		"error": "No se pudo cargar la tarjeta.",
