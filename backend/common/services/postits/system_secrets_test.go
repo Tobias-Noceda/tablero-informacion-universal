@@ -178,7 +178,7 @@ func TestNasaApod_UserParamsCannotShadowTheSystemSecret(t *testing.T) {
 // Only a well-known definition can reach the system scope. A hand-made
 // post-it naming the secret gets the reference sent verbatim, like any secret
 // it does not own.
-func TestCustomPostIt_CannotReferenceASystemSecret(t *testing.T) {
+func TestTemplatePostIt_CannotReferenceASystemSecret(t *testing.T) {
 	allowLoopback(t)
 	provider, gotKey := nasaStub(t)
 	secrets := realSecrets(t)

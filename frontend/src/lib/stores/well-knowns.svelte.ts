@@ -2,27 +2,27 @@ import { session } from '$modules/session.svelte';
 import { getLocale } from '$lib/paraglide/runtime';
 import { m } from '$lib/paraglide/messages';
 import * as wellKnownsApi from '$services/well-knowns';
-import * as customApi from '$services/custom-well-knowns';
+import * as templatesApi from '$services/postit-templates';
 import { toWellKnown } from '$lib/well-knowns/normalize';
 import { ONE_OFF } from '$lib/well-knowns/one-off';
 import type { UUID, WellKnown, WellKnownOutput, WellKnownParameter } from '$types/api';
 
 // The card types: the platform's catalogue, loaded once per user (admins get
-// a little more of each definition), plus the custom ones of the board open,
+// a little more of each definition), plus the post-it templates of the board open,
 // in the catalogue's shape.
 class WellKnowns {
 	list = $state<WellKnown[]>([]);
-	// The open board's custom card types (usable ones and those its cards use).
-	custom = $state<WellKnown[]>([]);
+	// The open board's post-it templates (usable ones and those its cards use).
+	templates = $state<WellKnown[]>([]);
 	#loading: Promise<void> | undefined;
 	// Bumped on reset, so a list requested for the previous user is dropped.
 	#generation = 0;
 	#board: UUID | undefined;
 
 	// Every card type the open board knows about, for rendering.
-	all = $derived([...this.list, ...this.custom]);
+	all = $derived([...this.list, ...this.templates]);
 	// What may be dropped on the open board.
-	pickable = $derived([...this.list, ...this.custom.filter((wk) => wk.usable)]);
+	pickable = $derived([...this.list, ...this.templates.filter((wk) => wk.usable)]);
 
 	ensure() {
 		const generation = this.#generation;
@@ -38,21 +38,21 @@ class WellKnowns {
 		return this.#loading;
 	}
 
-	// Loads the custom card types of board. A failure leaves none: the board
-	// still works, its custom cards just render without labels.
+	// Loads the post-it templates of board. A failure leaves none: the board
+	// still works, its cards made from templates just render without labels.
 	async loadBoard(board: UUID) {
 		const generation = this.#generation;
 		this.#board = board;
-		let custom: WellKnown[] = [];
+		let templates: WellKnown[] = [];
 		try {
-			custom = (await customApi.forBoard(board)).map(toWellKnown);
+			templates = (await templatesApi.forBoard(board)).map(toWellKnown);
 		} catch {
-			// Shown as "no custom types".
+			// Shown as "no templates".
 		}
-		if (generation === this.#generation && this.#board === board) this.custom = custom;
+		if (generation === this.#generation && this.#board === board) this.templates = templates;
 	}
 
-	// Reloads the open board's custom card types after one changed.
+	// Reloads the open board's post-it templates after one changed.
 	async refreshBoard() {
 		if (this.#board) await this.loadBoard(this.#board);
 	}
@@ -62,7 +62,7 @@ class WellKnowns {
 		this.#loading = undefined;
 		this.#board = undefined;
 		this.list = [];
-		this.custom = [];
+		this.templates = [];
 	}
 
 	async refresh() {
@@ -89,12 +89,12 @@ class WellKnowns {
 	}
 
 	// The card's name in the current language; once deleted, its key (or a
-	// placeholder for a custom type, whose key means nothing to anyone).
+	// placeholder for a template, whose key means nothing to anyone).
 	name(key: string | undefined) {
 		const wk = this.byKey(key);
 		if (wk) return wk[`name_${getLocale()}`];
 		if (key === ONE_OFF) return m['one_off.kind']();
-		return key?.startsWith('custom_') ? m['custom_wk.deleted']() : (key ?? '');
+		return key?.startsWith('custom_') ? m['postit_templates.deleted']() : (key ?? '');
 	}
 }
 

@@ -1,4 +1,4 @@
-package customwellknowns
+package postittemplates
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/services/access"
-	srv "github.com/Secreto31126/tesis/common/services/customwellknowns"
+	srv "github.com/Secreto31126/tesis/common/services/postittemplates"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -54,7 +54,7 @@ func setup(t *testing.T) (http.Handler, uuid.UUID) {
 
 	r := gin.New()
 	api := r.Group("/api/v1", middleware.RequireAuth(tokenVerifier{}), middleware.RestrictAccessTokens())
-	NewController(srv.New(mocks.NewMemoryCustomWellKnownStore(), db, access.New(nil))).RegisterRoutes(api)
+	NewController(srv.New(mocks.NewMemoryPostitTemplateStore(), db, access.New(nil))).RegisterRoutes(api)
 	return r, board.Id
 }
 
@@ -70,49 +70,49 @@ func do(r http.Handler, token, method, path, body string) *httptest.ResponseReco
 func TestLifecycle(t *testing.T) {
 	r, board := setup(t)
 
-	w := do(r, "ana", http.MethodPost, "/users/ana/well-knowns", catFact)
+	w := do(r, "ana", http.MethodPost, "/users/ana/postit-templates", catFact)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("create: %d %s", w.Code, w.Body)
 	}
-	var created models.CustomWellKnown
+	var created models.PostitTemplate
 	if err := json.Unmarshal(w.Body.Bytes(), &created); err != nil {
 		t.Fatal(err)
 	}
-	if !models.IsCustomWellKnownKey(created.Key) || created.Scope.Kind != models.CustomScopeUser || created.Outputs[0].Label != "Dato" {
+	if !models.IsPostitTemplateKey(created.Key) || created.Scope.Kind != models.TemplateScopeUser || created.Outputs[0].Label != "Dato" {
 		t.Errorf("created: %+v", created)
 	}
 
-	if w := do(r, "ana", http.MethodGet, "/users/ana/well-knowns", ""); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), created.Key) {
+	if w := do(r, "ana", http.MethodGet, "/users/ana/postit-templates", ""); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), created.Key) {
 		t.Errorf("list: %d %s", w.Code, w.Body)
 	}
-	if w := do(r, "bob", http.MethodGet, "/users/ana/well-knowns", ""); w.Code != http.StatusNotFound {
+	if w := do(r, "bob", http.MethodGet, "/users/ana/postit-templates", ""); w.Code != http.StatusNotFound {
 		t.Errorf("someone else's list: %d", w.Code)
 	}
-	if w := do(r, "bob", http.MethodGet, "/custom-well-knowns/"+created.Key, ""); w.Code != http.StatusNotFound {
+	if w := do(r, "bob", http.MethodGet, "/postit-templates/"+created.Key, ""); w.Code != http.StatusNotFound {
 		t.Errorf("someone else's get: %d", w.Code)
 	}
 
 	edited := strings.Replace(catFact, "Cat fact", "Gato", 1)
-	if w := do(r, "ana", http.MethodPut, "/custom-well-knowns/"+created.Key, edited); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Gato") {
+	if w := do(r, "ana", http.MethodPut, "/postit-templates/"+created.Key, edited); w.Code != http.StatusOK || !strings.Contains(w.Body.String(), "Gato") {
 		t.Errorf("update: %d %s", w.Code, w.Body)
 	}
 
-	w = do(r, "ana", http.MethodGet, "/boards/"+board.String()+"/well-knowns/usable", "")
+	w = do(r, "ana", http.MethodGet, "/boards/"+board.String()+"/postit-templates/usable", "")
 	if w.Code != http.StatusOK || !strings.Contains(w.Body.String(), `"usable":true`) {
 		t.Errorf("usable: %d %s", w.Code, w.Body)
 	}
 
-	if w := do(r, "ana", http.MethodDelete, "/custom-well-knowns/"+created.Key, ""); w.Code != http.StatusNoContent {
+	if w := do(r, "ana", http.MethodDelete, "/postit-templates/"+created.Key, ""); w.Code != http.StatusNoContent {
 		t.Errorf("delete: %d %s", w.Code, w.Body)
 	}
-	if w := do(r, "ana", http.MethodGet, "/custom-well-knowns/"+created.Key, ""); w.Code != http.StatusNotFound {
+	if w := do(r, "ana", http.MethodGet, "/postit-templates/"+created.Key, ""); w.Code != http.StatusNotFound {
 		t.Errorf("after delete: %d", w.Code)
 	}
 }
 
 func TestBoardScopeAndErrors(t *testing.T) {
 	r, board := setup(t)
-	path := "/boards/" + board.String() + "/well-knowns"
+	path := "/boards/" + board.String() + "/postit-templates"
 
 	if w := do(r, "bob", http.MethodPost, path, catFact); w.Code != http.StatusNotFound {
 		t.Errorf("viewer create: %d", w.Code)
@@ -131,7 +131,7 @@ func TestBoardScopeAndErrors(t *testing.T) {
 	if w := do(r, "ana", http.MethodPost, path, "{"); w.Code != http.StatusBadRequest {
 		t.Errorf("malformed: %d", w.Code)
 	}
-	if w := do(r, "ana", http.MethodGet, "/boards/nope/well-knowns", ""); w.Code != http.StatusBadRequest {
+	if w := do(r, "ana", http.MethodGet, "/boards/nope/postit-templates", ""); w.Code != http.StatusBadRequest {
 		t.Errorf("bad uuid: %d", w.Code)
 	}
 }
@@ -139,10 +139,10 @@ func TestBoardScopeAndErrors(t *testing.T) {
 func TestAccessTokens(t *testing.T) {
 	r, board := setup(t)
 
-	if w := do(r, "pat:ana", http.MethodGet, "/boards/"+board.String()+"/well-knowns/usable", ""); w.Code != http.StatusOK {
+	if w := do(r, "pat:ana", http.MethodGet, "/boards/"+board.String()+"/postit-templates/usable", ""); w.Code != http.StatusOK {
 		t.Errorf("token reads the board's types: %d %s", w.Code, w.Body)
 	}
-	for _, path := range []string{"/users/ana/well-knowns", "/boards/" + board.String() + "/well-knowns"} {
+	for _, path := range []string{"/users/ana/postit-templates", "/boards/" + board.String() + "/postit-templates"} {
 		if w := do(r, "pat:ana", http.MethodPost, path, catFact); w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "token_not_allowed") {
 			t.Errorf("token create %s: %d %s", path, w.Code, w.Body)
 		}

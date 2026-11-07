@@ -1,4 +1,4 @@
-package customwellknowns
+package postittemplates
 
 import (
 	"errors"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/models"
-	srv "github.com/Secreto31126/tesis/common/services/customwellknowns"
+	srv "github.com/Secreto31126/tesis/common/services/postittemplates"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -21,23 +21,21 @@ func NewController(service *srv.Service) *Controller {
 	return &Controller{service}
 }
 
-// Request is what a client sends to create or replace a custom card type:
-// the key, scope and stamps are the server's.
 type Request struct {
-	Name        string                            `json:"name"`
-	Description string                            `json:"description"`
-	Title       models.BoardPostItTitle           `json:"title"`
-	Resource    string                            `json:"resource"`
-	Request     models.Request                    `json:"request"`
-	Response    string                            `json:"response"`
-	Query       map[string]string                 `json:"query"`
-	Rate        int                               `json:"rate"`
-	Parameters  []models.CustomWellKnownParameter `json:"parameters"`
-	Outputs     []models.CustomWellKnownOutput    `json:"outputs"`
+	Name        string                           `json:"name"`
+	Description string                           `json:"description"`
+	Title       models.BoardPostItTitle          `json:"title"`
+	Resource    string                           `json:"resource"`
+	Request     models.Request                   `json:"request"`
+	Response    string                           `json:"response"`
+	Query       map[string]string                `json:"query"`
+	Rate        int                              `json:"rate"`
+	Parameters  []models.PostitTemplateParameter `json:"parameters"`
+	Outputs     []models.PostitTemplateOutput    `json:"outputs"`
 }
 
-func (r Request) definition() models.CustomWellKnown {
-	return models.CustomWellKnown{
+func (r Request) definition() models.PostitTemplate {
+	return models.PostitTemplate{
 		Name:        strings.TrimSpace(r.Name),
 		Description: strings.TrimSpace(r.Description),
 		Title:       r.Title,
@@ -51,39 +49,39 @@ func (r Request) definition() models.CustomWellKnown {
 	}
 }
 
-type scoping func(c *gin.Context) (models.CustomWellKnownScope, bool)
+type scoping func(c *gin.Context) (models.PostitTemplateScope, bool)
 
-func userScope(c *gin.Context) (models.CustomWellKnownScope, bool) {
-	return models.CustomWellKnownScope{Kind: models.CustomScopeUser, Owner: c.Param("id")}, true
+func userScope(c *gin.Context) (models.PostitTemplateScope, bool) {
+	return models.PostitTemplateScope{Kind: models.TemplateScopeUser, Owner: c.Param("id")}, true
 }
 
-func boardScope(c *gin.Context) (models.CustomWellKnownScope, bool) {
-	return uuidScope(c, models.CustomScopeBoard)
+func boardScope(c *gin.Context) (models.PostitTemplateScope, bool) {
+	return uuidScope(c, models.TemplateScopeBoard)
 }
 
-func orgScope(c *gin.Context) (models.CustomWellKnownScope, bool) {
-	return uuidScope(c, models.CustomScopeOrg)
+func orgScope(c *gin.Context) (models.PostitTemplateScope, bool) {
+	return uuidScope(c, models.TemplateScopeOrg)
 }
 
-func uuidScope(c *gin.Context, kind models.CustomWellKnownScopeKind) (models.CustomWellKnownScope, bool) {
+func uuidScope(c *gin.Context, kind models.PostitTemplateScopeKind) (models.PostitTemplateScope, bool) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid uuid"})
-		return models.CustomWellKnownScope{}, false
+		return models.PostitTemplateScope{}, false
 	}
-	return models.CustomWellKnownScope{Kind: kind, Owner: id.String()}, true
+	return models.PostitTemplateScope{Kind: kind, Owner: id.String()}, true
 }
 
 // RegisterRoutes: card types are listed and created under the scope that
 // owns them, then read, replaced and deleted by key.
 func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 	for prefix, s := range map[string]scoping{"/users/:id": userScope, "/boards/:id": boardScope, "/orgs/:id": orgScope} {
-		router.GET(prefix+"/well-knowns", ctrl.List(s))
-		router.POST(prefix+"/well-knowns", ctrl.Create(s))
+		router.GET(prefix+"/postit-templates", ctrl.List(s))
+		router.POST(prefix+"/postit-templates", ctrl.Create(s))
 	}
-	router.GET("/boards/:id/well-knowns/usable", ctrl.ForBoard)
+	router.GET("/boards/:id/postit-templates/usable", ctrl.ForBoard)
 
-	group := router.Group("/custom-well-knowns")
+	group := router.Group("/postit-templates")
 	{
 		group.GET("/:key", ctrl.Get)
 		group.PUT("/:key", ctrl.Update)
@@ -92,14 +90,14 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 }
 
 // List godoc
-// @Summary      List a scope's custom card types
-// @Tags         custom-well-knowns
+// @Summary      List a scope's post-it templates
+// @Tags         postit-templates
 // @Param        id  path  string  true  "User id, board UUID or org UUID"
-// @Success      200  {array}  models.CustomWellKnown
+// @Success      200  {array}  models.PostitTemplate
 // @Failure      404  {object}  map[string]string{"error": "not_found"}
-// @Router       /users/{id}/well-knowns [get]
-// @Router       /boards/{id}/well-knowns [get]
-// @Router       /orgs/{id}/well-knowns [get]
+// @Router       /users/{id}/postit-templates [get]
+// @Router       /boards/{id}/postit-templates [get]
+// @Router       /orgs/{id}/postit-templates [get]
 func (ctrl *Controller) List(s scoping) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		scope, ok := s(c)
@@ -116,18 +114,18 @@ func (ctrl *Controller) List(s scoping) gin.HandlerFunc {
 }
 
 // Create godoc
-// @Summary      Create a custom card type in a scope
+// @Summary      Create a post-it template in a scope
 // @Description  User scope: only that user. Board scope: board editors. Org scope: org admins.
-// @Tags         custom-well-knowns
+// @Tags         postit-templates
 // @Param        id    path  string   true  "User id, board UUID or org UUID"
 // @Param        body  body  Request  true  "Definition"
-// @Success      201  {object}  models.CustomWellKnown
-// @Failure      400  {object}  map[string]string{"error": "invalid_well_known", "message": "string"}
+// @Success      201  {object}  models.PostitTemplate
+// @Failure      400  {object}  map[string]string{"error": "invalid_postit_template", "message": "string"}
 // @Failure      404  {object}  map[string]string{"error": "not_found"}
 // @Failure      409  {object}  map[string]string{"error": "limit_reached"}
-// @Router       /users/{id}/well-knowns [post]
-// @Router       /boards/{id}/well-knowns [post]
-// @Router       /orgs/{id}/well-knowns [post]
+// @Router       /users/{id}/postit-templates [post]
+// @Router       /boards/{id}/postit-templates [post]
+// @Router       /orgs/{id}/postit-templates [post]
 func (ctrl *Controller) Create(s scoping) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		scope, ok := s(c)
@@ -148,13 +146,13 @@ func (ctrl *Controller) Create(s scoping) gin.HandlerFunc {
 }
 
 // ForBoard godoc
-// @Summary      The custom card types a board needs
+// @Summary      The post-it templates a board needs
 // @Description  Those the caller may drop on it (usable: theirs, the board's, its org's) and those its cards were made from (usable: false).
-// @Tags         custom-well-knowns
+// @Tags         postit-templates
 // @Param        id  path  string  true  "Board UUID"
-// @Success      200  {array}  srv.BoardWellKnown
+// @Success      200  {array}  srv.BoardPostitTemplate
 // @Failure      404  {object}  map[string]string{"error": "not_found"}
-// @Router       /boards/{id}/well-knowns/usable [get]
+// @Router       /boards/{id}/postit-templates/usable [get]
 func (ctrl *Controller) ForBoard(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
@@ -170,12 +168,12 @@ func (ctrl *Controller) ForBoard(c *gin.Context) {
 }
 
 // Get godoc
-// @Summary      Get a custom card type
-// @Tags         custom-well-knowns
+// @Summary      Get a post-it template
+// @Tags         postit-templates
 // @Param        key  path  string  true  "Key (custom_…)"
-// @Success      200  {object}  models.CustomWellKnown
+// @Success      200  {object}  models.PostitTemplate
 // @Failure      404  {object}  map[string]string{"error": "not_found"}
-// @Router       /custom-well-knowns/{key} [get]
+// @Router       /postit-templates/{key} [get]
 func (ctrl *Controller) Get(c *gin.Context) {
 	def, err := ctrl.service.Get(middleware.Principal(c), c.Param("key"))
 	if err != nil {
@@ -186,15 +184,15 @@ func (ctrl *Controller) Get(c *gin.Context) {
 }
 
 // Update godoc
-// @Summary      Replace a custom card type
+// @Summary      Replace a post-it template
 // @Description  Its key and scope stay. Cards already made keep their own copy.
-// @Tags         custom-well-knowns
+// @Tags         postit-templates
 // @Param        key   path  string   true  "Key (custom_…)"
 // @Param        body  body  Request  true  "Definition"
-// @Success      200  {object}  models.CustomWellKnown
-// @Failure      400  {object}  map[string]string{"error": "invalid_well_known", "message": "string"}
+// @Success      200  {object}  models.PostitTemplate
+// @Failure      400  {object}  map[string]string{"error": "invalid_postit_template", "message": "string"}
 // @Failure      404  {object}  map[string]string{"error": "not_found"}
-// @Router       /custom-well-knowns/{key} [put]
+// @Router       /postit-templates/{key} [put]
 func (ctrl *Controller) Update(c *gin.Context) {
 	body, ok := bind(c)
 	if !ok {
@@ -209,13 +207,13 @@ func (ctrl *Controller) Update(c *gin.Context) {
 }
 
 // Delete godoc
-// @Summary      Delete a custom card type
+// @Summary      Delete a post-it template
 // @Description  For good. Cards made from it keep running but can no longer be edited.
-// @Tags         custom-well-knowns
+// @Tags         postit-templates
 // @Param        key  path  string  true  "Key (custom_…)"
 // @Success      204  "No Content"
 // @Failure      404  {object}  map[string]string{"error": "not_found"}
-// @Router       /custom-well-knowns/{key} [delete]
+// @Router       /postit-templates/{key} [delete]
 func (ctrl *Controller) Delete(c *gin.Context) {
 	if err := ctrl.service.Delete(middleware.Principal(c), c.Param("key")); err != nil {
 		fail(c, err)
@@ -224,11 +222,11 @@ func (ctrl *Controller) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func bind(c *gin.Context) (models.CustomWellKnown, bool) {
+func bind(c *gin.Context) (models.PostitTemplate, bool) {
 	var body Request
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": srv.ErrInvalid.Error(), "message": err.Error()})
-		return models.CustomWellKnown{}, false
+		return models.PostitTemplate{}, false
 	}
 	return body.definition(), true
 }
@@ -243,7 +241,7 @@ func fail(c *gin.Context, err error) {
 	case errors.Is(err, srv.ErrLimit):
 		c.JSON(http.StatusConflict, gin.H{"error": srv.ErrLimit.Error()})
 	default:
-		log.Printf("custom well-knowns: %v", err)
+		log.Printf("post-it templates: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal"})
 	}
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CustomWellKnown } from '$types/api';
+import type { PostitTemplate } from '$types/api';
 import { bodyOf, draftFrom, emptyDraft, problems, type Draft } from './draft';
 
 function catFact(): Draft {
@@ -37,7 +37,7 @@ describe('bodyOf', () => {
 
 	it('round-trips through a stored definition', () => {
 		const body = bodyOf(catFact());
-		const stored: CustomWellKnown = {
+		const stored: PostitTemplate = {
 			...body,
 			key: 'custom_x',
 			scope: { kind: 'user', owner: 'ana' },

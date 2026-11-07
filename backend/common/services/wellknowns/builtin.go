@@ -13,7 +13,7 @@ func Builtin() []models.WellKnown {
 			TitleEn: "{{text}}",
 			TitleEs: "{{text}}",
 			Parameters: []models.WellKnownParameter{
-				{Key: "text", LabelEn: "Content", LabelEs: "Contenido", Type: models.ParameterString, PlaceholderEn: ptr("Enter text"), PlaceholderEs: ptr("Ingrese texto"), Default: ptr("")},
+				{Key: "text", LabelEn: "Content", LabelEs: "Contenido", Type: models.ParameterString, PlaceholderEn: new("Enter text"), PlaceholderEs: new("Ingrese texto"), Default: new("")},
 			},
 			Outputs: []models.WellKnownOutput{
 				{Key: "text", LabelEn: "Text", LabelEs: "Texto", ExampleEn: "Hello!", ExampleEs: "Hola!"},
@@ -43,10 +43,10 @@ func Builtin() []models.WellKnown {
 			},
 			Rate: 30,
 			Parameters: []models.WellKnownParameter{
-				{Key: "$latitude", LabelEn: "Latitude", LabelEs: "Latitud", Type: models.ParameterNumber, Default: ptr("-34.6131")},
-				{Key: "$longitude", LabelEn: "Longitude", LabelEs: "Longitud", Type: models.ParameterNumber, Default: ptr("-58.3772")},
-				{Key: "$start_date", LabelEn: "Start date", LabelEs: "Fecha de inicio", Type: models.ParameterString, PlaceholderEn: ptr("YYYY-MM-DD"), PlaceholderEs: ptr("AAAA-MM-DD")},
-				{Key: "$end_date", LabelEn: "End date", LabelEs: "Fecha de fin", Type: models.ParameterString, PlaceholderEn: ptr("YYYY-MM-DD"), PlaceholderEs: ptr("AAAA-MM-DD")},
+				{Key: "$latitude", LabelEn: "Latitude", LabelEs: "Latitud", Type: models.ParameterNumber, Default: new("-34.6131")},
+				{Key: "$longitude", LabelEn: "Longitude", LabelEs: "Longitud", Type: models.ParameterNumber, Default: new("-58.3772")},
+				{Key: "$start_date", LabelEn: "Start date", LabelEs: "Fecha de inicio", Type: models.ParameterString, PlaceholderEn: new("YYYY-MM-DD"), PlaceholderEs: new("AAAA-MM-DD")},
+				{Key: "$end_date", LabelEn: "End date", LabelEs: "Fecha de fin", Type: models.ParameterString, PlaceholderEn: new("YYYY-MM-DD"), PlaceholderEs: new("AAAA-MM-DD")},
 			},
 			Outputs: []models.WellKnownOutput{
 				{Key: "min", LabelEn: "Minimum °C", LabelEs: "Mínimo °C", ExampleEn: 12.4, ExampleEs: 12.4},
@@ -80,7 +80,7 @@ func Builtin() []models.WellKnown {
 			},
 			Rate: 120,
 			Parameters: []models.WellKnownParameter{
-				{Key: "$keyword", LabelEn: "Keyword", LabelEs: "Palabra clave", Type: models.ParameterString, PlaceholderEn: ptr("Enter keyword"), PlaceholderEs: ptr("Ingrese palabra clave")},
+				{Key: "$keyword", LabelEn: "Keyword", LabelEs: "Palabra clave", Type: models.ParameterString, PlaceholderEn: new("Enter keyword"), PlaceholderEs: new("Ingrese palabra clave")},
 				{Key: "$credential", LabelEn: "Credential", LabelEs: "Credencial", Type: models.ParameterSecret},
 			},
 			Outputs: []models.WellKnownOutput{
@@ -169,8 +169,8 @@ func Builtin() []models.WellKnown {
 			},
 			Rate: 60,
 			Parameters: []models.WellKnownParameter{
-				{Key: "$coin", LabelEn: "Coin", LabelEs: "Moneda", Type: models.ParameterString, PlaceholderEn: ptr("bitcoin"), PlaceholderEs: ptr("bitcoin"), Default: ptr("bitcoin")},
-				{Key: "$currency", LabelEn: "Currency", LabelEs: "Moneda", Type: models.ParameterString, PlaceholderEn: ptr("usd"), PlaceholderEs: ptr("usd"), Default: ptr("usd")},
+				{Key: "$coin", LabelEn: "Coin", LabelEs: "Moneda", Type: models.ParameterString, PlaceholderEn: new("bitcoin"), PlaceholderEs: new("bitcoin"), Default: new("bitcoin")},
+				{Key: "$currency", LabelEn: "Currency", LabelEs: "Moneda", Type: models.ParameterString, PlaceholderEn: new("usd"), PlaceholderEs: new("usd"), Default: new("usd")},
 			},
 			Outputs: []models.WellKnownOutput{
 				{Key: "coin", LabelEn: "Coin", LabelEs: "Moneda", ExampleEn: "bitcoin", ExampleEs: "bitcoin"},
@@ -201,8 +201,8 @@ func Builtin() []models.WellKnown {
 			},
 			Rate: 900,
 			Parameters: []models.WellKnownParameter{
-				{Key: "$latitude", LabelEn: "Latitude", LabelEs: "Latitud", Type: models.ParameterNumber, Default: ptr("-34.6131")},
-				{Key: "$longitude", LabelEn: "Longitude", LabelEs: "Longitud", Type: models.ParameterNumber, Default: ptr("-58.3772")},
+				{Key: "$latitude", LabelEn: "Latitude", LabelEs: "Latitud", Type: models.ParameterNumber, Default: new("-34.6131")},
+				{Key: "$longitude", LabelEn: "Longitude", LabelEs: "Longitud", Type: models.ParameterNumber, Default: new("-58.3772")},
 			},
 			Outputs: []models.WellKnownOutput{
 				{Key: "aqi", LabelEn: "US AQI", LabelEs: "AQI de EE.UU.", ExampleEn: 42, ExampleEs: 42},
@@ -236,7 +236,7 @@ func Builtin() []models.WellKnown {
 			},
 			Rate: 300,
 			Parameters: []models.WellKnownParameter{
-				{Key: "$query", LabelEn: "Repository", LabelEs: "Repositorio", Type: models.ParameterString, PlaceholderEn: ptr("itchyny/gojq"), PlaceholderEs: ptr("itchyny/gojq")},
+				{Key: "$query", LabelEn: "Repository", LabelEs: "Repositorio", Type: models.ParameterString, PlaceholderEn: new("itchyny/gojq"), PlaceholderEs: new("itchyny/gojq")},
 			},
 			Outputs: []models.WellKnownOutput{
 				{Key: "name", LabelEn: "Repository", LabelEs: "Repositorio", ExampleEn: "itchyny/gojq", ExampleEs: "itchyny/gojq"},
@@ -271,8 +271,8 @@ func Builtin() []models.WellKnown {
 			},
 			Rate: 3600,
 			Parameters: []models.WellKnownParameter{
-				{Key: "$base", LabelEn: "Base currency", LabelEs: "Moneda base", Type: models.ParameterString, PlaceholderEn: ptr("USD"), PlaceholderEs: ptr("USD"), Default: ptr("USD")},
-				{Key: "$currency", LabelEn: "Quote currency", LabelEs: "Moneda de cotización", Type: models.ParameterString, PlaceholderEn: ptr("ARS"), PlaceholderEs: ptr("ARS"), Default: ptr("ARS")},
+				{Key: "$base", LabelEn: "Base currency", LabelEs: "Moneda base", Type: models.ParameterString, PlaceholderEn: new("USD"), PlaceholderEs: new("USD"), Default: new("USD")},
+				{Key: "$currency", LabelEn: "Quote currency", LabelEs: "Moneda de cotización", Type: models.ParameterString, PlaceholderEn: new("ARS"), PlaceholderEs: new("ARS"), Default: new("ARS")},
 				{Key: "$credential", LabelEn: "Credential", LabelEs: "Credencial", Type: models.ParameterSecret},
 			},
 			Outputs: []models.WellKnownOutput{
@@ -334,7 +334,7 @@ func Builtin() []models.WellKnown {
 			},
 			Rate: 300,
 			Parameters: []models.WellKnownParameter{
-				{Key: "$time_min", LabelEn: "From", LabelEs: "De", Type: models.ParameterString, PlaceholderEn: ptr("2026-01-01T00:00:00Z"), PlaceholderEs: ptr("2026-01-01T00:00:00Z")},
+				{Key: "$time_min", LabelEn: "From", LabelEs: "De", Type: models.ParameterString, PlaceholderEn: new("2026-01-01T00:00:00Z"), PlaceholderEs: new("2026-01-01T00:00:00Z")},
 				{Key: "$credential", LabelEn: "Google account", LabelEs: "Cuenta de Google", Type: models.ParameterSecret},
 			},
 			Outputs: []models.WellKnownOutput{
@@ -378,5 +378,3 @@ func Builtin() []models.WellKnown {
 	}
 	return defs
 }
-
-func ptr(s string) *string { return &s }

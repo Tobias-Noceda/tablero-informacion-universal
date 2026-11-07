@@ -62,10 +62,10 @@ func TestSystemParams_StillResolvedForADeletedWellKnown(t *testing.T) {
 	}
 }
 
-// customTypes answers Usable from a fixed map of key → definition.
-type customTypes map[string]models.CustomWellKnown
+// templateStubs answers Usable from a fixed map of key → definition.
+type templateStubs map[string]models.PostitTemplate
 
-func (c customTypes) Usable(_ models.Principal, _ uuid.UUID, key string) (*models.WellKnown, error) {
+func (c templateStubs) Usable(_ models.Principal, _ uuid.UUID, key string) (*models.WellKnown, error) {
 	def, ok := c[key]
 	if !ok {
 		return nil, errors.New("not_found")
@@ -74,21 +74,21 @@ func (c customTypes) Usable(_ models.Principal, _ uuid.UUID, key string) (*model
 	return &wk, nil
 }
 
-func TestCreatePostIt_FromCustomWellKnown(t *testing.T) {
-	key := models.NewCustomWellKnownKey()
-	custom := customTypes{key: {
+func TestCreatePostIt_FromPostitTemplate(t *testing.T) {
+	key := models.NewPostitTemplateKey()
+	templates := templateStubs{key: {
 		Key:      key,
-		Scope:    models.CustomWellKnownScope{Kind: models.CustomScopeUser, Owner: boardOwner.ID},
+		Scope:    models.PostitTemplateScope{Kind: models.TemplateScopeUser, Owner: boardOwner.ID},
 		Name:     "Cat fact",
 		Title:    models.BoardPostItTitle{Text: "{{fact}}", Vars: true},
 		Resource: "https://catfact.ninja/fact",
 		Request:  models.Request{Method: "GET", Queries: map[string]string{"max_length": "$max"}},
 		Response: "json",
 		Query:    map[string]string{"fact": ".fact"},
-		Parameters: []models.CustomWellKnownParameter{
+		Parameters: []models.PostitTemplateParameter{
 			{Key: "$max", Label: "Max", Type: models.ParameterNumber},
 		},
-		Outputs: []models.CustomWellKnownOutput{{Key: "fact", Label: "Fact"}},
+		Outputs: []models.PostitTemplateOutput{{Key: "fact", Label: "Fact"}},
 	}}
 
 	db := boardOf(boardOwner)
@@ -97,7 +97,7 @@ func TestCreatePostIt_FromCustomWellKnown(t *testing.T) {
 		ptype = kind
 		return p, nil
 	}
-	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, &mocks.MockSecretResolver{}, access.New(nil), builtins(), custom)
+	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, &mocks.MockSecretResolver{}, access.New(nil), builtins(), templates)
 
 	postit, err := svc.CreatePostIt(boardOwner, nil, &models.PostIts{Board: uuid.New(), WellKnown: key, Params: map[string]string{"$max": "80"}})
 	if err != nil {
@@ -107,12 +107,12 @@ func TestCreatePostIt_FromCustomWellKnown(t *testing.T) {
 		t.Errorf("card: type %q, %+v", ptype, postit)
 	}
 
-	// Missing, not usable here, or no custom types at all: unknown.
-	if _, err := svc.CreatePostIt(boardOwner, nil, &models.PostIts{Board: uuid.New(), WellKnown: models.NewCustomWellKnownKey()}); !errors.Is(err, ErrUnknownWellKnown) {
+	// Missing, not usable here, or no templates at all: unknown.
+	if _, err := svc.CreatePostIt(boardOwner, nil, &models.PostIts{Board: uuid.New(), WellKnown: models.NewPostitTemplateKey()}); !errors.Is(err, ErrUnknownWellKnown) {
 		t.Errorf("unusable: err = %v", err)
 	}
 	none := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, &mocks.MockSecretResolver{}, access.New(nil), builtins(), nil)
 	if _, err := none.CreatePostIt(boardOwner, nil, &models.PostIts{Board: uuid.New(), WellKnown: key}); !errors.Is(err, ErrUnknownWellKnown) {
-		t.Errorf("without custom types: err = %v", err)
+		t.Errorf("without templates: err = %v", err)
 	}
 }

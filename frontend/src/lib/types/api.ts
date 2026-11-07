@@ -323,21 +323,21 @@ export type WellKnown = {
 	builtin: boolean;
 	updated_at?: string;
 	updated_by?: string;
-	/** Only on a custom card type seen as a well-known: who it belongs to. */
-	scope?: CustomWellKnownScope;
-	/** Only on a custom card type: whether it may be dropped on this board. */
+	/** Only on a post-it template seen as a well-known: who it belongs to. */
+	scope?: PostitTemplateScope;
+	/** Only on a post-it template: whether it may be dropped on this board. */
 	usable?: boolean;
 };
 
 // A card type a user defines for themselves, a board or an organization. One
 // language only: whichever its author writes it in.
-export type CustomWellKnownScope = {
+export type PostitTemplateScope = {
 	kind: 'user' | 'board' | 'org';
 	/** User id, board id or organization id. */
 	owner: string;
 };
 
-export type CustomWellKnownParameter = {
+export type PostitTemplateParameter = {
 	key: string;
 	label: string;
 	type: WellKnownParameter['type'];
@@ -345,14 +345,14 @@ export type CustomWellKnownParameter = {
 	default?: string;
 };
 
-export type CustomWellKnownOutput = {
+export type PostitTemplateOutput = {
 	key: string;
 	label: string;
 	example?: unknown;
 };
 
-/** What a client sends to create or replace a custom card type. */
-export type CustomWellKnownBody = {
+/** What a client sends to create or replace a post-it template. */
+export type PostitTemplateBody = {
 	name: string;
 	description?: string;
 	title: { text: string; vars: boolean };
@@ -361,22 +361,22 @@ export type CustomWellKnownBody = {
 	response: 'json' | 'html';
 	query: Record<string, string>;
 	rate: number;
-	parameters: CustomWellKnownParameter[];
-	outputs: CustomWellKnownOutput[];
+	parameters: PostitTemplateParameter[];
+	outputs: PostitTemplateOutput[];
 };
 
-export type CustomWellKnown = Omit<CustomWellKnownBody, 'request' | 'query' | 'parameters' | 'outputs'> & {
+export type PostitTemplate = Omit<PostitTemplateBody, 'request' | 'query' | 'parameters' | 'outputs'> & {
 	key: string;
-	scope: CustomWellKnownScope;
+	scope: PostitTemplateScope;
 	request: WellKnown['request'];
 	query: Record<string, string> | null;
-	parameters: CustomWellKnownParameter[] | null;
-	outputs: CustomWellKnownOutput[] | null;
+	parameters: PostitTemplateParameter[] | null;
+	outputs: PostitTemplateOutput[] | null;
 	created_by: string;
 	created_at: string;
 	updated_by: string;
 	updated_at: string;
 };
 
-/** A custom card type as a board sees it (GET /boards/:id/well-knowns/usable). */
-export type BoardWellKnown = CustomWellKnown & { usable: boolean };
+/** A post-it template as a board sees it (GET /boards/:id/postit-templates/usable). */
+export type BoardPostitTemplate = PostitTemplate & { usable: boolean };

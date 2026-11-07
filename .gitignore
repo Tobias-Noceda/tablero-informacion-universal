@@ -33,3 +33,6 @@ go.work.sum
 .env*
 !.env.example
 /.claude
+
+# Backend binary built by the Vercel buildCommand (or a local go build -o server)
+/backend/server
