@@ -10,6 +10,7 @@
 	"landing": {
 		"title_personal": "Personal boards",
 		"empty": "No boards yet. Create one to get started.",
+		"empty_mobile": "No boards yet. Create one from a larger screen.",
 		"cards": "{count} cards",
 		"title_placeholder": "title",
 		"create_board": "Create a new board"

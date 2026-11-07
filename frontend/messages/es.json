@@ -11,6 +11,7 @@
 	"landing": {
 		"title_personal": "Tableros personales",
 		"empty": "Todavía no hay tableros. Creá uno para empezar.",
+		"empty_mobile": "Todavía no hay tableros. Creá uno desde una pantalla más grande.",
 		"cards": "{count} tarjetas",
 		"title_placeholder": "título",
 		"create_board": "Crear un nuevo tablero"
