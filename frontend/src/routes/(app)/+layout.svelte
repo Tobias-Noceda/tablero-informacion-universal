@@ -25,7 +25,7 @@
 </script>
 
 <SvelteFlowProvider>
-	<div class="flex flex-col h-screen w-screen">
+	<div class="flex flex-col h-dvh w-full overflow-hidden">
 		<TopBar />
 		<div class="flex flex-col flex-1 min-h-0 overflow-auto bg-background">
 			<!-- Pages in (app) may assume a user; signing out unmounts them before it navigates. -->
