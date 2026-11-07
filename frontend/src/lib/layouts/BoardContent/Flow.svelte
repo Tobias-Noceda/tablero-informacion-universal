@@ -44,6 +44,7 @@
 		nodes,
 		edges,
 		role,
+		readOnly = false,
 		boardId,
 		orgId,
 		boardUpdate
@@ -51,6 +52,8 @@
 		nodes: Node[];
 		edges: Edge[];
 		role: BoardRole;
+		/** A phone: the board is looked at, its cards can only be deleted. */
+		readOnly?: boolean;
 		boardId: string;
 		orgId?: string;
 		boardUpdate: (update: Update) => void;
@@ -58,7 +61,9 @@
 
 	// Viewers look: no dragging or connecting and no deleting (the board
 	// layout hides the cards and credentials; the backend refuses it anyway).
-	const canEdit = $derived(role === 'owner' || role === 'editor');
+	const canDelete = $derived(role === 'owner' || role === 'editor');
+	// A phone (readOnly) keeps deleting but nothing else.
+	const canEdit = $derived(canDelete && !readOnly);
 
 	let settingsVersion = $state(0);
 
@@ -184,7 +189,7 @@
 	};
 
 	const deleteNode = async (node: Node) => {
-		if (!canEdit) return;
+		if (!canDelete) return;
 		await postItsApi.del(node.id).then((deletedEdges) => {
 			edges = edges.filter((e) => !deletedEdges.map((edge) => edge.id).includes(e.id));
 		});
@@ -368,7 +373,7 @@
 		</Realtime>
 	</main>
 	{#if selectedNode}
-		<NodeDetail node={selectedNode} {canEdit} {settingsVersion} onedit={onEditStart} onback={closeNode} ondelete={deleteNode} />
+		<NodeDetail node={selectedNode} {canEdit} {canDelete} {settingsVersion} onedit={onEditStart} onback={closeNode} ondelete={deleteNode} />
 	{/if}
 
 	{#if $isManagingSecrets}

@@ -88,7 +88,7 @@
 	</div>
 	<div class="flex flex-col flex-1 min-h-0 overflow-auto bg-background">
 		{#key boardId}
-			<Flow {nodes} {edges} role={viewRole} {boardId} {orgId} {boardUpdate} />
+			<Flow {nodes} {edges} {role} readOnly={mobile.current} {boardId} {orgId} {boardUpdate} />
 		{/key}
 	</div>
 </div>

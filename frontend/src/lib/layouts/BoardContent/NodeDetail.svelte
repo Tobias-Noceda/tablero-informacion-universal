@@ -35,13 +35,14 @@
 	interface NodeDetailProps {
 		node: Node;
 		canEdit: boolean;
+		canDelete: boolean;
 		settingsVersion: number;
 		onback: () => void;
 		onedit: (node: PostItData) => void;
 		ondelete: (node: Node) => void;
 	}
 
-	let { node, canEdit, settingsVersion, onback, onedit, ondelete }: NodeDetailProps = $props();
+	let { node, canEdit, canDelete, settingsVersion, onback, onedit, ondelete }: NodeDetailProps = $props();
 
 	const title = $derived(node.data?.title as { text: string; vars: boolean } | undefined);
 
@@ -353,7 +354,7 @@
 		</section>
 	</div>
 
-	{#if canEdit}
+	{#if canDelete}
 		<div class="flex shrink-0 items-center justify-center p-4 pt-0">
 			<Button variant="destructive" class="shrink-0" onclick={() => ondelete(node)}>
 				{m['node_detail.delete']()}
