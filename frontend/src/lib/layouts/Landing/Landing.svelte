@@ -21,12 +21,12 @@
 	};
 </script>
 
-<div class="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
-	<h1 class="text-3xl font-semibold text-main-text">
+<div class="flex flex-1 flex-col gap-4 overflow-y-auto p-4 sm:p-6">
+	<h1 class="text-2xl font-semibold text-main-text sm:text-3xl">
 		{org?.name ?? m['landing.title_personal']()}
 	</h1>
 
-	<div class="grid grid-cols-[repeat(auto-fill,minmax(25rem,1fr))] gap-5">
+	<div class="grid grid-cols-[repeat(auto-fill,minmax(min(25rem,100%),1fr))] gap-4 sm:gap-5">
 		{#each boards as board (board.id)}
 			<a
 				href={resolve(boardPath(board.id, org?.id))}
@@ -45,7 +45,7 @@
 			</a>
 		{/each}
 		<button
-			class="flex aspect-4/3 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-main-border text-secondary transition-colors hover:border-main-border-hover hover:text-primary"
+			class="hidden aspect-4/3 cursor-pointer flex-col items-center md:flex justify-center gap-2 rounded-lg border-2 border-dashed border-main-border text-secondary transition-colors hover:border-main-border-hover hover:text-primary"
 			onclick={() => setCreatingBoard(true)}
 		>
 			<Icon name="plus" class="h-10 w-10" />
@@ -54,6 +54,7 @@
 	</div>
 
 	{#if boards.length === 0}
-		<p class="text-sm opacity-70">{m['landing.empty']()}</p>
+		<p class="hidden text-sm opacity-70 md:block">{m['landing.empty']()}</p>
+		<p class="text-sm opacity-70 md:hidden">{m['landing.empty_mobile']()}</p>
 	{/if}
 </div>

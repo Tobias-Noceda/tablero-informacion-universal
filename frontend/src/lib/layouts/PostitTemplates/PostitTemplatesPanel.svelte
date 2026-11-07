@@ -158,7 +158,7 @@
 	withCloseButton={false}
 	onaccept={onclose}
 	acceptText={m['postit_templates.close']()}
-	dialogClass={cn("max-w-2xl max-h-[90vh] overflow-y-auto", scrollClass)}
+	dialogClass={cn("max-w-2xl max-h-[90dvh] overflow-y-auto", scrollClass)}
 >
 	<h2 class="text-lg font-semibold">{m['postit_templates.title']()}</h2>
 

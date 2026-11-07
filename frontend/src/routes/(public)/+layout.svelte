@@ -5,12 +5,12 @@
 	let { children } = $props();
 </script>
 
-<div class="flex min-h-screen flex-col bg-background">
+<div class="flex min-h-dvh flex-col bg-background">
 	<header
-		class="flex flex-row items-center justify-between gap-4 border-b border-main-border bg-main px-4 py-1"
+		class="flex flex-row items-center justify-between gap-2 sm:gap-4 border-b border-main-border bg-main px-4 py-1"
 	>
-		<a href={resolve('/about')}><img src={logo} alt="Corcheria Company" class="w-44" /></a>
-		<nav class="flex flex-row items-center gap-4 text-sm font-medium text-main-text">
+		<a href={resolve('/about')}><img src={logo} alt="Corcheria Company" class="w-32 sm:w-44" /></a>
+		<nav class="flex flex-row items-center gap-2 sm:gap-4 text-xs sm:text-sm font-medium text-main-text">
 			<a href={resolve('/login')} class="hover:underline">Sign in</a>
 			<a href={resolve('/register')} class="hover:underline">Create an account</a>
 		</nav>

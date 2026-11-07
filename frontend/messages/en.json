@@ -10,6 +10,7 @@
 	"landing": {
 		"title_personal": "Personal boards",
 		"empty": "No boards yet. Create one to get started.",
+		"empty_mobile": "No boards yet. Create one from a larger screen.",
 		"cards": "{count} cards",
 		"title_placeholder": "title",
 		"create_board": "Create a new board"
@@ -179,7 +180,9 @@
 	"header": {
 		"profile": "Profile",
 		"logout": "Sign out",
-		"menu": "Account menu"
+		"menu": "Account menu",
+		"navigation": "Boards and organizations",
+		"members": "People on this board"
 	},
 	"members": {
 		"share": "Share",

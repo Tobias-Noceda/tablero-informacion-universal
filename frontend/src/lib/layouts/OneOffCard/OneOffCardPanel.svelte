@@ -230,7 +230,7 @@
 		? m['nodes.modify_modal.create.action']()
 		: m['nodes.modify_modal.edit.action']()}
 	acceptDisabled={saving || (touched && found.length > 0)}
-	dialogClass={cn('max-w-2xl max-h-[90vh] overflow-y-auto', scrollClass)}
+	dialogClass={cn('max-w-2xl max-h-[90dvh] overflow-y-auto', scrollClass)}
 >
 	<h2 class="text-lg font-semibold">
 		{creating ? m['one_off.create_title']() : m['one_off.edit_title']()}
