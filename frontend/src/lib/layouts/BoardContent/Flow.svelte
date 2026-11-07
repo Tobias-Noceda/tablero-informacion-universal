@@ -27,6 +27,7 @@
 	import { wellKnowns } from '$stores/well-knowns.svelte';
 	import { edgesMap } from '$components/Edges/edge-map';
 	import { mouses } from '$stores/mouses.svelte';
+	import { theme } from '$stores/theme.svelte';
 	import Realtime from './Realtime.svelte';
 	import Cursors from './Cursors.svelte';
 	import type { NodeMoves, Update } from '$modules/realtime.svelte';
@@ -356,7 +357,7 @@
 					onedgeclick={onEdgeClick}
 					onconnect={onConnect}
 					onpaneclick={onBoardClick}
-					colorMode="system"
+					colorMode={theme.colorMode}
 					class="bg-transparent!"
 					attributionPosition={undefined}
 				>

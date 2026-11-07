@@ -64,14 +64,18 @@
     'inline-block align-middle select-none',
     /\b(w-|h-)/.test(className) ? '' : 'w-4 h-4', // default size
     className,
-    'fill-transparent!',
+    // Line art stays hollow. A glyph fills with the text color: many (e.g.
+    // Heroicons solid: moon, sun) declare fill only on their root <svg>,
+    // which is dropped here, so a transparent fill would hide them.
+    svgData?.isStrokeStyle ? 'fill-transparent!' : '',
   ));
 </script>
 
 {#if svgData}
-  <svg 
-    viewBox={svgData.viewBox} 
+  <svg
+    viewBox={svgData.viewBox}
     class={finalClass}
+    fill={svgData.isStrokeStyle ? "none" : "currentColor"}
     stroke={svgData.isStrokeStyle ? "currentColor" : "none"}
   >
     {@html svgData.body}

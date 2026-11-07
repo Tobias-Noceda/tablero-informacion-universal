@@ -131,10 +131,6 @@
 
 <!-- A one-off card's own request. A credential shows as its name, never its value. -->
 {#snippet oneOffConfiguration(s: PostItSettings)}
-	{@const shown = (value: string) => {
-		const name = /^\$([A-Z][A-Z0-9_]*)$/.exec(value)?.[1];
-		return name ? m['one_off.credential']({ name }) : value;
-	}}
 	<div class="flex flex-col gap-3">
 		{@render record(
 			[

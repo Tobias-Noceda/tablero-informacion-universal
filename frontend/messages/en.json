@@ -20,7 +20,12 @@
 			"en": "English",
 			"es": "Spanish"
 		},
-		"logout": "Log out"
+		"logout": "Log out",
+		"theme": {
+			"title": "Theme",
+			"dark": "Dark mode",
+			"light": "Light mode"
+		}
 	},
 	"nodes": {
 		"title": "Cards",

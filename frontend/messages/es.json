@@ -21,7 +21,12 @@
 			"en": "Inglés",
 			"es": "Español"
 		},
-		"logout": "Cerrar sesión"
+		"logout": "Cerrar sesión",
+		"theme": {
+			"title": "Tema",
+			"dark": "Modo oscuro",
+			"light": "Modo claro"
+		}
 	},
 	"nodes": {
 		"title": "Tarjetas",
