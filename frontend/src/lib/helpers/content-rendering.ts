@@ -19,7 +19,8 @@ export function isImageLink(value: unknown): value is string {
 export function githubRepoPath(value: unknown): string | null {
     if (typeof value !== 'string') return null;
     const path = value.trim().replace(/\/+/g, '/').replace(/^\/|\/$/g, '');
-    return /^[\w.-]+\/[\w.-]+$/.test(path) ? path : null;
+ 	const valid = /^[\w.-]+\/[\w.-]+$/.test(path) && !path.split('/').some((part) => part === '.' || part === '..');
+ 	return valid ? path : null;
 }
 
 /** The repository page of a github_repo query; null when it names none. */
