@@ -1,0 +1,180 @@
+package models
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/google/uuid"
+)
+
+// PostitTemplateScopeKind is who a post-it template belongs to.
+type PostitTemplateScopeKind string
+
+const (
+	// TemplateScopeUser: only its owner (a user id) sees and uses it, on any
+	// board they edit.
+	TemplateScopeUser PostitTemplateScopeKind = "user"
+	// TemplateScopeBoard: everyone on the board (a board id) sees it, its
+	// editors use and manage it.
+	TemplateScopeBoard PostitTemplateScopeKind = "board"
+	// TemplateScopeOrg: every member of the organization (an org id) sees it and
+	// uses it on the org's boards, its admins manage it.
+	TemplateScopeOrg PostitTemplateScopeKind = "org"
+)
+
+type PostitTemplateScope struct {
+	Kind  PostitTemplateScopeKind `bson:"kind" json:"kind"`
+	Owner string                  `bson:"owner" json:"owner"`
+}
+
+func (s PostitTemplateScope) Valid() bool {
+	switch s.Kind {
+	case TemplateScopeUser, TemplateScopeBoard, TemplateScopeOrg:
+		return s.Owner != ""
+	}
+	return false
+}
+
+// PostitTemplatePrefix starts every template key, so a post-it template can
+// never be taken for one of the platform's catalogue.
+const PostitTemplatePrefix = "custom_"
+
+const (
+	maxTemplateName       = 64
+	maxTemplateParameters = 20
+	maxTemplateOutputs    = 20
+)
+
+// NewPostitTemplateKey is a fresh key for a post-it template.
+func NewPostitTemplateKey() string {
+	return PostitTemplatePrefix + strings.ReplaceAll(uuid.NewString(), "-", "")
+}
+
+func IsPostitTemplateKey(key string) bool {
+	return strings.HasPrefix(key, PostitTemplatePrefix)
+}
+
+// PostitTemplate is a card type a user defines for themselves, a board or an
+// organization. Unlike the catalogue it is written in one language, whichever
+// its author picks. Stored in postit_templates.
+type PostitTemplate struct {
+	Key         string              `bson:"_id" json:"key"`
+	Scope       PostitTemplateScope `bson:"scope" json:"scope"`
+	Name        string              `bson:"name" json:"name"`
+	Description string              `bson:"description,omitempty" json:"description,omitempty"`
+
+	// Default title of a new card, may use the outputs as {{key}}.
+	Title BoardPostItTitle `bson:"title" json:"title"`
+
+	Resource string            `bson:"resource" json:"resource"`
+	Request  Request           `bson:"request" json:"request"`
+	Response string            `bson:"response" json:"response"`
+	Query    map[string]string `bson:"query" json:"query"`
+	Rate     int               `bson:"rate" json:"rate"`
+
+	Parameters []PostitTemplateParameter `bson:"parameters" json:"parameters"`
+	Outputs    []PostitTemplateOutput    `bson:"outputs" json:"outputs"`
+
+	CreatedBy string    `bson:"created_by" json:"created_by"`
+	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+	UpdatedBy string    `bson:"updated_by" json:"updated_by"`
+	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
+}
+
+type PostitTemplateParameter struct {
+	Key         string                 `bson:"key" json:"key"`
+	Label       string                 `bson:"label" json:"label"`
+	Type        WellKnownParameterType `bson:"type" json:"type"`
+	Placeholder *string                `bson:"placeholder,omitempty" json:"placeholder,omitempty"`
+	Default     *string                `bson:"default,omitempty" json:"default,omitempty"`
+}
+
+type PostitTemplateOutput struct {
+	Key     string `bson:"key" json:"key"`
+	Label   string `bson:"label" json:"label"`
+	Example any    `bson:"example,omitempty" json:"example,omitempty"`
+}
+
+// AsWellKnown is the definition in the catalogue's shape, with its one
+// language in both, so it instantiates and validates like any other. A
+// post-it template never uses platform credentials.
+func (c PostitTemplate) AsWellKnown() WellKnown {
+	wk := WellKnown{
+		Key:           c.Key,
+		NameEn:        c.Name,
+		NameEs:        c.Name,
+		DescriptionEn: c.Description,
+		DescriptionEs: c.Description,
+		TitleEn:       c.Title.Text,
+		TitleEs:       c.Title.Text,
+		Resource:      c.Resource,
+		Request:       c.Request,
+		Response:      c.Response,
+		Query:         c.Query,
+		Rate:          c.Rate,
+		Parameters:    make([]WellKnownParameter, 0, len(c.Parameters)),
+		Outputs:       make([]WellKnownOutput, 0, len(c.Outputs)),
+		template:      true,
+	}
+	for _, p := range c.Parameters {
+		wk.Parameters = append(wk.Parameters, WellKnownParameter{
+			Key:           p.Key,
+			LabelEn:       p.Label,
+			LabelEs:       p.Label,
+			Type:          p.Type,
+			PlaceholderEn: p.Placeholder,
+			PlaceholderEs: p.Placeholder,
+			Default:       p.Default,
+		})
+	}
+	for _, o := range c.Outputs {
+		wk.Outputs = append(wk.Outputs, WellKnownOutput{
+			Key:       o.Key,
+			LabelEn:   o.Label,
+			LabelEs:   o.Label,
+			ExampleEn: o.Example,
+			ExampleEs: o.Example,
+		})
+	}
+	return wk
+}
+
+// Validate applies the catalogue's rules plus a template's own: it always
+// fetches something and stays small.
+func (c PostitTemplate) Validate() error {
+	if !IsPostitTemplateKey(c.Key) {
+		return errors.New("key must be generated by the server")
+	}
+	if !c.Scope.Valid() {
+		return errors.New("scope must be user, board or org")
+	}
+	if utf8.RuneCountInString(c.Name) > maxTemplateName {
+		return fmt.Errorf("name must be at most %d characters", maxTemplateName)
+	}
+	if strings.TrimSpace(c.Resource) == "" {
+		return errors.New("resource is required")
+	}
+	if len(c.Parameters) > maxTemplateParameters {
+		return fmt.Errorf("at most %d parameters", maxTemplateParameters)
+	}
+	if len(c.Outputs) > maxTemplateOutputs {
+		return fmt.Errorf("at most %d outputs", maxTemplateOutputs)
+	}
+
+	err := c.AsWellKnown().Validate()
+	if err == nil {
+		return nil
+	}
+	// The catalogue speaks of its en/es fields; a template has one.
+	message := strings.NewReplacer(
+		"name_en and name_es are", "name is",
+		"title_en and title_es are", "title is",
+		"needs label_en and label_es", "needs a label",
+		" nor a system secret", "",
+		"neither a parameter", "not a parameter",
+	).Replace(err.Error())
+	return errors.New(message)
+}

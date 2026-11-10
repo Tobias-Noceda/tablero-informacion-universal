@@ -6,6 +6,7 @@
 :root {
 	color-scheme: light;
 	--app-background: #ffffff;
+	--app-background-hover: #cfcfcf;
 	--app-foreground: #111827;
 	--app-main: #005166;
     --app-main-text: #ffffff;
@@ -52,10 +53,13 @@
 	--app-secondary: #676767;
 }
 
+/* Dark: the system's, unless the app is set to light (data-theme, from
+   the tiu-theme cookie), or the app's own choice. Keep both blocks equal. */
 @media (prefers-color-scheme: dark) {
-	:root {
+	:root:not([data-theme='light']) {
 		color-scheme: dark;
 		--app-background: #0b1020;
+		--app-background-hover: #2b3040;
 		--app-foreground: #f9fafb;
 
 		--app-primary: var(--app-foreground);
@@ -68,8 +72,28 @@
 	}
 }
 
+:root[data-theme='dark'] {
+	color-scheme: dark;
+	--app-background: #0b1020;
+	--app-background-hover: #2b3040;
+	--app-foreground: #f9fafb;
+
+	--app-primary: var(--app-foreground);
+	--app-secondary: #cfcfcf;
+
+	--app-border: #374151;
+	--app-skeleton: #1e2a3a;
+	--app-error-bg: rgba(220, 38, 38, 0.15);
+	--app-error-text: #fca5a5;
+}
+
+:root[data-theme='light'] {
+	color-scheme: light;
+}
+
 @theme {
 	--color-background: var(--app-background);
+	--color-background-hover: var(--app-background-hover);
 	--color-foreground: var(--app-foreground);
 
 	--color-main: var(--app-main);

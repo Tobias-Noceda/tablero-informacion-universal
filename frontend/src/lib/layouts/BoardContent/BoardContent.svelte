@@ -3,7 +3,6 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 
 	import type { Node, Edge } from '@xyflow/svelte';
 	import type { Update } from '$modules/realtime.svelte.js';
@@ -11,12 +10,23 @@
 	import { mapPostitWithTitle, type PostItWithTitle } from '$lib/helpers/post-it.js';
 	import { landingPath } from '$lib/helpers/routes';
 
-	import { isConfiguringBoard, isSharing, setConfiguringBoard, setSharing, setSidebar } from '$stores/sidebar';
+	import {
+		isConfiguringBoard,
+		isManagingCardTypes,
+		isSharing,
+		setConfiguringBoard,
+		setManagingCardTypes,
+		setSharing,
+		setSidebar
+	} from '$stores/sidebar';
 	import { refreshBoards } from '$stores/boards';
+	import { mobile } from '$stores/viewport.svelte';
 
 	import ShareDialog from '$layouts/Share/ShareDialog.svelte';
+	import PostitTemplatesPanel from '$layouts/PostitTemplates/PostitTemplatesPanel.svelte';
 	import SideBar from '$layouts/Sidebar/SideBar.svelte';
 	import Flow from './Flow.svelte';
+	import { nodeType } from '$lib/well-knowns/one-off';
 	import BoardConfiguration from '$layouts/BoardConfiguration/BoardConfiguration.svelte';
 	import { deleteBoard, renameBoard } from '$services/board';
 
@@ -28,22 +38,24 @@
 	);
 	const edges = $derived(data.edges as Edge[]);
 
+	// Phones are read-only: the canvas and the sidebar act as for a viewer.
+	// The share, configuration and card-type dialogs keep the real role.
+	const viewRole = $derived(mobile.current ? ('viewer' as const) : role);
+
 	// Viewers look: no cards to drop and no credentials (the backend refuses
 	// all of it anyway).
-	const canEdit = $derived(role === 'owner' || role === 'editor');
+	const canEdit = $derived(viewRole === 'owner' || viewRole === 'editor');
 
 	$effect(() => {
 		if (!canEdit) setSidebar(null);
 	});
 
-	// On a phone an open card takes the whole board, its sidebar included.
-	const cardOpen = $derived(!!page.params.nodeId);
-
 	function boardUpdate(update: Update) {
 		data = {
 			...data,
 			boardName: update.board.name ?? data.boardName,
-			nodes: (update.board.postits ?? data.nodes) as typeof data.nodes,
+			nodes: (update.board.postits?.map((p) => ({ ...p, type: nodeType(p.type) })) ??
+				data.nodes) as typeof data.nodes,
 			edges: update.board.strands ?? data.edges
 		};
 	}
@@ -70,18 +82,23 @@
 </script>
 
 <div class="flex flex-row flex-1 min-h-0">
-	<div class={cardOpen ? 'hidden md:contents' : 'contents'}>
-		<SideBar {role} {boardId} />
+	<!-- No board tools on a phone; Members is in the TopBar's drawer. -->
+	<div class="hidden md:contents">
+		<SideBar role={viewRole} {boardId} />
 	</div>
 	<div class="flex flex-col flex-1 min-h-0 overflow-auto bg-background">
 		{#key boardId}
-			<Flow {nodes} {edges} {role} {boardId} {orgId} {boardUpdate} />
+			<Flow {nodes} {edges} {role} readOnly={mobile.current} {boardId} {orgId} {boardUpdate} />
 		{/key}
 	</div>
 </div>
 
 {#if $isSharing}
 	<ShareDialog board={boardId} {role} onclose={() => setSharing(false)} onleave={left} />
+{/if}
+
+{#if $isManagingCardTypes}
+	<PostitTemplatesPanel {boardId} {orgId} {role} onclose={() => setManagingCardTypes(false)} />
 {/if}
 
 {#if $isConfiguringBoard}

@@ -140,9 +140,9 @@
 		}
 	}
 
+	// A credential being written stays: it is saved in whichever tab is shown.
 	function show(next: Tab) {
 		tab = next;
-		resetDraft();
 	}
 
 	// Re-runs when the tab changes, since the scope is derived from it.

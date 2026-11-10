@@ -5,6 +5,8 @@
 	let { id }: NodeProps = $props();
 
 	const request = $derived(results.get(id));
+	// Fetched again now and then while the card is on the board.
+	$effect(() => results.watch(id));
 </script>
 
 <div class="bg-main p-4 rounded-lg">

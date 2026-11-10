@@ -9,6 +9,9 @@
 	import Dropdown from '$components/Dropdown/Dropdown.svelte';
 	import { cn } from '$lib/utils';
 
+	// fullWidth stretches it to its container (the TopBar's mobile drawer).
+	let { fullWidth = false }: { fullWidth?: boolean } = $props();
+
 	// Switching organization opens its landing; the URL is the selection.
 	function select(value: string) {
 		setSidebar(null);
@@ -22,15 +25,14 @@
 </script>
 
 <Dropdown
-	class="w-fit"
-	activatorClass={() => "w-48! cursor-pointer truncate whitespace-nowrap rounded-md border border-main-border bg-main px-2 py-1.5 text-sm text-white transition-colors hover:bg-main-hover"}
-	drawerClass="rounded-md"
-	itemClass={() =>
+	class={fullWidth ? 'w-full' : 'w-fit'}
+	activatorClass={() =>
 		cn(
-			'justify-start!',
-			'whitespace-nowrap truncate'
-		)
-	}
+			fullWidth ? 'w-full!' : 'w-48!',
+			'cursor-pointer truncate whitespace-nowrap rounded-md border border-main-border bg-main px-2 py-1.5 text-sm text-white transition-colors hover:bg-main-hover'
+		)}
+	drawerClass="rounded-md"
+	itemClass={() => cn('justify-start!', 'whitespace-nowrap truncate')}
 	placeholder={m['orgs.switcher']()}
 	{options}
 	value={page.params.orgId ?? PERSONAL}

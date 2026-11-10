@@ -29,6 +29,9 @@ type MongoDB struct {
 	groups   *mongo.Collection
 	orgs     *mongo.Collection
 
+	wellKnowns      *mongo.Collection
+	postitTemplates *mongo.Collection
+
 	accessTokens *mongo.Collection
 }
 
@@ -71,6 +74,8 @@ func New() (*MongoDB, error) {
 	db.groups = db.client.Database(name).Collection("groups")
 	db.orgs = db.client.Database(name).Collection("orgs")
 	db.accessTokens = db.client.Database(name).Collection("access_tokens")
+	db.wellKnowns = db.client.Database(name).Collection("well_knowns")
+	db.postitTemplates = db.client.Database(name).Collection("postit_templates")
 
 	return db, nil
 }
@@ -103,6 +108,10 @@ func (db *MongoDB) EnsureIndexes() error {
 	}
 
 	if err := db.ensureAccessTokenIndexes(); err != nil {
+		return err
+	}
+
+	if err := db.ensurePostitTemplateIndexes(); err != nil {
 		return err
 	}
 
@@ -252,8 +261,11 @@ func (db *MongoDB) DeleteBoard(id uuid.UUID) error {
 		return err
 	}
 
-	_, err = db.boards.DeleteOne(ctx, bson.M{"_id": id})
-	return err
+	if _, err = db.boards.DeleteOne(ctx, bson.M{"_id": id}); err != nil {
+		return err
+	}
+
+	return db.purgePostitTemplates(models.PostitTemplateScope{Kind: models.TemplateScopeBoard, Owner: id.String()})
 }
 
 func (db *MongoDB) UpdatePostIt(id uuid.UUID, set map[string]any) error {

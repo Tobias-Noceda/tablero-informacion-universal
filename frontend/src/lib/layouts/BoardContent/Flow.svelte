@@ -21,11 +21,13 @@
 	import type { Board, BoardRole } from '$types/api';
 	import SecretsPanel from '$layouts/Secrets/SecretsPanel.svelte';
 	import * as secretsApi from '$services/secrets';
-	import type { SecretMeta } from '$types/api';
+	import type { PostItSettings, SecretMeta } from '$types/api';
 	import { uuid } from '$lib/utils';
-	import { nodesMap, parameters } from '$components/Nodes/node-map';
+	import { nodeTypesFor } from '$components/Nodes/node-map';
+	import { wellKnowns } from '$stores/well-knowns.svelte';
 	import { edgesMap } from '$components/Edges/edge-map';
 	import { mouses } from '$stores/mouses.svelte';
+	import { theme } from '$stores/theme.svelte';
 	import Realtime from './Realtime.svelte';
 	import Cursors from './Cursors.svelte';
 	import type { NodeMoves, Update } from '$modules/realtime.svelte';
@@ -35,11 +37,14 @@
 	import NodeDetail, { type PostItData } from './NodeDetail.svelte';
 
 	import NodeConfigurationPanel from '$layouts/NodeConfiguration/NodeConfigurationPanel.svelte';
+	import OneOffCardPanel from '$layouts/OneOffCard/OneOffCardPanel.svelte';
+	import { ONE_OFF } from '$lib/well-knowns/one-off';
 
 	let {
 		nodes,
 		edges,
 		role,
+		readOnly = false,
 		boardId,
 		orgId,
 		boardUpdate
@@ -47,6 +52,8 @@
 		nodes: Node[];
 		edges: Edge[];
 		role: BoardRole;
+		/** A phone: the board is looked at, its cards can only be deleted. */
+		readOnly?: boolean;
 		boardId: string;
 		orgId?: string;
 		boardUpdate: (update: Update) => void;
@@ -54,7 +61,9 @@
 
 	// Viewers look: no dragging or connecting and no deleting (the board
 	// layout hides the cards and credentials; the backend refuses it anyway).
-	const canEdit = $derived(role === 'owner' || role === 'editor');
+	const canDelete = $derived(role === 'owner' || role === 'editor');
+	// A phone (readOnly) keeps deleting but nothing else.
+	const canEdit = $derived(canDelete && !readOnly);
 
 	let settingsVersion = $state(0);
 
@@ -89,6 +98,19 @@
 
 	let editingNode = $state<PostItData | null>(null);
 
+	// A card with its own request (no card type) has its own form.
+	let creatingOneOff = $state<{ id: string; position: { x: number; y: number } } | null>(null);
+	let editingOneOff = $state<{ node: PostItData; settings: PostItSettings } | null>(null);
+
+	// Recomputed only when the set of card types changes, not on every move.
+	const typeKeys = $derived(
+		[...new Set([...wellKnowns.all.map((wk) => wk.key), ...nodes.map((n) => n.type)])].join(',')
+	);
+	const nodeTypes = $derived.by(() => {
+		void typeKeys;
+		return untrack(() => nodeTypesFor(wellKnowns.all, nodes.map((n) => n.type)));
+	});
+
 	const { screenToFlowPosition } = useSvelteFlow();
 
 	mouses.updateMappers(screenToFlowPosition);
@@ -118,15 +140,20 @@
 			y: event.clientY
 		});
 
-		// if ((parameters[type.current] ?? []).length === 0) {
+		// if (wellKnowns.parameters(type.current).length === 0) {
 		// 	const newPostIt = await postItsApi.create_well_known(boardId, title, type.current, {});
 		// 	await postItsApi.move(newPostIt.id, position.x, position.y);
 		// 	nodes = [...nodes, { id: newPostIt.id, position, type: type.current } as Node];
 		// 	return;
 		// }
 
+		if (type.current === ONE_OFF) {
+			creatingOneOff = { id: uuid(), position };
+			return;
+		}
+
 		paramValues = Object.fromEntries(
-			(parameters[type.current] ?? []).map((p) => [p.key, p.default ?? ''])
+			wellKnowns.parameters(type.current).map((p) => [p.key, p.default ?? ''])
 		);
 		creatingNode = {
 			id: uuid(),
@@ -156,11 +183,13 @@
 		}
 		creatingNode = null;
 		editingNode = null;
+		creatingOneOff = null;
+		editingOneOff = null;
 		paramValues = {};
 	};
 
 	const deleteNode = async (node: Node) => {
-		if (!canEdit) return;
+		if (!canDelete) return;
 		await postItsApi.del(node.id).then((deletedEdges) => {
 			edges = edges.filter((e) => !deletedEdges.map((edge) => edge.id).includes(e.id));
 		});
@@ -272,6 +301,11 @@
 
 	const onEditStart = (node: PostItData) => {
 		if (!canEdit) return;
+		if (node.type === ONE_OFF) {
+			if (node.settings) editingOneOff = { node: { ...node }, settings: node.settings };
+			return;
+		}
+		if (!wellKnowns.byKey(node.type)) return;
 		editingNode = { ...node };
 		paramValues = node.paramValues;
 	};
@@ -298,7 +332,7 @@
 	});
 
 	$effect(() => {
-		if (creatingNode) {
+		if (creatingNode || creatingOneOff) {
 			selectedEdge = null;
 			untrack(closeNode);
 		}
@@ -312,7 +346,7 @@
 				<SvelteFlow
 					bind:nodes
 					bind:edges
-					nodeTypes={nodesMap}
+					{nodeTypes}
 					edgeTypes={edgesMap}
 					defaultEdgeOptions={{ type: 'floating' }}
 					fitView
@@ -328,7 +362,7 @@
 					onedgeclick={onEdgeClick}
 					onconnect={onConnect}
 					onpaneclick={onBoardClick}
-					colorMode="system"
+					colorMode={theme.colorMode}
 					class="bg-transparent!"
 					attributionPosition={undefined}
 				>
@@ -339,11 +373,27 @@
 		</Realtime>
 	</main>
 	{#if selectedNode}
-		<NodeDetail node={selectedNode} {canEdit} {settingsVersion} onedit={onEditStart} onback={closeNode} ondelete={deleteNode} />
+		<NodeDetail node={selectedNode} {canEdit} {canDelete} {settingsVersion} onedit={onEditStart} onback={closeNode} ondelete={deleteNode} />
 	{/if}
 
 	{#if $isManagingSecrets}
 		<SecretsPanel board={boardId} onclose={() => setManagingSecrets(false)} />
+	{/if}
+
+	{#if creatingOneOff || editingOneOff}
+		{#key creatingOneOff?.id ?? editingOneOff?.node.id}
+			<OneOffCardPanel
+				{boardId}
+				{usableSecrets}
+				creating={creatingOneOff}
+				editing={editingOneOff}
+				onclose={() => {
+					creatingOneOff = null;
+					editingOneOff = null;
+				}}
+				onPersistNode={persistNode}
+			/>
+		{/key}
 	{/if}
 
 	<NodeConfigurationPanel

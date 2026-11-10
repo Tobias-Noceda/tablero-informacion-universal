@@ -9,6 +9,7 @@ import (
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/services/access"
+	"github.com/Secreto31126/tesis/common/services/wellknowns"
 	"github.com/google/uuid"
 )
 
@@ -25,7 +26,7 @@ func newService(db *mocks.MockDB, cache *mocks.MockCache, run *mocks.MockExecute
 	if run == nil {
 		run = &mocks.MockExecuter{}
 	}
-	return New(db, cache, run, &mocks.MockSecretResolver{}, access.New(nil))
+	return New(db, cache, run, &mocks.MockSecretResolver{}, access.New(nil), builtins(), nil)
 }
 
 func TestCreatePostIt_PlainPassesThrough(t *testing.T) {
@@ -42,7 +43,7 @@ func TestCreatePostIt_PlainPassesThrough(t *testing.T) {
 	}
 
 	svc := newService(db, nil, nil)
-	_, err := svc.CreatePostIt(boardOwner, &models.BoardPostItTitle{Text: "Hi", Vars: false}, &models.PostIts{Board: board})
+	_, err := svc.CreatePostIt(boardOwner, &models.BoardPostItTitle{Text: "Hi", Vars: false}, oneOff(board, nil))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -382,7 +383,7 @@ func TestViewer_ReadsAndRunsButCannotChangeCards(t *testing.T) {
 		},
 	}
 	run := &mocks.MockExecuter{ExecuteFn: func(*models.PostIts) (any, error) { return "data", nil }}
-	svc := New(db, &mocks.MockCache{}, run, &mocks.MockSecretResolver{}, access.New(nil))
+	svc := New(db, &mocks.MockCache{}, run, &mocks.MockSecretResolver{}, access.New(nil), builtins(), nil)
 
 	postit, err := svc.GetPostIt(viewer, id)
 	if err != nil {
@@ -393,7 +394,7 @@ func TestViewer_ReadsAndRunsButCannotChangeCards(t *testing.T) {
 	}
 
 	changes := map[string]error{}
-	_, changes["create"] = svc.CreatePostIt(viewer, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{Board: uuid.New()})
+	_, changes["create"] = svc.CreatePostIt(viewer, &models.BoardPostItTitle{Text: "Hi"}, oneOff(uuid.New(), nil))
 	changes["title"] = svc.EditTitlePostIt(viewer, id, models.BoardPostItTitle{Text: "Hi"})
 	changes["update"] = svc.UpdatePostIt(viewer, id, map[string]any{"rate": 5})
 	changes["move"] = svc.MovePostIt(viewer, id, models.Position{})
@@ -467,7 +468,7 @@ func TestExecutePostIt_DoesNotLeakSecretsOntoTheCaller(t *testing.T) {
 		},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver, access.New(nil))
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver, access.New(nil), builtins(), nil)
 
 	if _, err := svc.ExecutePostIt(postit); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -512,7 +513,7 @@ func TestExecutePostIt_ResourcelessPostItNeverResolvesSecrets(t *testing.T) {
 		},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver, access.New(nil))
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver, access.New(nil), builtins(), nil)
 
 	out, err := svc.ExecutePostIt(postit)
 	if err != nil {
@@ -584,4 +585,9 @@ func existingCard(id uuid.UUID) func(uuid.UUID) (*models.PostIts, error) {
 	return func(uuid.UUID) (*models.PostIts, error) {
 		return &models.PostIts{Id: id, Board: uuid.New(), RunAs: boardOwner.ID}, nil
 	}
+}
+
+// builtins is the catalogue the platform seeds.
+func builtins() *mocks.MemoryWellKnownStore {
+	return mocks.NewMemoryWellKnownStore(wellknowns.Builtin()...)
 }
