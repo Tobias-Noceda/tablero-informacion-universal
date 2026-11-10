@@ -251,6 +251,7 @@
 		"refresh": "Refresh content",
 		"configuration": "Configuration",
 		"content": "Content",
+		"render_markdown": "Render Markdown",
 		"no_configuration": "This card has no settings.",
 		"no_content": "This card has no values.",
 		"error": "The card could not be loaded.",
