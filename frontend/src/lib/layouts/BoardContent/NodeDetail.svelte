@@ -10,9 +10,17 @@
 	import * as postItsApi from '$services/post-it';
 	import { results } from '$stores/postit-results.svelte';
 	import { cn } from '$lib/utils';
-	import { capitalize, isImageLink, isLink } from '$lib/helpers/content-rendering';
+	import {
+		capitalize,
+		githubRepoPath,
+		githubRepoUrl,
+		isImageLink,
+		isLink
+	} from '$lib/helpers/content-rendering';
 	import { getLocale } from '$lib/paraglide/runtime';
 	import Tooltip from '$components/Tooltip/Tooltip.svelte';
+	import Switch from '$components/Switch/Switch.svelte';
+	import { renderMarkdown } from '$lib/helpers/markdown';
 	import type { PostIt, PostItSettings, SecretRef } from '$types/api';
 	import { ONE_OFF } from '$lib/well-knowns/one-off';
 
@@ -27,13 +35,14 @@
 	interface NodeDetailProps {
 		node: Node;
 		canEdit: boolean;
+		canDelete: boolean;
 		settingsVersion: number;
 		onback: () => void;
 		onedit: (node: PostItData) => void;
 		ondelete: (node: Node) => void;
 	}
 
-	let { node, canEdit, settingsVersion, onback, onedit, ondelete }: NodeDetailProps = $props();
+	let { node, canEdit, canDelete, settingsVersion, onback, onedit, ondelete }: NodeDetailProps = $props();
 
 	const title = $derived(node.data?.title as { text: string; vars: boolean } | undefined);
 
@@ -65,6 +74,13 @@
 	// Kept up to date while open, also for a card whose title needs no data.
 	$effect(() => results.watch(id));
 
+	// A note shows its raw text until asked to render it; back to raw on
+	// every card opened (the panel stays mounted while switching cards).
+	let markdown = $derived.by(() => {
+		void id;
+		return false;
+	});
+
 	let refreshing = $state(false);
 	const MAX_TITLE_LENGTH = 24;
 
@@ -86,6 +102,17 @@
 		);
 	}
 
+	// A configuration row: label, value and, for some, the page it links to.
+	// The stored value is left as it is; only what the panel shows changes.
+	function configurationEntry(key: string, value: unknown): [string, unknown, string?] {
+		const label = parameterLabelOf(key);
+		if (node.type === 'github_repo' && key === '$query') {
+			const href = githubRepoUrl(value);
+			if (href) return [label, githubRepoPath(value), href];
+		}
+		return [label, value];
+	}
+
 	function contentLabelOf(key: string) {
 		return (
 			wellKnowns.outputs(node.type).find((c) => c.key === key)?.[`label_${getLocale()}`] ?? key
@@ -99,17 +126,25 @@
 	}
 </script>
 
-{#snippet record(entries: [string, unknown][], empty: string)}
+{#snippet record(entries: [string, unknown, string?][], empty: string)}
 	{#if entries.length === 0}
 		<p class="opacity-70 sm:text-sm md:text-[15px]">{empty}</p>
 	{:else}
 		<!-- Display a list of key-value pairs: medium text for desktop, small text for mobile -->
 		<dl class="flex flex-col gap-1 sm:text-sm md:text-[15px]">
-			{#each entries as [name, value] (name)}
+			{#each entries as [name, value, href] (name)}
 				<div class="wrap-break-word">
 					<dt class="inline font-semibold">{capitalize(name)}:</dt>
 					<dd class="inline">
-						{#if isLink(value)}
+						{#if href}
+							<Tooltip content={href} placement="bottom" tooltipClass="max-w-60! break-all">
+								<!-- An external page the value names, not an app route. -->
+								<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+								<a {href} target="_blank" rel="noopener noreferrer" class="underline">
+									{display(value)}
+								</a>
+							</Tooltip>
+						{:else if isLink(value)}
 							<!-- An external address the card returned, not an app route. -->
 							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
 							<a href={value} target="_blank" rel="noopener noreferrer" class="underline">
@@ -270,7 +305,7 @@
 							{@render oneOffConfiguration(s)}
 						{:else}
 							{@render record(
-								Object.entries(s.params ?? {}).map(([key, value]) => [parameterLabelOf(key), value]),
+								Object.entries(s.params ?? {}).map(([key, value]) => configurationEntry(key, value)),
 								m['node_detail.no_configuration']()
 							)}
 						{/if}
@@ -282,12 +317,31 @@
 		{/if}
 
 		<section class="flex flex-col gap-2">
-			<h3 class="font-semibold text-xl">{m['node_detail.content']()}</h3>
+			<div class="flex items-center justify-between gap-2">
+				<h3 class="font-semibold text-xl">{m['node_detail.content']()}</h3>
+				{#if node.type === 'static_card'}
+					<Switch
+						label={m['node_detail.render_markdown']()}
+						checked={markdown}
+						onchange={(on) => (markdown = on)}
+					/>
+				{/if}
+			</div>
 			{#await output}
 				<p class="text-sm opacity-70">{m.input_loading()}</p>
 			{:then data}
 				{#if node.type === 'static_card'}
-					<p class="sm:text-sm md:text-[15px]">{data['text']}</p>
+					{#if markdown}
+						<div
+							class="prose prose-sm max-w-none wrap-break-word text-inherit [--tw-prose-body:currentColor] [--tw-prose-bold:currentColor] [--tw-prose-bullets:currentColor] [--tw-prose-code:currentColor] [--tw-prose-counters:currentColor] [--tw-prose-headings:currentColor] [--tw-prose-links:currentColor] [--tw-prose-quotes:currentColor]"
+						>
+							<!-- Sanitized by renderMarkdown (DOMPurify): notes come from other users. -->
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+							{@html renderMarkdown(data?.text)}
+						</div>
+					{:else}
+						<p class="whitespace-pre-wrap wrap-break-word sm:text-sm md:text-[15px]">{data?.text}</p>
+					{/if}
 				{:else}
 					{@render record(
 						Object.entries(data ?? {}).map(([key, value]) => [contentLabelOf(key), value]),
@@ -300,7 +354,7 @@
 		</section>
 	</div>
 
-	{#if canEdit}
+	{#if canDelete}
 		<div class="flex shrink-0 items-center justify-center p-4 pt-0">
 			<Button variant="destructive" class="shrink-0" onclick={() => ondelete(node)}>
 				{m['node_detail.delete']()}

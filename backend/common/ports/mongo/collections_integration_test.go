@@ -72,12 +72,12 @@ func TestMongo_RenameCollections(t *testing.T) {
 		t.Errorf("empty old: err=%v, old exists=%v, new holds %d", err, exists(from), count(to))
 	}
 
-	// Both holding documents is left for a person to merge.
+	// Both holding different documents is left for a person to merge.
 	if _, err := database.Collection(from).InsertOne(ctx, bson.M{"_id": "b"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.renameCollections(rename); err == nil {
-		t.Error("two non-empty collections were merged silently")
+		t.Error("two collections with different documents were merged silently")
 	}
 
 	// An empty new one (only its indexes) is replaced by the old one.
@@ -89,5 +89,65 @@ func TestMongo_RenameCollections(t *testing.T) {
 	}
 	if exists(from) || count(to) != 1 {
 		t.Errorf("empty new: old exists=%v, new holds %d, want gone and 1", exists(from), count(to))
+	}
+
+	// A copy cut short before dropping the old one: the new one already holds
+	// every old document, so the old one goes.
+	if _, err := database.Collection(from).InsertOne(ctx, bson.M{"_id": "b"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.renameCollections(rename); err != nil {
+		t.Fatalf("copy cut short: %v", err)
+	}
+	if exists(from) || count(to) != 1 {
+		t.Errorf("copy cut short: old exists=%v, new holds %d, want gone and 1", exists(from), count(to))
+	}
+}
+
+// The fallback used where renameCollection is refused (Atlas shared tiers).
+// A local Mongo accepts the rename, so it is called directly.
+func TestMongo_CopyCollection(t *testing.T) {
+	db := integrationDB(t)
+	ctx, cancel := timeout()
+	defer cancel()
+
+	database := db.postitTemplates.Database()
+	suffix := strings.ReplaceAll(uuid.NewString(), "-", "")
+	rename := collectionRename{from: "it_copy_old_" + suffix, to: "it_copy_new_" + suffix}
+	t.Cleanup(func() {
+		ctx, cancel := timeout()
+		defer cancel()
+		_ = database.Collection(rename.from).Drop(ctx)
+		_ = database.Collection(rename.to).Drop(ctx)
+	})
+
+	docs := []any{bson.M{"_id": "a", "name": "A"}, bson.M{"_id": "b", "name": "B"}}
+	if _, err := database.Collection(rename.from).InsertMany(ctx, docs); err != nil {
+		t.Fatal(err)
+	}
+	// An existing empty target (e.g. created by its indexes) is replaced.
+	if err := database.CreateCollection(ctx, rename.to); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := copyCollection(ctx, database, rename); err != nil {
+		t.Fatalf("copy: %v", err)
+	}
+
+	names, err := database.ListCollectionNames(ctx, bson.M{"name": rename.from})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(names) != 0 {
+		t.Error("the old collection was kept after a complete copy")
+	}
+	var got struct {
+		Name string `bson:"name"`
+	}
+	if err := database.Collection(rename.to).FindOne(ctx, bson.M{"_id": "b"}).Decode(&got); err != nil || got.Name != "B" {
+		t.Errorf("copied b = %+v (%v), want its fields", got, err)
+	}
+	if n, err := database.Collection(rename.to).CountDocuments(ctx, bson.M{}); err != nil || n != 2 {
+		t.Errorf("new collection holds %d (%v), want 2", n, err)
 	}
 }

@@ -10,7 +10,7 @@ import { z } from "zod";
 export const schema = {
     board_id: z.uuid().describe("The memory PKG ID"),
     title: z.string().trim().min(1).max(128).describe("The memory title"),
-    description: z.string().trim().min(1).describe("The memory description"),
+    description: z.string().trim().min(1).describe("The memory description, which may be basic Markdown (headings, bold, italic, lists, images)"),
     relevant: z.array(z.uuid()).describe("Related memories to this memory"),
     position: z
         .object({
