@@ -21,6 +21,8 @@
 	import OrgSwitcher from '$components/OrgSwitcher/OrgSwitcher.svelte';
 	import { clickOutside } from '$lib/actions/clickOutside';
 	import { setCreatingBoard } from '$stores/creating';
+	import { theme } from '$stores/theme.svelte';
+	import Switch from '$components/Switch/Switch.svelte';
 
 	// The organization comes from the URL; none means Personal.
 	const orgId = $derived(page.params.orgId);
@@ -185,6 +187,35 @@
 							{m[`user_info.language.${locale}`]()}
 						</button>
 					{/each}
+					<!-- The app's own theme; it starts as (and can go back to) the system's. -->
+					<div
+						role="none"
+						class={cn(
+							'flex w-full items-center justify-between gap-3',
+							'px-3 py-2.5 text-main-text bg-sidebar',
+							'border-t border-main-border'
+						)}
+					>
+						<div class="flex min-w-0 flex-col">
+							<span class="truncate text-sm font-medium">
+								{m[`user_info.theme.${theme.dark ? 'dark' : 'light'}`]()}
+							</span>
+						</div>
+						<!-- <Icon name="moon" class='w-4 h-4 text-black' /> -->
+						<Switch
+							ariaLabel={m['user_info.theme.title']()}
+							checked={theme.dark}
+							onchange={theme.setDark}
+							innerClass="focus-visible:outline-main-text"
+						>
+							{#snippet checkedIcon()}
+								<Icon name="moon" class='w-4 h-4 text-black' />
+							{/snippet}
+							{#snippet uncheckedIcon()}	
+								<Icon name="sun" class='w-4 h-4 text-black' />
+							{/snippet}
+						</Switch>
+					</div>
 					<button
 						role="menuitem"
 						class={cn(dropdownOptionClass(false), 'border-t border-main-border')}

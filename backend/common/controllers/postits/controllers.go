@@ -59,7 +59,7 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 		Board:     req.Board,
 		WellKnown: req.WellKnown,
 		Params:    req.Params,
-		Resource:  req.Resource,
+		Resource:  req.Resource.URL,
 		Request:   req.Request,
 		Response:  req.Response,
 		Query:     req.Query,
@@ -240,6 +240,12 @@ func (ctrl *Controller) EditPostIt(c *gin.Context) {
 	if req.Rate != nil {
 		set["rate"] = *req.Rate
 	}
+	if req.Resource != nil {
+		set["resource"] = *req.Resource
+	}
+	if req.Request != nil {
+		set["request"] = *req.Request
+	}
 
 	if len(set) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -351,6 +357,10 @@ func statusOf(err error) int {
 		errors.Is(err, infrastructure.ErrForbidden):
 		return http.StatusForbidden
 	case errors.Is(err, srv.ErrInvalidBinding),
+		errors.Is(err, srv.ErrUnknownWellKnown),
+		errors.Is(err, srv.ErrInvalidOneOff),
+		errors.Is(err, srv.ErrTemplateFixed),
+		errors.Is(err, models.ErrWellKnownMissingVariable),
 		errors.Is(err, infrastructure.ErrUnknownCredential):
 		return http.StatusBadRequest
 	case errors.Is(err, srv.ErrSystemSecretMissing):

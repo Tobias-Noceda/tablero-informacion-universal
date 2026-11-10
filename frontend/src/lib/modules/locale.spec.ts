@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Profile } from '$types/api';
 
-const setLocale = vi.hoisted(() => vi.fn());
 const update = vi.hoisted(() => vi.fn());
 const session = vi.hoisted(() => ({ user: null as Profile | null }));
 
-vi.mock('$lib/paraglide/runtime', () => ({ setLocale }));
 vi.mock('$services/users', () => ({ update }));
 vi.mock('$modules/session.svelte', () => ({ session }));
 
@@ -24,12 +22,11 @@ const ana: Profile = {
 
 describe('switchLocale', () => {
 	beforeEach(() => {
-		setLocale.mockReset();
 		update.mockReset();
 		session.user = null;
 	});
 
-	it('saves the language of a signed-in user before switching', async () => {
+	it('saves the language of a signed-in user', async () => {
 		session.user = ana;
 		update.mockResolvedValue({ ...ana, locale: 'es' });
 
@@ -37,26 +34,24 @@ describe('switchLocale', () => {
 
 		expect(update).toHaveBeenCalledWith(ana.id, { locale: 'es' });
 		expect(session.user?.locale).toBe('es');
-		expect(setLocale).toHaveBeenCalledWith('es');
-		expect(update.mock.invocationCallOrder[0]).toBeLessThan(setLocale.mock.invocationCallOrder[0]);
 	});
 
-	it('only switches for someone signed out', async () => {
+	it('saves nothing for someone signed out', async () => {
 		await switchLocale('es');
 
 		expect(update).not.toHaveBeenCalled();
-		expect(setLocale).toHaveBeenCalledWith('es');
 	});
 
-	it('switches anyway when saving fails', async () => {
+	it('keeps the session as it was when saving fails', async () => {
 		session.user = ana;
 		update.mockRejectedValue(new Error('offline'));
-		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-		await switchLocale('es');
+		await expect(switchLocale('es')).resolves.toBeUndefined();
 
-		expect(setLocale).toHaveBeenCalledWith('es');
 		expect(session.user?.locale).toBe('en');
+		expect(error).toHaveBeenCalled();
+		error.mockRestore();
 	});
 
 	it('does not save the language the user already has', async () => {
@@ -65,6 +60,5 @@ describe('switchLocale', () => {
 		await switchLocale('es');
 
 		expect(update).not.toHaveBeenCalled();
-		expect(setLocale).toHaveBeenCalledWith('es');
 	});
 });

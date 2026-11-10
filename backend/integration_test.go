@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/Secreto31126/tesis/common/services/wellknowns"
 	"io"
 	"net"
 	"net/http"
@@ -58,6 +59,9 @@ func newStack(t *testing.T) *stack {
 	}
 	if err := db.EnsureIndexes(); err != nil {
 		t.Skipf("mongo not reachable: %v", err)
+	}
+	if err := wellknowns.New(db).Seed(); err != nil {
+		t.Fatalf("seed well-knowns: %v", err)
 	}
 
 	cache, err := redis.New()

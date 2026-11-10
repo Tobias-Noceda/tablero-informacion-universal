@@ -15,10 +15,12 @@ import login from '$assets/icons/login.svg';
 import logout from '$assets/icons/logout.svg';
 import manage from '$assets/icons/manage.svg';
 import menu from '$assets/icons/menu.svg';
+import moon from '$assets/icons/moon.svg';
 import plus from '$assets/icons/plus.svg';
 import refresh from '$assets/icons/refresh.svg';
 import rightArrow from '$assets/icons/right-arrow.svg';
 import search from '$assets/icons/search.svg';
+import sun from '$assets/icons/sun.svg';
 import trash from '$assets/icons/trash.svg';
 import users from '$assets/icons/users.svg';
 
@@ -40,10 +42,12 @@ export const iconMap: Record<string, string> = {
     logout: logout,
     manage: manage,
     menu: menu,
+    moon: moon,
     plus: plus,
     refresh: refresh,
     'right-arrow': rightArrow,
     search: search,
+    sun: sun,
     trash: trash,
     users: users
 };

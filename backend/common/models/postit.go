@@ -1,6 +1,8 @@
 package models
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/url"
 
 	"github.com/google/uuid"
@@ -31,4 +33,42 @@ type PostIts struct {
 	// A "$TOKEN" the card uses that does not live in the board's own scope.
 	// Keyed by the token name without the dollar sign.
 	Bindings map[string]SecretRef `bson:"bindings" json:"bindings"`
+}
+
+// MarshalJSON sends the resource as the URL it is, not as url.URL's fields.
+func (p PostIts) MarshalJSON() ([]byte, error) {
+	type plain PostIts
+	var resource *string
+	if p.Resource != nil {
+		text := p.Resource.String()
+		resource = &text
+	}
+	return json.Marshal(struct {
+		plain
+		Resource *string `json:"resource"`
+	}{plain(p), resource})
+}
+
+// UnmarshalJSON reads the resource back from the URL string MarshalJSON
+// writes; null or "" leave it nil.
+func (p *PostIts) UnmarshalJSON(data []byte) error {
+	type plain PostIts
+	var wire struct {
+		*plain
+		Resource *string `json:"resource"`
+	}
+	wire.plain = (*plain)(p)
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+
+	p.Resource = nil
+	if wire.Resource != nil && *wire.Resource != "" {
+		resource, err := url.Parse(*wire.Resource)
+		if err != nil {
+			return fmt.Errorf("resource: %w", err)
+		}
+		p.Resource = resource
+	}
+	return nil
 }

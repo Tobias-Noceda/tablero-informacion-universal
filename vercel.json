@@ -4,7 +4,8 @@
         "backend": {
             "root": "backend/",
             "framework": "go",
-            "entrypoint": "main.go"
+            "entrypoint": "main.go",
+            "buildCommand": "go build -ldflags '-s -w' -o server . && if [ \"$VERCEL_ENV\" = production ]; then ./server -migrate; fi"
         },
         "realtime": {
             "root": "realtime/",

@@ -16,14 +16,25 @@ const (
 )
 
 func main() {
+	maintenance, err := parseMaintenance(os.Args[1:])
+	if err != nil {
+		panic(err)
+	}
+
 	db, err := mongo.New()
 	if err != nil {
 		panic(err)
 	}
 	defer db.Close()
 
-	if err := db.EnsureIndexes(); err != nil {
-		panic(err)
+	if maintenance.migrate || migrateOnBoot(os.Getenv) {
+		if err := migrate(db); err != nil {
+			panic(err)
+		}
+		if maintenance.migrate && !maintenance.requested() {
+			log.Println("migrated: indexes ensured, built-in well-knowns seeded")
+			return
+		}
 	}
 
 	cache, err := redis.New()
@@ -59,10 +70,6 @@ func main() {
 
 	application := newApp(db, cache, kek, keys, cfg, mail.New(templates, sender))
 
-	maintenance, err := parseMaintenance(os.Args[1:])
-	if err != nil {
-		panic(err)
-	}
 	if maintenance.requested() {
 		if err := maintenance.run(application.secrets, os.Stdout); err != nil {
 			panic(err)
