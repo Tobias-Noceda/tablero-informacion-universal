@@ -37,14 +37,14 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div
-	class={cn('z-200', modalClass, 'fixed inset-0 flex items-center justify-center bg-black/50')}
+	class={cn('z-200', modalClass, 'fixed inset-0 flex items-center justify-center bg-black/50 p-4')}
 	role="presentation"
 	onclick={onclose}
 >
 	<!-- svelte-ignore a11y_click_events_have_key_events -->
 	<div
 		class={cn(
-			'bg-background border border-main-border rounded-lg p-6 w-full max-w-md shadow-xl flex flex-col gap-4',
+			'bg-background border border-main-border rounded-lg p-4 sm:p-6 w-full max-w-md max-h-[90dvh] overflow-y-auto shadow-xl flex flex-col gap-4',
 			dialogClass
 		)}
 		role="dialog"

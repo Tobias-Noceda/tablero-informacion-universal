@@ -6,11 +6,11 @@
 	let { children } = $props();
 </script>
 
-<div class="flex min-h-screen flex-col bg-background">
+<div class="flex min-h-dvh flex-col bg-background">
 	<header
 		class="flex flex-row items-center justify-between border-b border-main-border bg-main px-4 py-1"
 	>
-		<a href={resolve('/about')}><img src={logo} alt="Corcheria Company" class="w-44" /></a>
+		<a href={resolve('/about')}><img src={logo} alt="Corcheria Company" class="w-32 sm:w-44" /></a>
 		<LocaleSwitcher />
 	</header>
 	<main class="flex flex-1 items-start justify-center p-6 sm:items-center">
