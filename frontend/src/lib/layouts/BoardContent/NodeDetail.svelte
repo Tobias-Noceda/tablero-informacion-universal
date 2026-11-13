@@ -214,7 +214,7 @@
 {/snippet}
 
 <aside
-	class="absolute inset-0 z-25 flex flex-col gap-4 overflow-hidden bg-tertiary text-black md:static md:h-auto md:max-h-full md:min-h-0 md:self-stretch md:w-100 md:shrink-0 md:rounded-l-2xl md:border-l md:border-tertiary-border"
+	class="absolute inset-0 z-25 flex flex-col gap-4 overflow-hidden bg-detail text-detail-text md:static md:h-auto md:max-h-full md:min-h-0 md:self-stretch md:w-100 md:shrink-0 md:rounded-l-2xl md:border-l md:border-detail-border"
 >
 	<header class="flex shrink-0 items-start gap-2 p-4 pb-0">
 		<Tooltip
@@ -224,7 +224,7 @@
 		>
 			<button
 				type="button"
-				class="cursor-pointer rounded-md p-2 hover:bg-tertiary-hover"
+				class="cursor-pointer rounded-md p-2 hover:bg-detail-hover"
 				aria-label={m['node_detail.back']()}
 				onclick={onback}
 			>
@@ -257,7 +257,7 @@
 			<Tooltip content={m['node_detail.edit']()} placement="bottom" tooltipClass="max-w-60! -mt-1">
 				<button
 					type="button"
-					class="cursor-pointer rounded-md p-2 hover:bg-tertiary-hover disabled:cursor-wait disabled:opacity-60"
+					class="cursor-pointer rounded-md p-2 hover:bg-detail-hover disabled:cursor-wait disabled:opacity-60"
 					aria-label={m['node_detail.edit']()}
 					onclick={async () => {
 						const s = await settings;
@@ -282,7 +282,7 @@
 		>
 			<button
 				type="button"
-				class="cursor-pointer rounded-md p-2 hover:bg-tertiary-hover disabled:cursor-wait disabled:opacity-60"
+				class="cursor-pointer rounded-md p-2 hover:bg-detail-hover disabled:cursor-wait disabled:opacity-60"
 				aria-label={m['node_detail.refresh']()}
 				disabled={refreshing}
 				onclick={refresh}
