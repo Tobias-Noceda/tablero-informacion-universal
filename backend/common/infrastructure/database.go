@@ -10,6 +10,9 @@ import (
 // ErrStrandNotFound reports a strand that is not on the board.
 var ErrStrandNotFound = errors.New("strand not found")
 
+// ErrPostItNotOnBoard reports a card that is not on the board.
+var ErrPostItNotOnBoard = errors.New("post-it not on the board")
+
 type Database interface {
 	// Find every board the user owns or is a member of, and every board of
 	// the given organizations
@@ -43,6 +46,9 @@ type Database interface {
 	UpdateStrand(boardID, strandID uuid.UUID, patch models.StrandPatch) (*models.Strand, error)
 	// Move Post It
 	MovePostIt(boardID, postItID uuid.UUID, pos models.Position) error
+	// Changes a card's style on its board and returns the style, or
+	// ErrPostItNotOnBoard
+	StylePostIt(boardID, postItID uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error)
 	// Change a Post It title
 	EditTitlePostIt(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error
 	// Update board's name

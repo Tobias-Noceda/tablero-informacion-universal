@@ -362,6 +362,64 @@ func (db *MongoDB) EditTitlePostIt(boardID, postItID uuid.UUID, title models.Boa
 	)
 }
 
+// StylePostIt sets the patch's fields on the card's board entry and unsets
+// the empty ones, so a default style is stored as no style at all.
+func (db *MongoDB) StylePostIt(boardID, postItID uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error) {
+	set, unset := bson.M{}, bson.M{}
+	putText := func(field string, value *string) {
+		switch {
+		case value == nil:
+		case *value == "":
+			unset["postits.$."+field] = ""
+		default:
+			set["postits.$."+field] = *value
+		}
+	}
+	putSide := func(field string, value *float32) {
+		switch {
+		case value == nil:
+		case *value == 0:
+			unset["postits.$."+field] = ""
+		default:
+			set["postits.$."+field] = *value
+		}
+	}
+	putText("color", (*string)(patch.Color))
+	putText("border", (*string)(patch.Border))
+	putSide("width", patch.Width)
+	putSide("height", patch.Height)
+
+	update := bson.M{}
+	if len(set) > 0 {
+		update["$set"] = set
+	}
+	if len(unset) > 0 {
+		update["$unset"] = unset
+	}
+	if len(update) == 0 {
+		return nil, errors.New("style post-it: the patch changes nothing")
+	}
+
+	ctx, cancel := timeout()
+	defer cancel()
+
+	board := &models.Board{}
+	err := db.boards.FindOneAndUpdate(ctx,
+		bson.M{"_id": boardID, "postits.id": postItID},
+		update,
+		options.FindOneAndUpdate().
+			SetReturnDocument(options.After).
+			SetProjection(bson.M{"postits": bson.M{"$elemMatch": bson.M{"id": postItID}}}),
+	).Decode(board)
+	if errors.Is(err, mongo.ErrNoDocuments) || (err == nil && len(board.PostIts) == 0) {
+		return nil, infrastructure.ErrPostItNotOnBoard
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &board.PostIts[0].CardStyle, nil
+}
+
 func (db *MongoDB) ConnectPostIts(boardID uuid.UUID, strand models.Strand) (*models.Strand, error) {
 	strand.Id = uuid.New()
 

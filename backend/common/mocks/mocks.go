@@ -31,6 +31,7 @@ type MockDB struct {
 	UpdateStrandFn      func(boardID, strandID uuid.UUID, patch models.StrandPatch) (*models.Strand, error)
 	MovePostItFn        func(boardID, postItID uuid.UUID, pos models.Position) error
 	EditTitlePostItFn   func(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error
+	StylePostItFn       func(boardID, postItID uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error)
 	UpdateBoardNameFn   func(id uuid.UUID, name string) error
 }
 
@@ -142,10 +143,18 @@ func (m *MockDB) MovePostIt(boardID, postItID uuid.UUID, pos models.Position) er
 }
 
 func (m *MockDB) EditTitlePostIt(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error {
-	if m.MovePostItFn != nil {
+	if m.EditTitlePostItFn != nil {
 		return m.EditTitlePostItFn(boardID, postItID, title)
 	}
 	return nil
+}
+
+func (m *MockDB) StylePostIt(boardID, postItID uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error) {
+	if m.StylePostItFn != nil {
+		return m.StylePostItFn(boardID, postItID, patch)
+	}
+	style := patch.Apply(models.CardStyle{})
+	return &style, nil
 }
 
 func (m *MockDB) UpdateBoardName(id uuid.UUID, name string) error {
