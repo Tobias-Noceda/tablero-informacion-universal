@@ -364,5 +364,27 @@
 		"rate": "Se actualiza cada",
 		"seconds": "{value} s",
 		"outputs": "Valores"
+	},
+	"strands": {
+		"toolbar": "Estilo de la conexión",
+		"label": "Etiqueta",
+		"label_placeholder": "¿Qué los relaciona?",
+		"label_edit_hint": "Doble clic para editar",
+		"arrow_none": "Sin flechas",
+		"arrow_start": "Flecha hacia el origen",
+		"arrow_end": "Flecha hacia el destino",
+		"arrow_both": "Flechas en ambos sentidos",
+		"width_thin": "Fino",
+		"width_normal": "Normal",
+		"width_thick": "Grueso",
+		"color_gray": "Gris",
+		"color_red": "Rojo",
+		"color_orange": "Naranja",
+		"color_yellow": "Amarillo",
+		"color_green": "Verde",
+		"color_blue": "Azul",
+		"color_purple": "Violeta",
+		"color_pink": "Rosa",
+		"remove": "Borrar conexión"
 	}
 }

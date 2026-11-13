@@ -112,7 +112,8 @@ func TestRoles_Matrix(t *testing.T) {
 	id := uuid.New()
 	db := boardDB(id)
 	db.FindBoardPostItsFn = func(uuid.UUID) ([]models.PostIts, error) { return []models.PostIts{}, nil }
-	db.ConnectPostItsFn = func(b, s, t uuid.UUID) (*models.Strand, error) { return &models.Strand{}, nil }
+	db.ConnectPostItsFn = func(uuid.UUID, models.Strand) (*models.Strand, error) { return &models.Strand{}, nil }
+	db.UpdateStrandFn = func(_, _ uuid.UUID, _ models.StrandPatch) (*models.Strand, error) { return &models.Strand{}, nil }
 	db.DisconnectPostItsFn = func(b, s uuid.UUID) error { return nil }
 	db.UpdateBoardNameFn = func(uuid.UUID, string) error { return nil }
 	db.DeleteBoardFn = func(uuid.UUID) error { return nil }
@@ -129,7 +130,12 @@ func TestRoles_Matrix(t *testing.T) {
 		{"post-its", models.BoardViewer, func(p models.Principal) error { _, err := svc.GetBoardPostIts(p, id); return err }},
 		{"members", models.BoardViewer, func(p models.Principal) error { _, err := svc.Members(p, id); return err }},
 		{"connect", models.BoardEditor, func(p models.Principal) error {
-			_, err := svc.ConnectPostIts(p, id, uuid.New(), uuid.New())
+			_, err := svc.ConnectPostIts(p, id, uuid.New(), uuid.New(), models.StrandStyle{})
+			return err
+		}},
+		{"restyle strand", models.BoardEditor, func(p models.Principal) error {
+			label := "feeds"
+			_, err := svc.UpdateStrand(p, id, uuid.New(), models.StrandPatch{Label: &label})
 			return err
 		}},
 		{"disconnect", models.BoardEditor, func(p models.Principal) error { return svc.DisconnectPostIts(p, id, uuid.New()) }},
@@ -441,5 +447,103 @@ func TestOrgBoard_RolesComeFromTheOrg(t *testing.T) {
 	}
 	if _, err := srv.GetBoard(outsider, id); !errors.Is(err, ErrForbidden) {
 		t.Errorf("someone outside the org opened the board: %v", err)
+	}
+}
+
+func TestConnectPostIts_StoresTheNormalizedStyle(t *testing.T) {
+	id, source, target := uuid.New(), uuid.New(), uuid.New()
+	var stored models.Strand
+	db := boardDB(id)
+	db.ConnectPostItsFn = func(_ uuid.UUID, strand models.Strand) (*models.Strand, error) {
+		stored = strand
+		return &strand, nil
+	}
+
+	style := models.StrandStyle{Label: " feeds ", Arrow: models.StrandArrowEnd, Color: models.StrandColorBlue}
+	if _, err := newService(db, &purgeRecorder{}).ConnectPostIts(ana, id, source, target, style); err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+
+	want := models.Strand{Source: source, Target: target, StrandStyle: models.StrandStyle{
+		Label: "feeds", Arrow: models.StrandArrowEnd, Color: models.StrandColorBlue,
+	}}
+	if stored != want {
+		t.Errorf("stored %+v, want %+v", stored, want)
+	}
+}
+
+func TestConnectPostIts_AnInvalidStyleIsNotStored(t *testing.T) {
+	id := uuid.New()
+	db := boardDB(id)
+	db.ConnectPostItsFn = func(uuid.UUID, models.Strand) (*models.Strand, error) {
+		t.Error("an invalid strand reached the database")
+		return nil, nil
+	}
+
+	_, err := newService(db, &purgeRecorder{}).ConnectPostIts(ana, id, uuid.New(), uuid.New(), models.StrandStyle{Color: "teal"})
+	if !errors.Is(err, ErrInvalidStrand) {
+		t.Errorf("got %v, want ErrInvalidStrand", err)
+	}
+}
+
+func TestUpdateStrand_SendsTheNormalizedPatch(t *testing.T) {
+	id, strandID := uuid.New(), uuid.New()
+	var got models.StrandPatch
+	db := boardDB(id)
+	db.UpdateStrandFn = func(board, strand uuid.UUID, patch models.StrandPatch) (*models.Strand, error) {
+		if board != id || strand != strandID {
+			t.Errorf("updated %s on %s", strand, board)
+		}
+		got = patch
+		return &models.Strand{Id: strand}, nil
+	}
+
+	label, width := "  feeds ", models.StrandWidthThick
+	if _, err := newService(db, &purgeRecorder{}).UpdateStrand(ana, id, strandID, models.StrandPatch{Label: &label, Width: &width}); err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if got.Label == nil || *got.Label != "feeds" || *got.Width != width || got.Arrow != nil || got.Color != nil {
+		t.Errorf("patch = %+v", got)
+	}
+}
+
+func TestUpdateStrand_AnInvalidPatchIsNotStored(t *testing.T) {
+	id := uuid.New()
+	db := boardDB(id)
+	db.UpdateStrandFn = func(_, _ uuid.UUID, _ models.StrandPatch) (*models.Strand, error) {
+		t.Error("an invalid patch reached the database")
+		return nil, nil
+	}
+
+	arrow := models.StrandArrow("sideways")
+	_, err := newService(db, &purgeRecorder{}).UpdateStrand(ana, id, uuid.New(), models.StrandPatch{Arrow: &arrow})
+	if !errors.Is(err, ErrInvalidStrand) {
+		t.Errorf("got %v, want ErrInvalidStrand", err)
+	}
+}
+
+// A patch that changes nothing answers from the board already loaded.
+func TestUpdateStrand_AnEmptyPatchAnswersTheStrand(t *testing.T) {
+	id := uuid.New()
+	strand := models.Strand{Id: uuid.New(), StrandStyle: models.StrandStyle{Label: "feeds"}}
+	db := &mocks.MockDB{
+		FindBoardFn: func(uuid.UUID) (*models.Board, error) {
+			board := boardFixture(id)
+			board.Strands = []models.Strand{strand}
+			return board, nil
+		},
+		UpdateStrandFn: func(_, _ uuid.UUID, _ models.StrandPatch) (*models.Strand, error) {
+			t.Error("an empty patch reached the database")
+			return nil, nil
+		},
+	}
+	svc := newService(db, &purgeRecorder{})
+
+	got, err := svc.UpdateStrand(ana, id, strand.Id, models.StrandPatch{})
+	if err != nil || *got != strand {
+		t.Errorf("got %+v, %v; want %+v", got, err, strand)
+	}
+	if _, err := svc.UpdateStrand(ana, id, uuid.New(), models.StrandPatch{}); !errors.Is(err, ErrStrandNotFound) {
+		t.Errorf("unknown strand: got %v, want ErrStrandNotFound", err)
 	}
 }

@@ -20,7 +20,8 @@
   "scripts": {
     "build": "xmcp build",
     "dev": "xmcp dev",
-    "start": "node dist/http.js"
+    "start": "node dist/http.js",
+    "test": "node --test \"test/**/*.test.ts\""
   },
   "dependencies": {
     "mustache": "^4.2.0",

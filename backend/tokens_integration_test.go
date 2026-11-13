@@ -93,14 +93,15 @@ func TestEndToEnd_AccessTokenReadsAsItsOwner(t *testing.T) {
 // past the middleware.
 // tokenWrites are the only writes a token may make: boards, cards and strands.
 var tokenWrites = map[string]bool{
-	"POST /api/v1/boards":                 true,
-	"DELETE /api/v1/boards/:id":           true,
-	"POST /api/v1/boards/:id/strands":     true,
-	"POST /api/v1/post-its":               true,
-	"DELETE /api/v1/post-its/:id":         true,
-	"PATCH /api/v1/post-its/:id/settings": true,
-	"PATCH /api/v1/post-its/:id/position": true,
-	"PATCH /api/v1/post-its/:id/title":    true,
+	"POST /api/v1/boards":                      true,
+	"DELETE /api/v1/boards/:id":                true,
+	"POST /api/v1/boards/:id/strands":          true,
+	"PATCH /api/v1/boards/:id/strands/:strand": true,
+	"POST /api/v1/post-its":                    true,
+	"DELETE /api/v1/post-its/:id":              true,
+	"PATCH /api/v1/post-its/:id/settings":      true,
+	"PATCH /api/v1/post-its/:id/position":      true,
+	"PATCH /api/v1/post-its/:id/title":         true,
 }
 
 func TestEndToEnd_AccessTokenReachesOnlyTheAllowlist(t *testing.T) {

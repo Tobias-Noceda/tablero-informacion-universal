@@ -2,6 +2,7 @@ package mongo
 
 import (
 	"context"
+	"errors"
 	"os"
 	"time"
 
@@ -361,14 +362,14 @@ func (db *MongoDB) EditTitlePostIt(boardID, postItID uuid.UUID, title models.Boa
 	)
 }
 
-func (db *MongoDB) ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error) {
-	strand := models.Strand{Id: uuid.New(), Source: source, Target: target}
+func (db *MongoDB) ConnectPostIts(boardID uuid.UUID, strand models.Strand) (*models.Strand, error) {
+	strand.Id = uuid.New()
 
 	err := db.updateBoard(
 		bson.M{
 			"_id": boardID,
 			"postits.id": bson.M{
-				"$all": []uuid.UUID{source, target},
+				"$all": []uuid.UUID{strand.Source, strand.Target},
 			},
 		},
 		bson.M{"$addToSet": bson.M{"strands": strand}},
@@ -378,6 +379,55 @@ func (db *MongoDB) ConnectPostIts(boardID, source, target uuid.UUID) (*models.St
 	}
 
 	return &strand, nil
+}
+
+// UpdateStrand sets the patch's fields on the strand and unsets the empty
+// ones, so a default style is stored as no style at all.
+func (db *MongoDB) UpdateStrand(boardID, strandID uuid.UUID, patch models.StrandPatch) (*models.Strand, error) {
+	set, unset := bson.M{}, bson.M{}
+	put := func(field string, value *string) {
+		switch {
+		case value == nil:
+		case *value == "":
+			unset["strands.$."+field] = ""
+		default:
+			set["strands.$."+field] = *value
+		}
+	}
+	put("label", patch.Label)
+	put("arrow", (*string)(patch.Arrow))
+	put("width", (*string)(patch.Width))
+	put("color", (*string)(patch.Color))
+
+	update := bson.M{}
+	if len(set) > 0 {
+		update["$set"] = set
+	}
+	if len(unset) > 0 {
+		update["$unset"] = unset
+	}
+	if len(update) == 0 {
+		return nil, errors.New("update strand: the patch changes nothing")
+	}
+
+	ctx, cancel := timeout()
+	defer cancel()
+
+	board := &models.Board{}
+	err := db.boards.FindOneAndUpdate(ctx,
+		bson.M{"_id": boardID, "strands.id": strandID},
+		update,
+		options.FindOneAndUpdate().
+			SetReturnDocument(options.After).
+			SetProjection(bson.M{"strands": bson.M{"$elemMatch": bson.M{"id": strandID}}}),
+	).Decode(board)
+	if errors.Is(err, mongo.ErrNoDocuments) || (err == nil && len(board.Strands) == 0) {
+		return nil, infrastructure.ErrStrandNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &board.Strands[0], nil
 }
 
 func (db *MongoDB) DisconnectPostIts(boardID, strandID uuid.UUID) error {

@@ -60,3 +60,25 @@ export function getEdgeParams(source: InternalNode, target: InternalNode) {
     targetPos,
   };
 }
+
+// Pulls each end of the segment `from → to` in by its trim, so an arrowhead
+// drawn past the end lands on the card's border instead of the line poking
+// through its tip. A segment too short for both trims stays as it is.
+export function trimSegment(
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+  trimStart: number,
+  trimEnd: number
+) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy);
+  if (length <= trimStart + trimEnd) return { from, to };
+
+  const ux = dx / length;
+  const uy = dy / length;
+  return {
+    from: { x: from.x + ux * trimStart, y: from.y + uy * trimStart },
+    to: { x: to.x - ux * trimEnd, y: to.y - uy * trimEnd }
+  };
+}

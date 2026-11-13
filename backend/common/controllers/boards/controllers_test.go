@@ -155,8 +155,11 @@ func TestEveryRoute_RequiresAToken(t *testing.T) {
 
 func okDB() *mocks.MockDB {
 	return &mocks.MockDB{
-		FindBoardPostItsFn:  func(uuid.UUID) ([]models.PostIts, error) { return []models.PostIts{}, nil },
-		ConnectPostItsFn:    func(_, s, t uuid.UUID) (*models.Strand, error) { return &models.Strand{Source: s, Target: t}, nil },
+		FindBoardPostItsFn: func(uuid.UUID) ([]models.PostIts, error) { return []models.PostIts{}, nil },
+		ConnectPostItsFn:   func(_ uuid.UUID, strand models.Strand) (*models.Strand, error) { return &strand, nil },
+		UpdateStrandFn: func(_, strand uuid.UUID, patch models.StrandPatch) (*models.Strand, error) {
+			return &models.Strand{Id: strand, StrandStyle: patch.Apply(models.StrandStyle{})}, nil
+		},
 		DisconnectPostItsFn: func(_, _ uuid.UUID) error { return nil },
 		DeleteBoardFn:       func(uuid.UUID) error { return nil },
 		UpdateBoardNameFn:   func(uuid.UUID, string) error { return nil },
@@ -181,6 +184,7 @@ var calls = []struct {
 	{call{"GetBoardPostIts", http.MethodGet, board + "/post-its", "", http.StatusOK}, models.BoardViewer},
 	{call{"GetMembers", http.MethodGet, board + "/members", "", http.StatusOK}, models.BoardViewer},
 	{call{"ConnectPostIts", http.MethodPost, board + "/strands", strand, http.StatusCreated}, models.BoardEditor},
+	{call{"UpdateStrand", http.MethodPatch, board + "/strands/" + uuid.NewString(), `{"label":"feeds"}`, http.StatusOK}, models.BoardEditor},
 	{call{"DisconnectPostIts", http.MethodDelete, board + "/strands/" + uuid.NewString(), "", http.StatusNoContent}, models.BoardEditor},
 	{call{"UpdateBoardName", http.MethodPatch, board + "/name", `{"name":"N"}`, http.StatusNoContent}, models.BoardOwner},
 	{call{"SetMember", http.MethodPut, board + "/members", `{"email":"eve@example.com","role":"viewer"}`, http.StatusOK}, models.BoardOwner},
@@ -296,7 +300,8 @@ func TestBoardHandlers_ServiceErrors(t *testing.T) {
 		SetBoardMemberFn:    func(uuid.UUID, string, models.BoardRole) error { return boom },
 		RemoveBoardMemberFn: func(uuid.UUID, string) error { return boom },
 		UpdateBoardNameFn:   func(uuid.UUID, string) error { return boom },
-		ConnectPostItsFn:    func(_, _, _ uuid.UUID) (*models.Strand, error) { return nil, boom },
+		ConnectPostItsFn:    func(uuid.UUID, models.Strand) (*models.Strand, error) { return nil, boom },
+		UpdateStrandFn:      func(_, _ uuid.UUID, _ models.StrandPatch) (*models.Strand, error) { return nil, boom },
 		DisconnectPostItsFn: func(_, _ uuid.UUID) error { return boom },
 	}
 	cases := []call{
@@ -328,6 +333,8 @@ func TestBoardHandlers_InvalidUUID(t *testing.T) {
 		{"RemoveMember", http.MethodDelete, "/boards/nope/members/" + ana, "", 0},
 		{"UpdateBoardName", http.MethodPatch, "/boards/nope/name", `{"name":"N"}`, 0},
 		{"ConnectPostIts", http.MethodPost, "/boards/nope/strands", strand, 0},
+		{"UpdateStrand board", http.MethodPatch, "/boards/nope/strands/" + uuid.NewString(), `{}`, 0},
+		{"UpdateStrand strand", http.MethodPatch, board + "/strands/jajant", `{}`, 0},
 		{"DisconnectPostIts board", http.MethodDelete, "/boards/nope/strands/" + uuid.NewString(), "", 0},
 		{"DisconnectPostIts strand", http.MethodDelete, board + "/strands/jajant", "", 0},
 	}
@@ -379,5 +386,62 @@ func TestCreateBoard_InAnOrg(t *testing.T) {
 		if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "org_not_found") || gotOrg != nil {
 			t.Errorf("%s in %s: %d %s, want 404 org_not_found", c.caller, c.org, w.Code, w.Body.String())
 		}
+	}
+}
+
+func TestConnectPostIts_TakesAStyle(t *testing.T) {
+	body := `{"source":"` + uuid.NewString() + `","target":"` + uuid.NewString() + `","label":"feeds","arrow":"end","width":"thick","color":"blue"}`
+	w := do(setupRouter(okDB()), ana, http.MethodPost, board+"/strands", body)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d %s", w.Code, w.Body.String())
+	}
+
+	var got models.Strand
+	_ = json.Unmarshal(w.Body.Bytes(), &got)
+	want := models.StrandStyle{Label: "feeds", Arrow: models.StrandArrowEnd, Width: models.StrandWidthThick, Color: models.StrandColorBlue}
+	if got.StrandStyle != want {
+		t.Errorf("style = %+v, want %+v", got.StrandStyle, want)
+	}
+}
+
+func TestUpdateStrand_AnswersTheStrand(t *testing.T) {
+	strandID := uuid.New()
+	w := do(setupRouter(okDB()), ana, http.MethodPatch, board+"/strands/"+strandID.String(), `{"arrow":"both","color":"red"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d %s", w.Code, w.Body.String())
+	}
+
+	var got models.Strand
+	_ = json.Unmarshal(w.Body.Bytes(), &got)
+	if got.Id != strandID || got.Arrow != models.StrandArrowBoth || got.Color != models.StrandColorRed {
+		t.Errorf("strand = %+v", got)
+	}
+}
+
+func TestStrandRoutes_RefuseAnInvalidStyle(t *testing.T) {
+	cases := []call{
+		{"connect", http.MethodPost, board + "/strands", `{"source":"` + uuid.NewString() + `","target":"` + uuid.NewString() + `","color":"#ff0000"}`, 0},
+		{"restyle", http.MethodPatch, board + "/strands/" + uuid.NewString(), `{"width":"huge"}`, 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := do(setupRouter(okDB()), ana, tc.method, tc.path, tc.body)
+			if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "invalid_strand") {
+				t.Errorf("status = %d %s, want 400 invalid_strand", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+func TestUpdateStrand_AnUnknownStrandIsNotFound(t *testing.T) {
+	db := okDB()
+	db.UpdateStrandFn = func(_, _ uuid.UUID, _ models.StrandPatch) (*models.Strand, error) {
+		return nil, b_srv.ErrStrandNotFound
+	}
+
+	w := do(setupRouter(db), ana, http.MethodPatch, board+"/strands/"+uuid.NewString(), `{"label":"feeds"}`)
+	if w.Code != http.StatusNotFound || !strings.Contains(w.Body.String(), "strand_not_found") {
+		t.Errorf("status = %d %s, want 404 strand_not_found", w.Code, w.Body.String())
 	}
 }

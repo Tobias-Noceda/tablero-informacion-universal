@@ -26,6 +26,44 @@ body {
   height: 100%;
 }
 
+/* Strand palette ($lib/strands/style.ts): one entry per colour the backend
+   accepts, darker on the light theme and lighter on the dark one so every
+   strand keeps its contrast. Keep both dark blocks equal. */
+:root {
+  --strand-gray: #4b5563;
+  --strand-red: #dc2626;
+  --strand-orange: #ea580c;
+  --strand-yellow: #ca8a04;
+  --strand-green: #16a34a;
+  --strand-blue: #2563eb;
+  --strand-purple: #9333ea;
+  --strand-pink: #db2777;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --strand-gray: #9ca3af;
+    --strand-red: #f87171;
+    --strand-orange: #fb923c;
+    --strand-yellow: #facc15;
+    --strand-green: #4ade80;
+    --strand-blue: #60a5fa;
+    --strand-purple: #c084fc;
+    --strand-pink: #f472b6;
+  }
+}
+
+:root[data-theme='dark'] {
+  --strand-gray: #9ca3af;
+  --strand-red: #f87171;
+  --strand-orange: #fb923c;
+  --strand-yellow: #facc15;
+  --strand-green: #4ade80;
+  --strand-blue: #60a5fa;
+  --strand-purple: #c084fc;
+  --strand-pink: #f472b6;
+}
+
 /* Sidebar is outside .react-flow so it doesn't get theme variables in dark mode.
    Dark: the system's unless the app is set to light, or the app's own choice
    (data-theme, see routes/layout.css). Keep both blocks equal. */

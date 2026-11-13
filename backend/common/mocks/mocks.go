@@ -27,7 +27,8 @@ type MockDB struct {
 	SetBoardMemberFn    func(boardID uuid.UUID, user string, role models.BoardRole) error
 	RemoveBoardMemberFn func(boardID uuid.UUID, user string) error
 	DisconnectPostItsFn func(boardID, strandID uuid.UUID) error
-	ConnectPostItsFn    func(boardID, source, target uuid.UUID) (*models.Strand, error)
+	ConnectPostItsFn    func(boardID uuid.UUID, strand models.Strand) (*models.Strand, error)
+	UpdateStrandFn      func(boardID, strandID uuid.UUID, patch models.StrandPatch) (*models.Strand, error)
 	MovePostItFn        func(boardID, postItID uuid.UUID, pos models.Position) error
 	EditTitlePostItFn   func(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error
 	UpdateBoardNameFn   func(id uuid.UUID, name string) error
@@ -119,9 +120,16 @@ func (m *MockDB) DisconnectPostIts(boardID, strandID uuid.UUID) error {
 	return nil
 }
 
-func (m *MockDB) ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error) {
+func (m *MockDB) ConnectPostIts(boardID uuid.UUID, strand models.Strand) (*models.Strand, error) {
 	if m.ConnectPostItsFn != nil {
-		return m.ConnectPostItsFn(boardID, source, target)
+		return m.ConnectPostItsFn(boardID, strand)
+	}
+	return nil, nil
+}
+
+func (m *MockDB) UpdateStrand(boardID, strandID uuid.UUID, patch models.StrandPatch) (*models.Strand, error) {
+	if m.UpdateStrandFn != nil {
+		return m.UpdateStrandFn(boardID, strandID, patch)
 	}
 	return nil, nil
 }

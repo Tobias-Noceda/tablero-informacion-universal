@@ -363,5 +363,27 @@
 		"rate": "Refresh every",
 		"seconds": "{value} s",
 		"outputs": "Values"
+	},
+	"strands": {
+		"toolbar": "Connection style",
+		"label": "Label",
+		"label_placeholder": "What links them?",
+		"label_edit_hint": "Double-click to edit",
+		"arrow_none": "No arrows",
+		"arrow_start": "Arrow to the source",
+		"arrow_end": "Arrow to the target",
+		"arrow_both": "Arrows both ways",
+		"width_thin": "Thin",
+		"width_normal": "Normal",
+		"width_thick": "Thick",
+		"color_gray": "Gray",
+		"color_red": "Red",
+		"color_orange": "Orange",
+		"color_yellow": "Yellow",
+		"color_green": "Green",
+		"color_blue": "Blue",
+		"color_purple": "Purple",
+		"color_pink": "Pink",
+		"remove": "Delete connection"
 	}
 }
