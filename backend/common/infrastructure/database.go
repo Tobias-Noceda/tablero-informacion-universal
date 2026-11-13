@@ -1,9 +1,14 @@
 package infrastructure
 
 import (
+	"errors"
+
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/google/uuid"
 )
+
+// ErrStrandNotFound reports a strand that is not on the board.
+var ErrStrandNotFound = errors.New("strand not found")
 
 type Database interface {
 	// Find every board the user owns or is a member of, and every board of
@@ -31,8 +36,11 @@ type Database interface {
 	RemoveBoardMember(boardID uuid.UUID, user string) error
 	// Disconnects a strand
 	DisconnectPostIts(boardID, strandID uuid.UUID) error
-	// Connects a Strand
-	ConnectPostIts(boardID, source, target uuid.UUID) (*models.Strand, error)
+	// Connects the strand's source and target, giving the strand a new id.
+	// Both cards must be on the board.
+	ConnectPostIts(boardID uuid.UUID, strand models.Strand) (*models.Strand, error)
+	// Changes a strand's style and returns the strand, or ErrStrandNotFound
+	UpdateStrand(boardID, strandID uuid.UUID, patch models.StrandPatch) (*models.Strand, error)
 	// Move Post It
 	MovePostIt(boardID, postItID uuid.UUID, pos models.Position) error
 	// Change a Post It title
