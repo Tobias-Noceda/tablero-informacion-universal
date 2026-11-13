@@ -28,7 +28,9 @@
 	import { edgesMap } from '$components/Edges/edge-map';
 	import { setStrandEditor } from '$lib/strands/editor';
 	import { applyPatch, strandToEdge } from '$lib/strands/style';
-	import type { StrandStyle } from '$types/api';
+	import { setCardEditor, type CardBounds } from '$lib/cards/editor';
+	import { applyCardPatch, resizePatch } from '$lib/cards/style';
+	import type { CardStyle, StrandStyle } from '$types/api';
 	import { mouses } from '$stores/mouses.svelte';
 	import { theme } from '$stores/theme.svelte';
 	import Realtime from './Realtime.svelte';
@@ -273,6 +275,46 @@
 		},
 		update: updateStrand,
 		remove: removeStrand
+	});
+
+	// The change shows at once and is undone if the backend refuses it.
+	const restyleCard = async (id: string, patch: CardStyle) => {
+		const before = nodes.find((n) => n.id === id);
+		if (!canEdit || !before) return;
+
+		nodes = nodes.map((n) => (n.id === id ? applyCardPatch(n, patch) : n));
+		try {
+			await postItsApi.style(id, patch);
+		} catch (err) {
+			console.error('Could not restyle the card:', err);
+			nodes = nodes.map((n) =>
+				n.id === id ? { ...before, data: { ...before.data, isSelected: n.data?.isSelected } } : n
+			);
+		}
+	};
+
+	// Svelte Flow already drew the new size; this keeps it within the limits
+	// and saves it, and the corner too when a top or left handle moved it.
+	const resizeCard = async (id: string, bounds: CardBounds, moved: boolean) => {
+		if (!canEdit) return;
+		const size = resizePatch(bounds.width, bounds.height);
+		nodes = nodes.map((n) => (n.id === id ? applyCardPatch(n, size) : n));
+		try {
+			await Promise.all([
+				postItsApi.style(id, size),
+				moved ? postItsApi.move(id, bounds.x, bounds.y) : undefined
+			]);
+		} catch (err) {
+			console.error('Could not resize the card:', err);
+		}
+	};
+
+	setCardEditor({
+		get canEdit() {
+			return canEdit;
+		},
+		restyle: restyleCard,
+		resized: resizeCard
 	});
 
 	const onConnect = async (connection: Connection) => {

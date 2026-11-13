@@ -385,5 +385,14 @@
 		"color_purple": "Purple",
 		"color_pink": "Pink",
 		"remove": "Delete connection"
+	},
+	"cards": {
+		"toolbar": "Card style",
+		"color_default": "Usual colour",
+		"border_none": "No border",
+		"border_solid": "Solid border",
+		"border_dashed": "Dashed border",
+		"border_dotted": "Dotted border",
+		"auto_size": "Fit to content"
 	}
 }

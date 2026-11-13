@@ -386,5 +386,14 @@
 		"color_purple": "Violeta",
 		"color_pink": "Rosa",
 		"remove": "Borrar conexión"
+	},
+	"cards": {
+		"toolbar": "Estilo de la tarjeta",
+		"color_default": "Color habitual",
+		"border_none": "Sin borde",
+		"border_solid": "Borde continuo",
+		"border_dashed": "Borde de guiones",
+		"border_dotted": "Borde de puntos",
+		"auto_size": "Ajustar al contenido"
 	}
 }
