@@ -46,6 +46,13 @@ export function cardNodeFields(source: CardStyle): CardSize & { look: CardLook }
 	return { ...sizeOf(source), look: lookOf(source) };
 }
 
+// The card without its style fields, which cardNodeFields places instead.
+export function withoutStyle<T extends CardStyle>(source: T): Omit<T, keyof CardStyle> {
+	const rest: Partial<T> = { ...source };
+	for (const key of [...LOOK_KEYS, ...SIZE_KEYS]) delete rest[key];
+	return rest as Omit<T, keyof CardStyle>;
+}
+
 // The node with the patch applied; an empty value (0 for a size) goes back to the default.
 export function applyCardPatch<N extends Node>(node: N, patch: CardStyle): N {
 	const look: CardLook = { ...(node.data?.look as CardLook | undefined) };
