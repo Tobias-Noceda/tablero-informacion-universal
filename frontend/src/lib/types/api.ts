@@ -153,12 +153,7 @@ export type Board = {
         position: { x: number; y: number; };
         // data: { url: `/api/post-its/${UUID}` };
     }[];
-    strands: {
-        source: string;
-        target: string;
-        // DTO only:
-        // id: `${this.source}-${this.target}`;
-    }[];
+    strands: Strand[];
     // Board defined env variables
     envs: Envs[];
 };
@@ -190,11 +185,25 @@ export type Board = {
 //     bindings?: Record<string, SecretRef>;
 // }
 
-export type Strand = {
+// Which ends of a strand point at their card.
+export type StrandArrow = 'none' | 'start' | 'end' | 'both';
+export type StrandWidth = 'thin' | 'normal' | 'thick';
+// A colour of the board's palette, drawn per theme (see $lib/strands/style.ts).
+export type StrandColor = 'gray' | 'red' | 'orange' | 'yellow' | 'green' | 'blue' | 'purple' | 'pink';
+
+// Every field is optional: none is a plain gray line without arrows.
+export type StrandStyle = {
+    label?: string;
+    arrow?: StrandArrow;
+    width?: StrandWidth;
+    color?: StrandColor;
+};
+
+export type Strand = StrandStyle & {
     id: UUID;
     source: UUID;
     target: UUID;
-}
+};
 
 export type SecretKind = 'api_key' | 'bearer' | 'basic' | 'oauth2';
 
