@@ -146,13 +146,13 @@ export type Board = {
     members: BoardMember[]; // everyone else on the board
     org?: UUID; // the organization it belongs to; none for a personal board
     role?: BoardRole; // the caller's
-    postits: {
+    postits: ({
         id: UUID;
         type?: string;
         title?: { text: string; vars: boolean; };
         position: { x: number; y: number; };
         // data: { url: `/api/post-its/${UUID}` };
-    }[];
+    } & CardStyle)[];
     strands: Strand[];
     // Board defined env variables
     envs: Envs[];
@@ -197,6 +197,20 @@ export type StrandStyle = {
     arrow?: StrandArrow;
     width?: StrandWidth;
     color?: StrandColor;
+};
+
+// The line around a card (see $lib/cards/style.ts).
+export type CardBorder = 'none' | 'solid' | 'dashed' | 'dotted';
+// Cards share the strands' palette.
+export type CardColor = StrandColor;
+
+// Every field is optional: none is the usual card, without a border, as
+// large as its content. A size of 0 in a patch goes back to that.
+export type CardStyle = {
+    color?: CardColor;
+    border?: CardBorder;
+    width?: number;
+    height?: number;
 };
 
 export type Strand = StrandStyle & {
