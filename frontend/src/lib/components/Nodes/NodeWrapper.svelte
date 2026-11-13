@@ -1,15 +1,33 @@
 <script lang="ts">
     /* eslint-disable svelte/no-navigation-without-resolve */
 	import './index.css';
-	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
+	import { Handle, NodeResizer, NodeToolbar, Position, type NodeProps } from '@xyflow/svelte';
 	import { results } from '$stores/postit-results.svelte';
 	import { renderTitle } from '$lib/title';
 	import type { Snippet } from 'svelte';
 	import { isImageLink, isLink } from '$lib/helpers/content-rendering';
 	import { cn } from '$lib/utils';
+	import { getCardEditor } from '$lib/cards/editor';
+	import {
+		cardBorder,
+		cardFill,
+		MAX_CARD_HEIGHT,
+		MAX_CARD_WIDTH,
+		MIN_CARD_HEIGHT,
+		MIN_CARD_WIDTH,
+		type CardLook
+	} from '$lib/cards/style';
+	import CardToolbar from './CardToolbar.svelte';
 
-	let { id, data, children }: NodeProps & { children: Snippet<[Record<string, string>]> } =
-		$props();
+	let {
+		id,
+		data,
+		width,
+		height,
+		children
+	}: NodeProps & { children: Snippet<[Record<string, string>]> } = $props();
+
+	const editor = getCardEditor();
 
 	const title = $derived(data?.title as { text: string; vars: boolean } | undefined);
 	// A plain title is all the card shows, so it needs no data.
@@ -21,6 +39,14 @@
 	});
 
 	const isSelected = $derived.by(() => data?.isSelected ?? false);
+	// An editor restyles and resizes the open card.
+	const showTools = $derived((editor?.canEdit ?? false) && isSelected === true);
+
+	// A side without a size of its own follows the content, up to a limit.
+	const look = $derived((data?.look ?? {}) as CardLook);
+	const sized = $derived(!!width || !!height);
+	// Where a resize started, to tell whether it also moved the card.
+	let resizeStart: { x: number; y: number } | null = null;
 
 	function shouldRenderImage(title: string, response: Record<string, string> | null): boolean {
 		const renderedTitle = renderTitle(title, response);
@@ -31,18 +57,39 @@
 	}
 </script>
 
+<NodeToolbar isVisible={showTools} position={Position.Top}>
+	<CardToolbar {look} {sized} onchange={(patch) => editor?.restyle(id, patch)} />
+</NodeToolbar>
+
+<NodeResizer
+	isVisible={showTools}
+	minWidth={MIN_CARD_WIDTH}
+	minHeight={MIN_CARD_HEIGHT}
+	maxWidth={MAX_CARD_WIDTH}
+	maxHeight={MAX_CARD_HEIGHT}
+	color="var(--app-foreground)"
+	onResizeStart={(_, bounds) => (resizeStart = bounds)}
+	onResizeEnd={(_, bounds) =>
+		editor?.resized(id, bounds, !!resizeStart && (resizeStart.x !== bounds.x || resizeStart.y !== bounds.y))}
+/>
+
 <div
 	class={cn(
-		'bg-main hover:bg-main-hover p-4 rounded-lg customNode text-main-text',
+		'bg-main hover:bg-main-hover p-4 rounded-lg customNode text-main-text overflow-hidden',
 		isSelected && 'bg-main-hover',
-        'max-h-34! overflow-hidden'
+		look.color && (isSelected ? 'brightness-110' : 'hover:brightness-110'),
+		width && 'w-full',
+		height ? 'h-full' : 'max-h-34!'
 	)}
+	style:background-color={cardFill(look.color)}
+	style:border={cardBorder(look)}
 >
 	<Handle class="customHandle" position={Position.Left} type="source" />
 	<div
 		class={cn(
-			'max-w-92! max-h-26! overflow-hidden',
-			'overflow-hidden text-ellipsis whitespace-wrap line-clamp-3'
+			'overflow-hidden text-ellipsis whitespace-wrap',
+			!width && 'max-w-92!',
+			height ? 'h-full' : 'max-h-26! line-clamp-3'
 		)}
 	>
 		{#if plainTitle}

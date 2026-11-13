@@ -1,21 +1,13 @@
 <script lang="ts">
-	import { Handle, Position, type NodeProps } from '@xyflow/svelte';
-	import { results } from '$stores/postit-results.svelte';
+	import { type NodeProps } from '@xyflow/svelte';
+	import NodeWrapper from '../NodeWrapper.svelte';
 
-	let { id }: NodeProps = $props();
-
-	const request = $derived(results.get(id));
-	// Fetched again now and then while the card is on the board.
-	$effect(() => results.watch(id));
+	let props: NodeProps = $props();
 </script>
 
-<div class="bg-main p-4 rounded-lg">
-	<Handle type="target" position={Position.Bottom} isConnectable />
-	{#await request then data}
+<NodeWrapper {...props}>
+	{#snippet children(data)}
 		<h3>{data.value} {data.code}</h3>
 		<h3 class="text-xs opacity-70">{data.updated}</h3>
-	{:catch}
-		An error has occurred
-	{/await}
-	<Handle type="source" position={Position.Top} isConnectable />
-</div>
+	{/snippet}
+</NodeWrapper>
