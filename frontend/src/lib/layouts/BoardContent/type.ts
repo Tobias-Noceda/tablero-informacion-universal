@@ -1,4 +1,4 @@
-import type { BoardRole, UUID } from '$lib/types/api';
+import type { BoardRole, CardStyle, UUID } from '$lib/types/api';
 import type { StrandEdge } from '$lib/strands/style';
 
 export interface BoardData {
@@ -9,7 +9,7 @@ export interface BoardData {
         id: UUID;
         type?: string;
         position: { x: number; y: number; };
-    }>;
+    } & CardStyle>;
     edges: StrandEdge[];
     role: BoardRole;
 }
