@@ -393,6 +393,13 @@
 		"border_solid": "Solid border",
 		"border_dashed": "Dashed border",
 		"border_dotted": "Dotted border",
-		"auto_size": "Fit to content"
+		"auto_size": "Fit to content",
+		"color_white": "White",
+		"fill": "Card",
+		"border": "Border",
+		"border_thin": "Thin border",
+		"border_normal": "Normal border",
+		"border_thick": "Thick border",
+		"border_follow": "Same colour as the card"
 	}
 }

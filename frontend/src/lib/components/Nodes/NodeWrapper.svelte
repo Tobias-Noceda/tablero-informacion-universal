@@ -11,6 +11,7 @@
 	import {
 		cardBorder,
 		cardFill,
+		cardText,
 		MAX_CARD_HEIGHT,
 		MAX_CARD_WIDTH,
 		MIN_CARD_HEIGHT,
@@ -77,12 +78,16 @@
 	class={cn(
 		'bg-main hover:bg-main-hover p-4 rounded-lg customNode text-main-text overflow-hidden',
 		isSelected && 'bg-main-hover',
-		look.color && (isSelected ? 'brightness-110' : 'hover:brightness-110'),
+		// A fill of its own replaces the hover colour; white can only darken.
+		look.color === 'white'
+			? isSelected ? 'brightness-95' : 'hover:brightness-95'
+			: look.color && (isSelected ? 'brightness-110' : 'hover:brightness-110'),
 		width && 'w-full',
 		height ? 'h-full' : 'max-h-34!'
 	)}
 	style:background-color={cardFill(look.color)}
 	style:border={cardBorder(look)}
+	style:color={cardText(look.color)}
 >
 	<Handle class="customHandle" position={Position.Left} type="source" />
 	<div

@@ -394,6 +394,13 @@
 		"border_solid": "Borde continuo",
 		"border_dashed": "Borde de guiones",
 		"border_dotted": "Borde de puntos",
-		"auto_size": "Ajustar al contenido"
+		"auto_size": "Ajustar al contenido",
+		"color_white": "Blanco",
+		"fill": "Tarjeta",
+		"border": "Borde",
+		"border_thin": "Borde fino",
+		"border_normal": "Borde normal",
+		"border_thick": "Borde grueso",
+		"border_follow": "Mismo color que la tarjeta"
 	}
 }
