@@ -6,6 +6,7 @@ import (
 	"slices"
 	"testing"
 
+	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/mocks"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/services/access"
@@ -377,6 +378,10 @@ func TestViewer_ReadsAndRunsButCannotChangeCards(t *testing.T) {
 			t.Error("a viewer renamed a card")
 			return nil
 		},
+		StylePostItFn: func(_, _ uuid.UUID, _ models.CardStylePatch) (*models.CardStyle, error) {
+			t.Error("a viewer restyled a card")
+			return nil, nil
+		},
 		DeletePostItFn: func(uuid.UUID) ([]models.Strand, error) {
 			t.Error("a viewer deleted a card")
 			return nil, nil
@@ -398,6 +403,7 @@ func TestViewer_ReadsAndRunsButCannotChangeCards(t *testing.T) {
 	changes["title"] = svc.EditTitlePostIt(viewer, id, models.BoardPostItTitle{Text: "Hi"})
 	changes["update"] = svc.UpdatePostIt(viewer, id, map[string]any{"rate": 5})
 	changes["move"] = svc.MovePostIt(viewer, id, models.Position{})
+	_, changes["style"] = svc.StylePostIt(viewer, id, models.CardStylePatch{Border: new(models.CardBorderSolid)})
 	changes["title"] = svc.EditTitlePostIt(viewer, id, models.BoardPostItTitle{Text: "Hi"})
 	_, changes["delete"] = svc.DeletePostIt(viewer, id)
 	for name, err := range changes {
@@ -590,4 +596,84 @@ func existingCard(id uuid.UUID) func(uuid.UUID) (*models.PostIts, error) {
 // builtins is the catalogue the platform seeds.
 func builtins() *mocks.MemoryWellKnownStore {
 	return mocks.NewMemoryWellKnownStore(wellknowns.Builtin()...)
+}
+
+func TestStylePostIt_StylesTheCardOnItsBoard(t *testing.T) {
+	id, board := uuid.New(), uuid.New()
+	var gotBoard, gotID uuid.UUID
+	var gotPatch models.CardStylePatch
+	db := &mocks.MockDB{
+		FindPostItFn: func(uuid.UUID) (*models.PostIts, error) {
+			return &models.PostIts{Id: id, Board: board}, nil
+		},
+		StylePostItFn: func(b, p uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error) {
+			gotBoard, gotID, gotPatch = b, p, patch
+			style := patch.Apply(models.CardStyle{})
+			return &style, nil
+		},
+	}
+
+	width := float32(300.7)
+	style, err := newService(db, nil, nil).StylePostIt(boardOwner, id, models.CardStylePatch{Color: new(models.StrandColorBlue), Width: &width})
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	if gotBoard != board || gotID != id {
+		t.Errorf("styled (board=%v,id=%v), want (board=%v,id=%v)", gotBoard, gotID, board, id)
+	}
+	if *gotPatch.Width != 301 {
+		t.Errorf("width sent = %v, want it rounded to 301", *gotPatch.Width)
+	}
+	if want := (models.CardStyle{Color: models.StrandColorBlue, Width: 301}); *style != want {
+		t.Errorf("style = %+v, want %+v", *style, want)
+	}
+}
+
+func TestStylePostIt_RefusesAnInvalidStyle(t *testing.T) {
+	db := &mocks.MockDB{
+		FindPostItFn: existingCard(uuid.New()),
+		StylePostItFn: func(_, _ uuid.UUID, _ models.CardStylePatch) (*models.CardStyle, error) {
+			t.Error("an invalid style reached the database")
+			return nil, nil
+		},
+	}
+	tiny := float32(10)
+	_, err := newService(db, nil, nil).StylePostIt(boardOwner, uuid.New(), models.CardStylePatch{Height: &tiny})
+	if !errors.Is(err, ErrInvalidCardStyle) {
+		t.Errorf("err = %v, want ErrInvalidCardStyle", err)
+	}
+}
+
+func TestStylePostIt_EmptyPatchAnswersTheCurrentStyle(t *testing.T) {
+	id, board := uuid.New(), uuid.New()
+	current := models.CardStyle{Border: models.CardBorderDotted, Height: 200}
+	db := &mocks.MockDB{
+		FindPostItFn: func(uuid.UUID) (*models.PostIts, error) {
+			return &models.PostIts{Id: id, Board: board}, nil
+		},
+		FindBoardFn: func(uuid.UUID) (*models.Board, error) {
+			return &models.Board{Id: board, Owner: boardOwner.ID, PostIts: []models.BoardPostIt{{Id: id, CardStyle: current}}}, nil
+		},
+		StylePostItFn: func(_, _ uuid.UUID, _ models.CardStylePatch) (*models.CardStyle, error) {
+			t.Error("an empty patch reached the database")
+			return nil, nil
+		},
+	}
+	style, err := newService(db, nil, nil).StylePostIt(boardOwner, id, models.CardStylePatch{})
+	if err != nil || *style != current {
+		t.Errorf("style = %+v, err = %v, want %+v", style, err, current)
+	}
+}
+
+func TestStylePostIt_CardNotOnItsBoardIsNotAMember(t *testing.T) {
+	db := &mocks.MockDB{
+		FindPostItFn: existingCard(uuid.New()),
+		StylePostItFn: func(_, _ uuid.UUID, _ models.CardStylePatch) (*models.CardStyle, error) {
+			return nil, infrastructure.ErrPostItNotOnBoard
+		},
+	}
+	_, err := newService(db, nil, nil).StylePostIt(boardOwner, uuid.New(), models.CardStylePatch{Border: new(models.CardBorderSolid)})
+	if !errors.Is(err, ErrNotAMember) {
+		t.Errorf("err = %v, want ErrNotAMember", err)
+	}
 }
