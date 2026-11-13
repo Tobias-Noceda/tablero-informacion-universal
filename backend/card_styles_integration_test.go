@@ -31,17 +31,20 @@ func TestEndToEnd_CardStyles(t *testing.T) {
 
 	var style models.CardStyle
 	s.mustJSON(owner.do(http.MethodPatch, stylePath, map[string]any{
-		"color": "purple", "border": "dotted", "width": 320.4, "height": 180,
+		"color": "white", "border": "dotted", "border_width": "thick", "border_color": "purple", "width": 320.4, "height": 180,
 	}), http.StatusOK, &style)
 
-	want := models.CardStyle{Color: models.StrandColorPurple, Border: models.CardBorderDotted, Width: 320, Height: 180}
+	want := models.CardStyle{
+		Color: models.CardColorWhite, Border: models.CardBorderDotted, BorderWidth: models.CardBorderWidthThick,
+		BorderColor: models.CardColorPurple, Width: 320, Height: 180,
+	}
 	if style != want {
 		t.Fatalf("style = %+v, want %+v", style, want)
 	}
 
-	s.mustJSON(owner.do(http.MethodPatch, stylePath, map[string]any{"border": "", "height": 0}), http.StatusOK, &style)
+	s.mustJSON(owner.do(http.MethodPatch, stylePath, map[string]any{"border": "", "border_width": "", "height": 0}), http.StatusOK, &style)
 
-	want = models.CardStyle{Color: models.StrandColorPurple, Width: 320}
+	want = models.CardStyle{Color: models.CardColorWhite, BorderColor: models.CardColorPurple, Width: 320}
 	if style != want {
 		t.Errorf("patched = %+v, want %+v", style, want)
 	}
