@@ -18,8 +18,8 @@ func TestCardStyle_Normalized(t *testing.T) {
 		{name: "the zero style is the usual card", give: CardStyle{}, want: CardStyle{}},
 		{
 			name: "every field set",
-			give: CardStyle{Color: StrandColorBlue, Border: CardBorderDashed, Width: 320, Height: 180},
-			want: CardStyle{Color: StrandColorBlue, Border: CardBorderDashed, Width: 320, Height: 180},
+			give: CardStyle{Color: CardColorBlue, Border: CardBorderDashed, Width: 320, Height: 180},
+			want: CardStyle{Color: CardColorBlue, Border: CardBorderDashed, Width: 320, Height: 180},
 		},
 		{name: "a side is rounded to whole pixels", give: CardStyle{Width: 240.6, Height: 99.4}, want: CardStyle{Width: 241, Height: 99}},
 		{name: "one side alone", give: CardStyle{Height: MinCardHeight}, want: CardStyle{Height: MinCardHeight}},
@@ -29,7 +29,15 @@ func TestCardStyle_Normalized(t *testing.T) {
 		{name: "too short", give: CardStyle{Height: MinCardHeight - 1}, wantErr: true},
 		{name: "too tall", give: CardStyle{Height: MaxCardHeight + 1}, wantErr: true},
 		{name: "a negative side", give: CardStyle{Width: -200}, wantErr: true},
+		{
+			name: "a white card with its own border",
+			give: CardStyle{Color: CardColorWhite, Border: CardBorderSolid, BorderWidth: CardBorderWidthThin, BorderColor: CardColorRed},
+			want: CardStyle{Color: CardColorWhite, Border: CardBorderSolid, BorderWidth: CardBorderWidthThin, BorderColor: CardColorRed},
+		},
+		{name: "a white border", give: CardStyle{BorderColor: CardColorWhite}, want: CardStyle{BorderColor: CardColorWhite}},
 		{name: "an unknown border", give: CardStyle{Border: "double"}, wantErr: true},
+		{name: "an unknown border width", give: CardStyle{BorderWidth: "huge"}, wantErr: true},
+		{name: "a border colour outside the palette", give: CardStyle{BorderColor: "black"}, wantErr: true},
 		{name: "a colour outside the palette", give: CardStyle{Color: "#ff0000"}, wantErr: true},
 	}
 
@@ -68,6 +76,8 @@ func TestCardStylePatch_Normalized(t *testing.T) {
 	invalid := []CardStylePatch{
 		{Color: ptr(CardColor("teal"))},
 		{Border: ptr(CardBorder("groove"))},
+		{BorderWidth: ptr(CardBorderWidth("hairline"))},
+		{BorderColor: ptr(CardColor("#fff"))},
 		{Width: ptr(float32(10))},
 		{Height: ptr(float32(5000))},
 	}
@@ -79,15 +89,17 @@ func TestCardStylePatch_Normalized(t *testing.T) {
 }
 
 func TestCardStylePatch_Apply(t *testing.T) {
-	style := CardStyle{Color: StrandColorRed, Border: CardBorderSolid, Width: 300, Height: 200}
+	style := CardStyle{Color: CardColorRed, Border: CardBorderSolid, BorderWidth: CardBorderWidthThick, BorderColor: CardColorBlue, Width: 300, Height: 200}
 
-	got := CardStylePatch{Border: ptr(CardBorder("")), Height: ptr(float32(0)), Color: ptr(StrandColorGreen)}.Apply(style)
+	got := CardStylePatch{
+		Border: ptr(CardBorder("")), Height: ptr(float32(0)), Color: ptr(CardColorGreen), BorderColor: ptr(CardColor("")),
+	}.Apply(style)
 
-	want := CardStyle{Color: StrandColorGreen, Width: 300}
+	want := CardStyle{Color: CardColorGreen, BorderWidth: CardBorderWidthThick, Width: 300}
 	if got != want {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
-	if !(CardStylePatch{}).Empty() || (CardStylePatch{Width: ptr(float32(0))}).Empty() {
+	if !(CardStylePatch{}).Empty() || (CardStylePatch{Width: ptr(float32(0))}).Empty() || (CardStylePatch{BorderWidth: ptr(CardBorderWidthThin)}).Empty() {
 		t.Error("Empty: only a patch without fields changes nothing")
 	}
 }
@@ -104,13 +116,13 @@ func TestBoardPostIt_DefaultStyleIsNotStored(t *testing.T) {
 	if err := bson.Unmarshal(raw, &doc); err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{"color", "border", "width", "height"} {
+	for _, field := range []string{"color", "border", "border_width", "border_color", "width", "height"} {
 		if _, ok := doc[field]; ok {
 			t.Errorf("bson has %q for a card without a style", field)
 		}
 	}
 
-	styled := BoardPostIt{CardStyle: CardStyle{Color: StrandColorPink, Width: 250}}
+	styled := BoardPostIt{CardStyle: CardStyle{Color: CardColorPink, Width: 250}}
 	js, err := json.Marshal(styled)
 	if err != nil {
 		t.Fatal(err)

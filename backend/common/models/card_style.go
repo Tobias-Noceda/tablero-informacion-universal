@@ -17,9 +17,27 @@ const (
 // ErrInvalidCardStyle reports a card style outside what a board can draw.
 var ErrInvalidCardStyle = errors.New("invalid card style")
 
-// CardColor is a colour of the board's palette, the same one strands are
-// drawn with. Empty is the card's usual colour.
-type CardColor = StrandColor
+// CardColor is a colour of the board's palette (the one strands are drawn
+// with) or white. The text on a card follows its fill, so it is not a
+// choice of its own.
+type CardColor string
+
+const (
+	CardColorGray   CardColor = CardColor(StrandColorGray)
+	CardColorRed    CardColor = CardColor(StrandColorRed)
+	CardColorOrange CardColor = CardColor(StrandColorOrange)
+	CardColorYellow CardColor = CardColor(StrandColorYellow)
+	CardColorGreen  CardColor = CardColor(StrandColorGreen)
+	CardColorBlue   CardColor = CardColor(StrandColorBlue)
+	CardColorPurple CardColor = CardColor(StrandColorPurple)
+	CardColorPink   CardColor = CardColor(StrandColorPink)
+	CardColorWhite  CardColor = "white"
+)
+
+// Valid reports whether c is empty, a colour of the palette or white.
+func (c CardColor) Valid() bool {
+	return c == CardColorWhite || StrandColor(c).Valid()
+}
 
 // CardBorder is the line drawn around a card. Empty is CardBorderNone.
 type CardBorder string
@@ -40,22 +58,43 @@ func (b CardBorder) Valid() bool {
 	return false
 }
 
+// CardBorderWidth is how thick a card's border is. Empty is
+// CardBorderWidthNormal.
+type CardBorderWidth string
+
+const (
+	CardBorderWidthThin   CardBorderWidth = "thin"
+	CardBorderWidthNormal CardBorderWidth = "normal"
+	CardBorderWidthThick  CardBorderWidth = "thick"
+)
+
+// Valid reports whether w is empty or one of the widths.
+func (w CardBorderWidth) Valid() bool {
+	switch w {
+	case "", CardBorderWidthThin, CardBorderWidthNormal, CardBorderWidthThick:
+		return true
+	}
+	return false
+}
+
 // CardStyle is how a card is drawn on its board. Every field is optional:
 // the zero value is a card of the usual colour, without a border, as large
 // as its content, which is how every card looked before styles existed.
-// Width and Height are set independently; zero leaves that side to the
-// content.
+// An empty BorderColor follows the card's colour. Width and Height are set
+// independently; zero leaves that side to the content.
 type CardStyle struct {
-	Color  CardColor  `bson:"color,omitempty" json:"color,omitempty"`
-	Border CardBorder `bson:"border,omitempty" json:"border,omitempty"`
-	Width  float32    `bson:"width,omitempty" json:"width,omitempty"`
-	Height float32    `bson:"height,omitempty" json:"height,omitempty"`
+	Color       CardColor       `bson:"color,omitempty" json:"color,omitempty"`
+	Border      CardBorder      `bson:"border,omitempty" json:"border,omitempty"`
+	BorderWidth CardBorderWidth `bson:"border_width,omitempty" json:"border_width,omitempty"`
+	BorderColor CardColor       `bson:"border_color,omitempty" json:"border_color,omitempty"`
+	Width       float32         `bson:"width,omitempty" json:"width,omitempty"`
+	Height      float32         `bson:"height,omitempty" json:"height,omitempty"`
 }
 
 // Normalized returns s with its size rounded to whole pixels, or
 // ErrInvalidCardStyle.
 func (s CardStyle) Normalized() (CardStyle, error) {
-	if err := validateCardEnums(s.Color, s.Border); err != nil {
+	if err := validateCardEnums(s.Color, s.Border, s.BorderWidth, s.BorderColor); err != nil {
 		return CardStyle{}, err
 	}
 	width, err := normalizeCardSide("width", s.Width, MinCardWidth, MaxCardWidth)
@@ -73,21 +112,24 @@ func (s CardStyle) Normalized() (CardStyle, error) {
 // CardStylePatch changes part of a card's style. A nil field stays as it
 // is; an empty one (zero for a size) goes back to its default.
 type CardStylePatch struct {
-	Color  *CardColor  `json:"color,omitempty"`
-	Border *CardBorder `json:"border,omitempty"`
-	Width  *float32    `json:"width,omitempty"`
-	Height *float32    `json:"height,omitempty"`
+	Color       *CardColor       `json:"color,omitempty"`
+	Border      *CardBorder      `json:"border,omitempty"`
+	BorderWidth *CardBorderWidth `json:"border_width,omitempty"`
+	BorderColor *CardColor       `json:"border_color,omitempty"`
+	Width       *float32         `json:"width,omitempty"`
+	Height      *float32         `json:"height,omitempty"`
 }
 
 // Empty reports whether p changes nothing.
 func (p CardStylePatch) Empty() bool {
-	return p.Color == nil && p.Border == nil && p.Width == nil && p.Height == nil
+	return p.Color == nil && p.Border == nil && p.BorderWidth == nil && p.BorderColor == nil &&
+		p.Width == nil && p.Height == nil
 }
 
 // Normalized returns p with its size rounded to whole pixels, or
 // ErrInvalidCardStyle.
 func (p CardStylePatch) Normalized() (CardStylePatch, error) {
-	if err := validateCardEnums(deref(p.Color), deref(p.Border)); err != nil {
+	if err := validateCardEnums(deref(p.Color), deref(p.Border), deref(p.BorderWidth), deref(p.BorderColor)); err != nil {
 		return CardStylePatch{}, err
 	}
 	if p.Width != nil {
@@ -115,6 +157,12 @@ func (p CardStylePatch) Apply(s CardStyle) CardStyle {
 	if p.Border != nil {
 		s.Border = *p.Border
 	}
+	if p.BorderWidth != nil {
+		s.BorderWidth = *p.BorderWidth
+	}
+	if p.BorderColor != nil {
+		s.BorderColor = *p.BorderColor
+	}
 	if p.Width != nil {
 		s.Width = *p.Width
 	}
@@ -124,12 +172,16 @@ func (p CardStylePatch) Apply(s CardStyle) CardStyle {
 	return s
 }
 
-func validateCardEnums(color CardColor, border CardBorder) error {
+func validateCardEnums(color CardColor, border CardBorder, borderWidth CardBorderWidth, borderColor CardColor) error {
 	switch {
 	case !color.Valid():
 		return fmt.Errorf("%w: unknown color %q", ErrInvalidCardStyle, color)
 	case !border.Valid():
 		return fmt.Errorf("%w: unknown border %q", ErrInvalidCardStyle, border)
+	case !borderWidth.Valid():
+		return fmt.Errorf("%w: unknown border width %q", ErrInvalidCardStyle, borderWidth)
+	case !borderColor.Valid():
+		return fmt.Errorf("%w: unknown border color %q", ErrInvalidCardStyle, borderColor)
 	}
 	return nil
 }
