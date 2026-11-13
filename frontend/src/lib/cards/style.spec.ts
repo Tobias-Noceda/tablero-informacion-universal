@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest';
 import type { Node } from '@xyflow/svelte';
 import {
 	applyCardPatch,
+	borderColorOf,
 	cardBorder,
 	cardFill,
 	cardNodeFields,
+	cardText,
 	clampSide,
 	lookOf,
 	MAX_CARD_HEIGHT,
@@ -31,6 +33,10 @@ describe('cardNodeFields', () => {
 	it('keeps one side alone', () => {
 		expect(sizeOf({ height: 150 })).toEqual({ height: 150 });
 		expect(lookOf({ border: 'solid' })).toEqual({ border: 'solid' });
+		expect(lookOf({ border_width: 'thick', border_color: 'white', width: 300 })).toEqual({
+			border_width: 'thick',
+			border_color: 'white'
+		});
 	});
 });
 
@@ -55,6 +61,16 @@ describe('applyCardPatch', () => {
 		expect('width' in next || 'height' in next).toBe(false);
 	});
 
+	it('changes the border width and colour on their own', () => {
+		const next = applyCardPatch(node, { border_width: 'thin', border_color: 'blue' });
+		expect(next.data.look).toEqual({ color: 'red', border: 'solid', border_width: 'thin', border_color: 'blue' });
+		expect(applyCardPatch(next, { border_color: '' as never }).data.look).toEqual({
+			color: 'red',
+			border: 'solid',
+			border_width: 'thin'
+		});
+	});
+
 	it('leaves the original node alone', () => {
 		applyCardPatch(node, { color: 'green', width: 0 });
 		expect(node.width).toBe(320);
@@ -77,13 +93,31 @@ describe('resizePatch', () => {
 describe('drawing', () => {
 	it('reads the fill from the palette', () => {
 		expect(cardFill('blue')).toBe('var(--card-blue)');
+		expect(cardFill('white')).toBe('var(--card-white)');
 		expect(cardFill(undefined)).toBeUndefined();
 	});
 
-	it('draws a border only when one is chosen, in the card colour or gray', () => {
+	it('darkens the text only on a white card', () => {
+		expect(cardText('white')).toBe('var(--card-text-on-white)');
+		expect(cardText('blue')).toBeUndefined();
+		expect(cardText(undefined)).toBeUndefined();
+	});
+
+	it('draws a border only when one is chosen', () => {
 		expect(cardBorder({})).toBeUndefined();
-		expect(cardBorder({ border: 'none', color: 'red' })).toBeUndefined();
+		expect(cardBorder({ border: 'none', color: 'red', border_width: 'thick' })).toBeUndefined();
+	});
+
+	it('follows the card colour unless the border has its own', () => {
 		expect(cardBorder({ border: 'dashed', color: 'red' })).toBe('2px dashed var(--strand-red)');
-		expect(cardBorder({ border: 'solid' })).toBe('2px solid var(--strand-gray)');
+		expect(cardBorder({ border: 'solid', color: 'red', border_color: 'white' })).toBe('2px solid var(--card-white)');
+		expect(borderColorOf({ color: 'white' })).toBe('var(--card-accent)');
+		expect(borderColorOf({})).toBe('var(--card-accent)');
+		expect(borderColorOf({ border_color: 'gray' })).toBe('var(--strand-gray)');
+	});
+
+	it('grows with the border width', () => {
+		expect(cardBorder({ border: 'dotted', border_width: 'thin' })).toBe('1px dotted var(--card-accent)');
+		expect(cardBorder({ border: 'dotted', border_width: 'thick', color: 'blue' })).toBe('4px dotted var(--strand-blue)');
 	});
 });

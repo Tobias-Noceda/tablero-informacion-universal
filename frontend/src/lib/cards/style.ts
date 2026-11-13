@@ -1,27 +1,35 @@
 import type { Node } from '@xyflow/svelte';
-import type { CardBorder, CardColor, CardStyle } from '$types/api';
+import type { CardBorder, CardBorderWidth, CardColor, CardStyle } from '$types/api';
 import { STRAND_COLORS } from '$lib/strands/style';
 
 // What the backend accepts (models/card_style.go), in the order the toolbar
 // offers them.
 export const CARD_BORDERS: readonly CardBorder[] = ['none', 'solid', 'dashed', 'dotted'];
-export const CARD_COLORS: readonly CardColor[] = STRAND_COLORS;
+export const CARD_BORDER_WIDTHS: readonly CardBorderWidth[] = ['thin', 'normal', 'thick'];
+export const CARD_COLORS: readonly CardColor[] = [...STRAND_COLORS, 'white'];
 
 export const MIN_CARD_WIDTH = 120;
 export const MAX_CARD_WIDTH = 1600;
 export const MIN_CARD_HEIGHT = 60;
 export const MAX_CARD_HEIGHT = 1200;
 
+const BORDER_PIXELS: Record<CardBorderWidth, number> = { thin: 1, normal: 2, thick: 4 };
+
+const LOOK_KEYS = ['color', 'border', 'border_width', 'border_color'] as const;
+const SIZE_KEYS = ['width', 'height'] as const;
+
 // How a card looks apart from its size: the size is the canvas node's own
 // width and height, so Svelte Flow lays the card out with it.
-export type CardLook = Pick<CardStyle, 'color' | 'border'>;
-export type CardSize = Pick<CardStyle, 'width' | 'height'>;
+export type CardLook = Pick<CardStyle, (typeof LOOK_KEYS)[number]>;
+export type CardSize = Pick<CardStyle, (typeof SIZE_KEYS)[number]>;
 
-// Only the colour and border that differ from the default, as the backend stores them.
+// Only the look fields that differ from the default, as the backend stores them.
 export function lookOf(source: CardStyle | undefined): CardLook {
 	const look: CardLook = {};
-	if (source?.color) look.color = source.color;
-	if (source?.border) look.border = source.border;
+	for (const key of LOOK_KEYS) {
+		const value = source?.[key];
+		if (value) Object.assign(look, { [key]: value });
+	}
 	return look;
 }
 
@@ -41,7 +49,7 @@ export function cardNodeFields(source: CardStyle): CardSize & { look: CardLook }
 // The node with the patch applied; an empty value (0 for a size) goes back to the default.
 export function applyCardPatch<N extends Node>(node: N, patch: CardStyle): N {
 	const look: CardLook = { ...(node.data?.look as CardLook | undefined) };
-	for (const key of ['color', 'border'] as const) {
+	for (const key of LOOK_KEYS) {
 		if (!(key in patch)) continue;
 		const value = patch[key];
 		if (value) Object.assign(look, { [key]: value });
@@ -49,7 +57,7 @@ export function applyCardPatch<N extends Node>(node: N, patch: CardStyle): N {
 	}
 
 	const next: N = { ...node, data: { ...node.data, look } };
-	for (const key of ['width', 'height'] as const) {
+	for (const key of SIZE_KEYS) {
 		if (!(key in patch)) continue;
 		const value = patch[key];
 		if (value) next[key] = value;
@@ -71,13 +79,34 @@ export function resizePatch(width: number, height: number): Required<CardSize> {
 	};
 }
 
-// The palette lives in CSS (BoardContent/index.css): the fill keeps the card's
-// white text legible, the border follows the theme so it stands out from the canvas.
+// The palette lives in CSS (BoardContent/index.css). Fills are deep enough
+// for the card's white text, except white, which takes dark text.
 export function cardFill(color: CardColor | undefined): string | undefined {
 	return color ? `var(--card-${color})` : undefined;
 }
 
+export function cardText(color: CardColor | undefined): string | undefined {
+	return color === 'white' ? 'var(--card-text-on-white)' : undefined;
+}
+
+// A line colour follows the theme so it stands out from the canvas.
+export function lineColor(color: CardColor): string {
+	return color === 'white' ? 'var(--card-white)' : `var(--strand-${color})`;
+}
+
+// The border's own colour, or the card's when it has none. A white or
+// uncoloured card has no tone of its own, so it takes the app's accent.
+export function borderColorOf(look: CardLook): string {
+	if (look.border_color) return lineColor(look.border_color);
+	if (look.color && look.color !== 'white') return lineColor(look.color);
+	return 'var(--card-accent)';
+}
+
+export function borderPixels(width: CardBorderWidth | undefined): number {
+	return BORDER_PIXELS[width ?? 'normal'];
+}
+
 export function cardBorder(look: CardLook): string | undefined {
 	if (!look.border || look.border === 'none') return undefined;
-	return `2px ${look.border} var(--strand-${look.color ?? 'gray'})`;
+	return `${borderPixels(look.border_width)}px ${look.border} ${borderColorOf(look)}`;
 }

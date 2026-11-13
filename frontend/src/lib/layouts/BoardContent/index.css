@@ -64,10 +64,14 @@ body {
   --strand-pink: #f472b6;
 }
 
-/* Card fills ($lib/cards/style.ts): the same palette as strands, deep enough
-   that a card's white text stays legible. Cards look the same in both
-   themes, so there is no dark block; their border uses --strand-<color>. */
+/* Card fills ($lib/cards/style.ts): the strands' palette, deep enough that a
+   card's white text stays legible, plus white, which takes dark text. Cards
+   look the same in both themes; borders use --strand-<color>, --card-white,
+   or the app's accent (--card-accent, per theme) when the card has no tone. */
 :root {
+  --card-white: #ffffff;
+  --card-text-on-white: #111827;
+  --card-accent: #0e7490;
   --card-gray: #374151;
   --card-red: #b91c1c;
   --card-orange: #c2410c;
@@ -76,6 +80,16 @@ body {
   --card-blue: #1d4ed8;
   --card-purple: #7e22ce;
   --card-pink: #be185d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --card-accent: #67e8f9;
+  }
+}
+
+:root[data-theme='dark'] {
+  --card-accent: #67e8f9;
 }
 
 /* Sidebar is outside .react-flow so it doesn't get theme variables in dark mode.

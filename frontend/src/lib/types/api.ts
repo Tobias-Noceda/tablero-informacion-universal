@@ -201,14 +201,18 @@ export type StrandStyle = {
 
 // The line around a card (see $lib/cards/style.ts).
 export type CardBorder = 'none' | 'solid' | 'dashed' | 'dotted';
-// Cards share the strands' palette.
-export type CardColor = StrandColor;
+export type CardBorderWidth = 'thin' | 'normal' | 'thick';
+// Cards use the strands' palette plus white. The text follows the fill.
+export type CardColor = StrandColor | 'white';
 
 // Every field is optional: none is the usual card, without a border, as
-// large as its content. A size of 0 in a patch goes back to that.
+// large as its content; a border without its own colour follows the
+// card's. A size of 0 in a patch goes back to that.
 export type CardStyle = {
     color?: CardColor;
     border?: CardBorder;
+    border_width?: CardBorderWidth;
+    border_color?: CardColor;
     width?: number;
     height?: number;
 };
