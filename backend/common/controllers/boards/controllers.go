@@ -8,6 +8,7 @@ import (
 
 	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/infrastructure"
+	"github.com/Secreto31126/tesis/common/models"
 	b_srv "github.com/Secreto31126/tesis/common/services/boards"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -38,6 +39,7 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 		boardGroup.DELETE("/:id/members/:user", ctrl.RemoveMember)
 
 		boardGroup.POST("/:id/strands", ctrl.ConnectPostIts)
+		boardGroup.PATCH("/:id/strands/:strand", ctrl.UpdateStrand)
 		boardGroup.DELETE("/:id/strands/:strand", ctrl.DisconnectPostIts)
 
 		boardGroup.PATCH("/:id/name", ctrl.UpdateBoardName)
@@ -59,6 +61,10 @@ func (ctrl *Controller) fail(c *gin.Context, err error) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_role"})
 	case errors.Is(err, b_srv.ErrOwnerRole):
 		c.JSON(http.StatusBadRequest, gin.H{"error": "owner_role"})
+	case errors.Is(err, b_srv.ErrStrandNotFound):
+		c.JSON(http.StatusNotFound, gin.H{"error": "strand_not_found"})
+	case errors.Is(err, b_srv.ErrInvalidStrand):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_strand"})
 	case errors.Is(err, b_srv.ErrRateLimited):
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate_limited"})
 	default:
@@ -313,13 +319,13 @@ func (ctrl *Controller) UpdateBoardName(c *gin.Context) {
 
 // ConnectPostIts godoc
 // @Summary      Connect two post-its
-// @Description  Members only. Creates a strand between a source and a target post-it.
+// @Description  Editors only. Creates a strand between a source and a target post-it, optionally with a label, arrows, a width and a palette colour.
 // @Tags         boards, strands
 // @Accept       json
 // @Param        id       path      string         true  "Board UUID" format(uuid)
 // @Param        request  body      StrandRequest  true  "Strand payload"
 // @Success      201      {object}  models.Strand
-// @Failure      400      {object}  map[string]string{"error": "string"}
+// @Failure      400      {object}  map[string]string{"error": "string"}  "invalid_strand"
 // @Failure      404      {object}  map[string]string{"error": "string"}
 // @Router       /boards/{id}/strands [post]
 func (ctrl *Controller) ConnectPostIts(c *gin.Context) {
@@ -333,7 +339,7 @@ func (ctrl *Controller) ConnectPostIts(c *gin.Context) {
 		return
 	}
 
-	strand, err := ctrl.service.ConnectPostIts(middleware.Principal(c), id, req.Source, req.Target)
+	strand, err := ctrl.service.ConnectPostIts(middleware.Principal(c), id, req.Source, req.Target, req.StrandStyle)
 	if err != nil {
 		ctrl.fail(c, err)
 		return
@@ -342,9 +348,46 @@ func (ctrl *Controller) ConnectPostIts(c *gin.Context) {
 	c.JSON(http.StatusCreated, strand)
 }
 
+// UpdateStrand godoc
+// @Summary      Restyle a strand
+// @Description  Editors only. Changes the fields sent (label, arrow, width, color); an empty value goes back to the default.
+// @Tags         boards, strands
+// @Accept       json
+// @Param        id       path      string              true  "Board UUID"  format(uuid)
+// @Param        strand   path      string              true  "Strand UUID" format(uuid)
+// @Param        request  body      models.StrandPatch  true  "Fields to change"
+// @Success      200      {object}  models.Strand
+// @Failure      400      {object}  map[string]string{"error": "string"}  "invalid_strand"
+// @Failure      404      {object}  map[string]string{"error": "string"}  "strand_not_found"
+// @Router       /boards/{id}/strands/{strand} [patch]
+func (ctrl *Controller) UpdateStrand(c *gin.Context) {
+	id, ok := uuidParam(c, "id")
+	if !ok {
+		return
+	}
+
+	strandID, ok := uuidParam(c, "strand")
+	if !ok {
+		return
+	}
+
+	var patch models.StrandPatch
+	if !bind(c, &patch) {
+		return
+	}
+
+	strand, err := ctrl.service.UpdateStrand(middleware.Principal(c), id, strandID, patch)
+	if err != nil {
+		ctrl.fail(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, strand)
+}
+
 // DisconnectPostIts godoc
 // @Summary      Disconnect two post-its
-// @Description  Members only. Removes a strand.
+// @Description  Editors only. Removes a strand.
 // @Tags         boards, strands
 // @Param        id       path      string         true  "Board UUID"  format(uuid)
 // @Param        strand   path      string         true  "Strand UUID" format(uuid)

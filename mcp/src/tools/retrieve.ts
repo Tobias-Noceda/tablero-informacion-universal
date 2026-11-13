@@ -4,6 +4,7 @@ import type { ToolMetadata, InferSchema } from "xmcp";
 
 import * as api from "../modules/api";
 import { dataOf, lines, titleOf } from "../modules/memory";
+import { relation } from "../modules/strands";
 
 import { z } from "zod";
 
@@ -17,7 +18,7 @@ export const schema = {
 export const metadata: ToolMetadata = {
     name: "retrieve",
     description:
-        "This tool lets you retrieve a specific memory, with all the details and variables populated. At retrieval, related memories will be reactivated, in order to help remembering other important details that may be required. Memories may be refreshed from time to time, as to always have the updated details, in particular for memories with variables that may change frequently.",
+        "This tool lets you retrieve a specific memory, with all the details and variables populated. At retrieval, related memories will be reactivated, in order to help remembering other important details that may be required. Each related memory starts with how it relates to this one: → this memory points to it, ← it points to this memory, ↔ both ways, — undirected, followed by the relation's label when it has one. Memories may be refreshed from time to time, as to always have the updated details, in particular for memories with variables that may change frequently.",
     annotations: {
         title: "Retrieve a memory",
         readOnlyHint: true,
@@ -42,20 +43,21 @@ export default async function ({
     const data = await dataOf(postit_id);
     const title = await titleOf(postit, data);
 
-    const related_ids = new Set(
-        board.strands
-            .map((p) =>
-                p.source === postit_id
-                    ? p.target
-                    : p.target === postit_id
-                      ? p.source
-                      : null,
-            )
-            .filter((id) => id !== null),
-    );
+    // The other end of every strand touching this memory, with how it reads.
+    const relations = new Map<string, string>();
+    for (const strand of board.strands) {
+        const other =
+            strand.source === postit_id
+                ? strand.target
+                : strand.target === postit_id
+                  ? strand.source
+                  : null;
+        if (other) relations.set(other, relation(strand, postit_id));
+    }
 
-    const related = await lines(
-        board.postits.filter((p) => related_ids.has(p.id)),
+    const related_postits = board.postits.filter((p) => relations.has(p.id));
+    const related = (await lines(related_postits)).map(
+        (line, i) => `${relations.get(related_postits[i].id)} ${line}`,
     );
 
     return `${JSON.stringify(title)}

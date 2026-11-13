@@ -19,10 +19,16 @@ export type BoardPostIt = {
     position: { x: number; y: number };
 };
 
+// Which ends of a strand point at their memory.
+export type StrandArrow = "none" | "start" | "end" | "both";
+
 export type Strand = {
     id: UUID;
     source: UUID;
     target: UUID;
+    // Optional style; the tools only read and write these two.
+    label?: string;
+    arrow?: StrandArrow;
 };
 
 export type Board = {

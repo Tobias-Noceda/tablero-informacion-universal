@@ -26,6 +26,9 @@
 	import { nodeTypesFor } from '$components/Nodes/node-map';
 	import { wellKnowns } from '$stores/well-knowns.svelte';
 	import { edgesMap } from '$components/Edges/edge-map';
+	import { setStrandEditor } from '$lib/strands/editor';
+	import { applyPatch, strandToEdge } from '$lib/strands/style';
+	import type { StrandStyle } from '$types/api';
 	import { mouses } from '$stores/mouses.svelte';
 	import { theme } from '$stores/theme.svelte';
 	import Realtime from './Realtime.svelte';
@@ -71,7 +74,7 @@
 	// be shared with a link and the browser's back button closes it.
 	const selectedNodeId = $derived(page.params.nodeId ?? null);
 	let selectedNode = $derived(nodes.find((n) => n.id === selectedNodeId) ?? null);
-	let selectedEdge: Edge | null = $state(null);
+	let selectedEdgeId = $state<string | null>(null);
 
 	const navigation = { noScroll: true, keepFocus: true };
 
@@ -164,11 +167,7 @@
 
 	const onBoardClick = () => {
 		closeNode();
-		selectedEdge = null;
-
-		edges = edges.map((e) => {
-			return { ...e, data: { ...e.data, isSelected: false } };
-		});
+		selectedEdgeId = null;
 	};
 
 	const persistNode = (action: 'create' | 'update', newNode: Node) => {
@@ -206,10 +205,7 @@
 		} else {
 			openNode(event.node.id);
 		}
-		selectedEdge = null;
-		edges = edges.map((e) => {
-			return { ...e, data: { ...e.data, isSelected: false } };
-		});
+		selectedEdgeId = null;
 	};
 
 	let realtime = $state<ReturnType<typeof Realtime>>();
@@ -242,19 +238,42 @@
 	const onEdgeClick = async (event: { event: MouseEvent; edge: Edge }) => {
 		event.event.preventDefault();
 		event.event.stopPropagation();
-		if (selectedEdge?.target === event.edge.target && selectedEdge?.source === event.edge.source) {
-			selectedEdge = null;
-			edges = edges.map((e) => {
-				return { ...e, data: { ...e.data, isSelected: false } };
-			});
-		} else {
-			selectedEdge = event.edge;
-			edges = edges.map((e) => {
-				return { ...e, data: { ...e.data, isSelected: e.id === event.edge.id } };
-			});
-		}
+		selectedEdgeId = selectedEdgeId === event.edge.id ? null : event.edge.id;
 		closeNode();
 	};
+
+	// The change shows at once and is undone if the backend refuses it.
+	const updateStrand = async (id: string, patch: StrandStyle) => {
+		const before = edges.find((e) => e.id === id);
+		if (!canEdit || !before) return;
+
+		edges = edges.map((e) => (e.id === id ? applyPatch(e, patch) : e));
+		try {
+			await edgesApi.update(boardId, id, patch);
+		} catch (err) {
+			console.error('Could not restyle the connection:', err);
+			edges = edges.map((e) => (e.id === id ? { ...e, data: { ...before.data, isSelected: e.data?.isSelected } } : e));
+		}
+	};
+
+	const removeStrand = (id: string) => {
+		if (!canEdit) return;
+		edgesApi.disconnect(boardId, id);
+		edges = edges.filter((e) => e.id !== id);
+		if (selectedEdgeId === id) selectedEdgeId = null;
+	};
+
+	setStrandEditor({
+		get canEdit() {
+			return canEdit;
+		},
+		select: (id) => {
+			selectedEdgeId = id;
+			closeNode();
+		},
+		update: updateStrand,
+		remove: removeStrand
+	});
 
 	const onConnect = async (connection: Connection) => {
 		const exists = edges.find(
@@ -270,8 +289,8 @@
 			}
 		}
 
-		const newEdge = await edgesApi.connect(boardId, connection.source, connection.target);
-		edges = [...edges, { id: newEdge.id, source: connection.source, target: connection.target }];
+		const strand = await edgesApi.connect(boardId, connection.source, connection.target);
+		edges = [...edges, strandToEdge(strand)];
 	};
 
 	// Backspace in a field of the detail drawer edits the field, not the board.
@@ -289,10 +308,8 @@
 		}
 		if (!canEdit || isTyping(event.target)) return;
 		if (event.key === 'Delete' || event.key === 'Backspace') {
-			if (selectedEdge) {
-				edgesApi.disconnect(boardId, selectedEdge.id);
-				edges = edges.filter((e) => e.id !== selectedEdge?.id);
-				selectedEdge = null;
+			if (selectedEdgeId) {
+				removeStrand(selectedEdgeId);
 			} else if (selectedNode) {
 				deleteNode(selectedNode);
 			}
@@ -324,6 +341,19 @@
 		}
 	});
 
+	// Highlights the selected strand, also after a live update replaced the edges.
+	$effect(() => {
+		const id = selectedEdgeId;
+		if (edges.some((e) => (e.data?.isSelected ?? false) !== (e.id === id))) {
+			edges = edges.map((e) => ({ ...e, data: { ...e.data, isSelected: e.id === id } }));
+		}
+	});
+
+	// A strand deleted elsewhere is no longer selected.
+	$effect(() => {
+		if (selectedEdgeId && !edges.some((e) => e.id === selectedEdgeId)) selectedEdgeId = null;
+	});
+
 	// A link to a card that is not (or no longer) on the board opens the board.
 	$effect(() => {
 		if (selectedNodeId && !selectedNode) {
@@ -333,7 +363,7 @@
 
 	$effect(() => {
 		if (creatingNode || creatingOneOff) {
-			selectedEdge = null;
+			selectedEdgeId = null;
 			untrack(closeNode);
 		}
 	});

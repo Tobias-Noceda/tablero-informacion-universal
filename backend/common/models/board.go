@@ -19,12 +19,6 @@ type BoardPostIt struct {
 	Position Position         `bson:"position" json:"position"`
 }
 
-type Strand struct {
-	Id     uuid.UUID `bson:"id" json:"id"`
-	Source uuid.UUID `bson:"source" json:"source"`
-	Target uuid.UUID `bson:"target" json:"target"`
-}
-
 // BoardRole is what someone may do on a board: viewers look, editors work on
 // the cards, the owner also decides who else is on it.
 type BoardRole string
