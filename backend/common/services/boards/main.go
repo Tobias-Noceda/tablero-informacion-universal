@@ -15,6 +15,9 @@ var (
 	ErrInvalidRole = errors.New("A member is an editor or a viewer")
 	ErrOwnerRole   = errors.New("The owner's role cannot change")
 	ErrRateLimited = infrastructure.ErrRateLimited
+
+	ErrStrandNotFound = infrastructure.ErrStrandNotFound
+	ErrInvalidStrand  = models.ErrInvalidStrand
 )
 
 // Adding someone by email tells the caller whether they have an account, so
@@ -219,11 +222,38 @@ func (srv *BoardService) UpdateBoardName(principal models.Principal, id uuid.UUI
 	return srv.db.UpdateBoardName(id, name)
 }
 
-func (srv *BoardService) ConnectPostIts(principal models.Principal, boardID, source, target uuid.UUID) (*models.Strand, error) {
+// ConnectPostIts draws a strand from source to target with the given style.
+func (srv *BoardService) ConnectPostIts(principal models.Principal, boardID, source, target uuid.UUID, style models.StrandStyle) (*models.Strand, error) {
 	if _, err := srv.require(principal, boardID, models.BoardEditor); err != nil {
 		return nil, err
 	}
-	return srv.db.ConnectPostIts(boardID, source, target)
+	style, err := style.Normalized()
+	if err != nil {
+		return nil, err
+	}
+	return srv.db.ConnectPostIts(boardID, models.Strand{Source: source, Target: target, StrandStyle: style})
+}
+
+// UpdateStrand changes part of a strand's style. A patch that changes
+// nothing answers the strand as it is.
+func (srv *BoardService) UpdateStrand(principal models.Principal, boardID, strandID uuid.UUID, patch models.StrandPatch) (*models.Strand, error) {
+	board, err := srv.require(principal, boardID, models.BoardEditor)
+	if err != nil {
+		return nil, err
+	}
+	patch, err = patch.Normalized()
+	if err != nil {
+		return nil, err
+	}
+	if !patch.Empty() {
+		return srv.db.UpdateStrand(boardID, strandID, patch)
+	}
+	for _, strand := range board.Strands {
+		if strand.Id == strandID {
+			return &strand, nil
+		}
+	}
+	return nil, ErrStrandNotFound
 }
 
 func (srv *BoardService) DisconnectPostIts(principal models.Principal, boardID, strandID uuid.UUID) error {
