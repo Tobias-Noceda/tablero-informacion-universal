@@ -25,14 +25,19 @@
 		data,
 		width,
 		height,
+		media = false,
 		children
-	}: NodeProps & { children: Snippet<[Record<string, string>]> } = $props();
+	}: NodeProps & {
+		children: Snippet<[Record<string, string>]>;
+		/** A picture card: always shows its content, which fills the card, instead of its title. */
+		media?: boolean;
+	} = $props();
 
 	const editor = getCardEditor();
 
 	const title = $derived(data?.title as { text: string; vars: boolean } | undefined);
 	// A plain title is all the card shows, so it needs no data.
-	const plainTitle = $derived(!!title?.text && !title.vars);
+	const plainTitle = $derived(!media && !!title?.text && !title.vars);
 	const request = $derived(plainTitle ? null : results.get(id));
 	// Fetched again now and then while the card shows its data.
 	$effect(() => {
@@ -76,14 +81,15 @@
 
 <div
 	class={cn(
-		'bg-main hover:bg-main-hover p-4 rounded-lg customNode text-main-text overflow-hidden',
+		'bg-main hover:bg-main-hover rounded-lg customNode text-main-text overflow-hidden',
+		media ? 'p-2' : 'p-4',
 		isSelected && 'bg-main-hover',
 		// A fill of its own replaces the hover colour; white can only darken.
 		look.color === 'white'
 			? isSelected ? 'brightness-95' : 'hover:brightness-95'
 			: look.color && (isSelected ? 'brightness-110' : 'hover:brightness-110'),
 		width && 'w-full',
-		height ? 'h-full' : 'max-h-34!'
+		height ? 'h-full' : !media && 'max-h-34!'
 	)}
 	style:background-color={cardFill(look.color)}
 	style:border={cardBorder(look)}
@@ -93,15 +99,17 @@
 	<div
 		class={cn(
 			'overflow-hidden text-ellipsis whitespace-wrap',
-			!width && 'max-w-92!',
-			height ? 'h-full' : 'max-h-26! line-clamp-3'
+			!width && !media && 'max-w-92!',
+			height ? 'h-full' : !media && 'max-h-26! line-clamp-3'
 		)}
 	>
 		{#if plainTitle}
 			<h3 class="text-lg font-bold">{title?.text}</h3>
 		{:else}
 			{#await request then response}
-				{#if title?.text}
+				{#if media}
+					{#if response}{@render children(response)}{/if}
+				{:else if title?.text}
 					<!-- Plain text interpolation: Svelte escapes whatever the values hold. -->
 					{#if shouldRenderImage(title.text, response)}
 						<!-- An external address the card returned, not an app route. -->
