@@ -33,6 +33,7 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 		boardGroup.PATCH("/:id/settings", ctrl.EditPostIt)
 		boardGroup.PATCH("/:id/position", ctrl.MovePostIt)
 		boardGroup.PATCH("/:id/title", ctrl.EditTitlePostIt)
+		boardGroup.PATCH("/:id/style", ctrl.StylePostIt)
 	}
 }
 
@@ -347,6 +348,43 @@ func (ctrl *Controller) EditTitlePostIt(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+// StylePostIt godoc
+// @Summary      Restyle a post-it
+// @Description  Editors only. Changes the fields sent (color from the strands' palette, border none|solid|dashed|dotted, width 120-1600 and height 60-1200 pixels); an empty value, or 0 for a size, goes back to the default.
+// @Tags         post-its
+// @Accept       json
+// @Param        id       path      string                 true  "Post-It UUID" format(uuid)
+// @Param        request  body      models.CardStylePatch  true  "Fields to change"
+// @Success      200      {object}  models.CardStyle
+// @Failure      400      {object}  map[string]string{"error": "string"}  "invalid_card_style"
+// @Failure      404      {object}  map[string]string{"error": "string"}
+// @Router       /post-its/{id}/style [patch]
+func (ctrl *Controller) StylePostIt(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid uuid"})
+		return
+	}
+
+	var patch models.CardStylePatch
+	if err := c.ShouldBindJSON(&patch); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_card_style"})
+		return
+	}
+
+	style, err := ctrl.service.StylePostIt(middleware.Principal(c), id, patch)
+	switch {
+	case errors.Is(err, srv.ErrInvalidCardStyle):
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_card_style"})
+		return
+	case err != nil:
+		c.JSON(statusOf(err), gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, style)
 }
 
 func statusOf(err error) int {

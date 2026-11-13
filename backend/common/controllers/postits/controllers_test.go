@@ -566,3 +566,54 @@ func TestExecutePostIt_UnavailableCredentialIs403(t *testing.T) {
 func builtins() *mocks.MemoryWellKnownStore {
 	return mocks.NewMemoryWellKnownStore(wellknowns.Builtin()...)
 }
+
+func TestStylePostIt_OK(t *testing.T) {
+	id := uuid.New()
+	var gotPatch models.CardStylePatch
+	db := &mocks.MockDB{
+		StylePostItFn: func(_, _ uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error) {
+			gotPatch = patch
+			style := patch.Apply(models.CardStyle{})
+			return &style, nil
+		},
+	}
+	r := setupRouter(db, nil, nil)
+
+	w := do(r, http.MethodPatch, "/post-its/"+id.String()+"/style", `{"color":"green","border":"dashed","width":320,"height":0}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (body: %s)", w.Code, w.Body.String())
+	}
+	if gotPatch.Height == nil || *gotPatch.Height != 0 {
+		t.Errorf("height = %v, want 0 sent to reset it", gotPatch.Height)
+	}
+	var style models.CardStyle
+	if err := json.Unmarshal(w.Body.Bytes(), &style); err != nil {
+		t.Fatal(err)
+	}
+	if want := (models.CardStyle{Color: models.StrandColorGreen, Border: models.CardBorderDashed, Width: 320}); style != want {
+		t.Errorf("style = %+v, want %+v", style, want)
+	}
+}
+
+func TestStylePostIt_Invalid(t *testing.T) {
+	r := setupRouter(nil, nil, nil)
+	path := "/post-its/" + uuid.NewString() + "/style"
+
+	for _, body := range []string{`{"border":"double"}`, `{"width":5}`, `{"color":42}`, `not json`} {
+		w := do(r, http.MethodPatch, path, body)
+		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "invalid_card_style") {
+			t.Errorf("%s: status = %d body = %s, want 400 invalid_card_style", body, w.Code, w.Body.String())
+		}
+	}
+	if w := do(r, http.MethodPatch, "/post-its/nope/style", `{}`); w.Code != http.StatusBadRequest {
+		t.Errorf("invalid uuid: status = %d, want 400", w.Code)
+	}
+}
+
+func TestStylePostIt_StrangerGetsNotFound(t *testing.T) {
+	r := setupRouter(nil, nil, nil)
+	w := doAs(r, "stranger", http.MethodPatch, "/post-its/"+uuid.NewString()+"/style", `{"border":"solid"}`)
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", w.Code)
+	}
+}

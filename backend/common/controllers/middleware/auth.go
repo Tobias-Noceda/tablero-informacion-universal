@@ -59,6 +59,7 @@ var accessTokenRoutes = map[string]bool{
 	"DELETE /api/v1/post-its/:id":                    true,
 	"PATCH /api/v1/post-its/:id/settings":            true,
 	"PATCH /api/v1/post-its/:id/position":            true,
+	"PATCH /api/v1/post-its/:id/style":               true,
 	"PATCH /api/v1/post-its/:id/title":               true,
 }
 
