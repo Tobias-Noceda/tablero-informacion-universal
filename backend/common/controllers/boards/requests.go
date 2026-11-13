@@ -23,4 +23,6 @@ type SetMemberRequest struct {
 type StrandRequest struct {
 	Source uuid.UUID `json:"source" binding:"required"`
 	Target uuid.UUID `json:"target" binding:"required"`
+	// The style is optional: without it the strand is a plain line.
+	models.StrandStyle
 }
