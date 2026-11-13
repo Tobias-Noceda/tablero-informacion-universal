@@ -20,6 +20,19 @@ func Builtin() []models.WellKnown {
 			},
 		},
 		{
+			// A picture the user links to. The card's title is its caption.
+			Key:    "image",
+			NameEn: "Image", NameEs: "Imagen",
+			TitleEn: "My picture",
+			TitleEs: "Mi imagen",
+			Parameters: []models.WellKnownParameter{
+				{Key: "url", LabelEn: "Image address", LabelEs: "Dirección de la imagen", Type: models.ParameterString, PlaceholderEn: new("https://example.com/photo.jpg"), PlaceholderEs: new("https://ejemplo.com/foto.jpg")},
+			},
+			Outputs: []models.WellKnownOutput{
+				{Key: "url", LabelEn: "Image address", LabelEs: "Dirección de la imagen", ExampleEn: "https://example.com/photo.jpg", ExampleEs: "https://ejemplo.com/foto.jpg"},
+			},
+		},
+		{
 			Key:    "temperature",
 			NameEn: "Temperature", NameEs: "Temperatura",
 			TitleEn:  "Today's temps are between {{min}}°C and {{max}}°C",

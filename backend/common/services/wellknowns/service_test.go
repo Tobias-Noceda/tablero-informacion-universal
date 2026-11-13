@@ -38,6 +38,37 @@ func TestBuiltinsAreValid(t *testing.T) {
 	}
 }
 
+// builtin is one of the seeded definitions, by key.
+func builtin(t *testing.T, key string) models.WellKnown {
+	t.Helper()
+	for _, wk := range Builtin() {
+		if wk.Key == key {
+			return wk
+		}
+	}
+	t.Fatalf("no built-in %q", key)
+	return models.WellKnown{}
+}
+
+// The image card answers with the address it is given, and needs one.
+func TestBuiltinImage_AnswersWithItsAddress(t *testing.T) {
+	image := builtin(t, "image")
+	if image.Resource != "" {
+		t.Errorf("resource = %q, want none: the card makes no request", image.Resource)
+	}
+	if _, _, err := image.Instantiate(nil); !errors.Is(err, models.ErrWellKnownMissingVariable) {
+		t.Errorf("without an address: err = %v, want ErrWellKnownMissingVariable", err)
+	}
+
+	postit, _, err := image.Instantiate(map[string]string{"url": "https://example.com/cat.png"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if postit.Resource != nil || postit.Params["url"] != "https://example.com/cat.png" {
+		t.Errorf("postit = %+v, want no resource and the address in its params", postit)
+	}
+}
+
 func TestList_HidesSystemSecretsFromUsers(t *testing.T) {
 	srv, _ := newService()
 
@@ -78,13 +109,13 @@ func TestWrites_AreAdminOnly(t *testing.T) {
 func TestPut_ValidatesAndStamps(t *testing.T) {
 	srv, store := newService()
 
-	bad := Builtin()[1]
+	bad := builtin(t, "temperature")
 	bad.Query = map[string]string{}
 	if _, err := srv.Put(admin, "broken", bad); !errors.Is(err, ErrInvalid) {
 		t.Errorf("err = %v, want invalid", err)
 	}
 
-	edited := Builtin()[1]
+	edited := builtin(t, "temperature")
 	edited.Builtin = false
 	edited.NameEn = "Renamed"
 	got, err := srv.Put(admin, edited.Key, edited)
@@ -95,7 +126,7 @@ func TestPut_ValidatesAndStamps(t *testing.T) {
 		t.Errorf("stored = %+v, want builtin kept and the edit stamped", got)
 	}
 
-	fresh := Builtin()[1]
+	fresh := builtin(t, "temperature")
 	fresh.Builtin = true
 	got, err = srv.Put(admin, "my_card", fresh)
 	if err != nil {
