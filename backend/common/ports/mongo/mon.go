@@ -386,6 +386,8 @@ func (db *MongoDB) StylePostIt(boardID, postItID uuid.UUID, patch models.CardSty
 	}
 	putText("color", (*string)(patch.Color))
 	putText("border", (*string)(patch.Border))
+	putText("border_width", (*string)(patch.BorderWidth))
+	putText("border_color", (*string)(patch.BorderColor))
 	putSide("width", patch.Width)
 	putSide("height", patch.Height)
 

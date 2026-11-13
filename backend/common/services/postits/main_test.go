@@ -614,7 +614,7 @@ func TestStylePostIt_StylesTheCardOnItsBoard(t *testing.T) {
 	}
 
 	width := float32(300.7)
-	style, err := newService(db, nil, nil).StylePostIt(boardOwner, id, models.CardStylePatch{Color: new(models.StrandColorBlue), Width: &width})
+	style, err := newService(db, nil, nil).StylePostIt(boardOwner, id, models.CardStylePatch{Color: new(models.CardColorBlue), Width: &width})
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
@@ -624,7 +624,7 @@ func TestStylePostIt_StylesTheCardOnItsBoard(t *testing.T) {
 	if *gotPatch.Width != 301 {
 		t.Errorf("width sent = %v, want it rounded to 301", *gotPatch.Width)
 	}
-	if want := (models.CardStyle{Color: models.StrandColorBlue, Width: 301}); *style != want {
+	if want := (models.CardStyle{Color: models.CardColorBlue, Width: 301}); *style != want {
 		t.Errorf("style = %+v, want %+v", *style, want)
 	}
 }

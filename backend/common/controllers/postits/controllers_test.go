@@ -579,7 +579,7 @@ func TestStylePostIt_OK(t *testing.T) {
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPatch, "/post-its/"+id.String()+"/style", `{"color":"green","border":"dashed","width":320,"height":0}`)
+	w := do(r, http.MethodPatch, "/post-its/"+id.String()+"/style", `{"color":"green","border":"dashed","border_width":"thin","border_color":"white","width":320,"height":0}`)
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200 (body: %s)", w.Code, w.Body.String())
 	}
@@ -590,7 +590,10 @@ func TestStylePostIt_OK(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &style); err != nil {
 		t.Fatal(err)
 	}
-	if want := (models.CardStyle{Color: models.StrandColorGreen, Border: models.CardBorderDashed, Width: 320}); style != want {
+	if want := (models.CardStyle{
+		Color: models.CardColorGreen, Border: models.CardBorderDashed, BorderWidth: models.CardBorderWidthThin,
+		BorderColor: models.CardColorWhite, Width: 320,
+	}); style != want {
 		t.Errorf("style = %+v, want %+v", style, want)
 	}
 }
@@ -599,7 +602,7 @@ func TestStylePostIt_Invalid(t *testing.T) {
 	r := setupRouter(nil, nil, nil)
 	path := "/post-its/" + uuid.NewString() + "/style"
 
-	for _, body := range []string{`{"border":"double"}`, `{"width":5}`, `{"color":42}`, `not json`} {
+	for _, body := range []string{`{"border":"double"}`, `{"border_width":"huge"}`, `{"border_color":"black"}`, `{"width":5}`, `{"color":42}`, `not json`} {
 		w := do(r, http.MethodPatch, path, body)
 		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "invalid_card_style") {
 			t.Errorf("%s: status = %d body = %s, want 400 invalid_card_style", body, w.Code, w.Body.String())

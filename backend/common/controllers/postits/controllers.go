@@ -352,7 +352,7 @@ func (ctrl *Controller) EditTitlePostIt(c *gin.Context) {
 
 // StylePostIt godoc
 // @Summary      Restyle a post-it
-// @Description  Editors only. Changes the fields sent (color from the strands' palette, border none|solid|dashed|dotted, width 120-1600 and height 60-1200 pixels); an empty value, or 0 for a size, goes back to the default.
+// @Description  Editors only. Changes the fields sent (color and border_color from the strands' palette or white, border none|solid|dashed|dotted, border_width thin|normal|thick, width 120-1600 and height 60-1200 pixels); an empty value, or 0 for a size, goes back to the default.
 // @Tags         post-its
 // @Accept       json
 // @Param        id       path      string                 true  "Post-It UUID" format(uuid)
