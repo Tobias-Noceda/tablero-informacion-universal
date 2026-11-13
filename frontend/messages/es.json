@@ -402,5 +402,10 @@
 		"border_normal": "Borde normal",
 		"border_thick": "Borde grueso",
 		"border_follow": "Mismo color que la tarjeta"
+	},
+	"image": {
+		"missing": "Esta tarjeta todavía no tiene la dirección de una imagen.",
+		"not_an_image": "Esta dirección no es una imagen:",
+		"open_original": "Abrir el original"
 	}
 }

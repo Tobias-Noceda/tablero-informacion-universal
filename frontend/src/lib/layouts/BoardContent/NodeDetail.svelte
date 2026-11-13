@@ -23,6 +23,7 @@
 	import { renderMarkdown } from '$lib/helpers/markdown';
 	import type { PostIt, PostItSettings, SecretRef } from '$types/api';
 	import { ONE_OFF } from '$lib/well-knowns/one-off';
+	import ImageView from '$components/Nodes/Image/ImageView.svelte';
 
 	export type PostItData = PostIt & {
 		title?: { text: string; vars: boolean };
@@ -294,7 +295,8 @@
 
 	<!-- Only the details scroll: the header and the delete button stay put. -->
 	<div class={cn('flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4', scrollClass)}>
-		{#if node.type !== 'static_card'}
+		<!-- A note's and a picture's only setting is what the content shows. -->
+		{#if node.type !== 'static_card' && node.type !== 'image'}
 			<section class="flex flex-col gap-2">
 				<h3 class="font-semibold text-xl">{m['node_detail.configuration']()}</h3>
 				<div class="text-xs">
@@ -342,6 +344,17 @@
 					{:else}
 						<p class="whitespace-pre-wrap wrap-break-word sm:text-sm md:text-[15px]">{data?.text}</p>
 					{/if}
+				{:else if node.type === 'image'}
+					<figure class="flex flex-col gap-2">
+						<ImageView src={data?.url} alt={title?.text ? renderTitle(title.text, data) : ""} class="max-w-full rounded" />
+						{#if isLink(data?.url)}
+							<!-- An external address the card holds, not an app route. -->
+							<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+							<a href={data.url} target="_blank" rel="noopener noreferrer" class="text-sm underline">
+								{m['image.open_original']()}
+							</a>
+						{/if}
+					</figure>
 				{:else}
 					{@render record(
 						Object.entries(data ?? {}).map(([key, value]) => [contentLabelOf(key), value]),

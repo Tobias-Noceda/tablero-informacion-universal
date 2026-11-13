@@ -401,5 +401,10 @@
 		"border_normal": "Normal border",
 		"border_thick": "Thick border",
 		"border_follow": "Same colour as the card"
+	},
+	"image": {
+		"missing": "This card has no image address yet.",
+		"not_an_image": "This address is not an image:",
+		"open_original": "Open the original"
 	}
 }
