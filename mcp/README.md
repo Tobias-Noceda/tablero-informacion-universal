@@ -7,9 +7,11 @@ An [xmcp](https://xmcp.dev) server (Streamable HTTP, `/mcp`) that lets an agent 
 | `list_pkgs` | Every board the user can see (`id - organization - name`) |
 | `create_pkg` / `delete_pkg` | Create or delete a board |
 | `memories` | The post-its of one board (`id - (x; y) - title`) |
-| `retrieve` | One post-it: its title, its data and the post-its connected to it |
+| `retrieve` | One post-it: its title, its data and the post-its connected to it, each with the relation's direction (`→` `←` `↔` `—`) and label |
 | `consolidate` | Save a text memory (a `static_card`) at a position, connected to related ones |
 | `reconsolidate` | Change a memory's title or text |
+| `associate` | Connect a memory to others, optionally with a label and a direction; an existing connection is updated, never duplicated |
+| `dissociate` | Remove the connection between two memories |
 | `forget` | Delete a memory |
 
 Every request needs `Authorization: Bearer <token>`. The server forwards it unchanged to the backend, which decides what the caller may see. Nothing is stored here. For how this could grow into OAuth for non-technical users, see `AUTH.md`.
@@ -33,5 +35,7 @@ Tokens reach only boards and cards (`middleware.RestrictAccessTokens`): the read
 
 - **Docker**: `docker compose up --build` from the repo root; the ALB routes `/mcp` here.
 - **Alone**: `pnpm install`, then `pnpm dev` (or `pnpm build && pnpm start`). Listens on `0.0.0.0:3001/mcp`. `API_URL` is the backend's **origin**: the server adds `/api` (`http://localhost` for the Docker stack, `http://localhost:31126` for a backend run by hand).
+
+`pnpm test` runs the unit tests in `test/` (`node --test`, Node strips the types; they stay out of `src/` so the xmcp build does not compile them).
 
 To try it without an agent: `npx @modelcontextprotocol/inspector`, transport "Streamable HTTP", URL `http://localhost/mcp`, header `Authorization: Bearer tiu_pat_…`.
