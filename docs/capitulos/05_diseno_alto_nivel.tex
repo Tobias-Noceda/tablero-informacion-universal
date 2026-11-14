@@ -142,10 +142,18 @@ La siguiente colección almacena la metadata del tablero, sus miembros con el ro
   members[].user & string & Sí & ID del miembro (referencia a \texttt{users}). \\
   members[].role & string & No & Rol del miembro: \texttt{editor} o \texttt{viewer}. \\
   org & binData (UUID) & Sí & Organización a la que pertenece el tablero (referencia a \texttt{orgs}). Opcional. \\
-  postIts & array (objects) & No & Estructura embebida con datos de renderizado de los post-its. \\
+  postIts & array (objects) & No & Estructura embebida con datos de renderizado de los post-its. Los campos de estilo de cada tarjeta son opcionales y un valor por defecto no se almacena. \\
   postIts.[].id & binData (UUID) & No & ID de la configuración completa en la colección \texttt{postits}. \\
   postIts.[].title & object & No & Título de la tarjeta (\texttt{text}) y si interpola variables del resultado (\texttt{vars}). \\
   postIts.[].position & object & No & Coordenadas x/y de la tarjeta dentro del lienzo. \\
+  postIts.[].color & string & No & Color de fondo de la tarjeta: la paleta de los hilos o \texttt{white}. Opcional. \\
+  postIts.[].border & string & No & Borde de la tarjeta: \texttt{none}, \texttt{solid}, \texttt{dashed} o \texttt{dotted}. Opcional. \\
+  postIts.[].border\_width & string & No & Grosor del borde: \texttt{thin}, \texttt{normal} o \texttt{thick}. Opcional. \\
+  postIts.[].border\_color & string & No & Color del borde, con las mismas opciones que \texttt{color}; si falta, sigue el color de la tarjeta. Opcional. \\
+  postIts.[].text\_align & string & No & Alineación horizontal del texto: \texttt{left}, \texttt{center} o \texttt{right}. Opcional. \\
+  postIts.[].vertical\_align & string & No & Ubicación vertical del texto: \texttt{top}, \texttt{middle} o \texttt{bottom}; se nota en una tarjeta con alto propio. Opcional. \\
+  postIts.[].width & double & No & Ancho de la tarjeta en píxeles del lienzo, entre 120 y 1600. Opcional. \\
+  postIts.[].height & double & No & Alto de la tarjeta en píxeles del lienzo, entre 60 y 1200. Opcional. \\
   strands & array (objects) & No & Lista de conexiones o hilos entre post-its. Los campos de estilo de cada hilo son opcionales y un valor por defecto no se almacena. \\
   strands[].id & binData (UUID) & No & Identificador único del hilo. \\
   strands[].source & binData (UUID) & No & Post-it de origen del hilo. \\

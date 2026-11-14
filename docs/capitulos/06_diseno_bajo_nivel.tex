@@ -121,11 +121,13 @@ Por su parte, la eliminación, en \texttt{DeletePostIt}, preserva la integridad 
 Finalmente, quitar a un miembro o eliminar el tablero desencadena la purga de los secretos que ese miembro guardaba para sí en el tablero, junto con sus claves de datos, evitando que queden credenciales huérfanas.
 
 \section{Motor de Tarjetas}
-El motor de tarjetas, en el paquete \texttt{postits}, se encarga de crear, configurar, mover y ejecutar tarjetas, cubriendo los requisitos RF-05, RF-07, RF-08 y la configuración del rate de RF-09.
+El motor de tarjetas, en el paquete \texttt{postits}, se encarga de crear, configurar, mover y ejecutar tarjetas, cubriendo los requisitos RF-05, RF-07, RF-08, RF-12 y la configuración del rate de RF-09.
 
 El principio de diseño central de este componente es que una tarjeta constituye una descripción declarativa de cómo obtener un dato y no un fragmento de código. El motor se limita a sustituir variables, ejecutar la petición y aplicar la proyección con jq. Esta restricción es, precisamente, lo que permite cumplir el RNF-04: agregar una integración predefinida se reduce a cargar su definición en el catálogo, sin necesidad de escribir lógica nueva ni desplegar una nueva versión del backend.
 
 Las escrituras sobre una tarjeta actúan en nombre del llamante. Al crearla, o cada vez que cambian sus \texttt{params} o \texttt{bindings}, se registra en el campo \texttt{RunAs} la identidad de quien la configuró, y es con esa identidad que luego se resuelven sus credenciales. Esto impide que un editor utilice, a través de una tarjeta, secretos a los que no tiene acceso, y garantiza que degradar a un usuario a viewer detenga las tarjetas que se ejecutan en su nombre.
+
+El estilo visual de cada tarjeta, correspondiente al RF-12, se guarda junto a su entrada en el documento del tablero, por lo que llega a los demás usuarios por el mismo canal de tiempo real que el resto de los cambios del tablero. La operación \texttt{StylePostIt}, reservada a los editores, valida el color, el borde, la alineación del texto y el tamaño, redondea las dimensiones a píxeles enteros dentro de los límites admitidos y actualiza únicamente los campos enviados mediante los operadores posicionales \texttt{\$set} y \texttt{\$unset}, de modo que un valor por defecto nunca se almacena.
 
 En la Figura~\ref{fig:clases_postits} se observa que \texttt{PostItsService} no conoce el motor de integraciones concreto: depende del puerto \texttt{Executer}, implementado por el adaptador \texttt{DewIt}, del puerto \texttt{Cache} para el resultado de cada tarjeta y del puerto \texttt{SecretResolver} para obtener las credenciales en nombre de \texttt{RunAs}.
 
@@ -145,13 +147,14 @@ Sus endpoints se resumen en la siguiente tabla.
   PATCH & /post-its/\{id\}/settings & Editar params, query, response o rate. & editor \\
   PATCH & /post-its/\{id\}/position & Mover la tarjeta dentro del board. & editor \\
   PATCH & /post-its/\{id\}/title & Editar el título de la tarjeta. & editor \\
+  PATCH & /post-its/\{id\}/style & Cambiar el estilo visual de la tarjeta (color, borde, alineación del texto y tamaño). & editor \\
   DELETE & /post-its/\{id\} & Eliminar la tarjeta y desreferenciar del board. & editor \\
 \end{tablaendpointsrol}
 
 \section{Integración con APIs}
 El motor de integración, en el paquete \texttt{executer}, es responsable de resolver un PostIt a un valor concreto, cubriendo la capa de ejecución de los requisitos RF-07 y RF-08. Antes de invocarlo, el servicio de tarjetas prepara una copia del PostIt: cada placeholder \texttt{\$TOKEN} presente en \texttt{params}, \texttt{headers} o \texttt{queries} se mapea a una referencia de secreto, tomando el binding explícito de la tarjeta si existe. Esas referencias se resuelven como el principal \texttt{RunAs}, verificando nuevamente que pueda utilizarlas, y por último se inyectan los secretos de sistema que requiera el well-known. A continuación, cada llamada a \texttt{DewIt.Execute} recorre cinco pasos.
 
-En primer lugar, un short-circuit estático: si el campo \texttt{Resource} es nil, se devuelven los \texttt{Params} tal cual, lo que da soporte a la integración \texttt{static\_card} y a cualquier tarjeta sin fuente externa. A continuación, la sustitución de variables, en la que \texttt{populate} reemplaza dentro de las queries y los headers aquellos valores cuyo contenido coincida con el nombre de un Param definido por el usuario, identificados por el prefijo \texttt{\$}. Luego se realiza la petición HTTP, creada con un \texttt{context.WithTimeout} de diez segundos, ensamblando querystring y headers y exigiendo un status 200 OK; cualquier otro código se reporta como error de la tarjeta.
+En primer lugar, un short-circuit estático: si el campo \texttt{Resource} es nil, se devuelven los \texttt{Params} tal cual, lo que da soporte a las integraciones \texttt{static\_card} e \texttt{image} y a cualquier tarjeta sin fuente externa. A continuación, la sustitución de variables, en la que \texttt{populate} reemplaza dentro de las queries y los headers aquellos valores cuyo contenido coincida con el nombre de un Param definido por el usuario, identificados por el prefijo \texttt{\$}. Luego se realiza la petición HTTP, creada con un \texttt{context.WithTimeout} de diez segundos, ensamblando querystring y headers y exigiendo un status 200 OK; cualquier otro código se reporta como error de la tarjeta.
 
 El cuarto paso es el parseo, donde el cuerpo de la respuesta se decodifica como JSON genérico. Por último, la proyección compila la expresión \texttt{Query} con \texttt{gojq.Parse} y la ejecuta sobre el JSON con un timeout de doscientos cincuenta milisegundos, mientras que para HTML se evalúan como selectores CSS mediante \texttt{goquery}, devolviendo al servicio un objeto con un valor por clave.
 
@@ -188,6 +191,7 @@ La siguiente tabla detalla las integraciones predefinidas que el sistema carga i
   \label{tab:integraciones_predefinidas}
   \endlastfoot
   static\_card & Interna & — & — & — \\
+  image & Interna & — & — & — \\
   temperature & Open-Meteo & mín./máx. de temperatura horaria & 30 s & — \\
   air\_quality & Open-Meteo & Índice de calidad del aire, Material particulado 2.5 y fecha y hora de medida & 15 min & — \\
   events\_search & Ticketmaster & nombre, fecha e imagen del primer evento & 120 s & del usuario \\
