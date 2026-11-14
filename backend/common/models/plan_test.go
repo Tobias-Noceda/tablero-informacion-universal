@@ -10,7 +10,7 @@ import (
 
 func TestLimitsFor_Table(t *testing.T) {
 	want := map[Plan]Limits{
-		PlanFree: {0, 5, 5, true, 25, 5, 0, 0, 5, 0, 300, false, false, 0},
+		PlanFree: {0, 5, 5, true, 25, 5, 0, 0, 5, 0, 600, false, false, 0},
 		PlanPro:  {3, 10, 5, false, 100, 10, 5, 3, 25, 5, 150, false, true, 9},
 		PlanMax:  {10, 50, 25, false, 300, 50, 50, 50, 200, 25, 60, true, true, 29},
 	}

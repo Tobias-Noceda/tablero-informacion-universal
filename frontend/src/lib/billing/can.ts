@@ -13,7 +13,7 @@ export const FREE_LIMITS: Limits = {
 	org_templates: 0,
 	secrets: 5,
 	groups: 0,
-	min_rate: 300,
+	min_rate: 600,
 	force_refresh: false,
 	api_access: false,
 	price_usd: 0

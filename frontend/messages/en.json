@@ -475,6 +475,11 @@
 			"failed": "The subscription was not completed. No plan was changed.",
 			"home": "Back to the boards",
 			"retry": "See plans"
+		},
+		"interval": {
+			"seconds": "{seconds} s",
+			"minutes": "{minutes} min",
+			"minutes_seconds": "{minutes} min {seconds} s"
 		}
 	},
 	"pricing": {
@@ -514,7 +519,7 @@
 			"templates_shared": "{board} card types per board and {org} per organization",
 			"secrets": "{count} stored credentials",
 			"groups": "{count} credential groups",
-			"min_rate": "Data updated every {seconds} seconds at most",
+			"min_rate": "Each card's data refreshes at most once every {interval}",
 			"force_refresh": "Manual refresh of a card",
 			"api_access": "MCP server and access tokens",
 			"seats_read_only": "Share with up to {count} people, read-only"

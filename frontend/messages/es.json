@@ -476,6 +476,11 @@
 			"failed": "La suscripción no se completó. No se cambió ningún plan.",
 			"home": "Volver a los tableros",
 			"retry": "Ver planes"
+		},
+		"interval": {
+			"seconds": "{seconds} s",
+			"minutes": "{minutes} min",
+			"minutes_seconds": "{minutes} min {seconds} s"
 		}
 	},
 	"pricing": {
@@ -515,7 +520,7 @@
 			"templates_shared": "{board} tipos de tarjeta por tablero y {org} por organización",
 			"secrets": "{count} credenciales almacenadas",
 			"groups": "{count} grupos de credenciales",
-			"min_rate": "Datos actualizados cada {seconds} segundos como máximo",
+			"min_rate": "Los datos de cada tarjeta se actualizan como mucho una vez cada {interval}",
 			"force_refresh": "Actualización manual de una tarjeta",
 			"api_access": "Servidor MCP y tokens de acceso",
 			"seats_read_only": "Compartí con hasta {count} personas, solo lectura"

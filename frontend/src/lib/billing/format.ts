@@ -21,6 +21,15 @@ export function money(amount: number, currency: string) {
 	}).format(amount);
 }
 
+// A refresh interval in whole minutes and seconds ("10 min", "2 min 30 s").
+export function interval(seconds: number) {
+	const minutes = Math.floor(seconds / 60);
+	const rest = seconds % 60;
+	if (minutes === 0) return m['billing.interval.seconds']({ seconds: rest });
+	if (rest === 0) return m['billing.interval.minutes']({ minutes });
+	return m['billing.interval.minutes_seconds']({ minutes, seconds: rest });
+}
+
 export function day(iso: string) {
 	return new Date(iso).toLocaleDateString(getLocale(), { dateStyle: 'long' });
 }

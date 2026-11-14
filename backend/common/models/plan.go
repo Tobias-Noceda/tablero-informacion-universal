@@ -51,7 +51,7 @@ var planLimits = map[Plan]Limits{
 	PlanFree: {
 		Orgs: 0, BoardsPerSpace: 5, Seats: 5, ViewersOnly: true, NodesPerBoard: 25,
 		UserTemplates: 5, BoardTemplates: 0, OrgTemplates: 0,
-		Secrets: 5, Groups: 0, MinRate: 300,
+		Secrets: 5, Groups: 0, MinRate: 600,
 		ForceRefresh: false, APIAccess: false, PriceUSD: 0,
 	},
 	PlanPro: {

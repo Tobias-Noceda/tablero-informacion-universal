@@ -4,7 +4,7 @@
 	import Button from '$components/Button/Button.svelte';
 	import Icon from '$components/Icon/Icon.svelte';
 	import Input from '$components/Input/Input.svelte';
-	import { money, planName } from '$lib/billing/format';
+	import { interval, money, planName } from '$lib/billing/format';
 	import { m } from '$lib/paraglide/messages';
 	import { session } from '$modules/session.svelte';
 	import * as billing from '$services/billing';
@@ -91,7 +91,7 @@
 		}
 		list.push(m['pricing.feature.secrets']({ count: limits.secrets }));
 		if (limits.groups > 0) list.push(m['pricing.feature.groups']({ count: limits.groups }));
-		list.push(m['pricing.feature.min_rate']({ seconds: limits.min_rate }));
+		list.push(m['pricing.feature.min_rate']({ interval: interval(limits.min_rate) }));
 		if (limits.force_refresh) list.push(m['pricing.feature.force_refresh']());
 		if (limits.api_access) list.push(m['pricing.feature.api_access']());
 		return list;
