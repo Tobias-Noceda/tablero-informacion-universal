@@ -43,7 +43,7 @@ jobs:
         working-directory: docs
         run: rm -rf informe.pdf
 
-      - name: Take it's place
+      - name: Take its place
         working-directory: docs
         run: mv main.pdf informe.pdf
 
