@@ -31,22 +31,28 @@ func TestEndToEnd_CardStyles(t *testing.T) {
 
 	var style models.CardStyle
 	s.mustJSON(owner.do(http.MethodPatch, stylePath, map[string]any{
-		"color": "white", "border": "dotted", "border_width": "thick", "border_color": "purple", "width": 320.4, "height": 180,
+		"color": "white", "border": "dotted", "border_width": "thick", "border_color": "purple", "text_align": "center", "vertical_align": "middle", "width": 320.4, "height": 180,
 	}), http.StatusOK, &style)
 
 	want := models.CardStyle{
 		Color: models.CardColorWhite, Border: models.CardBorderDotted, BorderWidth: models.CardBorderWidthThick,
-		BorderColor: models.CardColorPurple, Width: 320, Height: 180,
+		BorderColor: models.CardColorPurple, TextAlign: models.CardTextAlignCenter,
+		VerticalAlign: models.CardVerticalAlignMiddle, Width: 320, Height: 180,
 	}
 	if style != want {
 		t.Fatalf("style = %+v, want %+v", style, want)
 	}
 
-	s.mustJSON(owner.do(http.MethodPatch, stylePath, map[string]any{"border": "", "border_width": "", "height": 0}), http.StatusOK, &style)
+	// A fresh value: the answer leaves out the fields that went back to the
+	// default, and decoding into the old one would keep their old values.
+	var patched models.CardStyle
+	s.mustJSON(owner.do(http.MethodPatch, stylePath, map[string]any{"border": "", "border_width": "", "vertical_align": "", "height": 0}), http.StatusOK, &patched)
 
-	want = models.CardStyle{Color: models.CardColorWhite, BorderColor: models.CardColorPurple, Width: 320}
-	if style != want {
-		t.Errorf("patched = %+v, want %+v", style, want)
+	want = models.CardStyle{
+		Color: models.CardColorWhite, BorderColor: models.CardColorPurple, TextAlign: models.CardTextAlignCenter, Width: 320,
+	}
+	if patched != want {
+		t.Errorf("patched = %+v, want %+v", patched, want)
 	}
 
 	stored, err := s.db.FindBoard(board.Id)
