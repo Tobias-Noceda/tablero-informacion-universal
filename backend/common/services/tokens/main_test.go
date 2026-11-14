@@ -27,7 +27,7 @@ type fixture struct {
 func setup() fixture {
 	now := time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
 	f := fixture{store: &mocks.MemoryAccessTokenStore{}, limiter: &mocks.CountingLimiter{}, clock: &now}
-	f.svc = New(f.store, f.limiter, func() time.Time { return *f.clock })
+	f.svc = New(f.store, f.limiter, mocks.StaticEntitlements{}, func() time.Time { return *f.clock })
 	return f
 }
 

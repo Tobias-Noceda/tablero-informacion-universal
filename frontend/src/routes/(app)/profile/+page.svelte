@@ -9,6 +9,10 @@
 	import { session } from '$modules/session.svelte';
 	import * as users from '$services/users';
 	import type { IdentityProvider } from '$types/api';
+	import PlanSection from '$components/Billing/PlanSection.svelte';
+	import PlanHint from '$components/PlanHint/PlanHint.svelte';
+	import { plan } from '$stores/plan.svelte';
+	import { hasApi } from '$lib/billing/can';
 
 	// The (app) guard only renders this for a signed-in user.
 	const user = $derived(session.user!);
@@ -113,5 +117,15 @@
 		{/if}
 	</section>
 
-	<AccessTokens user={user.id} />
+	<PlanSection />
+
+	<!-- Tokens (and the MCP server they are for) are part of the paid plans. -->
+	{#if hasApi(plan.limits)}
+		<AccessTokens user={user.id} />
+	{:else}
+		<section class="flex flex-col gap-1">
+			<h2 class="text-sm font-medium">{m['profile.tokens.title']()}</h2>
+			<PlanHint text={m['billing.hint.tokens']()} />
+		</section>
+	{/if}
 </main>

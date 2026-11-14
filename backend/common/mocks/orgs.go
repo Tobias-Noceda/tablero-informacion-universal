@@ -116,3 +116,13 @@ func (m *MemoryOrgStore) FindOrgBoards(id uuid.UUID) ([]models.Board, error) {
 func (m *MemoryOrgStore) CountOrgGroups(id uuid.UUID) (int64, error) {
 	return m.Groups[id], nil
 }
+
+func (m *MemoryOrgStore) CountOwnedOrgs(userID string) (int64, error) {
+	var owned int64
+	for _, org := range m.Orgs {
+		if org.Owner == userID {
+			owned++
+		}
+	}
+	return owned, nil
+}

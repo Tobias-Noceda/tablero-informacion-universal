@@ -31,6 +31,8 @@ Every request needs `Authorization: Bearer <token>`. The server forwards it unch
 
 Tokens reach only boards and cards (`middleware.RestrictAccessTokens`): the reads, plus creating, editing and deleting boards, cards and strands, with the user's board roles. Secrets, sharing, organizations, tokens and system routes answer `403 token_not_allowed`. Revoking one in the profile stops it on its next request.
 
+Tokens need a Pro or Max plan on the account that created them: on Free, creating one and using an existing one both answer `402 plan_limit` (`limit: "api_access"`), which the server reports as a readable tool error. Any other `402 plan_limit` (for example the card limit of the board's plan) is reported the same way.
+
 ## Running
 
 - **Docker**: `docker compose up --build` from the repo root; the ALB routes `/mcp` here.

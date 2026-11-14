@@ -413,5 +413,123 @@
 		"missing": "This card has no image address yet.",
 		"not_an_image": "This address is not an image:",
 		"open_original": "Open the original"
+	},
+	"billing": {
+		"menu": "Plans",
+		"plan": {
+			"free": "Free",
+			"pro": "Pro",
+			"max": "Max"
+		},
+		"hint": {
+			"see_plans": "See plans",
+			"boards": "{count} of {max} boards",
+			"nodes": "{count} of {max} cards",
+			"seats": "{count} of {max} people",
+			"orgs": "{count} of {max} organizations",
+			"orgs_unavailable": "Creating organizations is not part of your plan",
+			"templates": "{count} of {max} card types",
+			"secrets": "{count} of {max} credentials",
+			"tokens": "Access tokens and the MCP server are not part of your plan",
+			"read_only": "On the Free plan people you add can only view"
+		},
+		"limit": {
+			"title": "Plan limit reached",
+			"generic": "Your plan does not allow this.",
+			"orgs": "The plan allows {max} organizations.",
+			"boards": "The plan allows {max} boards per space.",
+			"seats": "The plan allows {max} people, owner included.",
+			"nodes": "The plan allows {max} cards per board.",
+			"templates": "The plan allows {max} card types here.",
+			"secrets": "The plan allows {max} stored credentials.",
+			"groups": "The plan allows {max} credential groups.",
+			"force_refresh": "Manual refresh is not part of the plan.",
+			"api_access": "Access tokens and the MCP server are not part of the plan.",
+			"editors": "On this plan boards are shared read-only."
+		},
+		"profile": {
+			"upgrade": "Upgrade to Pro",
+			"unlocks": "Pro unlocks editing together, organizations and API access.",
+			"manage": "Manage plan",
+			"title": "Plan",
+			"current": "Current plan: {plan}",
+			"next_charge": "Next charge on {date}: {amount}",
+			"pending_plan": "It changes to {plan} with the next charge.",
+			"pending": "The payment is waiting for confirmation.",
+			"paused": "Your subscription is paused. Resume it in Mercado Pago to keep the plan.",
+			"ends": "The {plan} plan stays active until {date}.",
+			"change": "Change plan",
+			"see_plans": "See plans",
+			"cancel": "End subscription",
+			"cancel_title": "End the subscription?",
+			"cancel_note_until": "No more charges are made. The {plan} plan stays active until {date}; after that the account goes back to Free. Nothing is deleted: only creating new things beyond the Free limits is blocked.",
+			"cancel_note": "No more charges are made. The plan stays active until the end of the period already paid; after that the account goes back to Free. Nothing is deleted: only creating new things beyond the Free limits is blocked.",
+			"cancel_failed": "The subscription could not be ended. Try again.",
+			"canceled": "The subscription was ended."
+		},
+		"return": {
+			"title": "Subscription",
+			"checking": "Checking the payment…",
+			"active": "The {plan} plan is active.",
+			"pending": "The payment is not confirmed yet. The plan is activated as soon as Mercado Pago confirms it; this may take a few minutes.",
+			"failed": "The subscription was not completed. No plan was changed.",
+			"home": "Back to the boards",
+			"retry": "See plans"
+		},
+		"interval": {
+			"seconds": "{seconds} s",
+			"minutes": "{minutes} min",
+			"minutes_seconds": "{minutes} min {seconds} s"
+		}
+	},
+	"pricing": {
+		"hero": "Pick the plan that fits how you work",
+		"popular": "Most popular",
+		"your_plan": "Your plan",
+		"month": "/month",
+		"title": "Plans",
+		"subtitle": "Start for free. A paid plan is charged monthly through Mercado Pago and can be ended at any time.",
+		"loading": "Loading the plans…",
+		"load_failed": "The plans could not be loaded. Try again later.",
+		"per_month": "per month",
+		"price_free": "Free",
+		"price_ars": "Charged as {amount} per month",
+		"current": "Current plan",
+		"pending_change": "From the next charge",
+		"sign_in": "Sign in",
+		"to_app": "Back to the boards",
+		"register": "Create an account",
+		"choose": "Choose {plan}",
+		"switch": "Switch to {plan}",
+		"payer_email": "Email of the Mercado Pago account that will pay",
+		"payer_email_hint": "It may differ from the email of this account. Mercado Pago asks to sign in with it to authorize the monthly charge.",
+		"continue": "Continue to Mercado Pago",
+		"back": "Back",
+		"paused": "Your subscription is paused. Resume it in Mercado Pago before changing plans.",
+		"switched_now": "The plan is now {plan}.",
+		"switched_later": "The plan changes to {plan} with the next charge.",
+		"feature": {
+			"orgs_none": "Personal space only",
+			"orgs": "{count} organizations of your own",
+			"boards": "{count} boards per space",
+			"seats_none": "Boards are not shared",
+			"seats": "Up to {count} people per board or organization",
+			"nodes": "{count} cards per board",
+			"templates_user": "{count} card types of your own",
+			"templates_shared": "{board} card types per board and {org} per organization",
+			"secrets": "{count} stored credentials",
+			"groups": "{count} credential groups",
+			"min_rate": "Each card's data refreshes at most once every {interval}",
+			"force_refresh": "Manual refresh of a card",
+			"api_access": "MCP server and access tokens",
+			"seats_read_only": "Share with up to {count} people, read-only"
+		},
+		"error": {
+			"invalid_plan": "That plan cannot be subscribed to.",
+			"invalid_email": "Enter a valid email.",
+			"already_subscribed": "This account already has a subscription. Change it from the profile.",
+			"billing_disabled": "Payments are not available right now.",
+			"unknown": "The subscription could not be started. Try again."
+		}
 	}
 }

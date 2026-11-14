@@ -39,7 +39,7 @@ func setupRouter() (*gin.Engine, *mocks.MemoryGroupStore, *purgeRecorder) {
 	purger := &purgeRecorder{}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(store, purger, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}))).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
+	NewController(srv.New(store, purger, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}), mocks.StaticEntitlements{})).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
 	return r, store, purger
 }
 

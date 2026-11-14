@@ -24,6 +24,8 @@
 	import type { PostIt, PostItSettings, SecretRef } from '$types/api';
 	import { ONE_OFF } from '$lib/well-knowns/one-off';
 	import ImageView from '$components/Nodes/Image/ImageView.svelte';
+	import { boardPlan } from '$stores/plan.svelte';
+	import { canRefresh } from '$lib/billing/can';
 
 	export type PostItData = PostIt & {
 		title?: { text: string; vars: boolean };
@@ -276,21 +278,24 @@
 			</Tooltip>
 		{/if}
 
-		<Tooltip
-			content={m['node_detail.refresh']()}
-			placement="bottom-left"
-			tooltipClass="max-w-60! -mt-1 ml-11"
-		>
-			<button
-				type="button"
-				class="cursor-pointer rounded-md p-2 hover:bg-detail-hover disabled:cursor-wait disabled:opacity-60"
-				aria-label={m['node_detail.refresh']()}
-				disabled={refreshing}
-				onclick={refresh}
+		<!-- Running a card again past the cache is part of some plans only. -->
+		{#if canRefresh(boardPlan.limits)}
+			<Tooltip
+				content={m['node_detail.refresh']()}
+				placement="bottom-left"
+				tooltipClass="max-w-60! -mt-1 ml-11"
 			>
-				<Icon name="refresh" class={'stroke-2 w-5 h-5 ' + (refreshing ? 'animate-spin' : '')} />
-			</button>
-		</Tooltip>
+				<button
+					type="button"
+					class="cursor-pointer rounded-md p-2 hover:bg-detail-hover disabled:cursor-wait disabled:opacity-60"
+					aria-label={m['node_detail.refresh']()}
+					disabled={refreshing}
+					onclick={refresh}
+				>
+					<Icon name="refresh" class={'stroke-2 w-5 h-5 ' + (refreshing ? 'animate-spin' : '')} />
+				</button>
+			</Tooltip>
+		{/if}
 	</header>
 
 	<!-- Only the details scroll: the header and the delete button stay put. -->

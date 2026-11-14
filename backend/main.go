@@ -71,7 +71,7 @@ func main() {
 	application := newApp(db, cache, kek, keys, cfg, mail.New(templates, sender))
 
 	if maintenance.requested() {
-		if err := maintenance.run(application.secrets, os.Stdout); err != nil {
+		if err := maintenance.run(application.secrets, application.billing, os.Stdout); err != nil {
 			panic(err)
 		}
 		return

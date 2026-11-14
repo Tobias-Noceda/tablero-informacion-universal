@@ -7,12 +7,20 @@
 	import { m } from '$lib/paraglide/messages';
 	import * as orgsApi from '$services/orgs';
 	import { orgs } from '$stores/org.svelte';
+	import { plan } from '$stores/plan.svelte';
+	import { canCreateOrg } from '$lib/billing/can';
+	import PlanHint from '$components/PlanHint/PlanHint.svelte';
 
 	let name = $state('');
 	let creating = $state(false);
 	let failed = $state(false);
 
+	// Organizations are created on the caller's own plan: no form without
+	// room for one more (never on a plan without organizations).
+	const canCreate = $derived(canCreateOrg(plan.limits, plan.usage?.orgs));
+
 	onMount(() => {
+		void plan.refreshUsage();
 		orgs.refresh().catch((err) => console.error('Failed to load organizations', err));
 	});
 
@@ -22,7 +30,7 @@
 		failed = false;
 		try {
 			const org = await orgsApi.create(name.trim());
-			await orgs.refresh();
+			await Promise.all([orgs.refresh(), plan.refreshUsage()]);
 			await goto(resolve(`/orgs/${org.id}`));
 		} catch (err) {
 			console.error(err);
@@ -57,13 +65,25 @@
 		</ul>
 	{/if}
 
-	<form class="flex flex-col gap-2 border-t border-main-border pt-4" onsubmit={create}>
-		<Input id="org-name" label={m['orgs.name']()} bind:value={name} required />
-		{#if failed}
-			<p role="alert" class="text-sm text-destructive">{m['orgs.error_unknown']()}</p>
-		{/if}
-		<Button variant="primary" type="submit" disabled={creating || !name.trim()}>
-			{m['orgs.create']()}
-		</Button>
-	</form>
+	{#if !canCreate}
+		<PlanHint
+			class="border-t border-main-border pt-4"
+			text={plan.limits.orgs === 0
+				? m['billing.hint.orgs_unavailable']()
+				: m['billing.hint.orgs']({
+						count: plan.usage?.orgs ?? plan.limits.orgs,
+						max: plan.limits.orgs
+					})}
+		/>
+	{:else}
+		<form class="flex flex-col gap-2 border-t border-main-border pt-4" onsubmit={create}>
+			<Input id="org-name" label={m['orgs.name']()} bind:value={name} required />
+			{#if failed}
+				<p role="alert" class="text-sm text-destructive">{m['orgs.error_unknown']()}</p>
+			{/if}
+			<Button variant="primary" type="submit" disabled={creating || !name.trim()}>
+				{m['orgs.create']()}
+			</Button>
+		</form>
+	{/if}
 </main>

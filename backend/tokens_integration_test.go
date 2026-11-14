@@ -93,16 +93,17 @@ func TestEndToEnd_AccessTokenReadsAsItsOwner(t *testing.T) {
 // past the middleware.
 // tokenWrites are the only writes a token may make: boards, cards and strands.
 var tokenWrites = map[string]bool{
-	"POST /api/v1/boards":                      true,
-	"DELETE /api/v1/boards/:id":                true,
-	"POST /api/v1/boards/:id/strands":          true,
-	"PATCH /api/v1/boards/:id/strands/:strand": true,
-	"POST /api/v1/post-its":                    true,
-	"DELETE /api/v1/post-its/:id":              true,
-	"PATCH /api/v1/post-its/:id/settings":      true,
-	"PATCH /api/v1/post-its/:id/position":      true,
-	"PATCH /api/v1/post-its/:id/style":         true,
-	"PATCH /api/v1/post-its/:id/title":         true,
+	"POST /api/v1/boards":                       true,
+	"DELETE /api/v1/boards/:id":                 true,
+	"POST /api/v1/boards/:id/strands":           true,
+	"PATCH /api/v1/boards/:id/strands/:strand":  true,
+	"DELETE /api/v1/boards/:id/strands/:strand": true,
+	"POST /api/v1/post-its":                     true,
+	"DELETE /api/v1/post-its/:id":               true,
+	"PATCH /api/v1/post-its/:id/settings":       true,
+	"PATCH /api/v1/post-its/:id/position":       true,
+	"PATCH /api/v1/post-its/:id/style":          true,
+	"PATCH /api/v1/post-its/:id/title":          true,
 }
 
 func TestEndToEnd_AccessTokenReachesOnlyTheAllowlist(t *testing.T) {
@@ -112,7 +113,8 @@ func TestEndToEnd_AccessTokenReachesOnlyTheAllowlist(t *testing.T) {
 	params := strings.NewReplacer(":id", uuid.NewString(), ":strand", uuid.NewString(), ":user", "u", ":name", "KEY", ":token", uuid.NewString())
 
 	for _, route := range s.app.router.Routes() {
-		if strings.HasPrefix(route.Path, "/api/v1/auth/") {
+		// The webhook is public, so a token is no different from anyone.
+		if strings.HasPrefix(route.Path, "/api/v1/auth/") || publicBilling[route.Path] {
 			continue
 		}
 		w := s.request(token, route.Method, params.Replace(route.Path), nil)

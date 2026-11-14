@@ -72,8 +72,11 @@ type Locker interface {
 }
 
 type SecretStore interface {
-	// Creates or replaces a secret, keyed by scope + name
+	// Creates or replaces a secret, keyed by scope + name. BilledTo is only
+	// stored with a new one: a rewrite keeps who it was billed to.
 	UpsertSecret(secret *models.Secret) error
+	// Counts the secrets billed to a user, across every scope
+	CountSecretsBilledTo(userID string) (int64, error)
 	// Find the named secrets of a scope. Missing names are simply absent.
 	FindSecrets(scope models.SecretScope, names []string) ([]models.Secret, error)
 	// Find every secret of a scope

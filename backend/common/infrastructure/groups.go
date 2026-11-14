@@ -24,4 +24,6 @@ type GroupStore interface {
 	DeleteGroup(id uuid.UUID) error
 	AddGroupMember(id uuid.UUID, userID string) error
 	RemoveGroupMember(id uuid.UUID, userID string) error
+	// CountOwnedGroups counts the groups userID owns.
+	CountOwnedGroups(userID string) (int64, error)
 }

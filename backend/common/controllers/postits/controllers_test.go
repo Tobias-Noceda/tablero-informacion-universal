@@ -49,7 +49,7 @@ func setupRouterWith(db *mocks.MockDB, cache *mocks.MockCache, run *mocks.MockEx
 	}
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
-	NewController(srv.New(db, cache, run, secrets, access.New(nil), builtins(), nil)).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
+	NewController(srv.New(db, cache, run, secrets, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
 	return r
 }
 
@@ -364,7 +364,7 @@ func TestEditPostIt_ServiceError(t *testing.T) {
 	}
 	r := setupRouter(db, nil, nil)
 
-	w := do(r, http.MethodPatch, "/post-its/"+uuid.New().String()+"/settings", `{"rate":1}`)
+	w := do(r, http.MethodPatch, "/post-its/"+uuid.New().String()+"/settings", `{"rate":30}`)
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
 	}

@@ -63,7 +63,7 @@ func setupRouter(db *mocks.MockDB) *gin.Engine {
 
 	r := gin.New()
 	users := &mocks.MemoryUserStore{Users: []models.User{ownerUser, anaUser, bobUser, eveUser}}
-	bs := b_srv.New(withBoard(db), &mocks.MockScopePurger{}, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}), users, &mocks.CountingLimiter{})
+	bs := b_srv.New(withBoard(db), &mocks.MockScopePurger{}, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}), users, &mocks.CountingLimiter{}, nil, mocks.StaticEntitlements{})
 
 	NewController(bs).RegisterRoutes(r.Group("", middleware.RequireAuth(mocks.SubjectVerifier{})))
 	return r

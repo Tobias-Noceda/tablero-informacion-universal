@@ -1,6 +1,7 @@
 import { SvelteMap } from 'svelte/reactivity';
 
 import { nextDelay } from '$lib/helpers/auto-refresh';
+import { boardPlan } from '$stores/plan.svelte';
 import { session } from '$modules/session.svelte';
 import * as postItsApi from '$services/post-it';
 import type { UUID } from '$types/api';
@@ -34,10 +35,20 @@ class PostItResults {
 		return request;
 	}
 
-	// Runs the card again, skipping the backend's cache. Its settings may have
-	// just changed, so its rate is read again too.
+	// Runs the card again, skipping the backend's cache: the detail's refresh
+	// button, on plans that have it.
 	refresh(id: UUID): Result {
 		const request = postItsApi.execute(id, { fresh: true });
+		this.#rates.delete(id);
+		this.#publish(id, request);
+		return request;
+	}
+
+	// Asks for the card again after it was edited. The backend dropped its
+	// cached answer with the edit, so this is a normal execution (no `fresh`,
+	// which only some plans may ask for). Its rate is read again too.
+	rerun(id: UUID): Result {
+		const request = postItsApi.execute(id, { reload: true });
 		this.#rates.delete(id);
 		this.#publish(id, request);
 		return request;
@@ -104,6 +115,8 @@ class PostItResults {
 		if (!rate) {
 			rate = postItsApi
 				.get_settings(id)
+				// Cards that make no request (static, image, notes: no resource)
+				// never poll, not even at the plan's floor.
 				.then((s) => (s.resource ? s.rate : null))
 				.catch(() => {
 					// Asked again on the next watch.
@@ -119,7 +132,10 @@ class PostItResults {
 		const rate = await this.#rateOf(id);
 		if (rate === null || this.#watches.get(id) !== watch) return;
 
-		watch.timer = setTimeout(() => this.#tick(id, watch), nextDelay(rate));
+		watch.timer = setTimeout(
+			() => this.#tick(id, watch),
+			nextDelay(rate, boardPlan.limits.min_rate)
+		);
 	}
 
 	async #tick(id: UUID, watch: Watch) {

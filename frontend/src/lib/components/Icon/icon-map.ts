@@ -1,5 +1,6 @@
 import calendar from '$assets/icons/calendar.svg';
 import cardStack from '$assets/icons/card-stack.svg';
+import check from '$assets/icons/check.svg';
 import chevronDown from '$assets/icons/chevron-down.svg';
 import chevronUp from '$assets/icons/chevron-up.svg';
 import configuration from '$assets/icons/configuration.svg';
@@ -20,6 +21,7 @@ import plus from '$assets/icons/plus.svg';
 import refresh from '$assets/icons/refresh.svg';
 import rightArrow from '$assets/icons/right-arrow.svg';
 import search from '$assets/icons/search.svg';
+import sparkles from '$assets/icons/sparkles.svg';
 import sun from '$assets/icons/sun.svg';
 import trash from '$assets/icons/trash.svg';
 import users from '$assets/icons/users.svg';
@@ -27,6 +29,7 @@ import users from '$assets/icons/users.svg';
 export const iconMap: Record<string, string> = {
     calendar: calendar,
     'card-stack': cardStack,
+    check: check,
     'chevron-down': chevronDown,
     'chevron-up': chevronUp,
     configuration: configuration,
@@ -47,6 +50,7 @@ export const iconMap: Record<string, string> = {
     refresh: refresh,
     'right-arrow': rightArrow,
     search: search,
+    sparkles: sparkles,
     sun: sun,
     trash: trash,
     users: users

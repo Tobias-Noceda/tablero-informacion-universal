@@ -3,6 +3,7 @@ package users
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
@@ -14,6 +15,7 @@ var (
 	ErrInvalidName     = errors.New("invalid name")
 	ErrInvalidLocale   = errors.New("invalid_locale")
 	ErrNothingToUpdate = errors.New("no fields to update")
+	ErrInvalidPlan     = errors.New("invalid_plan")
 )
 
 type UserService struct {
@@ -110,4 +112,17 @@ func (srv *UserService) self(principal models.Principal, id uuid.UUID) (*models.
 	}
 
 	return user, nil
+}
+
+// SetPlan puts a user on a plan by hand, until expires when given: how a
+// platform admin comps an account, helps one out or tries a plan without
+// paying for it. Anyone else is Forbidden.
+func (srv *UserService) SetPlan(principal models.Principal, id uuid.UUID, plan models.Plan, expires *time.Time) error {
+	if !principal.Admin {
+		return ErrForbidden
+	}
+	if !plan.Valid() {
+		return ErrInvalidPlan
+	}
+	return srv.users.SetUserPlan(id, plan, expires)
 }

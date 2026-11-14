@@ -101,7 +101,7 @@ func TestUpdatePostIt_EditsAOneOffRequest(t *testing.T) {
 			return nil
 		},
 	}
-	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil)
+	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	err := svc.UpdatePostIt(member, uuid.New(), map[string]any{
 		"resource": "https://api.example.com/v2",

@@ -12,12 +12,20 @@
 	import { orgs } from '$stores/org.svelte';
 	import type { OrgMemberSummary, OrgRole } from '$types/api';
 	import type { PageProps } from './$types';
+	import { plan } from '$stores/plan.svelte';
+	import { canInvite, orgLimits } from '$lib/billing/can';
+	import PlanHint from '$components/PlanHint/PlanHint.svelte';
 
 	let { data }: PageProps = $props();
 
 	const org = $derived(data.org);
 	const isAdmin = $derived(org.role === 'admin');
 	const roles: OrgRole[] = ['admin', 'member'];
+
+	// An organization runs on its payer's plan, which the backend reports with
+	// it. Without that (an older backend) the form stays and the backend answers.
+	const limits = $derived(orgLimits(org, session.userId, plan.limits));
+	const canAdd = $derived(!limits || canInvite(limits, org.seats_used ?? org.members.length));
 
 	let name = $derived(org.name);
 	let email = $state('');
@@ -29,6 +37,7 @@
 		invalid_role: m['orgs.error_invalid_role'],
 		invalid_name: m['orgs.error_invalid_name'],
 		last_admin: m['orgs.error_last_admin'],
+		plan_limit: m['billing.limit.title'],
 		org_not_empty: m['orgs.error_org_not_empty'],
 		rate_limited: m['orgs.error_rate_limited']
 	};
@@ -168,7 +177,12 @@
 		</ul>
 	</section>
 
-	{#if isAdmin}
+	{#if isAdmin && limits && !canAdd}
+		<PlanHint
+			class="border-t border-main-border pt-4"
+			text={m['billing.hint.seats']({ count: org.members.length, max: limits.seats })}
+		/>
+	{:else if isAdmin}
 		<form class="flex flex-col gap-2 border-t border-main-border pt-4" onsubmit={add}>
 			<Input
 				id="member-email"

@@ -9,6 +9,9 @@
 	type StaticKind = 'api_key' | 'bearer' | 'basic';
 	import { m } from '$lib/paraglide/messages';
 	import { cn } from '$lib/utils';
+	import { boardPlan, plan } from '$stores/plan.svelte';
+	import { canAddOwnSecret, canAddSecret } from '$lib/billing/can';
+	import PlanHint from '$components/PlanHint/PlanHint.svelte';
 
 	let { board, onclose }: { board: UUID; onclose: () => void } = $props();
 
@@ -19,6 +22,26 @@
 	const scope = $derived(
 		tab === 'board' ? secretsApi.boardScope(board) : secretsApi.memberScope(board, session.userId)
 	);
+
+	// A board credential counts against whoever pays for the board, one of
+	// "only mine" against the caller. With no room left there is no form.
+	const canAdd = $derived(
+		tab === 'board'
+			? canAddSecret(boardPlan.secretsLeft)
+			: canAddOwnSecret(plan.limits, plan.usage?.secrets)
+	);
+	const limitHint = $derived(
+		tab === 'board'
+			? { count: boardPlan.limits.secrets, max: boardPlan.limits.secrets }
+			: { count: plan.usage?.secrets ?? plan.limits.secrets, max: plan.limits.secrets }
+	);
+
+	// What is left after a credential was added or removed.
+	function recount() {
+		void boardPlan.reload();
+		void plan.refreshUsage();
+	}
+	recount();
 
 	let secrets = $state<SecretMeta[]>([]);
 	let providers = $state<OAuthProviderStatus[]>([]);
@@ -117,6 +140,7 @@
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		}
+		recount();
 	}
 
 	async function remove(secret: SecretMeta) {
@@ -124,6 +148,7 @@
 		try {
 			await secretsApi.del(scope, secret.name);
 			await refresh();
+			recount();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		}
@@ -213,7 +238,9 @@
 		</ul>
 	{/if}
 
-	{#if drafting === null}
+	{#if !canAdd}
+		<PlanHint text={m['billing.hint.secrets'](limitHint)} />
+	{:else if drafting === null}
 		<div class="flex gap-2">
 			<Button variant="primary" onclick={() => (drafting = 'static')}>
 				{m['secrets.add_static']()}

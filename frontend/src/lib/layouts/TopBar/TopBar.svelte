@@ -25,6 +25,9 @@
 	import Switch from '$components/Switch/Switch.svelte';
 	import Drawer from '$components/Drawer/Drawer.svelte';
 	import { mobile } from '$stores/viewport.svelte';
+	import { boardSpace, plan } from '$stores/plan.svelte';
+	import { planName } from '$lib/billing/format';
+	import PlanHint from '$components/PlanHint/PlanHint.svelte';
 
 	// The organization comes from the URL; none means Personal.
 	const orgId = $derived(page.params.orgId);
@@ -33,6 +36,9 @@
 	const cardOpen = $derived(!!page.params.nodeId);
 
 	const visibleBoards = $derived($boardList.filter((board) => orgs.shows(board, orgId)));
+
+	// At the plan's board limit "Create new" gives way to a line saying so.
+	const space = $derived(boardSpace(orgId, $boardList));
 
 	// The profile and organization management pages are about no board.
 	const showsBoards = $derived(
@@ -112,10 +118,17 @@
 		onchange={selectBoard}
 	>
 		{#if !phone && (orgId === undefined || orgs.byId(orgId)?.role === 'admin')}
-			<button class={addButtonClass} onclick={() => setCreatingBoard(true)}>
-				<Icon name="plus" class="w-5 h-5 text-main-text mb-0.5 mr-1" />
-				<span class="min-w-0 flex-1 truncate">Create new</span>
-			</button>
+			{#if space.allowed}
+				<button class={addButtonClass} onclick={() => setCreatingBoard(true)}>
+					<Icon name="plus" class="w-5 h-5 text-main-text mb-0.5 mr-1" />
+					<span class="min-w-0 flex-1 truncate">Create new</span>
+				</button>
+			{:else}
+				<PlanHint
+					class="bg-sidebar px-3 py-2.5 text-main-text"
+					text={m['billing.hint.boards']({ count: space.count, max: space.max ?? space.count })}
+				/>
+			{/if}
 		{/if}
 	</Dropdown>
 {/snippet}
@@ -163,10 +176,14 @@
 
 	{#if session.user}
 		<div class="flex min-w-0 flex-row items-center gap-1">
-			<div class="relative flex w-fit min-w-0 max-w-[45vw] flex-col gap-1 md:max-w-none">
+			<!-- At least as wide as the menu below it (min-w-48), so a short name
+			     does not leave the menu sticking out past the button. -->
+			<div
+				class="relative flex w-fit min-w-0 max-w-[45vw] flex-col gap-1 md:min-w-48 md:max-w-none"
+			>
 				<button
 					class={cn(
-						'relative flex min-w-0 flex-row items-center gap-1 md:gap-2',
+						'relative flex w-full min-w-0 flex-row items-center justify-end gap-1 md:gap-2',
 						'px-2 py-1 md:px-4 md:py-2 rounded-md',
 						'hover:bg-main-hover transition-colors',
 						'text-main-text text-xs md:text-sm font-medium',
@@ -186,7 +203,19 @@
 						userDataOpen = !userDataOpen;
 					}}
 				>
-					<span class="min-w-0 max-w-40 truncate">{session.user.name}</span>
+					<span class="flex min-w-0 max-w-[45vw] flex-col items-start leading-tight md:max-w-40">
+						<span class="w-full truncate">{session.user.name}</span>
+						<span
+							class={cn(
+								'hidden rounded-full px-1.5 text-[10px] uppercase tracking-wide md:inline',
+								plan.name === 'free'
+									? 'bg-main-text/15 text-main-text/70'
+									: 'bg-main-text text-main'
+							)}
+						>
+							{planName(plan.name)}
+						</span>
+					</span>
 					<Avatar src={session.user.picture} class="h-5 w-5 shrink-0 md:h-6 md:w-6" />
 					<Icon
 						name={userDataOpen ? 'chevron-up' : 'chevron-down'}
@@ -215,10 +244,18 @@
 						<a
 							role="menuitem"
 							href={resolve('/orgs')}
-							class={cn(dropdownOptionClass(false), 'border-b border-main-border')}
+							class={dropdownOptionClass(false)}
 							onclick={() => (userDataOpen = false)}
 						>
 							{m['orgs.menu']()}
+						</a>
+						<a
+							role="menuitem"
+							href={resolve('/pricing')}
+							class={cn(dropdownOptionClass(false), 'border-b border-main-border')}
+							onclick={() => (userDataOpen = false)}
+						>
+							{m['billing.menu']()}
 						</a>
 						<div class={dropdownSectionClass}>{m['user_info.language.title']()}</div>
 						{#each locales as locale (locale)}

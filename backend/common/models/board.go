@@ -67,6 +67,13 @@ type Board struct {
 
 	// Role is the caller's role, filled in per response and never stored.
 	Role BoardRole `bson:"-" json:"role,omitempty"`
+
+	// What the plan of whoever pays for the board allows, how many people
+	// already reach it and how many more secrets the payer may store.
+	// Filled in when one board is read, never stored.
+	Limits      *Limits `bson:"-" json:"limits,omitempty"`
+	SeatsUsed   int     `bson:"-" json:"seats_used,omitempty"`
+	SecretsLeft *int    `bson:"-" json:"secrets_left,omitempty"`
 }
 
 // ExplicitRole is the role the board itself gives userID, before anything
@@ -94,4 +101,25 @@ func (b *Board) Everyone() []string {
 		users = append(users, member.User)
 	}
 	return users
+}
+
+// People are the distinct users who reach the board: its owner, its members
+// and, on an organization's board, everyone in org (nil for none).
+func (b *Board) People(org *Org) []string {
+	people := b.Everyone()
+	if org == nil {
+		return people
+	}
+
+	seen := make(map[string]bool, len(people))
+	for _, user := range people {
+		seen[user] = true
+	}
+	for _, member := range org.Members {
+		if !seen[member.User] {
+			seen[member.User] = true
+			people = append(people, member.User)
+		}
+	}
+	return people
 }

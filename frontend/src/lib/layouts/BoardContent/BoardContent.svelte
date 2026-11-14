@@ -20,6 +20,7 @@
 		setSidebar
 	} from '$stores/sidebar';
 	import { refreshBoards } from '$stores/boards';
+	import { orgs } from '$stores/org.svelte';
 	import { mobile } from '$stores/viewport.svelte';
 
 	import ShareDialog from '$layouts/Share/ShareDialog.svelte';
@@ -71,6 +72,7 @@
 	const onDeleteBoard = async () => {
 		await deleteBoard(data.boardId);
 		await refreshBoards();
+		void orgs.refresh().catch(() => {});
 		await goto(resolve(landingPath(orgId)));
 		setConfiguringBoard(false);
 	}

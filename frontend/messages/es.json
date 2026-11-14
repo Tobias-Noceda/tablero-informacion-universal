@@ -414,5 +414,123 @@
 		"missing": "Esta tarjeta todavía no tiene la dirección de una imagen.",
 		"not_an_image": "Esta dirección no es una imagen:",
 		"open_original": "Abrir el original"
+	},
+	"billing": {
+		"menu": "Planes",
+		"plan": {
+			"free": "Free",
+			"pro": "Pro",
+			"max": "Max"
+		},
+		"hint": {
+			"see_plans": "Ver planes",
+			"boards": "{count} de {max} tableros",
+			"nodes": "{count} de {max} tarjetas",
+			"seats": "{count} de {max} personas",
+			"orgs": "{count} de {max} organizaciones",
+			"orgs_unavailable": "El plan actual no incluye crear organizaciones",
+			"templates": "{count} de {max} tipos de tarjeta",
+			"secrets": "{count} de {max} credenciales",
+			"tokens": "El plan actual no incluye tokens de acceso ni el servidor MCP",
+			"read_only": "En el plan Free las personas que agregues solo pueden ver"
+		},
+		"limit": {
+			"title": "Límite del plan alcanzado",
+			"generic": "El plan actual no permite esta acción.",
+			"orgs": "El plan permite {max} organizaciones.",
+			"boards": "El plan permite {max} tableros por espacio.",
+			"seats": "El plan permite {max} personas, incluido el dueño.",
+			"nodes": "El plan permite {max} tarjetas por tablero.",
+			"templates": "El plan permite {max} tipos de tarjeta en este lugar.",
+			"secrets": "El plan permite {max} credenciales almacenadas.",
+			"groups": "El plan permite {max} grupos de credenciales.",
+			"force_refresh": "El plan no incluye la actualización manual.",
+			"api_access": "El plan no incluye tokens de acceso ni el servidor MCP.",
+			"editors": "En este plan los tableros se comparten solo en lectura."
+		},
+		"profile": {
+			"upgrade": "Pasar a Pro",
+			"unlocks": "Pro habilita editar en equipo, organizaciones y acceso por API.",
+			"manage": "Gestionar plan",
+			"title": "Plan",
+			"current": "Plan actual: {plan}",
+			"next_charge": "Próximo cobro el {date}: {amount}",
+			"pending_plan": "Cambia a {plan} con el próximo cobro.",
+			"pending": "El pago está pendiente de confirmación.",
+			"paused": "Tu suscripción está pausada. Reanudala en Mercado Pago para conservar el plan.",
+			"ends": "El plan {plan} sigue activo hasta el {date}.",
+			"change": "Cambiar de plan",
+			"see_plans": "Ver planes",
+			"cancel": "Dar de baja la suscripción",
+			"cancel_title": "¿Dar de baja la suscripción?",
+			"cancel_note_until": "No se realizan más cobros. El plan {plan} sigue activo hasta el {date}; después la cuenta vuelve a Free. No se elimina nada: solo se bloquea la creación de elementos nuevos por encima de los límites de Free.",
+			"cancel_note": "No se realizan más cobros. El plan sigue activo hasta el final del período ya pagado; después la cuenta vuelve a Free. No se elimina nada: solo se bloquea la creación de elementos nuevos por encima de los límites de Free.",
+			"cancel_failed": "No se pudo dar de baja la suscripción. Es posible intentarlo de nuevo.",
+			"canceled": "La suscripción se dio de baja."
+		},
+		"return": {
+			"title": "Suscripción",
+			"checking": "Verificando el pago…",
+			"active": "El plan {plan} está activo.",
+			"pending": "El pago todavía no está confirmado. El plan se activa en cuanto Mercado Pago lo confirme; puede demorar unos minutos.",
+			"failed": "La suscripción no se completó. No se cambió ningún plan.",
+			"home": "Volver a los tableros",
+			"retry": "Ver planes"
+		},
+		"interval": {
+			"seconds": "{seconds} s",
+			"minutes": "{minutes} min",
+			"minutes_seconds": "{minutes} min {seconds} s"
+		}
+	},
+	"pricing": {
+		"hero": "Elegí el plan que se adapta a tu forma de trabajar",
+		"popular": "Más elegido",
+		"your_plan": "Tu plan",
+		"month": "/mes",
+		"title": "Planes",
+		"subtitle": "El uso básico es gratuito. Los planes pagos se cobran por mes mediante Mercado Pago y se pueden dar de baja en cualquier momento.",
+		"loading": "Cargando los planes…",
+		"load_failed": "No se pudieron cargar los planes. Es posible intentarlo más tarde.",
+		"per_month": "por mes",
+		"price_free": "Gratis",
+		"price_ars": "Se cobra {amount} por mes",
+		"current": "Plan actual",
+		"pending_change": "Desde el próximo cobro",
+		"sign_in": "Iniciar sesión",
+		"to_app": "Volver a los tableros",
+		"register": "Crear una cuenta",
+		"choose": "Elegir {plan}",
+		"switch": "Cambiar a {plan}",
+		"payer_email": "Correo de la cuenta de Mercado Pago que va a pagar",
+		"payer_email_hint": "Puede ser distinto del correo de esta cuenta. Mercado Pago pide iniciar sesión con él para autorizar el cobro mensual.",
+		"continue": "Continuar a Mercado Pago",
+		"back": "Volver",
+		"paused": "Tu suscripción está pausada. Reanudala en Mercado Pago antes de cambiar de plan.",
+		"switched_now": "El plan ahora es {plan}.",
+		"switched_later": "El plan cambia a {plan} con el próximo cobro.",
+		"feature": {
+			"orgs_none": "Solo espacio personal",
+			"orgs": "{count} organizaciones propias",
+			"boards": "{count} tableros por espacio",
+			"seats_none": "Los tableros no se comparten",
+			"seats": "Hasta {count} personas por tablero u organización",
+			"nodes": "{count} tarjetas por tablero",
+			"templates_user": "{count} tipos de tarjeta propios",
+			"templates_shared": "{board} tipos de tarjeta por tablero y {org} por organización",
+			"secrets": "{count} credenciales almacenadas",
+			"groups": "{count} grupos de credenciales",
+			"min_rate": "Los datos de cada tarjeta se actualizan como mucho una vez cada {interval}",
+			"force_refresh": "Actualización manual de una tarjeta",
+			"api_access": "Servidor MCP y tokens de acceso",
+			"seats_read_only": "Compartí con hasta {count} personas, solo lectura"
+		},
+		"error": {
+			"invalid_plan": "No es posible suscribirse a ese plan.",
+			"invalid_email": "El correo ingresado no es válido.",
+			"already_subscribed": "Esta cuenta ya tiene una suscripción. Se puede cambiar desde el perfil.",
+			"billing_disabled": "Los pagos no están disponibles en este momento.",
+			"unknown": "No se pudo iniciar la suscripción. Es posible intentarlo de nuevo."
+		}
 	}
 }
