@@ -2,6 +2,9 @@
 	import '$layouts/BoardContent/index.css';
 	import type { Board } from '$types/api';
 	import { m } from '$lib/paraglide/messages';
+	import { getLocale } from '$lib/paraglide/runtime';
+	import { wellKnowns } from '$stores/well-knowns.svelte';
+	import * as templatesApi from '$services/postit-templates';
 	import { borderColorOf, borderPixels, cardFill, cardText, lookOf } from '$lib/cards/style';
 	import { resolveStyle, strokeColor, strokeWidth } from '$lib/strands/style';
 
@@ -17,6 +20,40 @@
 	const PAD = 40;
 	// The preview is scaled down, so lines are drawn thicker than on the canvas.
 	const LINE_SCALE = 3;
+	// About how wide a bold character of the label is, to keep it inside its card.
+	const CHAR_W = 15;
+
+	// Each card is labelled with its type: the catalogue's name, its post-it
+	// template's (loaded for this board only when one of its cards uses one),
+	// or a short word for a card with its own request.
+	$effect(() => {
+		wellKnowns.ensure().catch(() => {});
+	});
+
+	let templateNames = $state<Record<string, string>>({});
+	const usesTemplates = $derived((board.postits ?? []).some((c) => c.type?.startsWith('custom_')));
+	$effect(() => {
+		if (!usesTemplates) return;
+		let current = true;
+		templatesApi.forBoard(board.id).then(
+			(list) => {
+				if (current) templateNames = Object.fromEntries(list.map((t) => [t.key, t.name]));
+			},
+			() => {} // Shown as the generic template label.
+		);
+		return () => (current = false);
+	});
+
+	function typeName(type: string | undefined): string {
+		if (!type) return m['landing.one_off_label']();
+		if (type.startsWith('custom_')) return templateNames[type] ?? m['landing.template_label']();
+		return wellKnowns.list.find((wk) => wk.key === type)?.[`name_${getLocale()}`] ?? type;
+	}
+
+	function fit(text: string, width: number): string {
+		const max = Math.max(4, Math.floor((width - 32) / CHAR_W));
+		return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+	}
 
 	const cards = $derived(
 		(board.postits ?? []).map((c) => {
@@ -25,6 +62,7 @@
 			const borderWidth = borderPixels(look.border_width) * LINE_SCALE;
 			return {
 				id: c.id,
+				label: typeName(c.type),
 				x: c.position.x,
 				y: c.position.y,
 				w: c.width || CARD_W,
@@ -111,7 +149,7 @@
 				class="fill-main-text"
 				style:fill={card.text}
 			>
-				{`{{${m['landing.title_placeholder']()}}}`}
+				{fit(card.label, card.w)}
 			</text>
 		{/each}
 	</svg>
