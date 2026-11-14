@@ -1,6 +1,7 @@
 package executer
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -328,5 +329,72 @@ func TestExecute_DoesNotMutateSharedResource(t *testing.T) {
 		if seen[i] != want[i] {
 			t.Errorf("request %d: server saw %q, want %q", i+1, seen[i], want[i])
 		}
+	}
+}
+
+func TestExecute_PostSendsTheJSONBody(t *testing.T) {
+	allowLoopback(t)
+	var method, contentType, apiKey string
+	var received map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method, contentType, apiKey = r.Method, r.Header.Get("Content-Type"), r.Header.Get("X-Api-Key")
+		_ = json.NewDecoder(r.Body).Decode(&received)
+		fmt.Fprint(w, `{"itineraries":[{"price":{"amount":2061}}]}`)
+	}))
+	defer srv.Close()
+
+	resource, _ := url.Parse(srv.URL)
+	postit := &models.PostIts{
+		Resource: resource,
+		Request: models.Request{
+			Method:  http.MethodPost,
+			Headers: map[string]string{"X-Api-Key": "$IGNAV"},
+			Body:    `{"origin":"EZE","destination":"NRT","partner":"$PARTNER"}`,
+		},
+		Params:   map[string]string{"$IGNAV": "key-123", "$PARTNER": `pa"rt`},
+		Response: "json",
+		Query:    map[string]string{"price": ".itineraries[0].price.amount"},
+	}
+
+	res, err := New().Execute(postit)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if method != http.MethodPost || contentType != "application/json" || apiKey != "key-123" {
+		t.Errorf("request = %s %q key %q, want a JSON POST with the credential", method, contentType, apiKey)
+	}
+	if received["origin"] != "EZE" || received["partner"] != `pa"rt` {
+		t.Errorf("body = %v, want the credential in place, as one string", received)
+	}
+	if res.(map[string]any)["price"] != 2061.0 {
+		t.Errorf("result = %v", res)
+	}
+	if !strings.Contains(postit.Request.Body, "$PARTNER") {
+		t.Errorf("the card's own body changed: %s", postit.Request.Body)
+	}
+}
+
+func TestExecute_PostKeepsTheCardsContentType(t *testing.T) {
+	allowLoopback(t)
+	var contentType string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		contentType = r.Header.Get("Content-Type")
+		fmt.Fprint(w, `{"ok":true}`)
+	}))
+	defer srv.Close()
+
+	resource, _ := url.Parse(srv.URL)
+	_, err := New().Execute(&models.PostIts{
+		Resource: resource,
+		Request: models.Request{Method: http.MethodPost, Body: `{"a":1}`,
+			Headers: map[string]string{"Content-Type": "application/vnd.api+json"}},
+		Response: "json",
+		Query:    map[string]string{"ok": ".ok"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if contentType != "application/vnd.api+json" {
+		t.Errorf("Content-Type = %q, want the card's own", contentType)
 	}
 }

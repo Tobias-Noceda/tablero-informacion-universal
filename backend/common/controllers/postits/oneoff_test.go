@@ -44,8 +44,11 @@ func TestCreatePostIt_OneOff(t *testing.T) {
 func TestCreatePostIt_OneOffRefusals(t *testing.T) {
 	cases := map[string]string{
 		"file scheme": oneOffBody(uuid.New(), "file:///etc/passwd", "GET", `{"fact":".fact"}`),
-		"post":        oneOffBody(uuid.New(), "https://catfact.ninja/fact", "POST", `{"fact":".fact"}`),
-		"no outputs":  oneOffBody(uuid.New(), "https://catfact.ninja/fact", "GET", `{}`),
+		"put":         oneOffBody(uuid.New(), "https://catfact.ninja/fact", "PUT", `{"fact":".fact"}`),
+		"post body that is not JSON": `{"board":"` + uuid.NewString() + `","title":{"text":"x","vars":false},` +
+			`"resource":"https://ignav.com/api/fares/one-way","request":{"method":"POST","body":"origin=EZE"},` +
+			`"response":"json","query":{"p":".p"},"rate":600}`,
+		"no outputs": oneOffBody(uuid.New(), "https://catfact.ninja/fact", "GET", `{}`),
 	}
 	for name, body := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -126,5 +129,27 @@ func TestCreatePostIt_OneOffRefusesAMalformedResource(t *testing.T) {
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("%s: status = %d, want 400", name, w.Code)
 		}
+	}
+}
+
+func TestCreatePostIt_OneOffPost(t *testing.T) {
+	var stored *models.PostIts
+	db := &mocks.MockDB{
+		CreatePostItFn: func(p *models.PostIts, _ models.BoardPostItTitle, _ string, _ models.Position) (*models.PostIts, error) {
+			stored = p
+			return p, nil
+		},
+	}
+	body := `{"board":"` + uuid.NewString() + `","title":{"text":"{{price}} USD","vars":true},` +
+		`"resource":"https://ignav.com/api/fares/one-way",` +
+		`"request":{"method":"post","headers":{"X-Api-Key":"$IGNAV"},"body":"{\"origin\":\"EZE\",\"destination\":\"NRT\"}"},` +
+		`"response":"json","query":{"price":".itineraries[0].price.amount"},"rate":3600}`
+
+	w := do(setupRouter(db, nil, nil), http.MethodPost, "/post-its", body)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201 (body: %s)", w.Code, w.Body.String())
+	}
+	if stored.Request.Method != "POST" || stored.Request.Body != `{"origin":"EZE","destination":"NRT"}` {
+		t.Errorf("stored request = %+v, want the POST and its body", stored.Request)
 	}
 }

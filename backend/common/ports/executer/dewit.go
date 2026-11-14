@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/ports/safehttp"
@@ -45,18 +46,26 @@ func (e *DewIt) Execute(postit *models.PostIts) (any, error) {
 		}
 	}
 
+	// A POST's JSON body takes the same values, string by string.
+	body := ""
+	if postit.Request.Method == http.MethodPost && postit.Request.Body != "" {
+		body, err = models.ReplaceBodyStrings(postit.Request.Body, postit.Params)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), safehttp.REQUEST_TIMEOUT)
 	defer cancel()
 
-	res, err := e.request(ctx, postit.Resource, postit.Request.Method, postit.Request.Queries, postit.Request.Headers)
+	res, err := e.request(ctx, postit.Resource, postit.Request.Method, postit.Request.Queries, postit.Request.Headers, body)
 	if err != nil {
 		return nil, err
 	}
 
 	defer res.Body.Close()
-	body := io.LimitReader(res.Body, safehttp.MAX_PAYLOAD_SIZE)
 
-	return parser.parse(postit, body)
+	return parser.parse(postit, io.LimitReader(res.Body, safehttp.MAX_PAYLOAD_SIZE))
 }
 
 func (*DewIt) getParser(postit *models.PostIts) (parser, error) {
@@ -80,7 +89,7 @@ func (*DewIt) populate(input, out map[string]string) error {
 	return nil
 }
 
-func (*DewIt) request(ctx context.Context, resource *url.URL, method string, queries, headers map[string]string) (*http.Response, error) {
+func (*DewIt) request(ctx context.Context, resource *url.URL, method string, queries, headers map[string]string, body string) (*http.Response, error) {
 	target := *resource
 
 	q := target.Query()
@@ -89,13 +98,21 @@ func (*DewIt) request(ctx context.Context, resource *url.URL, method string, que
 	}
 	target.RawQuery = q.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, method, target.String(), nil)
+	var payload io.Reader
+	if body != "" {
+		payload = strings.NewReader(body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, target.String(), payload)
 	if err != nil {
 		return nil, err
 	}
 
 	for k, v := range headers {
 		req.Header.Add(k, v)
+	}
+	if body != "" && req.Header.Get("Content-Type") == "" {
+		req.Header.Set("Content-Type", "application/json")
 	}
 
 	res, err := safehttp.Client().Do(req)
