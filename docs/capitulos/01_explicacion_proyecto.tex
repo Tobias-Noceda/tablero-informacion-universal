@@ -1,0 +1,134 @@
+% !TEX root = ../main.tex
+\chapter{Explicación del Proyecto}
+
+\section{Contexto}
+En la actualidad, la información relevante para la toma de decisiones se encuentra distribuida en múltiples plataformas y servicios: precios de mercado, estados de sistemas, tickets de soporte, repositorios de código, datos de viajes, entre otros. Esta dispersión obliga a los usuarios a alternar constantemente entre herramientas, perdiendo tiempo y contexto en el proceso. Si bien existen soluciones de organización como Notion, Trello o dashboards personalizados, ninguna combina la flexibilidad visual de un tablero libre con la capacidad de consumir datos en tiempo real de fuentes externas arbitrarias.
+
+El problema afecta a perfiles de usuario muy distintos. Una persona que sigue sus finanzas consulta a diario cotizaciones, tasas y saldos en sitios diferentes; quien planifica un viaje compara precios de vuelos, alojamientos y el pronóstico del clima del destino; un equipo de desarrollo controla el estado de sus repositorios, issues y despliegues; y, cada vez con mayor frecuencia, los usuarios de asistentes de inteligencia artificial necesitan que esos asistentes recuerden información y la mantengan organizada entre conversaciones.
+
+Se trata de información dinámica, que cambia en cuestión de minutos u horas; heterogénea, ya que proviene de fuentes con formatos distintos; dispersa en servicios que exponen cada uno su propia API. Además, en muchos casos, es privada, por lo que acceder a ella requiere credenciales o la autorización del usuario. Hoy, la forma habitual de seguirla consiste en abrir varias pestañas o aplicaciones, refrescarlas manualmente y copiar los datos relevantes a una nota o planilla. Este proceso consume tiempo, produce datos que quedan desactualizados en cuanto se copian y no permite ver las relaciones entre ellos, como el efecto de la cotización del dólar sobre el presupuesto de un viaje.
+
+Para resolver este problema, hace falta un espacio que reúna en un mismo lugar información de fuentes diversas, la mantenga actualizada sin intervención del usuario y permita expresar las relaciones entre los datos.
+
+El proyecto surge en este contexto como una herramienta web que unifica la organización visual de información con la actualización automática de datos provenientes de APIs externas. Inspirado en la metáfora del pizarrón de corcho, popularizada en series policiales donde las tarjetas se conectan con hilos para revelar relaciones, el sistema permite al usuario construir tableros inteligentes donde cada tarjeta representa una fuente de información viva, y los hilos entre ellas expresan relaciones, dependencias o secuencias temporales. Los tableros pueden compartirse para trabajar sobre ellos en tiempo real, y un servidor MCP permite que los agentes de inteligencia artificial los utilicen para guardar y consultar sus propias memorias, que el usuario puede ver y editar como cualquier otra tarjeta.
+
+\section{Objetivo}
+El objetivo general del proyecto es desarrollar una aplicación web que permita reunir en tableros visuales información proveniente de fuentes externas, mantenerla actualizada de forma automática y expresar las relaciones entre los datos, ofreciendo además a los agentes de inteligencia artificial un medio para gestionar sus memorias sobre la misma herramienta.
+
+Para alcanzarlo, se plantearon los siguientes objetivos específicos:
+\begin{itemize}
+  \item Construir un lienzo en el que las tarjetas puedan crearse, moverse y conectarse mediante hilos.
+  \item Ofrecer un catálogo de integraciones predefinidas que no requieran conocimientos técnicos y permitir conectar tarjetas a APIs personalizadas.
+  \item Actualizar el contenido de cada tarjeta de forma automática, según la frecuencia configurada.
+  \item Almacenar de forma segura las credenciales necesarias para acceder a fuentes privadas.
+  \item Permitir compartir tableros y reflejar en tiempo real los cambios de todos sus miembros.
+  \item Exponer los tableros a los agentes de inteligencia artificial mediante un servidor MCP, para que gestionen sus memorias como tarjetas.
+\end{itemize}
+
+\section{Estado del arte}
+Existen en el mercado distintas herramientas que resuelven parte del problema descrito. A continuación se presentan las principales, y la Tabla~\ref{tab:comparacion_herramientas} las compara según un mismo conjunto de criterios: tipo de tecnología, problema que resuelve, tipo de solución, integración de datos dinámicos y representación explícita de relaciones.
+
+\begin{itemize}
+  \item \textbf{Notion:} Permite generar wikis estructuradas con bases de datos relacionales para poder relacionarlas. Excelentes para documentación jerarquizada y colaboración en equipo. Las relaciones entre nodos (wikis) existen, pero son fundamentalmente lineales, no se ven en un grafo de relaciones gráfico y explícito, está implícito en links que permiten la navegación sin tener todo el contexto de relaciones. No tienen actualización dinámica de datos en tiempo real \cite{notion_about, morton2025}.
+  \item \textbf{Miro, FigJam, Mural:} Pizarras visuales colaborativas infinitas. Excelentes para brainstorming \cite{mural_brainstorming} y diagramación libre, pero los nodos son formas estáticas y muestran toda la información en pantalla, saturando la visual y perdiendo el foco en las relaciones. No tienen integración nativa con datos en vivo ni semántica de grafo real \cite{miro_about, yamashita2021, morton2025}.
+  \item \textbf{Kumu, Gephi:} Son herramientas de visualización y análisis de grafos \cite{wills2026}. Gephi es especialmente potente para análisis de redes, pero es un software orientado a análisis de datos estáticos \cite{ouestware2025}. Kumu permite grafos dinámicos pero sin integración fluida con APIs externas \cite{kumu_manifesto}.
+  \item \textbf{Trello:} Plataforma de gestión de tareas basada en el modelo Kanban, organizada en tableros, listas y tarjetas. Es excelente para el seguimiento de flujos de trabajo y la colaboración en equipo gracias a su simplicidad. Sin embargo, su estructura es rígidamente columnar: las tarjetas se agrupan en listas secuenciales y no existe la noción de relaciones explícitas ni de hilos entre ellas, por lo que no permite representar dependencias o conexiones arbitrarias en un grafo. Si bien admite la incorporación de automatizaciones y extensiones (Power-Ups), las tarjetas son contenedores de información estática y no ofrecen actualización dinámica de datos en tiempo real desde fuentes externas \cite{trello_about}.
+  \item \textbf{Personal knowledge graphs:} Los grafos de información personal (PKGs) son una representación estructurada de información sobre entidades relacionadas personalmente con un individuo, como personas, lugares, objetos y eventos \cite{velitchkov2023}. Aunque hay un abundante número de trabajos desarrollados alrededor del tema, la mayoría de los trabajos se limitan a un estudio teórico del tema, sin expandir en la posibilidad de implementarse como una herramienta digital o producto, o limitándose a un número finito de entidades, como personas, lugares y eventos \cite{new2026, pavlyshyn2024, rasmus2024}.
+  \item \textbf{Inteligencia artificial:} En 2019, dos ingenieros de Google publicaron un artículo sobre los PKG, en el cual incluían ilustraciones de escenarios donde un asistente virtual podría beneficiarse del uso de un grafo de conocimiento para así contestar consultas complejas de manera más personalizada y con mayor precisión. Hace 7 años tal tecnología se consideraba ciencia ficción, pero con los avances que vio el mundo de la inteligencia artificial en la última década, estos ``ejemplos motivacionales'' pasaron de ser ideas de películas a la tecnología del presente \cite{balog2019}.
+\end{itemize}
+
+\begin{table}[H]
+  \centering
+  \footnotesize
+  \setlength{\tabcolsep}{4.5pt}
+  \renewcommand{\arraystretch}{1.35}
+  \newcolumntype{L}[1]{>{\raggedright\arraybackslash\hsize=#1\hsize}X}
+  \rowcolors{2}{gray!7}{white}
+  \begin{tabularx}{\textwidth}{
+    >{\bfseries}L{0.95}
+    L{1.05}
+    L{0.95}
+    L{1.05}
+    L{1.00}
+    L{1.00}
+  }
+    \toprule
+    \rowcolor{gray!18}
+    \textbf{Herramienta} & \textbf{Tecnología} & \textbf{Problema que resuelve} & \textbf{Tipo de solución} & \textbf{Datos dinámicos} & \textbf{Relaciones explícitas} \\
+    \midrule
+    Notion & Web, escritorio y móvil (SaaS) & Individual y de equipos & Registro y documentación & No & Implícitas, mediante enlaces \\
+    Miro, FigJam, Mural & Web y escritorio (SaaS) & De equipos & Visualización libre & No & Conectores sin semántica \\
+    Kumu, Gephi & Web (Kumu) y escritorio (Gephi) & Análisis de redes & Visualización y análisis & No & Sí, como grafo \\
+    Trello & Web, escritorio y móvil (SaaS) & De equipos y proyectos & Organización de tareas & Mediante extensiones & No \\
+    PKG & Investigación académica & Individual & Organización del conocimiento & No & Sí, como grafo \\
+    \midrule
+    \rowcolor{blue!8}
+    Este proyecto & Web (SaaS) & Individual y de equipos & Visualización y organización & Sí, desde APIs externas & Sí, mediante hilos \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Comparación de herramientas según un criterio unificado}
+  \label{tab:comparacion_herramientas}
+\end{table}
+
+\section{Inteligencia Artificial y Memoria de Agentes}
+Los asistentes basados en LLMs no conservan memoria entre conversaciones, por lo que todo lo que conocen del usuario debe incluirse en el contexto de cada consulta. Para resolverlo se propusieron distintas técnicas, como la generación aumentada por recuperación (RAG), que agrega al contexto fragmentos relevantes de una base \cite{lewis2020}, la gestión jerárquica de la memoria, que mueve información entre el contexto y un almacenamiento de largo plazo \cite{packer2023}, y las memorias basadas en grafos de conocimiento, que retoman la idea de los PKG \cite{rasmussen2025}.
+
+Por su parte, el Model Context Protocol (MCP) define una forma estándar para que un agente acceda a herramientas y fuentes de datos externas \cite{mcp_intro}.
+
+En la mayoría de estas soluciones, la memoria queda dentro del servicio de cada proveedor y el usuario tiene pocas posibilidades de revisarla o corregirla. El proyecto propone representar las memorias del agente como tarjetas de un tablero, que el usuario puede ver y editar, mientras el agente las gestiona a través de un servidor MCP.
+
+Con este contexto, surge este proyecto que viene a solucionar las limitaciones que tiene cada uno de estos productos o estudios preexistentes, haciendo foco en las relaciones e interacciones entre nodos, una interfaz visual agradable e intuitiva para representarlas y, principalmente, en la información dinámica y en tiempo real con el objetivo de que el tablero represente siempre la realidad. A su vez, se investiga la posibilidad de integrar el sistema para que agentes digitales puedan gestionar sus propias memorias en un PKG, permitiendo que los usuarios ingresen al cerebro de sus asistentes digitales y poder administrarlos con completa flexibilidad en los detalles.
+
+\section{Justificación}
+La propuesta se justifica en tres ejes:
+
+\textbf{Utilidad práctica.} Los casos de uso del sistema abarcan perfiles de usuario muy diversos: desde un viajero que quiere consolidar precios de vuelos, hoteles y atracciones en un único tablero visual, hasta un equipo de desarrollo que necesita visualizar el estado de sus issues, PRs y dependencias en tiempo real. Esta versatilidad lo diferencia de soluciones de nicho y lo posiciona como una herramienta de propósito general.
+
+\textbf{Relevancia tecnológica.} La incorporación del protocolo MCP (Model Context Protocol) como mecanismo de integración coloca al sistema en la vanguardia de las herramientas de productividad, permitiendo conectar no solo APIs REST tradicionales sino también servidores de contexto para modelos de lenguaje. Esto abre la puerta a casos de uso avanzados como la organización de memorias y contexto para sistemas de IA \cite{mcp_intro}.
+
+\textbf{Complejidad técnica apropiada.} El proyecto involucra desafíos relevantes para un trabajo final de Ingeniería Informática: diseño de un sistema extensible para integraciones heterogéneas, manejo de autenticación y credenciales de terceros, sincronización de datos en tiempo real, y construcción de una interfaz interactiva y altamente personalizable.
+
+\section{Glosario}
+\begin{description}[style=nextline,leftmargin=1.5em]
+  \item[AES-GCM, o Advanced Encryption Standard en modo Galois/Counter:] Algoritmo de cifrado simétrico autenticado, que garantiza la confidencialidad y la integridad de los datos.
+  \item[ALB, o Application Load Balancer:] Balanceador de carga que distribuye las peticiones entrantes entre los servicios según la ruta solicitada.
+  \item[API, o Application Program Interface:] Interfaz de métodos invocables de un servicio.
+  \item[AWS, o Amazon Web Services:] Plataforma de servicios de computación en la nube de Amazon.
+  \item[BSON, o Binary JSON:] Formato binario en el que MongoDB almacena los documentos.
+  \item[CI/CD, o Continuous Integration / Continuous Delivery:] Práctica de integrar, probar y desplegar automáticamente cada cambio en el código.
+  \item[CORS, o Cross-Origin Resource Sharing:] Mecanismo del navegador que regula las peticiones entre sitios de distinto origen.
+  \item[CRUD, o Create, Read, Update, Delete:] Operaciones asociadas a las entidades de un dominio.
+  \item[CSS, o Cascading Style Sheets:] Lenguaje que define la presentación visual de las páginas web.
+  \item[EdDSA, o Edwards-curve Digital Signature Algorithm:] Algoritmo de firma digital de curva elíptica, utilizado en su variante Ed25519 para firmar los tokens de acceso.
+  \item[HCI, o Human-Computer Interaction:] Disciplina que estudia la interacción entre las personas y los sistemas informáticos.
+  \item[HTML, o HyperText Markup Language:] Lenguaje de marcado que define la estructura de las páginas web.
+  \item[HTTP, o HyperText Transfer Protocol:] Protocolo estándar para la comunicación entre dispositivos.
+  \item[HTTPS, o HTTP Secure:] Versión cifrada del protocolo HTTP.
+  \item[IA, o Inteligencia Artificial:] Campo de la informática que desarrolla sistemas capaces de realizar tareas que requieren capacidades propias de la inteligencia humana.
+  \item[JSON, o JavaScript Object Notation:] Formato de texto liviano para el intercambio de datos estructurados.
+  \item[JWT, o JSON Web Token:] Formato estándar de token firmado que transporta la identidad de un usuario entre servicios.
+  \item[KEK, o Key Encryption Key:] Clave maestra utilizada para cifrar las claves de datos de cada ámbito.
+  \item[LLM, o Large Language Model:] Modelo de lenguaje de gran tamaño, entrenado sobre grandes volúmenes de texto, en el que se basan los asistentes de inteligencia artificial actuales.
+  \item[MCP, o Model Context Protocol:] Protocolo estandarizado para la comunicación de agentes con servicios, mediante el uso de herramientas, prompts o funciones.
+  \item[MVP, o Minimum Viable Product:] Es una instancia del desarrollo del producto, en el cual ya se satisfacen los requisitos esenciales para lanzar el mismo al mercado.
+  \item[OAuth2, u Open Authorization 2.0:] Protocolo que permite a una aplicación acceder a recursos de un usuario en otro servicio sin conocer su contraseña.
+  \item[OIDC, u OpenID Connect:] Capa de identidad construida sobre OAuth2, utilizada para el inicio de sesión con Google.
+  \item[OWASP, u Open Worldwide Application Security Project:] Fundación que publica guías y buenas prácticas de seguridad para aplicaciones web.
+  \item[PKG, o Personal Knowledge Graph:] Tablero de gestión y visualización de información, administrado por el usuario.
+  \item[PR, o Pull Request:] Solicitud para incorporar un conjunto de cambios a la rama principal de un repositorio, que habilita su revisión previa.
+  \item[RAG, o Retrieval-Augmented Generation:] Técnica que agrega al contexto de un modelo de lenguaje información recuperada de una base documental.
+  \item[REST, o Representational State Transfer:] Estilo de arquitectura para APIs web basado en recursos y en los métodos del protocolo HTTP.
+  \item[SaaS, o Software as a Service:] Modelo de distribución en el que el software se ofrece como un servicio accesible desde internet.
+  \item[SHA-256, o Secure Hash Algorithm de 256 bits:] Función de hash criptográfica utilizada para almacenar los tokens personales sin guardar su valor.
+  \item[SPA, o Single Page Application:] Aplicación web que carga una única página y actualiza su contenido de forma dinámica.
+  \item[SSG, o Static Site Generation:] Generación de las páginas de un sitio en tiempo de compilación.
+  \item[SSR, o Server-Side Rendering:] Renderizado de las páginas en el servidor antes de enviarlas al navegador.
+  \item[STUN, o Session Traversal Utilities for NAT:] Protocolo que permite a dos navegadores descubrir sus direcciones públicas para establecer una conexión directa.
+  \item[TTL, o Time To Live:] Tiempo de vida de un dato almacenado en caché antes de ser descartado.
+  \item[UML, o Unified Modeling Language:] Lenguaje estándar de modelado para especificar y documentar sistemas de software.
+  \item[URL, o Uniform Resource Locator:] Dirección que identifica un recurso en internet.
+  \item[UUID, o Universally Unique Identifier:] Identificador de 128 bits que se considera único sin necesidad de una coordinación central.
+  \item[UX, o User Experience:] Es la percepción, emoción, sentimientos y reacciones que experimenta el usuario al interactuar con el producto.
+  \item[WAF, o Web Application Firewall:] Firewall que filtra el tráfico HTTP para proteger una aplicación web.
+  \item[WebRTC, o Web Real-Time Communication:] Tecnología que permite la comunicación directa entre navegadores.
+\end{description}

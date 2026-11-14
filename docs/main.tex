@@ -1,0 +1,214 @@
+\documentclass[11pt,a4paper,oneside]{report}
+
+% --- Codificación e idioma ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish,es-tabla,es-nodecimaldot]{babel}
+\usepackage{csquotes}
+
+% --- Tipografía y microtipografía ---
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% --- Márgenes y geometría ---
+\usepackage[
+  top=2.5cm,
+  bottom=2.5cm,
+  left=3.0cm,
+  right=2.5cm
+]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\setlength{\parskip}{0.45em}
+\setlength{\parindent}{0pt}
+
+% --- Encabezados y pies de página ---
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{Tablero de organización con tarjetas inteligentes}}
+\fancyhead[R]{\small\textit{ITBA}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% --- Gráficos, tablas y colores ---
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage[table]{xcolor}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf,justification=centering}
+
+% --- Código y formato técnico ---
+\usepackage{enumitem}
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  backgroundcolor=\color{gray!8}
+}
+
+% --- Enlaces y marcadores PDF ---
+\usepackage[hidelinks,breaklinks=true]{hyperref}
+
+% --- Bibliografía IEEE en español (Disposición ITBA 645/2016 y 882/2019) ---
+\usepackage[
+  backend=biber,
+  style=ieee,
+  sorting=none,
+  language=spanish
+]{biblatex}
+\addbibresource{referencias.bib}
+
+% --- Ajuste de títulos de capítulo sin palabra "Capítulo X" si se desea estilo informe ---
+\usepackage{titlesec}
+\titleformat{\chapter}[hang]{\normalfont\LARGE\bfseries}{\thechapter.}{0.8em}{}
+\titlespacing*{\chapter}{0pt}{-15pt}{15pt}
+
+% --- Estilo unificado para tablas de esquemas de base de datos (Tablas 5.1 a 5.10) ---
+\newenvironment{tablacoleccion}[2]{%
+  \begingroup
+  \footnotesize
+  \setlength{\tabcolsep}{4.5pt}%
+  \renewcommand{\arraystretch}{1.35}%
+  \rowcolors{2}{gray!7}{white}%
+  \longtable{
+    >{\ttfamily\raggedright\arraybackslash}p{\dimexpr 0.25\textwidth - 2\tabcolsep\relax}
+    >{\raggedright\arraybackslash}p{\dimexpr 0.17\textwidth - 2\tabcolsep\relax}
+    >{\raggedright\arraybackslash}p{\dimexpr 0.17\textwidth - 2\tabcolsep\relax}
+    >{\raggedright\arraybackslash}p{\dimexpr 0.41\textwidth - 2\tabcolsep\relax}
+  }
+  \toprule
+  \rowcolor{gray!18}
+  \normalfont\bfseries Campo & \bfseries Tipo BSON & \bfseries Indexado & \bfseries Descripción \\
+  \midrule
+  \endfirsthead
+  \toprule
+  \rowcolor{gray!18}
+  \normalfont\bfseries Campo & \bfseries Tipo BSON & \bfseries Indexado & \bfseries Descripción \\
+  \midrule
+  \endhead
+  \midrule
+  \multicolumn{4}{r}{\textit{\scriptsize Continúa en la página siguiente...}} \\
+  \endfoot
+  \bottomrule
+  \caption{#1}
+  \label{#2}
+  \endlastfoot
+}{%
+  \endlongtable
+  \endgroup
+}
+
+% --- Estilo unificado para tablas de endpoints de 3 columnas ---
+\newenvironment{tablaendpoints}[2]{%
+  \begingroup
+  \footnotesize
+  \setlength{\tabcolsep}{4.5pt}%
+  \renewcommand{\arraystretch}{1.35}%
+  \rowcolors{2}{gray!7}{white}%
+  \longtable{
+    >{\bfseries\raggedright\arraybackslash}p{\dimexpr 0.18\textwidth - 2\tabcolsep\relax}
+    >{\ttfamily\raggedright\arraybackslash}p{\dimexpr 0.35\textwidth - 2\tabcolsep\relax}
+    >{\raggedright\arraybackslash}p{\dimexpr 0.47\textwidth - 2\tabcolsep\relax}
+  }
+  \toprule
+  \rowcolor{gray!18}
+  \textbf{Método} & \normalfont\bfseries Ruta & \bfseries Función \\
+  \midrule
+  \endfirsthead
+  \toprule
+  \rowcolor{gray!18}
+  \textbf{Método} & \normalfont\bfseries Ruta & \bfseries Función \\
+  \midrule
+  \endhead
+  \midrule
+  \rowcolor{white}
+  \multicolumn{3}{r}{\textit{\scriptsize Continúa en la página siguiente...}} \\
+  \endfoot
+  \bottomrule
+  \caption{#1}
+  \label{#2}
+  \endlastfoot
+}{%
+  \endlongtable
+  \endgroup
+}
+
+% --- Estilo unificado para tablas de endpoints de 4 columnas (con Rol Mínimo) ---
+\newenvironment{tablaendpointsrol}[2]{%
+  \begingroup
+  \footnotesize
+  \setlength{\tabcolsep}{4.5pt}%
+  \renewcommand{\arraystretch}{1.35}%
+  \rowcolors{2}{gray!7}{white}%
+  \longtable{
+    >{\bfseries\raggedright\arraybackslash}p{\dimexpr 0.12\textwidth - 2\tabcolsep\relax}
+    >{\ttfamily\raggedright\arraybackslash}p{\dimexpr 0.36\textwidth - 2\tabcolsep\relax}
+    >{\raggedright\arraybackslash}p{\dimexpr 0.36\textwidth - 2\tabcolsep\relax}
+    >{\raggedright\arraybackslash}p{\dimexpr 0.16\textwidth - 2\tabcolsep\relax}
+  }
+  \toprule
+  \rowcolor{gray!18}
+  \textbf{Método} & \normalfont\bfseries Ruta & \bfseries Función & \bfseries Rol Mínimo \\
+  \midrule
+  \endfirsthead
+  \toprule
+  \rowcolor{gray!18}
+  \textbf{Método} & \normalfont\bfseries Ruta & \bfseries Función & \bfseries Rol Mínimo \\
+  \midrule
+  \endhead
+  \midrule
+  \rowcolor{white}
+  \multicolumn{4}{r}{\textit{\scriptsize Continúa en la página siguiente...}} \\
+  \endfoot
+  \bottomrule
+  \caption{#1}
+  \label{#2}
+  \endlastfoot
+}{%
+  \endlongtable
+  \endgroup
+}
+
+\begin{document}
+
+% 1. Carátula obligatoria ITBA
+\input{caratula}
+
+% 2. Índice general, índice de tablas e índice de figuras
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+\listoffigures
+\listoftables
+\clearpage
+
+% Nota preliminar del documento
+\noindent\textit{Nota: salvo indicación en contrario, todas las figuras y tablas del presente documento son de elaboración propia.}
+\vspace{1em}
+
+% 3. Cuerpo del informe (numeración arábiga)
+\pagenumbering{arabic}
+\input{capitulos/01_explicacion_proyecto}
+\input{capitulos/02_gestion_proyecto}
+\input{capitulos/03_requerimientos}
+\input{capitulos/04_documentacion_interfaces}
+\input{capitulos/05_diseno_alto_nivel}
+\input{capitulos/06_diseno_bajo_nivel}
+\input{capitulos/07_testing_y_produccion}
+
+% 4. Bibliografía IEEE ordenada automáticamente por aparición
+\clearpage
+\addcontentsline{toc}{chapter}{Bibliografía}
+\printbibliography[title={Bibliografía}]
+
+% 5. Reconocimiento y Agradecimientos
+\input{capitulos/08_reconocimiento_agradecimientos}
+
+\end{document}
