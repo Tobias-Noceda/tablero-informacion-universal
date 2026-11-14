@@ -45,11 +45,26 @@ var allowedDays = map[int]bool{7: true, 15: true, 30: true}
 type TokenService struct {
 	store   infrastructure.AccessTokenStore
 	limiter infrastructure.RateLimiter
+	plans   infrastructure.Entitlements
 	now     func() time.Time
 }
 
-func New(store infrastructure.AccessTokenStore, limiter infrastructure.RateLimiter, now func() time.Time) *TokenService {
-	return &TokenService{store, limiter, now}
+func New(store infrastructure.AccessTokenStore, limiter infrastructure.RateLimiter, plans infrastructure.Entitlements, now func() time.Time) *TokenService {
+	return &TokenService{store, limiter, plans, now}
+}
+
+// APIAccess fails with a *models.LimitError unless user's plan lets tools
+// act for them. The one place that is decided: minting a token and every
+// request made with one ask here, and so would any other way a tool signs in.
+func (srv *TokenService) APIAccess(user string) error {
+	plan, err := srv.plans.ForUser(user)
+	if err != nil {
+		return err
+	}
+	if !plan.Limits.APIAccess {
+		return plan.Refuse(models.LimitAPIAccess, 0)
+	}
+	return nil
 }
 
 // Created is a new token together with its only plaintext copy.
@@ -74,6 +89,9 @@ func (srv *TokenService) Create(principal models.Principal, name string, days in
 	}
 	if !allowedDays[days] {
 		return nil, ErrInvalidExpiry
+	}
+	if err := srv.APIAccess(principal.ID); err != nil {
+		return nil, err
 	}
 
 	allowed, err := srv.limiter.Allow("pat-create:"+principal.ID, createLimit, createWindow)
@@ -137,7 +155,9 @@ func (srv *TokenService) Revoke(principal models.Principal, id uuid.UUID) error 
 }
 
 // Resolve turns a presented token into its owner's claims. Every failure is
-// ErrInvalidToken, so a caller learns nothing about why.
+// ErrInvalidToken, so a caller learns nothing about why, except a valid
+// token whose owner's plan no longer has API access: that one is a
+// *models.LimitError, so the tool can say what to do about it.
 func (srv *TokenService) Resolve(raw string) (infrastructure.Claims, error) {
 	token, err := srv.store.FindAccessTokenByHash(hash(raw))
 	if err != nil {
@@ -146,6 +166,14 @@ func (srv *TokenService) Resolve(raw string) (infrastructure.Claims, error) {
 
 	now := srv.now()
 	if !token.ExpiresAt.After(now) {
+		return infrastructure.Claims{}, infrastructure.ErrInvalidToken
+	}
+
+	if err := srv.APIAccess(token.User); err != nil {
+		var limit *models.LimitError
+		if errors.As(err, &limit) {
+			return infrastructure.Claims{}, limit
+		}
 		return infrastructure.Claims{}, infrastructure.ErrInvalidToken
 	}
 

@@ -51,7 +51,7 @@ func setup(t *testing.T) *fixture {
 		return nil, errors.New("no board")
 	}}
 	store := mocks.NewMemoryPostitTemplateStore()
-	return &fixture{New(store, db, access.New(orgs)), store, board, org}
+	return &fixture{New(store, db, access.New(orgs), mocks.StaticEntitlements{}), store, board, org}
 }
 
 func (f *fixture) scope(kind models.PostitTemplateScopeKind) models.PostitTemplateScope {
@@ -170,13 +170,13 @@ func TestCreate_StampsAndValidates(t *testing.T) {
 func TestCreate_Limit(t *testing.T) {
 	f := setup(t)
 	scope := f.scope(models.TemplateScopeUser)
-	for range Limit {
+	for range models.LimitsFor(models.PlanMax).UserTemplates {
 		if _, err := f.srv.Create(ana, scope, body()); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if _, err := f.srv.Create(ana, scope, body()); !errors.Is(err, ErrLimit) {
-		t.Errorf("err = %v, want limit_reached", err)
+	if _, err := f.srv.Create(ana, scope, body()); !errors.As(err, new(*models.LimitError)) {
+		t.Errorf("err = %v, want plan_limit", err)
 	}
 }
 

@@ -71,9 +71,7 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 
 	postIt, err := ctrl.service.CreatePostIt(middleware.Principal(c), req.Title, newPostIt)
 	if err != nil {
-		c.JSON(statusOf(err), gin.H{
-			"error": err.Error(),
-		})
+		fail(c, err)
 		return
 	}
 
@@ -102,9 +100,7 @@ func (ctrl *Controller) GetPostIt(c *gin.Context) {
 
 	postIt, err := ctrl.service.GetPostIt(middleware.Principal(c), id)
 	if err != nil {
-		c.JSON(statusOf(err), gin.H{
-			"error": err.Error(),
-		})
+		fail(c, err)
 		return
 	}
 
@@ -133,9 +129,7 @@ func (ctrl *Controller) DeletePostIt(c *gin.Context) {
 
 	strands, err := ctrl.service.DeletePostIt(middleware.Principal(c), id)
 	if err != nil {
-		c.JSON(statusOf(err), gin.H{
-			"error": err.Error(),
-		})
+		fail(c, err)
 		return
 	}
 
@@ -148,6 +142,7 @@ func (ctrl *Controller) DeletePostIt(c *gin.Context) {
 // @Tags         post-its
 // @Accept       json
 // @Param        id       path      string                  true  "Post-it UUID" format(uuid)
+// @Param        fresh    query     string                  false "1 skips the cache: 402 plan_limit (force_refresh) unless the board's plan allows it, 429 rate_limited more than once every 10 s"
 // @Success      200      {object}  any
 // @Failure      400      {object}  map[string]string{"error": "string"}
 // @Failure      500      {object}  map[string]string{"error": "string"}
@@ -165,13 +160,12 @@ func (ctrl *Controller) ExecutePostIt(c *gin.Context) {
 
 	postIt, err := ctrl.service.GetPostIt(middleware.Principal(c), id)
 	if err != nil {
-		c.JSON(statusOf(err), gin.H{
-			"error": err.Error(),
-		})
+		fail(c, err)
 		return
 	}
 
-	// ?fresh=1 skips the cached result (the card detail's refresh button).
+	// ?fresh=1 skips the cached result (the card detail's refresh button),
+	// on a board whose plan allows it and once every few seconds per card.
 	fresh := c.Query("fresh") == "1"
 	execute := ctrl.service.ExecutePostIt
 	if fresh {
@@ -180,9 +174,7 @@ func (ctrl *Controller) ExecutePostIt(c *gin.Context) {
 
 	data, err := execute(postIt)
 	if err != nil {
-		c.JSON(statusOf(err), gin.H{
-			"error": err.Error(),
-		})
+		fail(c, err)
 		return
 	}
 
@@ -257,9 +249,7 @@ func (ctrl *Controller) EditPostIt(c *gin.Context) {
 
 	err = ctrl.service.UpdatePostIt(middleware.Principal(c), id, set)
 	if err != nil {
-		c.JSON(statusOf(err), gin.H{
-			"error": err.Error(),
-		})
+		fail(c, err)
 		return
 	}
 
@@ -299,9 +289,7 @@ func (ctrl *Controller) MovePostIt(c *gin.Context) {
 
 	err = ctrl.service.MovePostIt(middleware.Principal(c), id, models.Position{X: *req.X, Y: *req.Y})
 	if err != nil {
-		c.JSON(statusOf(err), gin.H{
-			"error": err.Error(),
-		})
+		fail(c, err)
 		return
 	}
 
@@ -341,9 +329,7 @@ func (ctrl *Controller) EditTitlePostIt(c *gin.Context) {
 
 	err = ctrl.service.EditTitlePostIt(middleware.Principal(c), id, req.Title)
 	if err != nil {
-		c.JSON(statusOf(err), gin.H{
-			"error": err.Error(),
-		})
+		fail(c, err)
 		return
 	}
 
@@ -380,11 +366,24 @@ func (ctrl *Controller) StylePostIt(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_card_style"})
 		return
 	case err != nil:
-		c.JSON(statusOf(err), gin.H{"error": err.Error()})
+		fail(c, err)
 		return
 	}
 
 	c.JSON(http.StatusOK, style)
+}
+
+// fail answers a refused request: what the plan does not allow as 402 with
+// the limit, anything else with the status its error maps to.
+func fail(c *gin.Context, err error) {
+	if middleware.PlanLimit(c, err) {
+		return
+	}
+	if errors.Is(err, srv.ErrRateLimited) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate_limited"})
+		return
+	}
+	c.JSON(statusOf(err), gin.H{"error": err.Error()})
 }
 
 func statusOf(err error) int {
@@ -398,6 +397,7 @@ func statusOf(err error) int {
 		errors.Is(err, srv.ErrUnknownWellKnown),
 		errors.Is(err, srv.ErrInvalidOneOff),
 		errors.Is(err, srv.ErrTemplateFixed),
+		errors.Is(err, srv.ErrInvalidRate),
 		errors.Is(err, models.ErrWellKnownMissingVariable),
 		errors.Is(err, infrastructure.ErrUnknownCredential):
 		return http.StatusBadRequest

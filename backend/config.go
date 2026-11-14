@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	netmail "net/mail"
 	"os"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/ports/mail"
+	"github.com/Secreto31126/tesis/common/ports/mercadopago"
 	"github.com/Secreto31126/tesis/common/ports/oidc"
 )
 
@@ -24,6 +26,9 @@ const (
 	ENV_GOOGLE_CLIENT_SECRET = "GOOGLE_SIGNIN_CLIENT_SECRET"
 	ENV_RESEND_API_KEY       = "RESEND_API_KEY"
 	ENV_MAIL_FROM            = "MAIL_FROM"
+	ENV_MP_ACCESS_TOKEN      = "MP_ACCESS_TOKEN"
+	ENV_MP_WEBHOOK_SECRET    = "MP_WEBHOOK_SECRET"
+	ENV_BILLING_USD_ARS      = "BILLING_USD_ARS"
 
 	DEFAULT_ACCESS_TTL  = 15 * time.Minute
 	DEFAULT_REFRESH_TTL = 30 * 24 * time.Hour
@@ -40,6 +45,14 @@ type config struct {
 	google       oidc.Config
 	resendAPIKey string
 	mailFrom     string
+
+	// Mercado Pago. Without an access token billing is off: plans are
+	// listed, none can be bought.
+	mpAccessToken   string
+	mpWebhookSecret string
+	billingUSDARS   float64
+	// gateway replaces Mercado Pago when set; only tests do.
+	gateway infrastructure.PaymentGateway
 }
 
 func loadConfig() (config, error) {
@@ -55,6 +68,21 @@ func loadConfig() (config, error) {
 		},
 		resendAPIKey: strings.TrimSpace(os.Getenv(ENV_RESEND_API_KEY)),
 		mailFrom:     strings.TrimSpace(os.Getenv(ENV_MAIL_FROM)),
+
+		mpAccessToken:   strings.TrimSpace(os.Getenv(ENV_MP_ACCESS_TOKEN)),
+		mpWebhookSecret: strings.TrimSpace(os.Getenv(ENV_MP_WEBHOOK_SECRET)),
+	}
+
+	if raw := strings.TrimSpace(os.Getenv(ENV_BILLING_USD_ARS)); raw != "" {
+		rate, err := strconv.ParseFloat(raw, 64)
+		if err != nil || rate <= 0 || math.IsInf(rate, 0) || math.IsNaN(rate) {
+			return cfg, fmt.Errorf("%s: expected a positive number of pesos per dollar, got %q", ENV_BILLING_USD_ARS, raw)
+		}
+		cfg.billingUSDARS = rate
+	}
+
+	if cfg.mpAccessToken != "" && (cfg.mpWebhookSecret == "" || cfg.billingUSDARS <= 0) {
+		return cfg, fmt.Errorf("%s needs %s and %s: the secret that signs its webhooks and the exchange rate subscriptions are priced at", ENV_MP_ACCESS_TOKEN, ENV_MP_WEBHOOK_SECRET, ENV_BILLING_USD_ARS)
 	}
 
 	if (cfg.google.ClientID == "") != (cfg.google.ClientSecret == "") {
@@ -97,6 +125,17 @@ func (cfg config) identityProvider() infrastructure.IdentityProvider {
 		return nil
 	}
 	return oidc.New(cfg.google)
+}
+
+// paymentGateway is Mercado Pago, or nil (billing off) without an access token.
+func (cfg config) paymentGateway() infrastructure.PaymentGateway {
+	if cfg.gateway != nil {
+		return cfg.gateway
+	}
+	if cfg.mpAccessToken == "" {
+		return nil
+	}
+	return mercadopago.New(cfg.mpAccessToken, cfg.mpWebhookSecret)
 }
 
 // mailSender is Resend, or the log when no API key is configured.

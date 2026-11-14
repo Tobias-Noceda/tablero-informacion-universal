@@ -185,6 +185,31 @@ func (db *MongoDB) UpdateUser(id uuid.UUID, set map[string]any) error {
 	return nil
 }
 
+// SetUserPlan stores the plan and when it lapses; with no expiry the field
+// is removed, so the plan lasts until it is changed.
+func (db *MongoDB) SetUserPlan(id uuid.UUID, plan models.Plan, expires *time.Time) error {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	set := bson.M{"plan": plan, "updatedat": time.Now().UTC()}
+	update := bson.M{"$set": set}
+	if expires != nil {
+		set["plan_expires"] = expires.UTC()
+	} else {
+		update["$unset"] = bson.M{"plan_expires": ""}
+	}
+
+	res, err := db.users.UpdateOne(ctx, bson.M{"_id": id}, update)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return infrastructure.ErrUserNotFound
+	}
+
+	return nil
+}
+
 func (db *MongoDB) ReplaceIdentities(id uuid.UUID, identities []models.Identity) error {
 	ctx, cancel := timeout()
 	defer cancel()

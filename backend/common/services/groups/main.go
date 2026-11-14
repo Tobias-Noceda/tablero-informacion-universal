@@ -21,14 +21,16 @@ type GroupService struct {
 	store   infrastructure.GroupStore
 	secrets infrastructure.ScopePurger
 	access  infrastructure.Access
+	plans   infrastructure.Entitlements
 }
 
-func New(store infrastructure.GroupStore, secrets infrastructure.ScopePurger, access infrastructure.Access) *GroupService {
-	return &GroupService{store, secrets, access}
+func New(store infrastructure.GroupStore, secrets infrastructure.ScopePurger, access infrastructure.Access, plans infrastructure.Entitlements) *GroupService {
+	return &GroupService{store, secrets, access, plans}
 }
 
 // Create makes the caller the group's owner. A group created in an
-// organization the caller belongs to is also owned by its admins.
+// organization the caller belongs to is also owned by its admins. Either
+// way it counts against the caller's plan, like the secrets it will hold.
 func (srv *GroupService) Create(principal models.Principal, name string, org *uuid.UUID) (*models.Group, error) {
 	if principal.Anonymous() {
 		return nil, ErrForbidden
@@ -40,6 +42,18 @@ func (srv *GroupService) Create(principal models.Principal, name string, org *uu
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, ErrInvalidName
+	}
+
+	plan, err := srv.plans.ForUser(principal.ID)
+	if err != nil {
+		return nil, err
+	}
+	owned, err := srv.store.CountOwnedGroups(principal.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := plan.Admits(models.LimitGroups, int(owned), plan.Limits.Groups); err != nil {
+		return nil, err
 	}
 
 	group := &models.Group{
@@ -86,12 +100,25 @@ func (srv *GroupService) ListMine(principal models.Principal) ([]models.Group, e
 	return groups, nil
 }
 
+// AddMember lists userID in the group. Someone new takes one of the seats
+// the owner's plan gives it, the owner's own included.
 func (srv *GroupService) AddMember(principal models.Principal, id uuid.UUID, userID string) error {
-	if _, err := srv.require(principal, id, models.GroupOwner); err != nil {
+	group, err := srv.require(principal, id, models.GroupOwner)
+	if err != nil {
 		return err
 	}
 	if userID == "" {
 		return ErrInvalidUser
+	}
+
+	if !group.IsMember(userID) {
+		plan, err := srv.plans.ForUser(group.Owner)
+		if err != nil {
+			return err
+		}
+		if err := plan.Admits(models.LimitSeats, len(group.Members)+1, plan.Limits.Seats); err != nil {
+			return err
+		}
 	}
 
 	return srv.store.AddGroupMember(id, userID)

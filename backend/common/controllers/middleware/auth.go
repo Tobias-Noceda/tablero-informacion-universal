@@ -24,7 +24,11 @@ func RequireAuth(verifier infrastructure.TokenVerifier) gin.HandlerFunc {
 
 		claims, err := verifier.Verify(token)
 		if err != nil {
-			unauthorized(c)
+			// A personal access token whose owner's plan has no API access
+			// is a real one: say so rather than ask to sign in again.
+			if !PlanLimit(c, err) {
+				unauthorized(c)
+			}
 			return
 		}
 
@@ -55,6 +59,7 @@ var accessTokenRoutes = map[string]bool{
 	"DELETE /api/v1/boards/:id":                      true,
 	"POST /api/v1/boards/:id/strands":                true,
 	"PATCH /api/v1/boards/:id/strands/:strand":       true,
+	"DELETE /api/v1/boards/:id/strands/:strand":      true,
 	"POST /api/v1/post-its":                          true,
 	"DELETE /api/v1/post-its/:id":                    true,
 	"PATCH /api/v1/post-its/:id/settings":            true,

@@ -31,6 +31,10 @@ type Database interface {
 	UpdatePostIt(id uuid.UUID, set map[string]any) error
 	// Creates a PostIt
 	CreatePostIt(postIt *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error)
+	// Counts the boards user owns outside any organization
+	CountPersonalBoards(user string) (int64, error)
+	// Counts the boards of an organization
+	CountOrgBoards(org uuid.UUID) (int64, error)
 	// Creates a Board, in an organization when org is set
 	CreateBoard(name, owner string, org *uuid.UUID) (*models.Board, error)
 	// Adds a member to a board, or changes the role of one already on it

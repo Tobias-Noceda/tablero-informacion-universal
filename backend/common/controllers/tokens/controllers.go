@@ -65,6 +65,7 @@ func (ctrl *Controller) ListTokens(c *gin.Context) {
 // @Param        body  body  CreateTokenRequest  true  "Name and lifetime in days"
 // @Success      201
 // @Failure      400  "invalid_name, invalid_expiry or invalid_request"
+// @Failure      402  "plan_limit (limit: api_access)"
 // @Failure      404  "Not one's own id"
 // @Failure      409  "too_many_tokens"
 // @Failure      429  "rate_limited"
@@ -131,6 +132,10 @@ func self(c *gin.Context) bool {
 }
 
 func fail(c *gin.Context, err error) {
+	if middleware.PlanLimit(c, err) {
+		return
+	}
+
 	switch {
 	case errors.Is(err, srv.ErrInvalidName), errors.Is(err, srv.ErrInvalidExpiry):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

@@ -25,6 +25,9 @@ services:
       GOOGLE_SIGNIN_CLIENT_SECRET: ${GOOGLE_SIGNIN_CLIENT_SECRET:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
+      MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET:-}
+      BILLING_USD_ARS: ${BILLING_USD_ARS:-}
     networks:
       - mongo
       - redis

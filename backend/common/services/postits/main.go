@@ -6,6 +6,7 @@ import (
 	"log"
 	"maps"
 	"strings"
+	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
@@ -23,12 +24,24 @@ var (
 	ErrInvalidBinding   = errors.New("Binding aliases must match [A-Z][A-Z0-9_]*")
 	ErrUnknownWellKnown = errors.New("Well Known post-it not found")
 	ErrInvalidCardStyle = models.ErrInvalidCardStyle
+	ErrInvalidRate      = fmt.Errorf("Rate must be at least %d seconds", MIN_RATE)
+	ErrRateLimited      = infrastructure.ErrRateLimited
+)
+
+// MIN_RATE is the shortest refresh rate, in seconds, a card can be set to.
+const MIN_RATE = 5
+
+// A forced refresh reaches the card's API every time, so each card takes
+// one every freshWindow whoever asks.
+const (
+	freshLimit  = 1
+	freshWindow = 10 * time.Second
 )
 
 type PostItsService struct {
 	db      infrastructure.Database
 	cache   infrastructure.Cache
-	run     infrastructure.Executer
+	exec    infrastructure.Executer
 	secrets infrastructure.SecretResolver
 	access  infrastructure.Access
 	// The well-known catalogue; tombstoned definitions are still read so the
@@ -36,6 +49,10 @@ type PostItsService struct {
 	wellKnowns infrastructure.WellKnownReader
 	// The card types users define; nil leaves only the catalogue.
 	templates PostitTemplates
+	// What the plan of a board's payer allows: how many cards, how long a
+	// result is cached at least, whether a refresh may skip the cache.
+	plans   infrastructure.Entitlements
+	limiter infrastructure.RateLimiter
 }
 
 // PostitTemplates answers which user-defined card type a new card on a
@@ -47,12 +64,21 @@ type PostitTemplates interface {
 	Usable(principal models.Principal, board uuid.UUID, key string) (*models.WellKnown, error)
 }
 
-func New(db infrastructure.Database, cache infrastructure.Cache, run infrastructure.Executer, secrets infrastructure.SecretResolver, access infrastructure.Access, wellKnowns infrastructure.WellKnownReader, templates PostitTemplates) *PostItsService {
-	return &PostItsService{db, cache, run, secrets, access, wellKnowns, templates}
+func New(db infrastructure.Database, cache infrastructure.Cache, run infrastructure.Executer, secrets infrastructure.SecretResolver, access infrastructure.Access, wellKnowns infrastructure.WellKnownReader, templates PostitTemplates, plans infrastructure.Entitlements, limiter infrastructure.RateLimiter) *PostItsService {
+	return &PostItsService{db, cache, run, secrets, access, wellKnowns, templates, plans, limiter}
 }
 
 func (srv *PostItsService) CreatePostIt(principal models.Principal, title *models.BoardPostItTitle, postIt *models.PostIts) (*models.PostIts, error) {
-	if err := srv.require(principal, postIt.Board, models.BoardEditor); err != nil {
+	board, err := srv.require(principal, postIt.Board, models.BoardEditor)
+	if err != nil {
+		return nil, err
+	}
+
+	plan, err := srv.plans.ForBoard(board)
+	if err != nil {
+		return nil, err
+	}
+	if err := plan.Admits(models.LimitNodes, len(board.PostIts), plan.Limits.NodesPerBoard); err != nil {
 		return nil, err
 	}
 
@@ -129,7 +155,7 @@ func (srv *PostItsService) load(principal models.Principal, id uuid.UUID, min mo
 		return nil, ErrNotAMember
 	}
 
-	if err := srv.require(principal, postit.Board, min); err != nil {
+	if _, err := srv.require(principal, postit.Board, min); err != nil {
 		return nil, err
 	}
 
@@ -144,6 +170,12 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 	postit, err := srv.load(principal, id, models.BoardEditor)
 	if err != nil {
 		return err
+	}
+
+	// 0 stays legal on a card that fetches nothing (a note, a picture):
+	// that is the rate those are created with.
+	if rate, ok := set["rate"].(int); ok && rate < MIN_RATE && (rate != 0 || postit.Resource != nil) {
+		return ErrInvalidRate
 	}
 
 	if err := applyOneOff(postit, set); err != nil {
@@ -175,12 +207,13 @@ func touchesCredentials(set map[string]any) bool {
 	return params || bindings || request
 }
 
-func (srv *PostItsService) require(principal models.Principal, boardID uuid.UUID, min models.BoardRole) error {
+// require loads a board on which the principal holds at least min.
+func (srv *PostItsService) require(principal models.Principal, boardID uuid.UUID, min models.BoardRole) (*models.Board, error) {
 	board, err := srv.db.FindBoard(boardID)
 	if err != nil || board == nil || !srv.access.BoardRole(principal, board).AtLeast(min) {
-		return ErrNotAMember
+		return nil, ErrNotAMember
 	}
-	return nil
+	return board, nil
 }
 
 // bind is the authorization event: whoever saves the card must be allowed to
@@ -252,7 +285,15 @@ func (srv *PostItsService) DeletePostIt(principal models.Principal, id uuid.UUID
 		return nil, err
 	}
 
-	return srv.db.DeletePostIt(id)
+	strands, err := srv.db.DeletePostIt(id)
+	if err != nil {
+		return nil, err
+	}
+	// The card is gone either way; a result left behind only waits to expire.
+	if err := srv.cache.DropPostItResult(id); err != nil {
+		log.Printf("post-it %s: dropping the cached result failed: %v", id, err)
+	}
+	return strands, nil
 }
 
 func secretRefs(postit *models.PostIts) []string {
@@ -418,18 +459,75 @@ func (srv *PostItsService) prepare(postit *models.PostIts) (*models.PostIts, err
 	return &clone, nil
 }
 
+// limits is what the plan of whoever pays for the card's board allows.
+func (srv *PostItsService) limits(postit *models.PostIts) (models.Entitlement, error) {
+	board, err := srv.db.FindBoard(postit.Board)
+	if err != nil || board == nil {
+		return models.Entitlement{}, ErrNotAMember
+	}
+	return srv.plans.ForBoard(board)
+}
+
+// ExecutePostIt answers the cached result while there is one, and runs the
+// card otherwise. Only a miss looks up the board's plan.
 func (srv *PostItsService) ExecutePostIt(postit *models.PostIts) (any, error) {
 	cached, err := srv.cache.FindPostItResult(postit.Id)
 	if err == nil {
 		return cached, nil
 	}
 
-	return srv.RefreshPostIt(postit)
+	return srv.execute(postit)
 }
 
 // RefreshPostIt runs the card without looking at the cache, and caches
-// the new result for the next readers.
+// the new result for the next readers. Only a plan with forced refresh may,
+// and each card takes one every freshWindow.
 func (srv *PostItsService) RefreshPostIt(postit *models.PostIts) (any, error) {
+	plan, err := srv.limits(postit)
+	if err != nil {
+		return nil, err
+	}
+	if !plan.Limits.ForceRefresh {
+		return nil, plan.Refuse(models.LimitForceRefresh, 0)
+	}
+
+	allowed, err := srv.limiter.Allow("fresh:"+postit.Id.String(), freshLimit, freshWindow)
+	if err != nil {
+		return nil, err
+	}
+	if !allowed {
+		return nil, ErrRateLimited
+	}
+
+	return srv.run(postit, plan.Limits)
+}
+
+func (srv *PostItsService) execute(postit *models.PostIts) (any, error) {
+	if postit.Resource == nil {
+		return srv.run(postit, models.Limits{})
+	}
+
+	plan, err := srv.limits(postit)
+	if err != nil {
+		return nil, err
+	}
+	return srv.run(postit, plan.Limits)
+}
+
+// cacheAs is the card as its result is cached: one that fetches a resource
+// is kept for at least the plan's MinRate, however short its own rate, so
+// neither this service nor the API behind it is asked more often than that.
+// The stored card is left alone.
+func cacheAs(postit *models.PostIts, plan models.Limits) *models.PostIts {
+	if postit.Resource == nil || postit.Rate >= plan.MinRate {
+		return postit
+	}
+	kept := *postit
+	kept.Rate = plan.MinRate
+	return &kept
+}
+
+func (srv *PostItsService) run(postit *models.PostIts, plan models.Limits) (any, error) {
 	var err error
 	prepared := postit
 	if postit.Resource != nil {
@@ -439,13 +537,14 @@ func (srv *PostItsService) RefreshPostIt(postit *models.PostIts) (any, error) {
 		}
 	}
 
-	data, err := srv.run.Execute(prepared)
+	data, err := srv.exec.Execute(prepared)
 	if err != nil {
 		return nil, err
 	}
 
+	kept := cacheAs(postit, plan)
 	go func() {
-		if err := srv.cache.AddPostItResult(postit, data); err != nil {
+		if err := srv.cache.AddPostItResult(kept, data); err != nil {
 			log.Printf("post-it %s: caching result failed: %v", postit.Id, err)
 		}
 	}()

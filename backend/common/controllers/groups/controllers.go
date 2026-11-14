@@ -34,6 +34,10 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 // A group the caller may not touch answers 404: whether it exists is not
 // disclosed, the same rule the vault applies to scopes.
 func fail(c *gin.Context, err error) {
+	if middleware.PlanLimit(c, err) {
+		return
+	}
+
 	if errors.Is(err, srv.ErrOrgNotFound) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "org_not_found",

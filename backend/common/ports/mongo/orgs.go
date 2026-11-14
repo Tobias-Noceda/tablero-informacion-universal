@@ -17,7 +17,10 @@ func (db *MongoDB) ensureOrgIndexes() error {
 	ctx, cancel := timeout()
 	defer cancel()
 
-	_, err := db.orgs.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{Key: "members.user", Value: 1}}})
+	_, err := db.orgs.Indexes().CreateMany(ctx, []mongo.IndexModel{
+		{Keys: bson.D{{Key: "members.user", Value: 1}}},
+		{Keys: bson.D{{Key: "owner", Value: 1}}},
+	})
 	return err
 }
 
@@ -171,6 +174,13 @@ func (db *MongoDB) CountOrgBoards(id uuid.UUID) (int64, error) {
 	defer cancel()
 
 	return db.boards.CountDocuments(ctx, bson.M{"org": id})
+}
+
+func (db *MongoDB) CountOwnedOrgs(userID string) (int64, error) {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	return db.orgs.CountDocuments(ctx, bson.M{"owner": userID})
 }
 
 func (db *MongoDB) FindOrgBoards(id uuid.UUID) ([]models.Board, error) {

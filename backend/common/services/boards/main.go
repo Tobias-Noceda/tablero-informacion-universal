@@ -2,6 +2,7 @@ package boards
 
 import (
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
@@ -33,10 +34,51 @@ type BoardService struct {
 	access  infrastructure.Access
 	users   infrastructure.UserReader
 	limiter infrastructure.RateLimiter
+	// orgs is where an organization board's members are read from, to count
+	// who reaches it; plans is what its payer's plan allows.
+	orgs  infrastructure.OrgReader
+	plans infrastructure.Entitlements
 }
 
-func New(db infrastructure.Database, secrets infrastructure.ScopePurger, access infrastructure.Access, users infrastructure.UserReader, limiter infrastructure.RateLimiter) *BoardService {
-	return &BoardService{db, secrets, access, users, limiter}
+func New(db infrastructure.Database, secrets infrastructure.ScopePurger, access infrastructure.Access, users infrastructure.UserReader, limiter infrastructure.RateLimiter, orgs infrastructure.OrgReader, plans infrastructure.Entitlements) *BoardService {
+	return &BoardService{db, secrets, access, users, limiter, orgs, plans}
+}
+
+// payer is the plan the board runs on and the organization it belongs to,
+// nil for a personal board or when the organization is gone (the owner pays
+// then).
+func (srv *BoardService) payer(board *models.Board) (models.Entitlement, *models.Org, error) {
+	if board.Org != nil && srv.orgs != nil {
+		org, err := srv.orgs.FindOrg(*board.Org)
+		if err == nil {
+			plan, err := srv.plans.ForOrg(org)
+			return plan, org, err
+		}
+		if !errors.Is(err, infrastructure.ErrOrgNotFound) {
+			return models.Entitlement{}, nil, err
+		}
+	}
+
+	plan, err := srv.plans.ForUser(board.Owner)
+	return plan, nil, err
+}
+
+// describe fills in what the board's payer's plan allows and how much of it
+// is taken, for the one board a response is about.
+func (srv *BoardService) describe(board *models.Board) error {
+	plan, org, err := srv.payer(board)
+	if err != nil {
+		return err
+	}
+	left, err := srv.plans.SecretsLeft(plan)
+	if err != nil {
+		return err
+	}
+
+	board.Limits = &plan.Limits
+	board.SeatsUsed = len(board.People(org))
+	board.SecretsLeft = &left
+	return nil
 }
 
 // require loads a board on which the principal holds at least min, with the
@@ -74,12 +116,23 @@ func (srv *BoardService) GetUserBoards(principal models.Principal) ([]models.Boa
 	return boards, nil
 }
 
+// GetBoard is the board with the caller's role and what its payer's plan
+// allows on it.
 func (srv *BoardService) GetBoard(principal models.Principal, id uuid.UUID) (*models.Board, error) {
-	return srv.require(principal, id, models.BoardViewer)
+	board, err := srv.require(principal, id, models.BoardViewer)
+	if err != nil {
+		return nil, err
+	}
+	if err := srv.describe(board); err != nil {
+		return nil, err
+	}
+	return board, nil
 }
 
 // CreateBoard makes the caller the board's owner. A board created in an
-// organization the caller belongs to is also reachable by its members.
+// organization the caller belongs to is also reachable by its members. A
+// space (the caller's own, or each organization) holds as many boards as its
+// payer's plan allows.
 func (srv *BoardService) CreateBoard(principal models.Principal, name string, org *uuid.UUID) (*models.Board, error) {
 	if principal.Anonymous() {
 		return nil, ErrForbidden
@@ -88,11 +141,31 @@ func (srv *BoardService) CreateBoard(principal models.Principal, name string, or
 		return nil, ErrOrgNotFound
 	}
 
+	space := &models.Board{Owner: principal.ID, Org: org}
+	plan, _, err := srv.payer(space)
+	if err != nil {
+		return nil, err
+	}
+	count := srv.db.CountPersonalBoards
+	if org != nil {
+		count = func(string) (int64, error) { return srv.db.CountOrgBoards(*org) }
+	}
+	boards, err := count(principal.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := plan.Admits(models.LimitBoards, int(boards), plan.Limits.BoardsPerSpace); err != nil {
+		return nil, err
+	}
+
 	board, err := srv.db.CreateBoard(name, principal.ID, org)
 	if err != nil {
 		return nil, err
 	}
 	board.Role = models.BoardOwner
+	if err := srv.describe(board); err != nil {
+		return nil, err
+	}
 	return board, nil
 }
 
@@ -157,6 +230,8 @@ func (srv *BoardService) Members(principal models.Principal, id uuid.UUID) ([]mo
 }
 
 // SetMember adds the account registered under email, or changes its role.
+// Only someone who does not reach the board yet takes a seat: a new role for
+// a member, or listing someone the organization already brings, is free.
 func (srv *BoardService) SetMember(principal models.Principal, id uuid.UUID, email string, role models.BoardRole) (*models.BoardMemberSummary, error) {
 	board, err := srv.require(principal, id, models.BoardOwner)
 	if err != nil {
@@ -175,6 +250,16 @@ func (srv *BoardService) SetMember(principal models.Principal, id uuid.UUID, ema
 	}
 	if user.Id.String() == board.Owner {
 		return nil, ErrOwnerRole
+	}
+
+	plan, org, err := srv.payer(board)
+	if err != nil {
+		return nil, err
+	}
+	if people := board.People(org); !slices.Contains(people, user.Id.String()) {
+		if err := plan.Admits(models.LimitSeats, len(people), plan.Limits.Seats); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := srv.db.SetBoardMember(id, user.Id.String(), role); err != nil {

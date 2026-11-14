@@ -232,14 +232,16 @@ func bind(c *gin.Context) (models.PostitTemplate, bool) {
 }
 
 func fail(c *gin.Context, err error) {
+	if middleware.PlanLimit(c, err) {
+		return
+	}
+
 	switch {
 	case errors.Is(err, srv.ErrInvalid):
 		message, _ := strings.CutPrefix(err.Error(), srv.ErrInvalid.Error()+": ")
 		c.JSON(http.StatusBadRequest, gin.H{"error": srv.ErrInvalid.Error(), "message": message})
 	case errors.Is(err, srv.ErrNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": srv.ErrNotFound.Error()})
-	case errors.Is(err, srv.ErrLimit):
-		c.JSON(http.StatusConflict, gin.H{"error": srv.ErrLimit.Error()})
 	default:
 		log.Printf("post-it templates: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal"})
