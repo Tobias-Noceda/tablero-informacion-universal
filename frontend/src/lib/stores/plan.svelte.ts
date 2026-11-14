@@ -130,6 +130,7 @@ const refusals: Record<string, (inputs: { max: number }) => string> = {
 	orgs: m['billing.limit.orgs'],
 	boards: m['billing.limit.boards'],
 	seats: m['billing.limit.seats'],
+	editors: m['billing.limit.editors'],
 	nodes: m['billing.limit.nodes'],
 	user_templates: m['billing.limit.templates'],
 	board_templates: m['billing.limit.templates'],

@@ -431,7 +431,8 @@
 			"orgs_unavailable": "El plan actual no incluye crear organizaciones",
 			"templates": "{count} de {max} tipos de tarjeta",
 			"secrets": "{count} de {max} credenciales",
-			"tokens": "El plan actual no incluye tokens de acceso ni el servidor MCP"
+			"tokens": "El plan actual no incluye tokens de acceso ni el servidor MCP",
+			"read_only": "En el plan Free las personas que agregues solo pueden ver"
 		},
 		"limit": {
 			"title": "Límite del plan alcanzado",
@@ -444,11 +445,12 @@
 			"secrets": "El plan permite {max} credenciales almacenadas.",
 			"groups": "El plan permite {max} grupos de credenciales.",
 			"force_refresh": "El plan no incluye la actualización manual.",
-			"api_access": "El plan no incluye tokens de acceso ni el servidor MCP."
+			"api_access": "El plan no incluye tokens de acceso ni el servidor MCP.",
+			"editors": "En este plan los tableros se comparten solo en lectura."
 		},
 		"profile": {
 			"upgrade": "Pasar a Pro",
-			"unlocks": "Pro habilita compartir, organizaciones y acceso por API.",
+			"unlocks": "Pro habilita editar en equipo, organizaciones y acceso por API.",
 			"manage": "Gestionar plan",
 			"title": "Plan",
 			"current": "Plan actual: {plan}",
@@ -515,7 +517,8 @@
 			"groups": "{count} grupos de credenciales",
 			"min_rate": "Datos actualizados cada {seconds} segundos como máximo",
 			"force_refresh": "Actualización manual de una tarjeta",
-			"api_access": "Servidor MCP y tokens de acceso"
+			"api_access": "Servidor MCP y tokens de acceso",
+			"seats_read_only": "Compartí con hasta {count} personas, solo lectura"
 		},
 		"error": {
 			"invalid_plan": "No es posible suscribirse a ese plan.",

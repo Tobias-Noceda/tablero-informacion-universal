@@ -39,6 +39,8 @@ export type Limits = {
     boards_per_space: number;
     // People on a board or an organization, its owner included.
     seats: number;
+    // Everyone but the owner joins a board as a viewer (Free).
+    viewers_only: boolean;
     nodes_per_board: number;
     user_templates: number;
     board_templates: number;
@@ -56,7 +58,7 @@ export type Limits = {
 export type PlanLimitCode =
     | 'orgs' | 'boards' | 'seats' | 'nodes'
     | 'user_templates' | 'board_templates' | 'org_templates'
-    | 'secrets' | 'groups' | 'force_refresh' | 'api_access';
+    | 'secrets' | 'groups' | 'force_refresh' | 'api_access' | 'editors';
 
 export type PlanInfo = {
     plan: Plan;

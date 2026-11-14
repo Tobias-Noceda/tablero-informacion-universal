@@ -261,6 +261,11 @@ func (srv *BoardService) SetMember(principal models.Principal, id uuid.UUID, ema
 			return nil, err
 		}
 	}
+	// On a plan that shares read-only, nobody new becomes an editor; someone
+	// who already edits keeps it until the owner changes it.
+	if plan.Limits.ViewersOnly && role != models.BoardViewer && board.ExplicitRole(user.Id.String()) != role {
+		return nil, plan.Refuse(models.LimitEditors, 0)
+	}
 
 	if err := srv.db.SetBoardMember(id, user.Id.String(), role); err != nil {
 		return nil, err

@@ -73,9 +73,11 @@
 		);
 		list.push(m['pricing.feature.boards']({ count: limits.boards_per_space }));
 		list.push(
-			limits.seats > 1
-				? m['pricing.feature.seats']({ count: limits.seats })
-				: m['pricing.feature.seats_none']()
+			limits.seats <= 1
+				? m['pricing.feature.seats_none']()
+				: limits.viewers_only
+					? m['pricing.feature.seats_read_only']({ count: limits.seats - 1 })
+					: m['pricing.feature.seats']({ count: limits.seats })
 		);
 		list.push(m['pricing.feature.nodes']({ count: limits.nodes_per_board }));
 		list.push(m['pricing.feature.templates_user']({ count: limits.user_templates }));

@@ -22,6 +22,7 @@ const PRO: Limits = {
 	orgs: 3,
 	boards_per_space: 10,
 	seats: 5,
+	viewers_only: false,
 	nodes_per_board: 100,
 	user_templates: 10,
 	board_templates: 5,
@@ -68,8 +69,10 @@ describe('numeric limits', () => {
 });
 
 describe('seats', () => {
-	it('never lets Free share', () => {
-		expect(canInvite(FREE_LIMITS, 1)).toBe(false);
+	it('lets Free share with four more people, read-only', () => {
+		expect(FREE_LIMITS.viewers_only).toBe(true);
+		expect(canInvite(FREE_LIMITS, 4)).toBe(true);
+		expect(canInvite(FREE_LIMITS, 5)).toBe(false);
 	});
 
 	it('counts the owner', () => {

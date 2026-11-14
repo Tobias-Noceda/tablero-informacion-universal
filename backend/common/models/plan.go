@@ -30,9 +30,11 @@ func (p Plan) Rank() int {
 // organization or in a group, its owner included, so 1 means no sharing.
 // MinRate is the shortest time, in seconds, a card's result stays cached.
 type Limits struct {
-	Orgs           int  `json:"orgs"`
-	BoardsPerSpace int  `json:"boards_per_space"`
-	Seats          int  `json:"seats"`
+	Orgs           int `json:"orgs"`
+	BoardsPerSpace int `json:"boards_per_space"`
+	Seats          int `json:"seats"`
+	// ViewersOnly: everyone but the owner joins a board as a viewer.
+	ViewersOnly    bool `json:"viewers_only"`
 	NodesPerBoard  int  `json:"nodes_per_board"`
 	UserTemplates  int  `json:"user_templates"`
 	BoardTemplates int  `json:"board_templates"`
@@ -47,7 +49,7 @@ type Limits struct {
 
 var planLimits = map[Plan]Limits{
 	PlanFree: {
-		Orgs: 0, BoardsPerSpace: 5, Seats: 1, NodesPerBoard: 25,
+		Orgs: 0, BoardsPerSpace: 5, Seats: 5, ViewersOnly: true, NodesPerBoard: 25,
 		UserTemplates: 5, BoardTemplates: 0, OrgTemplates: 0,
 		Secrets: 5, Groups: 0, MinRate: 300,
 		ForceRefresh: false, APIAccess: false, PriceUSD: 0,
@@ -80,6 +82,7 @@ const (
 	LimitOrgs           = "orgs"
 	LimitBoards         = "boards"
 	LimitSeats          = "seats"
+	LimitEditors        = "editors"
 	LimitNodes          = "nodes"
 	LimitUserTemplates  = "user_templates"
 	LimitBoardTemplates = "board_templates"

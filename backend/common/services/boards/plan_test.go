@@ -87,11 +87,57 @@ func TestSetMember_SeatsByPlan(t *testing.T) {
 func TestSetMember_ExistingMemberKeepsTheirSeat(t *testing.T) {
 	id := uuid.New()
 	db := &mocks.MockDB{FindBoardFn: func(uuid.UUID) (*models.Board, error) {
-		return &models.Board{Id: id, Owner: owner.ID, Members: []models.BoardMember{{User: eveUser.Id.String(), Role: models.BoardViewer}}}, nil
+		// Pro and full: the owner, eve and three more take its five seats.
+		members := []models.BoardMember{{User: eveUser.Id.String(), Role: models.BoardViewer}}
+		for range 3 {
+			members = append(members, models.BoardMember{User: uuid.NewString(), Role: models.BoardViewer})
+		}
+		return &models.Board{Id: id, Owner: owner.ID, Members: members}, nil
 	}}
-	svc := New(db, &purgeRecorder{}, access.New(nil), users(), &mocks.CountingLimiter{}, nil, mocks.StaticEntitlements{Plan: models.PlanFree})
+	svc := New(db, &purgeRecorder{}, access.New(nil), users(), &mocks.CountingLimiter{}, nil, mocks.StaticEntitlements{Plan: models.PlanPro})
 	if _, err := svc.SetMember(owner, id, eveUser.Email, models.BoardEditor); err != nil {
 		t.Errorf("a role change on a full board: %v", err)
+	}
+}
+
+func TestSetMember_FreeSharesReadOnly(t *testing.T) {
+	id := uuid.New()
+	board := func(role models.BoardRole) *mocks.MockDB {
+		return &mocks.MockDB{FindBoardFn: func(uuid.UUID) (*models.Board, error) {
+			b := &models.Board{Id: id, Owner: owner.ID}
+			if role != "" {
+				b.Members = []models.BoardMember{{User: eveUser.Id.String(), Role: role}}
+			}
+			return b, nil
+		}}
+	}
+	free := mocks.StaticEntitlements{Plan: models.PlanFree}
+
+	svc := New(board(""), &purgeRecorder{}, access.New(nil), users(), &mocks.CountingLimiter{}, nil, free)
+	if _, err := svc.SetMember(owner, id, eveUser.Email, models.BoardViewer); err != nil {
+		t.Errorf("free adds a viewer: %v", err)
+	}
+	if _, err := svc.SetMember(owner, id, eveUser.Email, models.BoardEditor); !isLimit(err, models.LimitEditors) {
+		t.Errorf("free adds an editor: %v, want editors", err)
+	}
+
+	// A viewer is not promoted, an editor from a former plan keeps the role.
+	svc = New(board(models.BoardViewer), &purgeRecorder{}, access.New(nil), users(), &mocks.CountingLimiter{}, nil, free)
+	if _, err := svc.SetMember(owner, id, eveUser.Email, models.BoardEditor); !isLimit(err, models.LimitEditors) {
+		t.Errorf("free promotes a viewer: %v, want editors", err)
+	}
+	svc = New(board(models.BoardEditor), &purgeRecorder{}, access.New(nil), users(), &mocks.CountingLimiter{}, nil, free)
+	if _, err := svc.SetMember(owner, id, eveUser.Email, models.BoardEditor); err != nil {
+		t.Errorf("free keeps an editor: %v", err)
+	}
+	if _, err := svc.SetMember(owner, id, eveUser.Email, models.BoardViewer); err != nil {
+		t.Errorf("free demotes an editor: %v", err)
+	}
+
+	// Pro shares with editors.
+	svc = New(board(""), &purgeRecorder{}, access.New(nil), users(), &mocks.CountingLimiter{}, nil, mocks.StaticEntitlements{Plan: models.PlanPro})
+	if _, err := svc.SetMember(owner, id, eveUser.Email, models.BoardEditor); err != nil {
+		t.Errorf("pro adds an editor: %v", err)
 	}
 }
 

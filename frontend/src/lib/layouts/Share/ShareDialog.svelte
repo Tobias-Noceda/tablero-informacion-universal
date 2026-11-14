@@ -24,6 +24,13 @@
 	// Once every seat of the plan is taken (always on a plan that does not
 	// share) there is no form to add someone; the list stays.
 	const canAdd = $derived(canInvite(boardPlan.limits, boardPlan.seatsUsed));
+	// A plan that shares read-only (Free) never offers the editor role; an
+	// editor from a former plan keeps it and can only be made a viewer.
+	const readOnly = $derived(boardPlan.limits.viewers_only);
+	const rolesFor = (current: BoardMember['role']) =>
+		readOnly
+			? assignable.filter((option) => option === 'viewer' || option === current)
+			: assignable;
 
 	let members = $state<BoardMemberSummary[]>([]);
 	// Someone who reaches the board through its organization is not listed
@@ -67,7 +74,9 @@
 
 	async function add(event: SubmitEvent) {
 		event.preventDefault();
-		if (await attempt(() => boardApi.setMember(board, email.trim(), newRole))) {
+		if (
+			await attempt(() => boardApi.setMember(board, email.trim(), readOnly ? 'viewer' : newRole))
+		) {
 			email = '';
 			await refresh();
 		}
@@ -126,17 +135,22 @@
 						<span class="truncate text-xs opacity-60">{member.user.email}</span>
 					</div>
 					<div class="flex items-center gap-2">
-						{#if isOwner && member.role !== 'owner'}
+						{#if isOwner && member.role !== 'owner' && rolesFor(member.role).length > 1}
 							<select
 								class="rounded-md border border-main-border bg-background px-2 py-1 text-sm"
 								aria-label={m['members.title']()}
 								value={member.role}
 								onchange={(e) => change(member, e.currentTarget.value as BoardMember['role'])}
 							>
-								{#each assignable as option (option)}
+								{#each rolesFor(member.role) as option (option)}
 									<option value={option}>{m[`members.role_${option}`]()}</option>
 								{/each}
 							</select>
+							<Button variant="destructive" onclick={() => remove(member)}
+								>{m['members.remove']()}</Button
+							>
+						{:else if isOwner && member.role !== 'owner'}
+							<span class="text-sm opacity-70">{m[`members.role_${member.role}`]()}</span>
 							<Button variant="destructive" onclick={() => remove(member)}
 								>{m['members.remove']()}</Button
 							>
@@ -167,23 +181,32 @@
 				required
 			/>
 			<div class="flex w-fit! gap-2">
-				<Dropdown
-					labelClass="font-semibold"
-					options={assignable.map((role) => ({ label: m[`members.role_${role}`](), value: role }))}
-					class="w-fit!"
-					activatorClass={(isOpen) => cn(
-						"rounded-md border border-border bg-transparent px-3 py-2 w-fit!",
-						isOpen ? "border-main-border hover:border-main-border" : ""
-					)}
-					drawerClass="rounded-md bg-background!"
-					sectionClass="font-semibold text-foreground!"
-					itemClass={() => "bg-background! rounded-md hover:bg-main-hover!"}
-					bind:value={newRole}
-				/>
+				{#if !readOnly}
+					<Dropdown
+						labelClass="font-semibold"
+						options={assignable.map((role) => ({
+							label: m[`members.role_${role}`](),
+							value: role
+						}))}
+						class="w-fit!"
+						activatorClass={(isOpen) =>
+							cn(
+								'rounded-md border border-border bg-transparent px-3 py-2 w-fit!',
+								isOpen ? 'border-main-border hover:border-main-border' : ''
+							)}
+						drawerClass="rounded-md bg-background!"
+						sectionClass="font-semibold text-foreground!"
+						itemClass={() => 'bg-background! rounded-md hover:bg-main-hover!'}
+						bind:value={newRole}
+					/>
+				{/if}
 				<Button variant="primary" type="submit" disabled={email.trim() === ''}
 					>{m['members.add']()}</Button
 				>
 			</div>
+			{#if readOnly}
+				<PlanHint text={m['billing.hint.read_only']()} />
+			{/if}
 		</form>
 	{:else if listed}
 		<Button variant="destructive" onclick={leave}>{m['members.leave']()}</Button>

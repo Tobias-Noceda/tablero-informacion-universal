@@ -5,7 +5,8 @@ import type { Limits, OrgRole, PostitTemplateScope, UserSummary, UUID } from '$t
 export const FREE_LIMITS: Limits = {
 	orgs: 0,
 	boards_per_space: 5,
-	seats: 1,
+	seats: 5,
+	viewers_only: true,
 	nodes_per_board: 25,
 	user_templates: 5,
 	board_templates: 0,
