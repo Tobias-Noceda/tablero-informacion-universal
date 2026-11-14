@@ -257,7 +257,12 @@
 		</div>
 
 		{#if canEdit && knownType}
-			<Tooltip content={m['node_detail.edit']()} placement="bottom" tooltipClass="max-w-60! -mt-1">
+			<!-- The last button in the row anchors its tooltip leftwards, so it stays on screen. -->
+			<Tooltip
+				content={m['node_detail.edit']()}
+				placement={canRefresh(boardPlan.limits) ? 'bottom' : 'bottom-left'}
+				tooltipClass={canRefresh(boardPlan.limits) ? 'max-w-60! -mt-1' : 'max-w-60! -mt-1 ml-11'}
+			>
 				<button
 					type="button"
 					class="cursor-pointer rounded-md p-2 hover:bg-detail-hover disabled:cursor-wait disabled:opacity-60"
