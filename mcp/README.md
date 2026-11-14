@@ -9,6 +9,7 @@ An [xmcp](https://xmcp.dev) server (Streamable HTTP, `/mcp`) that lets an agent 
 | `memories` | The post-its of one board (`id - (x; y) - title`) |
 | `retrieve` | One post-it: its title, its data and the post-its connected to it, each with the relation's direction (`→` `←` `↔` `—`) and label |
 | `consolidate` | Save a text memory (a `static_card`) at a position, connected to related ones |
+| `perceive` | Save a live memory: a card with its own GET request (an http(s) address, `json` read with jq or `html` read with CSS selectors, optional headers and query parameters, a refresh rate) that reads the address once and answers what it read; a read that fails keeps nothing. A header or query value written as `$NAME` uses the board credential of that name, so secrets never go through the agent |
 | `reconsolidate` | Change a memory's title or text |
 | `associate` | Connect a memory to others, optionally with a label and a direction; an existing connection is updated, never duplicated |
 | `dissociate` | Remove the connection between two memories |
