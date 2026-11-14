@@ -6,21 +6,33 @@
 		CARD_BORDER_WIDTHS,
 		CARD_BORDERS,
 		CARD_COLORS,
+		CARD_TEXT_ALIGNS,
+		CARD_VERTICAL_ALIGNS,
 		cardFill,
 		lineColor,
 		type CardLook
 	} from '$lib/cards/style';
 	import { cn } from '$lib/utils';
-	import type { CardBorder, CardBorderWidth, CardColor, CardStyle } from '$types/api';
+	import type {
+		CardBorder,
+		CardBorderWidth,
+		CardColor,
+		CardStyle,
+		CardTextAlign,
+		CardVerticalAlign
+	} from '$types/api';
 
 	let {
 		look,
 		sized,
+		tall,
 		onchange
 	}: {
 		look: CardLook;
 		/** Whether the card has a size of its own, so it can go back to fitting its content. */
 		sized: boolean;
+		/** Whether the card has a height of its own, the only case where the vertical alignment shows. */
+		tall: boolean;
 		onchange: (patch: CardStyle) => void;
 	} = $props();
 
@@ -36,6 +48,24 @@
 		normal: m['cards.border_normal'],
 		thick: m['cards.border_thick']
 	};
+
+	const textAlignNames: Record<CardTextAlign, () => string> = {
+		left: m['cards.align_left'],
+		center: m['cards.align_center'],
+		right: m['cards.align_right']
+	};
+
+	const verticalAlignNames: Record<CardVerticalAlign, () => string> = {
+		top: m['cards.valign_top'],
+		middle: m['cards.valign_middle'],
+		bottom: m['cards.valign_bottom']
+	};
+
+	// Line lengths of each horizontal alignment icon, and where each line starts.
+	const ALIGN_LINES = [14, 9, 12];
+	const lineStart = (align: CardTextAlign, length: number) =>
+		align === 'left' ? 1 : align === 'right' ? 15 - length : (16 - length) / 2;
+	const BAR_Y: Record<CardVerticalAlign, number> = { top: 3, middle: 7, bottom: 11 };
 
 	// The palette is the strands' one, so are the colour names.
 	const colorNames: Record<CardColor, () => string> = {
@@ -54,6 +84,8 @@
 	const reset = '' as never;
 
 	const border = $derived(look.border ?? 'none');
+	const textAlign = $derived(look.text_align ?? 'left');
+	const verticalAlign = $derived(look.vertical_align ?? 'top');
 	const hasBorder = $derived(border !== 'none');
 	const borderWidth = $derived(look.border_width ?? 'normal');
 	// What the border shows without a colour of its own.
@@ -199,6 +231,53 @@
 				onclick={() => onchange({ border_color: color })}
 			>
 				<span class={swatch(look.border_color === color)} style:background-color={lineColor(color)}></span>
+			</button>
+		{/each}
+	</div>
+	<div class="flex items-center gap-1" role="group" aria-label={m['cards.text']()}>
+		{@render rowLabel(m['cards.text']())}
+
+		{#each CARD_TEXT_ALIGNS as align (align)}
+			<button
+				type="button"
+				class={option(textAlign === align)}
+				title={textAlignNames[align]()}
+				aria-label={textAlignNames[align]()}
+				aria-pressed={textAlign === align}
+				onclick={() => onchange({ text_align: align === 'left' ? reset : align })}
+			>
+				<svg viewBox="0 0 16 14" class="h-4 w-4" aria-hidden="true">
+					{#each ALIGN_LINES as length, i (i)}
+						<line
+							x1={lineStart(align, length)}
+							x2={lineStart(align, length) + length}
+							y1={3 + i * 4}
+							y2={3 + i * 4}
+							stroke="currentColor"
+							stroke-width="1.5"
+							stroke-linecap="round"
+						/>
+					{/each}
+				</svg>
+			</button>
+		{/each}
+
+		{@render separator()}
+
+		{#each CARD_VERTICAL_ALIGNS as align (align)}
+			<button
+				type="button"
+				class={option(tall && verticalAlign === align)}
+				title={verticalAlignNames[align]()}
+				aria-label={verticalAlignNames[align]()}
+				aria-pressed={tall && verticalAlign === align}
+				disabled={!tall}
+				onclick={() => onchange({ vertical_align: align === 'top' ? reset : align })}
+			>
+				<svg viewBox="0 0 16 14" class="h-4 w-4" fill="none" aria-hidden="true">
+					<rect x="1" y="0.75" width="14" height="12.5" rx="2" stroke="currentColor" stroke-width="1.2" opacity="0.5" />
+					<line x1="4" x2="12" y1={BAR_Y[align]} y2={BAR_Y[align]} stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+				</svg>
 			</button>
 		{/each}
 	</div>

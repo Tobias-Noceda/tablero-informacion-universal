@@ -401,7 +401,14 @@
 		"border_thin": "Borde fino",
 		"border_normal": "Borde normal",
 		"border_thick": "Borde grueso",
-		"border_follow": "Mismo color que la tarjeta"
+		"border_follow": "Mismo color que la tarjeta",
+		"text": "Texto",
+		"align_left": "Alinear a la izquierda",
+		"align_center": "Centrar",
+		"align_right": "Alinear a la derecha",
+		"valign_top": "Arriba (requiere un alto propio)",
+		"valign_middle": "En el medio (requiere un alto propio)",
+		"valign_bottom": "Abajo (requiere un alto propio)"
 	},
 	"image": {
 		"missing": "Esta tarjeta todavía no tiene la dirección de una imagen.",

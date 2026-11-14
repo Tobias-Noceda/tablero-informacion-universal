@@ -12,6 +12,7 @@
 		cardBorder,
 		cardFill,
 		cardText,
+		alignmentClasses,
 		MAX_CARD_HEIGHT,
 		MAX_CARD_WIDTH,
 		MIN_CARD_HEIGHT,
@@ -51,6 +52,7 @@
 	// A side without a size of its own follows the content, up to a limit.
 	const look = $derived((data?.look ?? {}) as CardLook);
 	const sized = $derived(!!width || !!height);
+	const alignment = $derived(alignmentClasses(look));
 	// Where a resize started, to tell whether it also moved the card.
 	let resizeStart: { x: number; y: number } | null = null;
 
@@ -64,7 +66,7 @@
 </script>
 
 <NodeToolbar isVisible={showTools} position={Position.Top}>
-	<CardToolbar {look} {sized} onchange={(patch) => editor?.restyle(id, patch)} />
+	<CardToolbar {look} {sized} tall={!!height} onchange={(patch) => editor?.restyle(id, patch)} />
 </NodeToolbar>
 
 <NodeResizer
@@ -81,7 +83,8 @@
 
 <div
 	class={cn(
-		'bg-main hover:bg-main-hover rounded-lg customNode text-main-text overflow-hidden',
+		'bg-main hover:bg-main-hover rounded-lg customNode text-main-text overflow-hidden flex flex-col',
+		alignment.vertical,
 		media ? 'p-2' : 'p-4',
 		isSelected && 'bg-main-hover',
 		// A fill of its own replaces the hover colour; white can only darken.
@@ -99,8 +102,10 @@
 	<div
 		class={cn(
 			'overflow-hidden text-ellipsis whitespace-wrap',
+			alignment.text,
 			!width && !media && 'max-w-92!',
-			height ? 'h-full' : !media && 'max-h-26! line-clamp-3'
+			// A tall card lets its text sit where vertical_align says; a picture fills it.
+			height ? (media ? 'h-full' : 'min-h-0') : !media && 'max-h-26! line-clamp-3'
 		)}
 	>
 		{#if plainTitle}
