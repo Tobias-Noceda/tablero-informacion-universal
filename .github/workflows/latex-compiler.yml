@@ -23,8 +23,8 @@ jobs:
       - name: Compile LaTeX document
         uses: xu-cheng/latex-action@v4
         with:
-          working_directory: $DOCS
-          root_file: $ENTRYPOINT
+          working_directory: docs
+          root_file: main.tex
 
       - uses: actions/upload-artifact@v7
         with:
