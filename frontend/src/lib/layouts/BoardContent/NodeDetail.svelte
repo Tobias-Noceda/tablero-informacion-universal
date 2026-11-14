@@ -217,7 +217,7 @@
 {/snippet}
 
 <aside
-	class="absolute inset-0 z-25 flex flex-col gap-4 overflow-hidden bg-detail text-detail-text md:relative md:-ml-4 md:h-auto md:max-h-full md:min-h-0 md:self-stretch md:w-100 md:shrink-0 md:rounded-l-2xl md:border-l md:border-detail-border"
+	class="absolute inset-0 z-25 flex flex-col gap-4 overflow-hidden bg-detail text-detail-text md:inset-auto md:top-0 md:right-0 md:bottom-0 md:my-4 md:mx-3 md:w-100 md:rounded-2xl md:border md:border-detail-border"
 >
 	<header class="flex shrink-0 items-start gap-2 p-4 pb-0">
 		<Tooltip
