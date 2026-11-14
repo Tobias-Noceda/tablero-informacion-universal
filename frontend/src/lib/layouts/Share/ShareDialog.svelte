@@ -183,6 +183,7 @@
 			<div class="flex w-fit! gap-2">
 				{#if !readOnly}
 					<Dropdown
+						floating
 						labelClass="font-semibold"
 						options={assignable.map((role) => ({
 							label: m[`members.role_${role}`](),
