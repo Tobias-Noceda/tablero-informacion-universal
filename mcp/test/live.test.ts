@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { credentialsOf, describeData, liveCardBody } from "../src/modules/live.ts";
+import { credentialsOf, describeData, liveCardBody, requestBody } from "../src/modules/live.ts";
 
 const memory = {
     board: "b",
@@ -70,5 +70,34 @@ describe("describeData", () => {
 
     it("says when the card read nothing", () => {
         assert.equal(describeData({}), "(no values)");
+    });
+});
+
+describe("POST memories", () => {
+    const search = {
+        ...memory,
+        url: "https://ignav.com/api/fares/one-way",
+        method: "POST" as const,
+        headers: { "X-Api-Key": "$IGNAV" },
+        queries: undefined,
+        body: { origin: "EZE", destination: "NRT", departure_date: "2026-12-05", partner: "$PARTNER" },
+    };
+
+    it("sends the body as JSON text with the POST", () => {
+        assert.deepEqual(liveCardBody(search).request, {
+            method: "POST",
+            headers: { "X-Api-Key": "$IGNAV" },
+            queries: {},
+            body: '{"origin":"EZE","destination":"NRT","departure_date":"2026-12-05","partner":"$PARTNER"}',
+        });
+    });
+
+    it("never sends a body with a GET", () => {
+        assert.equal(requestBody({ method: "GET", body: { a: 1 } }), "");
+        assert.equal("body" in liveCardBody({ ...search, method: "GET" }).request, false);
+    });
+
+    it("lists the credentials of the headers and the body", () => {
+        assert.deepEqual(credentialsOf(search), ["IGNAV", "PARTNER"]);
     });
 });

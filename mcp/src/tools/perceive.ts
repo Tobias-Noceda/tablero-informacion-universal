@@ -3,7 +3,13 @@ import type { BoardPostIt, PostItData } from "../types/api";
 import type { ToolMetadata, InferSchema } from "xmcp";
 
 import * as api from "../modules/api";
-import { credentialsOf, describeData, liveCardBody } from "../modules/live";
+import {
+    credentialsOf,
+    describeData,
+    liveCardBody,
+    MAX_REQUEST_BODY,
+    requestBody,
+} from "../modules/live";
 
 import { z } from "zod";
 
@@ -24,7 +30,17 @@ export const schema = {
         ),
     url: z
         .url({ protocol: /^https?$/ })
-        .describe("The http(s) address the memory reads with a GET request, without its query string"),
+        .describe("The http(s) address the memory reads, without its query string"),
+    method: z
+        .enum(["GET", "POST"])
+        .default("GET")
+        .describe("GET, or POST for APIs that take their search in a JSON body"),
+    body: z
+        .unknown()
+        .optional()
+        .describe(
+            "Only with POST: the JSON body (an object or an array), sent as application/json, at most 16 KB. A string value written as $NAME uses the board credential stored under NAME",
+        ),
     response: z
         .enum(["json", "html"])
         .default("json")
@@ -59,7 +75,7 @@ export const schema = {
 export const metadata: ToolMetadata = {
     name: "perceive",
     description:
-        "This tool lets you save a live memory: instead of a fixed text, it reads an external API (or web page) and keeps the values you pick, refreshing them every `rate` seconds, so retrieving it later always shows current data. Use it for things that change, such as prices, weather, statuses or counters. The memory reads the address once right away and you get what it read, so you can check your jq expressions or CSS selectors; if the read fails, the memory is not kept and you get the reason, so fix the request and try again. Never put a secret (an API key, a token) in a header or query value: write $NAME instead and ask the user to store that credential, under that name, in the board's credentials panel. You must provide a spacial position, in pixels, for the memory in the board, so make an educated guess.",
+        "This tool lets you save a live memory: instead of a fixed text, it reads an external API (or web page), with a GET or a POST carrying a JSON body, and keeps the values you pick, refreshing them every `rate` seconds, so retrieving it later always shows current data. Use it for things that change, such as prices, weather, statuses or counters. The memory reads the address once right away and you get what it read, so you can check your jq expressions or CSS selectors; if the read fails, the memory is not kept and you get the reason, so fix the request and try again. Never put a secret (an API key, a token) in a header or query value: write $NAME instead and ask the user to store that credential, under that name, in the board's credentials panel. You must provide a spacial position, in pixels, for the memory in the board, so make an educated guess.",
     annotations: {
         title: "Perceive a live memory",
         readOnlyHint: false,
@@ -74,6 +90,8 @@ export default async function ({
     board_id,
     title,
     url,
+    method,
+    body,
     response,
     query,
     queries,
@@ -82,7 +100,14 @@ export default async function ({
     relevant,
     position,
 }: InferSchema<typeof schema>) {
-    const memory = { board: board_id, title, url, response, query, queries, headers, rate };
+    if (method === "GET" && body !== undefined) {
+        return "A GET request carries no body: use method POST to send one.";
+    }
+    const memory = { board: board_id, title, url, method, body, response, query, queries, headers, rate };
+    const size = new TextEncoder().encode(requestBody(memory)).length;
+    if (size > MAX_REQUEST_BODY) {
+        return `The body is ${size} bytes; a memory's body may be at most ${MAX_REQUEST_BODY}.`;
+    }
 
     const res = await api.post("/v1/post-its", liveCardBody(memory));
     const postit = (await res.json()) as BoardPostIt;

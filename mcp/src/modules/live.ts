@@ -1,11 +1,17 @@
 import type { PostItData, UUID } from "../types/api";
 
+// What the backend keeps (models.MaxRequestBody), in bytes.
+export const MAX_REQUEST_BODY = 16 << 10;
+
 // What a live memory needs: the request a card makes on its own (a one-off
 // card, POST /post-its without a well-known) and how to read the answer.
 export type LiveMemory = {
     board: UUID;
     title: string;
     url: string;
+    method?: "GET" | "POST";
+    // A POST's JSON body; a credential in it is a string value "$NAME".
+    body?: unknown;
     response: "json" | "html";
     query: Record<string, string>;
     headers?: Record<string, string>;
@@ -13,21 +19,30 @@ export type LiveMemory = {
     rate: number;
 };
 
-// A board credential, referenced by name in a header or query value.
+// A board credential, referenced by name in a header, query or body value.
 const CREDENTIAL = /^\$[A-Z][A-Z0-9_]*$/;
 
+// A POST's body as the card stores it: JSON text. A GET sends none.
+export function requestBody(memory: Pick<LiveMemory, "method" | "body">) {
+    if (memory.method !== "POST" || memory.body === undefined) return "";
+    return JSON.stringify(memory.body);
+}
+
 // The body POST /post-its takes for a card with its own request. The backend
-// checks it again (validateOneOff): a GET to an http(s) URL, json or html, at
-// most 20 headers, query parameters and outputs.
+// checks it again (validateOneOff): a GET or POST to an http(s) URL, json or
+// html, at most 20 headers, query parameters and outputs, a JSON body of at
+// most MAX_REQUEST_BODY bytes.
 export function liveCardBody(memory: LiveMemory) {
+    const body = requestBody(memory);
     return {
         board: memory.board,
         title: { text: memory.title, vars: false },
         resource: memory.url,
         request: {
-            method: "GET",
+            method: memory.method ?? "GET",
             headers: memory.headers ?? {},
             queries: memory.queries ?? {},
+            ...(body && { body }),
         },
         response: memory.response,
         query: memory.query,
@@ -37,10 +52,13 @@ export function liveCardBody(memory: LiveMemory) {
 
 // The credentials a memory's request names, so the agent can tell the user
 // which ones the board must hold.
-export function credentialsOf(memory: Pick<LiveMemory, "headers" | "queries">) {
+export function credentialsOf(
+    memory: Pick<LiveMemory, "headers" | "queries" | "method" | "body">,
+) {
     const values = [
         ...Object.values(memory.headers ?? {}),
         ...Object.values(memory.queries ?? {}),
+        ...(memory.method === "POST" ? stringsOf(memory.body) : []),
     ];
     return [...new Set(values.filter((v) => CREDENTIAL.test(v)).map((v) => v.slice(1)))];
 }
@@ -63,4 +81,12 @@ export function describeData(data: PostItData) {
             return `${key}: ${shown}`;
         })
         .join("\n");
+}
+
+// Every string value in a JSON document, at any depth (object keys excluded).
+function stringsOf(node: unknown): string[] {
+    if (typeof node === "string") return [node];
+    if (Array.isArray(node)) return node.flatMap(stringsOf);
+    if (node && typeof node === "object") return Object.values(node).flatMap(stringsOf);
+    return [];
 }
