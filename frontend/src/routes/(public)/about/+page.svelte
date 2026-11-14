@@ -28,6 +28,9 @@
 		<a href={resolve('/login')} class="rounded-md border border-border px-4 py-2 font-medium">
 			Sign in
 		</a>
+		<a href={resolve('/pricing')} class="rounded-md border border-border px-4 py-2 font-medium">
+			Plans and pricing
+		</a>
 	</div>
 </section>
 
