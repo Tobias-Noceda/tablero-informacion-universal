@@ -258,14 +258,23 @@ func (srv *PostItsService) DeletePostIt(principal models.Principal, id uuid.UUID
 func secretRefs(postit *models.PostIts) []string {
 	seen := make(map[string]struct{})
 
+	note := func(value string) {
+		name, found := strings.CutPrefix(value, "$")
+		if found && models.ValidSecretName(name) {
+			seen[name] = struct{}{}
+		}
+	}
 	for _, source := range []map[string]string{postit.Request.Headers, postit.Request.Queries, postit.Params} {
 		for _, value := range source {
-			name, found := strings.CutPrefix(value, "$")
-			if !found || !models.ValidSecretName(name) {
-				continue
-			}
-
-			seen[name] = struct{}{}
+			note(value)
+		}
+	}
+	// A JSON body names credentials the same way, as whole string values. A
+	// body that is not JSON was refused when the card was saved.
+	if postit.Request.Body != "" {
+		values, _ := models.BodyStrings(postit.Request.Body)
+		for _, value := range values {
+			note(value)
 		}
 	}
 

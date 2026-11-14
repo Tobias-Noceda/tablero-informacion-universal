@@ -3,6 +3,7 @@ package postits
 import (
 	"errors"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/Secreto31126/tesis/common/mocks"
@@ -35,7 +36,7 @@ func TestValidateOneOff(t *testing.T) {
 		"no resource":      {func(p *models.PostIts) { p.Resource = nil }, false},
 		"file scheme":      {func(p *models.PostIts) { p.Resource = &url.URL{Scheme: "file", Path: "/etc/passwd"} }, false},
 		"no host":          {func(p *models.PostIts) { p.Resource = &url.URL{Scheme: "https"} }, false},
-		"post":             {func(p *models.PostIts) { p.Request.Method = "POST" }, false},
+		"put":              {func(p *models.PostIts) { p.Request.Method = "PUT" }, false},
 		"xml response":     {func(p *models.PostIts) { p.Response = "xml" }, false},
 		"no query":         {func(p *models.PostIts) { p.Query = nil }, false},
 		"empty expression": {func(p *models.PostIts) { p.Query = map[string]string{"fact": " "} }, false},
@@ -153,5 +154,44 @@ func TestUpdatePostIt_KeepsACardTypesRequest(t *testing.T) {
 	err := svc.UpdatePostIt(boardOwner, uuid.New(), map[string]any{"resource": "https://evil.example"})
 	if !errors.Is(err, ErrTemplateFixed) {
 		t.Errorf("got %v, want ErrTemplateFixed", err)
+	}
+}
+
+func TestValidateOneOff_Post(t *testing.T) {
+	cases := map[string]struct {
+		method, body string
+		wantBody     string
+		ok           bool
+	}{
+		"post with a JSON body":    {"POST", `{"origin":"EZE","key":"$IGNAV"}`, `{"origin":"EZE","key":"$IGNAV"}`, true},
+		"lowercase post":           {"post", `[1,2]`, `[1,2]`, true},
+		"post without a body":      {"POST", "", "", true},
+		"blank body is no body":    {"POST", "  \n ", "", true},
+		"body that is not JSON":    {"POST", "origin=EZE", "", false},
+		"two JSON documents":       {"POST", `{"a":1}{"b":2}`, "", false},
+		"body over the size limit": {"POST", `"` + strings.Repeat("a", models.MaxRequestBody) + `"`, "", false},
+		"a GET drops its body":     {"GET", `{"origin":"EZE"}`, "", true},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			p := oneOff(uuid.New(), nil)
+			p.Request.Method, p.Request.Body = c.method, c.body
+			err := validateOneOff(p)
+			if !c.ok {
+				if !errors.Is(err, ErrInvalidOneOff) {
+					t.Fatalf("got %v, want ErrInvalidOneOff", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if p.Request.Body != c.wantBody {
+				t.Errorf("body = %q, want %q", p.Request.Body, c.wantBody)
+			}
+			if want := strings.ToUpper(c.method); p.Request.Method != want {
+				t.Errorf("method = %q, want %q", p.Request.Method, want)
+			}
+		})
 	}
 }
