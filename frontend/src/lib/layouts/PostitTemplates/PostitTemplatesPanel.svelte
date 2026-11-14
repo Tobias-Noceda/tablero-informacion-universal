@@ -10,6 +10,9 @@
 	import { draftFrom, emptyDraft, type Draft } from '$lib/well-knowns/draft';
 	import type { BoardRole, PostitTemplate, PostitTemplateBody, UUID } from '$types/api';
 	import PostitTemplateForm from './PostitTemplateForm.svelte';
+	import { boardPlan, plan } from '$stores/plan.svelte';
+	import { canAddTemplate, offersTemplates, orgLimits, templateLimit } from '$lib/billing/can';
+	import PlanHint from '$components/PlanHint/PlanHint.svelte';
 
 	interface Props {
 		boardId: UUID;
@@ -36,12 +39,37 @@
 	// the user is in can be picked, not only the board's.
 	type Tab = 'user' | 'board' | 'org';
 	let tab = $state<Tab>('user');
-	const tabs = $derived<Tab[]>(orgs.list.length > 0 ? ['user', 'board', 'org'] : ['user', 'board']);
+
+	// The plan each scope runs on: the caller's for their own, the board
+	// payer's for the board and its organization. Another organization's is
+	// only known when the caller pays for it; undefined leaves it to the backend.
+	function orgPlan(id: UUID) {
+		if (id === orgId) return boardPlan.limits;
+		const found = orgs.byId(id);
+		return found ? orgLimits(found, session.userId, plan.limits) : undefined;
+	}
+
+	// Organizations whose plan has templates (or may have: unknown ones stay).
+	const offeredOrgs = $derived(
+		orgs.list.filter((o) => {
+			const limits = orgPlan(o.id);
+			return !limits || offersTemplates('org', limits);
+		})
+	);
+
+	// A scope the plan has no templates for is not offered at all.
+	const tabs = $derived<Tab[]>([
+		'user',
+		...(offersTemplates('board', boardPlan.limits) ? (['board'] as const) : []),
+		...(offeredOrgs.length > 0 ? (['org'] as const) : [])
+	]);
 
 	// The board's organization first, else one the user administers.
 	// svelte-ignore state_referenced_locally
 	let org = $state<UUID>(
-		orgs.byId(orgId)?.id ?? (orgs.list.find((o) => o.role === 'admin') ?? orgs.list[0])?.id ?? ''
+		offeredOrgs.find((o) => o.id === orgId)?.id ??
+			(offeredOrgs.find((o) => o.role === 'admin') ?? offeredOrgs[0])?.id ??
+			''
 	);
 
 	const scope = $derived(
@@ -60,6 +88,14 @@
 
 	let list = $state<PostitTemplate[]>([]);
 	let loading = $state(true);
+
+	const limits = $derived(
+		tab === 'user' ? plan.limits : tab === 'board' ? boardPlan.limits : orgPlan(org)
+	);
+	// At the scope's limit "new" gives way to a line saying so.
+	const canCreate = $derived(
+		!limits || canAddTemplate(tab, limits, loading ? undefined : list.length)
+	);
 	let error = $state('');
 	// null: nothing open; 'new': a new one; otherwise the one being edited.
 	let editing = $state<PostitTemplate | 'new' | null>(null);
@@ -84,7 +120,8 @@
 
 	function explain(e: unknown) {
 		if (e instanceof templatesApi.PostitTemplateError) {
-			if (e.code === 'limit_reached') return m['postit_templates.error_limit']();
+			if (e.code === 'limit_reached' || e.code === 'plan_limit')
+				return m['postit_templates.error_limit']();
 			if (e.code === 'invalid_postit_template')
 				return m['postit_templates.error_invalid']({ detail: e.detail ?? '' });
 		}
@@ -150,6 +187,11 @@
 		return tab === 'org' ? (orgs.byId(org)?.name ?? '') : m[`postit_templates.tab_${tab}`]();
 	}
 
+	// A plan that ended while the panel was open may take the tab shown away.
+	$effect(() => {
+		if (!tabs.includes(tab)) show('user');
+	});
+
 	refresh();
 </script>
 
@@ -186,7 +228,7 @@
 				value={org}
 				onchange={(e) => pickOrg(e.currentTarget.value)}
 			>
-				{#each orgs.list as o (o.id)}
+				{#each offeredOrgs as o (o.id)}
 					<option value={o.id}>{o.name}</option>
 				{/each}
 			</select>
@@ -240,6 +282,16 @@
 
 	{#if !canManage}
 		<p class="text-xs opacity-70">{m['postit_templates.read_only']()}</p>
+		{#if editing === 'new'}
+			<p class="text-xs opacity-70">{m['postit_templates.draft_kept']()}</p>
+		{/if}
+	{:else if !canCreate && (editing === null || editing === 'new')}
+		<PlanHint
+			text={m['billing.hint.templates']({
+				count: list.length,
+				max: limits ? templateLimit(tab, limits) : list.length
+			})}
+		/>
 		{#if editing === 'new'}
 			<p class="text-xs opacity-70">{m['postit_templates.draft_kept']()}</p>
 		{/if}

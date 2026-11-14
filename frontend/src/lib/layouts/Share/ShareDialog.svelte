@@ -8,6 +8,9 @@
 	import type { BoardMember, BoardMemberSummary, BoardRole, UUID } from '$types/api';
 	import Dropdown from '$components/Dropdown/Dropdown.svelte';
 	import { cn } from '$lib/utils';
+	import { boardPlan } from '$stores/plan.svelte';
+	import { canInvite } from '$lib/billing/can';
+	import PlanHint from '$components/PlanHint/PlanHint.svelte';
 
 	let {
 		board,
@@ -18,6 +21,9 @@
 
 	const isOwner = $derived(role === 'owner');
 	const assignable: BoardMember['role'][] = ['editor', 'viewer'];
+	// Once every seat of the plan is taken (always on a plan that does not
+	// share) there is no form to add someone; the list stays.
+	const canAdd = $derived(canInvite(boardPlan.limits, boardPlan.seatsUsed));
 
 	let members = $state<BoardMemberSummary[]>([]);
 	// Someone who reaches the board through its organization is not listed
@@ -33,7 +39,8 @@
 		user_not_found: m['members.error_user_not_found'],
 		invalid_role: m['members.error_invalid_role'],
 		owner_role: m['members.error_owner_role'],
-		rate_limited: m['members.error_rate_limited']
+		rate_limited: m['members.error_rate_limited'],
+		plan_limit: m['billing.limit.title']
 	};
 
 	function describe(err: unknown) {
@@ -64,6 +71,8 @@
 			email = '';
 			await refresh();
 		}
+		// A seat was taken, or the backend said there is none left.
+		await boardPlan.reload();
 	}
 
 	async function change(member: BoardMemberSummary, to: BoardMember['role']) {
@@ -72,7 +81,10 @@
 	}
 
 	async function remove(member: BoardMemberSummary) {
-		if (await attempt(() => boardApi.removeMember(board, member.user.id))) await refresh();
+		if (await attempt(() => boardApi.removeMember(board, member.user.id))) {
+			await refresh();
+			await boardPlan.reload();
+		}
 	}
 
 	async function leave() {
@@ -137,7 +149,15 @@
 		</ul>
 	{/if}
 
-	{#if isOwner}
+	{#if isOwner && !canAdd}
+		<PlanHint
+			class="border-t border-main-border pt-3"
+			text={m['billing.hint.seats']({
+				count: boardPlan.seatsUsed ?? boardPlan.limits.seats,
+				max: boardPlan.limits.seats
+			})}
+		/>
+	{:else if isOwner}
 		<form class="flex flex-col gap-2 border-t border-main-border pt-3" onsubmit={add}>
 			<Input
 				label={m['members.email']()}

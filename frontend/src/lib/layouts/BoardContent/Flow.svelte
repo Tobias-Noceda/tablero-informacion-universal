@@ -40,6 +40,8 @@
 	import { results } from '$stores/postit-results.svelte';
 	import { boardPath, nodePath } from '$lib/helpers/routes';
 	import NodeDetail, { type PostItData } from './NodeDetail.svelte';
+	import { boardPlan } from '$stores/plan.svelte';
+	import { canAddNode } from '$lib/billing/can';
 
 	import NodeConfigurationPanel from '$layouts/NodeConfiguration/NodeConfigurationPanel.svelte';
 	import OneOffCardPanel from '$layouts/OneOffCard/OneOffCardPanel.svelte';
@@ -136,7 +138,8 @@
 	const onDrop = async (event: DragEvent) => {
 		event.preventDefault();
 
-		if (!type.current || !canEdit) {
+		// At the plan's card limit the cards sidebar offers nothing to drop.
+		if (!type.current || !canEdit || !canAddNode(boardPlan.limits, nodes.length)) {
 			return;
 		}
 
@@ -178,7 +181,8 @@
 			nodes = nodes.map((n) => (n.id === newNode.id ? { ...newNode, data: { ...n.data, ...newNode.data } } : n));
 			selectedNode = newNode;
 			settingsVersion++;
-			results.refresh(newNode.id)
+			// The edit dropped the cached answer: a normal request runs it again.
+			results.rerun(newNode.id);
 		} else if (action === 'create') {
 			nodes = [...nodes, { ...newNode }];
 		}
@@ -370,6 +374,11 @@
 	};
 
 	// Effects
+	// The cards sidebar offers new cards only below the plan's limit.
+	$effect(() => {
+		boardPlan.nodes = nodes.length;
+	});
+
 	$effect(() => {
 		window.addEventListener('keydown', onKeyDown);
 		return () => window.removeEventListener('keydown', onKeyDown);
