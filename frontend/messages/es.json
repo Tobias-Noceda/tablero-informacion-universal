@@ -363,7 +363,15 @@
 		"response": "Respuesta",
 		"rate": "Se actualiza cada",
 		"seconds": "{value} s",
-		"outputs": "Valores"
+		"outputs": "Valores",
+		"method": "Método",
+		"body": "Cuerpo (JSON)",
+		"body_hint": "Se envía con el POST como application/json. Para usar una credencial, escribila como un valor de texto, por ejemplo {example}, o insertala desde la lista: su valor nunca se muestra en la tarjeta.",
+		"body_size": "{used} de {max} bytes",
+		"body_insert_credential": "Insertar una credencial",
+		"err_body_json": "El cuerpo no es un JSON válido.",
+		"err_body_size": "El cuerpo pesa más de {max} KB.",
+		"err_body_credential": "El cuerpo usa ${name}, pero no hay ninguna credencial con ese nombre que puedas usar."
 	},
 	"strands": {
 		"toolbar": "Estilo de la conexión",

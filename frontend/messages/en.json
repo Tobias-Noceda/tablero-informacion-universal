@@ -362,7 +362,15 @@
 		"response": "Response",
 		"rate": "Refresh every",
 		"seconds": "{value} s",
-		"outputs": "Values"
+		"outputs": "Values",
+		"method": "Method",
+		"body": "Body (JSON)",
+		"body_hint": "Sent with the POST as application/json. To use a credential, write it as a string value like {example}, or insert it from the list: its value is never shown on the card.",
+		"body_size": "{used} of {max} bytes",
+		"body_insert_credential": "Insert a credential",
+		"err_body_json": "The body is not valid JSON.",
+		"err_body_size": "The body is larger than {max} KB.",
+		"err_body_credential": "The body uses ${name}, but there is no credential with that name you can use."
 	},
 	"strands": {
 		"toolbar": "Connection style",
