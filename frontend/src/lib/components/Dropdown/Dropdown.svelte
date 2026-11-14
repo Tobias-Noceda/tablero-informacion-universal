@@ -40,6 +40,11 @@
      */
     floating?: boolean;
     /**
+     * `main` is the teal activator; `plain` a bordered one on the page's own
+     * background, for forms and modals.
+     */
+    variant?: 'main' | 'plain';
+    /**
      * Optional slot for rendering a last custom item in the dropdown, such as
      * a "Create new" button. This slot will be rendered after all options and
      * will not be affected by pagination.
@@ -73,6 +78,7 @@
     itemClass,
     onchange,
     floating = false,
+    variant = 'main',
     children
   }: Props = $props();
 
@@ -136,12 +142,16 @@
     selectClass
   ));
 
+  const plain = $derived(variant === 'plain');
+
   const buttonClass = $derived(cn(
     'bg-main-hover text-main-text',
     'disabled:opacity-50 disabled:cursor-not-allowed',
     'px-3 py-2.5 rounded-xl transition-colors cursor-pointer',
     'border border-main-border hover:border-sidebar',
     isOpen ? 'border-sidebar' : '',
+    plain ? 'rounded-md border-border bg-transparent text-foreground px-3 py-2' : '',
+    plain && isOpen ? 'border-main-border hover:border-main-border' : '',
     activatorClass ? activatorClass(isOpen) : 'w-full',
     'flex items-center justify-between',
     'focus:outline-none focus:ring-none',
@@ -159,6 +169,7 @@
     '[&::-webkit-scrollbar-thumb]:bg-tertiary',
     '[&::-webkit-scrollbar-thumb]:rounded-full',
     '[&::-webkit-scrollbar-thumb]:hover:bg-tertiary-hover',
+    plain ? 'rounded-md bg-background' : '',
     drawerClass,
   ));
 
@@ -168,6 +179,8 @@
     'bg-sidebar hover:bg-sidebar-hover',
     itemClass
       ? itemClass(isSelected)
+      : plain
+        ? 'bg-background text-foreground rounded-md hover:bg-main-hover hover:text-white'
         : isSelected ? 'bg-sidebar-hover font-medium' : '',
     'overflow-x-hidden'
   );
@@ -263,7 +276,7 @@
     {/each}
   {:else if isGroupedOptions(options)}
     {#each Object.entries(options) as [groupKey, group] (groupKey)}
-      <div class={cn("px-3 py-2 text-sm font-medium text-gray-500", sectionClass)}>{group.label}</div>
+      <div class={cn("px-3 py-2 text-sm font-medium text-gray-500", plain && 'font-semibold text-foreground', sectionClass)}>{group.label}</div>
       {#each group.options as option, index (option.value)}
         <button
           tabindex={index}

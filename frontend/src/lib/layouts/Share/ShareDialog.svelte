@@ -7,7 +7,6 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { BoardMember, BoardMemberSummary, BoardRole, UUID } from '$types/api';
 	import Dropdown from '$components/Dropdown/Dropdown.svelte';
-	import { cn } from '$lib/utils';
 	import { boardPlan } from '$stores/plan.svelte';
 	import { canInvite } from '$lib/billing/can';
 	import PlanHint from '$components/PlanHint/PlanHint.svelte';
@@ -184,20 +183,13 @@
 				{#if !readOnly}
 					<Dropdown
 						floating
-						labelClass="font-semibold"
+						variant="plain"
 						options={assignable.map((role) => ({
 							label: m[`members.role_${role}`](),
 							value: role
 						}))}
 						class="w-fit!"
-						activatorClass={(isOpen) =>
-							cn(
-								'rounded-md border border-border bg-transparent px-3 py-2 w-fit!',
-								isOpen ? 'border-main-border hover:border-main-border' : ''
-							)}
-						drawerClass="rounded-md bg-background!"
-						sectionClass="font-semibold text-foreground!"
-						itemClass={() => 'bg-background! rounded-md hover:bg-main-hover!'}
+						activatorClass={() => 'w-fit!'}
 						bind:value={newRole}
 					/>
 				{/if}

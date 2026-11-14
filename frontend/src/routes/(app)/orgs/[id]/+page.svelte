@@ -5,7 +5,6 @@
 	import Dropdown from '$components/Dropdown/Dropdown.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import { cn } from '$lib/utils';
 	import { session } from '$modules/session.svelte';
 	import * as orgsApi from '$services/orgs';
 	import { refreshBoards } from '$stores/boards';
@@ -151,17 +150,11 @@
 						{#if isAdmin}
 							{#if member.user.id !== session.userId}
 								<Dropdown
-									labelClass="font-semibold"
+									variant="plain"
 									options={roles.map((role) => ({ label: m[`orgs.role_${role}`](), value: role }))}
 									class="w-fit!"
-									activatorClass={(isOpen) => cn(
-										"rounded-md border border-border bg-transparent px-3 py-2 w-fit!",
-										isOpen ? "border-main-border hover:border-main-border" : ""
-									)}
+									activatorClass={() => 'w-fit!'}
 									value={member.role}
-									drawerClass="rounded-md bg-background!"
-									sectionClass="font-semibold text-foreground!"
-									itemClass={() => "bg-background! rounded-md hover:bg-main-hover!"}
 									onchange={(selectedId) => change(member, selectedId as OrgRole)}
 								/>
 								<Button variant="destructive" onclick={() => remove(member)}>
@@ -193,15 +186,14 @@
 				required
 			/>
 			<div class="flex gap-2">
-				<select
-					class="rounded-md border border-main-border bg-background px-2 py-1 text-sm"
-					aria-label={m['orgs.members']()}
-					bind:value={newRole}
-				>
-					{#each roles as option (option)}
-						<option value={option}>{m[`orgs.role_${option}`]()}</option>
-					{/each}
-				</select>
+				<Dropdown
+					variant="plain"
+					options={roles.map((role) => ({ label: m[`orgs.role_${role}`](), value: role }))}
+					class="w-fit!"
+					activatorClass={() => 'w-fit!'}
+					value={newRole}
+					onchange={(selected) => (newRole = selected as OrgRole)}
+				/>
 				<Button variant="primary" type="submit" disabled={email.trim() === ''}>
 					{m['orgs.add']()}
 				</Button>
