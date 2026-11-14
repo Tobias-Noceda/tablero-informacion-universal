@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 
-import { credentialsOf, describeData, liveCardBody, requestBody } from "../src/modules/live.ts";
+import { credentialsOf, describeData, describeRequest, liveCardBody, requestBody } from "../src/modules/live.ts";
 
 const memory = {
     board: "b",
@@ -99,5 +99,32 @@ describe("POST memories", () => {
 
     it("lists the credentials of the headers and the body", () => {
         assert.deepEqual(credentialsOf(search), ["IGNAV", "PARTNER"]);
+    });
+});
+
+describe("describeRequest", () => {
+    it("tells how a live memory reads, credentials by name", () => {
+        const text = describeRequest({
+            id: "p",
+            rate: 43200,
+            resource: "https://ignav.com/api/fares/round-trip",
+            request: { method: "POST", headers: { "X-Api-Key": "$IGNAV_KEY" }, queries: {}, body: '{"origin":"EZE"}' },
+            response: "json",
+            query: { price: ".itineraries | min_by(.price.amount) | .price.amount" },
+        });
+        assert.equal(
+            text,
+            [
+                "POST https://ignav.com/api/fares/round-trip (json), read every 43200 s",
+                "Headers: X-Api-Key: $IGNAV_KEY",
+                'Body: {"origin":"EZE"}',
+                "Values: price ← .itineraries | min_by(.price.amount) | .price.amount",
+            ].join("\n"),
+        );
+    });
+
+    it("says nothing for a note or a card made from a card type", () => {
+        assert.equal(describeRequest({ id: "p", rate: 0, resource: null }), null);
+        assert.equal(describeRequest({ id: "p", rate: 60, resource: "https://x.dev", wellknown: "dolar_oficial" }), null);
     });
 });

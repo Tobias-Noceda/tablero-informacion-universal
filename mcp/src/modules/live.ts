@@ -1,4 +1,4 @@
-import type { PostItData, UUID } from "../types/api";
+import type { PostItData, PostItSettings, UUID } from "../types/api";
 
 // What the backend keeps (models.MaxRequestBody), in bytes.
 export const MAX_REQUEST_BODY = 16 << 10;
@@ -89,4 +89,24 @@ function stringsOf(node: unknown): string[] {
     if (Array.isArray(node)) return node.flatMap(stringsOf);
     if (node && typeof node === "object") return Object.values(node).flatMap(stringsOf);
     return [];
+}
+
+// How a live memory reads, for an agent about to fix it: only for a card with
+// its own request (a one-off card); a card type's request is not the agent's.
+export function describeRequest(settings: PostItSettings): string | null {
+    if (!settings.resource || settings.wellknown) return null;
+    const request = settings.request ?? {};
+    const pairs = (record?: Record<string, string> | null) =>
+        Object.entries(record ?? {})
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(", ");
+    const lines = [
+        `${(request.method || "GET").toUpperCase()} ${settings.resource} (${settings.response || "json"}), read every ${settings.rate} s`,
+    ];
+    if (pairs(request.queries)) lines.push(`Query string: ${pairs(request.queries)}`);
+    if (pairs(request.headers)) lines.push(`Headers: ${pairs(request.headers)}`);
+    if (request.body) lines.push(`Body: ${request.body}`);
+    const values = Object.entries(settings.query ?? {}).map(([key, expression]) => `${key} ← ${expression}`);
+    if (values.length) lines.push(`Values: ${values.join("; ")}`);
+    return lines.join("\n");
 }

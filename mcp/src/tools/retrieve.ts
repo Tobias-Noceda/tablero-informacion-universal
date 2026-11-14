@@ -1,9 +1,10 @@
-import type { Board } from "../types/api";
+import type { Board, PostItSettings } from "../types/api";
 
 import type { ToolMetadata, InferSchema } from "xmcp";
 
 import * as api from "../modules/api";
 import { dataOf, lines, titleOf } from "../modules/memory";
+import { describeRequest } from "../modules/live";
 import { relation } from "../modules/strands";
 
 import { z } from "zod";
@@ -18,7 +19,7 @@ export const schema = {
 export const metadata: ToolMetadata = {
     name: "retrieve",
     description:
-        "This tool lets you retrieve a specific memory, with all the details and variables populated. At retrieval, related memories will be reactivated, in order to help remembering other important details that may be required. Each related memory starts with how it relates to this one: → this memory points to it, ← it points to this memory, ↔ both ways, — undirected, followed by the relation's label when it has one. Memories may be refreshed from time to time, as to always have the updated details, in particular for memories with variables that may change frequently.",
+        "This tool lets you retrieve a specific memory, with all the details and variables populated. At retrieval, related memories will be reactivated, in order to help remembering other important details that may be required. A live memory (one that reads an API) also says how it reads: its method, address, query string, headers, body and the jq expression or CSS selector behind each value, with credentials only as $NAME. Each related memory starts with how it relates to this one: → this memory points to it, ← it points to this memory, ↔ both ways, — undirected, followed by the relation's label when it has one. Memories may be refreshed from time to time, as to always have the updated details, in particular for memories with variables that may change frequently.",
     annotations: {
         title: "Retrieve a memory",
         readOnlyHint: true,
@@ -43,6 +44,13 @@ export default async function ({
     const data = await dataOf(postit_id);
     const title = await titleOf(postit, data);
 
+    // How a live memory reads; a note or a card type has nothing to show.
+    const settings = await api
+        .get(`/v1/post-its/${postit_id}/settings`)
+        .then((res) => res.json() as Promise<PostItSettings>)
+        .catch(() => null);
+    const reads = settings && describeRequest(settings);
+
     // The other end of every strand touching this memory, with how it reads.
     const relations = new Map<string, string>();
     for (const strand of board.strands) {
@@ -63,7 +71,10 @@ export default async function ({
     return `${JSON.stringify(title)}
 
 Data: ${JSON.stringify(data)}
-
+${reads ? `
+How it reads:
+${reads}
+` : ""}
 Related memories:
 ${related.join("\n") || "(none)"}
 `;

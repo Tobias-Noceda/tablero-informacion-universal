@@ -51,3 +51,19 @@ export type Org = {
 
 // What a card's query produced: GET /post-its/:id.
 export type PostItData = Record<string, unknown>;
+
+// GET /post-its/:id/settings: how a card reads, credentials only as "$NAME".
+export type PostItSettings = {
+    id: UUID;
+    wellknown?: string;
+    rate: number;
+    resource?: string | null;
+    request?: {
+        method?: string;
+        headers?: Record<string, string> | null;
+        queries?: Record<string, string> | null;
+        body?: string;
+    };
+    response?: string;
+    query?: Record<string, string> | null;
+};
