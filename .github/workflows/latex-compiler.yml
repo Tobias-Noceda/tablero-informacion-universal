@@ -7,12 +7,6 @@ on:
     paths-ignore:
       - docs/informe.pdf
 
-env:
-  DOCS: docs
-  ENTRYPOINT: main.tex
-  OUTPUT: main.pdf
-  INFORME: informe.pdf
-
 jobs:
   build_latex:
     runs-on: ubuntu-latest
@@ -29,7 +23,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: informe
-          path: $DOCS/$OUTPUT
+          path: docs/main.pdf
 
   commit:
     runs-on: ubuntu-slim
@@ -44,19 +38,19 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: informe
-          path: $DOCS
+          path: docs
 
       - name: Delete previous version
-        working-directory: $DOCS
-        run: rm -rf $INFORME
+        working-directory: docs
+        run: rm -rf informe.pdf
 
       - name: Take it's place
-        working-directory: $DOCS
-        run: mv $OUTPUT $INFORME
+        working-directory: docs
+        run: mv main.pdf informe.pdf
 
       - name: Add & Commit
         uses: EndBug/add-and-commit@v11
         with:
-          cwd: $DOCS
-          add: -f $INFORME
-          message: 'Re-compiled $INFORME'
+          cwd: docs
+          add: -f informe.pdf
+          message: 'Re-compiled informe.pdf'
