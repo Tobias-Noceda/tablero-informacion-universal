@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Node } from '@xyflow/svelte';
 import {
+	alignmentClasses,
 	applyCardPatch,
 	borderColorOf,
 	cardBorder,
@@ -119,5 +120,29 @@ describe('drawing', () => {
 	it('grows with the border width', () => {
 		expect(cardBorder({ border: 'dotted', border_width: 'thin' })).toBe('1px dotted var(--card-accent)');
 		expect(cardBorder({ border: 'dotted', border_width: 'thick', color: 'blue' })).toBe('4px dotted var(--strand-blue)');
+	});
+});
+
+describe('alignmentClasses', () => {
+	it('puts the text at the top left by default', () => {
+		expect(alignmentClasses({})).toEqual({ text: 'text-left', vertical: 'justify-start' });
+	});
+
+	it('maps each alignment', () => {
+		expect(alignmentClasses({ text_align: 'center', vertical_align: 'middle' })).toEqual({
+			text: 'text-center',
+			vertical: 'justify-center'
+		});
+		expect(alignmentClasses({ text_align: 'right', vertical_align: 'bottom' })).toEqual({
+			text: 'text-right',
+			vertical: 'justify-end'
+		});
+	});
+
+	it('travels with the rest of the look', () => {
+		expect(lookOf({ text_align: 'center', vertical_align: 'bottom', width: 200 })).toEqual({
+			text_align: 'center',
+			vertical_align: 'bottom'
+		});
 	});
 });

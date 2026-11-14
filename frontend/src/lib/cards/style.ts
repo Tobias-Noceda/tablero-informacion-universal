@@ -1,5 +1,12 @@
 import type { Node } from '@xyflow/svelte';
-import type { CardBorder, CardBorderWidth, CardColor, CardStyle } from '$types/api';
+import type {
+	CardBorder,
+	CardBorderWidth,
+	CardColor,
+	CardStyle,
+	CardTextAlign,
+	CardVerticalAlign
+} from '$types/api';
 import { STRAND_COLORS } from '$lib/strands/style';
 
 // What the backend accepts (models/card_style.go), in the order the toolbar
@@ -7,6 +14,8 @@ import { STRAND_COLORS } from '$lib/strands/style';
 export const CARD_BORDERS: readonly CardBorder[] = ['none', 'solid', 'dashed', 'dotted'];
 export const CARD_BORDER_WIDTHS: readonly CardBorderWidth[] = ['thin', 'normal', 'thick'];
 export const CARD_COLORS: readonly CardColor[] = [...STRAND_COLORS, 'white'];
+export const CARD_TEXT_ALIGNS: readonly CardTextAlign[] = ['left', 'center', 'right'];
+export const CARD_VERTICAL_ALIGNS: readonly CardVerticalAlign[] = ['top', 'middle', 'bottom'];
 
 export const MIN_CARD_WIDTH = 120;
 export const MAX_CARD_WIDTH = 1600;
@@ -15,7 +24,19 @@ export const MAX_CARD_HEIGHT = 1200;
 
 const BORDER_PIXELS: Record<CardBorderWidth, number> = { thin: 1, normal: 2, thick: 4 };
 
-const LOOK_KEYS = ['color', 'border', 'border_width', 'border_color'] as const;
+const LOOK_KEYS = ['color', 'border', 'border_width', 'border_color', 'text_align', 'vertical_align'] as const;
+
+// Whole class names, so Tailwind finds them in the source.
+const TEXT_ALIGN_CLASSES: Record<CardTextAlign, string> = {
+	left: 'text-left',
+	center: 'text-center',
+	right: 'text-right'
+};
+const VERTICAL_ALIGN_CLASSES: Record<CardVerticalAlign, string> = {
+	top: 'justify-start',
+	middle: 'justify-center',
+	bottom: 'justify-end'
+};
 const SIZE_KEYS = ['width', 'height'] as const;
 
 // How a card looks apart from its size: the size is the canvas node's own
@@ -116,4 +137,13 @@ export function borderPixels(width: CardBorderWidth | undefined): number {
 export function cardBorder(look: CardLook): string | undefined {
 	if (!look.border || look.border === 'none') return undefined;
 	return `${borderPixels(look.border_width)}px ${look.border} ${borderColorOf(look)}`;
+}
+
+// Where the text sits: across the card, and from top to bottom (the card is a
+// column, so the vertical one is how it justifies its content).
+export function alignmentClasses(look: CardLook): { text: string; vertical: string } {
+	return {
+		text: TEXT_ALIGN_CLASSES[look.text_align ?? 'left'],
+		vertical: VERTICAL_ALIGN_CLASSES[look.vertical_align ?? 'top']
+	};
 }

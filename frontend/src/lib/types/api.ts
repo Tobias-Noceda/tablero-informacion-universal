@@ -202,6 +202,9 @@ export type StrandStyle = {
 // The line around a card (see $lib/cards/style.ts).
 export type CardBorder = 'none' | 'solid' | 'dashed' | 'dotted';
 export type CardBorderWidth = 'thin' | 'normal' | 'thick';
+// Where the text sits on the card; the vertical one shows on a card taller than its text.
+export type CardTextAlign = 'left' | 'center' | 'right';
+export type CardVerticalAlign = 'top' | 'middle' | 'bottom';
 // Cards use the strands' palette plus white. The text follows the fill.
 export type CardColor = StrandColor | 'white';
 
@@ -213,6 +216,8 @@ export type CardStyle = {
     border?: CardBorder;
     border_width?: CardBorderWidth;
     border_color?: CardColor;
+    text_align?: CardTextAlign;
+    vertical_align?: CardVerticalAlign;
     width?: number;
     height?: number;
 };
