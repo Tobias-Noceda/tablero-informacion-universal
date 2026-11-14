@@ -46,6 +46,14 @@ jobs:
           name: informe
           path: $DOCS
 
+      - name: Delete previous version
+        working-directory: $DOCS
+        run: rm -rf $INFORME
+
+      - name: Take it's place
+        working-directory: $DOCS
+        run: mv $OUTPUT $INFORME
+
       - name: Add & Commit
         uses: EndBug/add-and-commit@v11
         with:
