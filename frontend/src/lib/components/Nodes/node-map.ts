@@ -12,6 +12,7 @@ import GenericNode from './Generic/Generic.svelte';
 import GithubRepoNode from './GithubRepo/GithubRepo.svelte';
 import GmailInboxNode from './GmailInbox/GmailInbox.svelte';
 import GoogleCalendarNode from './GoogleCalendar/GoogleCalendar.svelte';
+import ImageNode from './Image/Image.svelte';
 import NasaApodNode from './NasaApod/NasaApod.svelte';
 import RiesgoPaisNode from './RiesgoPais/RiesgoPais.svelte';
 import StaticCardNode from './StaticCard/StaticCard.svelte';
@@ -22,6 +23,7 @@ import { ONE_OFF } from '$lib/well-knowns/one-off';
 // outputs) comes from the backend: $stores/well-knowns.svelte.
 export const nodesMap: Record<string, Component<NodeProps>> = {
 	static_card: StaticCardNode,
+	image: ImageNode,
 	temperature: TemperatureNode,
 	events_search: EventsSearchNode,
 	dog_facts: DogFactsNode,

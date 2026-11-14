@@ -51,6 +51,13 @@
 
 	--app-primary: var(--app-foreground);
 	--app-secondary: #676767;
+
+	/* The open card's detail panel: cream, so it sits warmly beside the
+	   teal cards. */
+	--app-detail: #fbf5e6;
+	--app-detail-hover: #f1e6c8;
+	--app-detail-border: #e3d3a8;
+	--app-detail-text: #1f2937;
 }
 
 /* Dark: the system's, unless the app is set to light (data-theme, from
@@ -69,6 +76,11 @@
 		--app-skeleton: #1e2a3a;
 		--app-error-bg: rgba(220, 38, 38, 0.15);
 		--app-error-text: #fca5a5;
+
+		--app-detail: #44403c;
+		--app-detail-hover: #524d47;
+		--app-detail-border: #5f5953;
+		--app-detail-text: #f3ead6;
 	}
 }
 
@@ -85,6 +97,11 @@
 	--app-skeleton: #1e2a3a;
 	--app-error-bg: rgba(220, 38, 38, 0.15);
 	--app-error-text: #fca5a5;
+
+	--app-detail: #44403c;
+	--app-detail-hover: #524d47;
+	--app-detail-border: #5f5953;
+	--app-detail-text: #f3ead6;
 }
 
 :root[data-theme='light'] {
@@ -130,6 +147,11 @@
 	--color-success-hover: var(--app-color-success-hover);
 	--color-success-border: var(--app-color-success-border);
 	--color-success-text: var(--app-color-success-text);
+
+	--color-detail: var(--app-detail);
+	--color-detail-hover: var(--app-detail-hover);
+	--color-detail-border: var(--app-detail-border);
+	--color-detail-text: var(--app-detail-text);
 
 	--color-border: var(--app-border);
 	--color-skeleton: var(--app-skeleton);
