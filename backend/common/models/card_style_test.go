@@ -35,6 +35,13 @@ func TestCardStyle_Normalized(t *testing.T) {
 			want: CardStyle{Color: CardColorWhite, Border: CardBorderSolid, BorderWidth: CardBorderWidthThin, BorderColor: CardColorRed},
 		},
 		{name: "a white border", give: CardStyle{BorderColor: CardColorWhite}, want: CardStyle{BorderColor: CardColorWhite}},
+		{
+			name: "text in the middle of the card",
+			give: CardStyle{TextAlign: CardTextAlignCenter, VerticalAlign: CardVerticalAlignMiddle},
+			want: CardStyle{TextAlign: CardTextAlignCenter, VerticalAlign: CardVerticalAlignMiddle},
+		},
+		{name: "an unknown text alignment", give: CardStyle{TextAlign: "justify"}, wantErr: true},
+		{name: "an unknown vertical alignment", give: CardStyle{VerticalAlign: "baseline"}, wantErr: true},
 		{name: "an unknown border", give: CardStyle{Border: "double"}, wantErr: true},
 		{name: "an unknown border width", give: CardStyle{BorderWidth: "huge"}, wantErr: true},
 		{name: "a border colour outside the palette", give: CardStyle{BorderColor: "black"}, wantErr: true},
@@ -78,6 +85,8 @@ func TestCardStylePatch_Normalized(t *testing.T) {
 		{Border: ptr(CardBorder("groove"))},
 		{BorderWidth: ptr(CardBorderWidth("hairline"))},
 		{BorderColor: ptr(CardColor("#fff"))},
+		{TextAlign: ptr(CardTextAlign("start"))},
+		{VerticalAlign: ptr(CardVerticalAlign("center"))},
 		{Width: ptr(float32(10))},
 		{Height: ptr(float32(5000))},
 	}
@@ -99,6 +108,13 @@ func TestCardStylePatch_Apply(t *testing.T) {
 	if got != want {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
+	aligned := CardStylePatch{TextAlign: ptr(CardTextAlignRight), VerticalAlign: ptr(CardVerticalAlignBottom)}.Apply(want)
+	if aligned.TextAlign != CardTextAlignRight || aligned.VerticalAlign != CardVerticalAlignBottom || aligned.Color != want.Color {
+		t.Errorf("aligned = %+v, want the alignments added and the rest kept", aligned)
+	}
+	if (CardStylePatch{TextAlign: ptr(CardTextAlign(""))}).Empty() {
+		t.Error("Empty: a patch resetting the alignment changes something")
+	}
 	if !(CardStylePatch{}).Empty() || (CardStylePatch{Width: ptr(float32(0))}).Empty() || (CardStylePatch{BorderWidth: ptr(CardBorderWidthThin)}).Empty() {
 		t.Error("Empty: only a patch without fields changes nothing")
 	}
@@ -116,7 +132,7 @@ func TestBoardPostIt_DefaultStyleIsNotStored(t *testing.T) {
 	if err := bson.Unmarshal(raw, &doc); err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{"color", "border", "border_width", "border_color", "width", "height"} {
+	for _, field := range []string{"color", "border", "border_width", "border_color", "text_align", "vertical_align", "width", "height"} {
 		if _, ok := doc[field]; ok {
 			t.Errorf("bson has %q for a card without a style", field)
 		}
