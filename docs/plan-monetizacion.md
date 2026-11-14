@@ -23,7 +23,7 @@ La arquitectura actual (Vercel, MongoDB Atlas, Redis Cloud y Resend) es la opci�
 
 1. El pico de usuarios concurrentes es el 10 % de los usuarios totales. El objetivo de 500.000 concurrentes equivale a 5.000.000 de usuarios.
 2. La concurrencia promedio del mes es el 30 % del pico.
-3. Un usuario concurrente mantiene abierto un tablero con 10 tarjetas que consultan una fuente externa. La aplicación consulta cada tarjeta con un intervalo medio de 300 segundos, que es el mínimo del plan Free.
+3. Un usuario concurrente mantiene abierto un tablero con 10 tarjetas que consultan una fuente externa. La aplicación consulta cada tarjeta con un intervalo medio de 300 segundos. El plan Free fija un mínimo de 600 segundos, por lo que las cifras de costo de este informe son un límite superior: el tráfico de los usuarios gratuitos es la mitad del supuesto.
 4. De lo anterior resultan 0,038 solicitudes por segundo por usuario concurrente, incluida la carga del tablero y la reconexión del WebSocket, y 3.200 solicitudes mensuales por usuario total. La red de distribución suma 800 solicitudes de archivos estáticos por usuario.
 5. Cada solicitud consume 5 milisegundos de CPU y transfiere 1,5 KB.
 6. Los correos mensuales equivalen al 15 % de los usuarios totales.
@@ -118,21 +118,21 @@ El plan pertenece al usuario. Los límites de un tablero dependen de quien lo pa
 | ------------------------------------ | ------- | ------------ |
 | Organizaciones propias               | Ninguna | 3 y 10       |
 | Tableros por espacio                 | 5       | 10 y 50      |
-| Personas por tablero u organización | 1       | 5 y 25       |
+| Personas por tablero u organización | 5, solo lectura | 5 y 25       |
 | Nodos por tablero                    | 25      | 100 y 300    |
 | Plantillas de usuario                | 5       | 10 y 50      |
 | Plantillas por tablero               | Ninguna | 5 y 50       |
 | Plantillas por organización         | Ninguna | 3 y 50       |
 | Credenciales almacenadas             | 5       | 25 y 200     |
 | Grupos de credenciales               | Ninguno | 5 y 25       |
-| Intervalo mínimo de actualización  | 300 s   | 150 s y 60 s |
+| Intervalo mínimo de actualización  | 10 min  | 2,5 min y 1 min |
 | Actualización manual sin caché     | No      | No y Sí     |
 | MCP y tokens de acceso               | No      | Sí y Sí    |
 
 Criterios de diseño:
 
-- **Intervalo mínimo.** Es el principal generador de costo y protege a las fuentes externas de un exceso de consultas. Se aplica como piso del tiempo de caché.
-- **Colaboración.** Es la diferencia principal entre Free y Pro. En Pro el total de personas con acceso a un tablero, contando a los miembros de la organización y a los invitados externos, no supera 5.
+- **Intervalo mínimo.** Es el tiempo más corto entre dos actualizaciones de los datos de una tarjeta. Una tarjeta configurada para actualizarse más seguido se actualiza recién al cumplirse ese mínimo: en Free, como mucho una vez cada 10 minutos. Es el principal generador de costo y protege a las fuentes externas de un exceso de consultas. Se aplica como piso del tiempo de caché.
+- **Colaboración.** Es la diferencia principal entre Free y Pro. En Free el dueño puede compartir cada tablero con hasta 4 personas más, que solo pueden verlo. En Pro el total de personas con acceso a un tablero, contando a los miembros de la organización y a los invitados externos, no supera 5, y cualquiera de ellas puede ser editora. Un lector no ejecuta tarjetas nuevas, por lo que compartir en Free agrega lecturas de resultados ya guardados y no consultas a fuentes externas.
 - **Actualización manual.** Queda reservada a Max. La aplicación no guarda en caché las ejecuciones fallidas, por lo que una consulta común ya reintenta.
 - **Tokens de acceso.** Un token no está vinculado a un dispositivo. Por ese motivo no se diferencia su cantidad entre Pro y Max y ambos conservan el tope técnico de 10 tokens activos.
 - **Topes de Max.** Son altos en lugar de ilimitados para acotar el costo máximo de una cuenta.
@@ -180,11 +180,11 @@ Los dos últimos hitos incluyen el costo de operación de AWS.
 
 ### 6.4 Justificación del precio de cada plan
 
-**Free.** Un usuario gratuito típico genera 3.200 solicitudes mensuales y cuesta entre USD 0,004 y 0,05 por mes según el hito. Con el tablero al límite (25 nodos, 300 segundos) y 8 horas diarias de uso cuesta USD 0,14. Cada pagador sostiene a 32 usuarios gratuitos, con un costo conjunto inferior a USD 1,60.
+**Free.** Con el mínimo de 10 minutos, un usuario gratuito típico genera 1.600 solicitudes mensuales y cuesta entre USD 0,002 y 0,025 por mes según el hito. Con el tablero al límite (25 nodos, 600 segundos) y 8 horas diarias de uso cuesta USD 0,07. Cada pagador sostiene a 32 usuarios gratuitos, con un costo conjunto inferior a USD 0,80.
 
-**Pro.** El peor caso es un tablero con 100 nodos, todos con fuente externa, abierto 8 horas por día hábil con el intervalo mínimo de 150 segundos. Genera 352.000 solicitudes mensuales, con un costo de USD 1,02 a la tarifa marginal de Vercel de USD 2,90 por millón de solicitudes. Sumados los usuarios gratuitos que sostiene, el costo máximo atribuible es de USD 2,60, frente a un ingreso neto de USD 8,51. El precio de USD 9 mantiene un margen superior al 69 % aun en el peor caso y permite un valor competitivo, acorde con el objetivo de concentrar en Pro a la mayoría de los pagadores.
+**Pro.** El peor caso es un tablero con 100 nodos, todos con fuente externa, abierto 8 horas por día hábil con el intervalo mínimo de 150 segundos. Genera 352.000 solicitudes mensuales, con un costo de USD 1,02 a la tarifa marginal de Vercel de USD 2,90 por millón de solicitudes. Sumados los usuarios gratuitos que sostiene, el costo máximo atribuible es de USD 1,82, frente a un ingreso neto de USD 8,51. El precio de USD 9 mantiene un margen superior al 78 % aun en el peor caso y permite un valor competitivo, acorde con el objetivo de concentrar en Pro a la mayoría de los pagadores.
 
-**Max.** El peor caso es un tablero con 300 nodos con el intervalo mínimo de 60 segundos. Genera 2.100.000 solicitudes mensuales, con un costo de USD 6,10. Con los usuarios gratuitos asociados el costo máximo es de USD 7,70, frente a un ingreso neto de USD 27,43. Un precio inferior a USD 20 dejaría un margen insuficiente frente al uso intensivo que el plan habilita.
+**Max.** El peor caso es un tablero con 300 nodos con el intervalo mínimo de 60 segundos. Genera 2.100.000 solicitudes mensuales, con un costo de USD 6,10. Con los usuarios gratuitos asociados el costo máximo es de USD 6,90, frente a un ingreso neto de USD 27,43. Un precio inferior a USD 20 dejaría un margen insuficiente frente al uso intensivo que el plan habilita.
 
 ## 7. Cobro con Mercado Pago
 
