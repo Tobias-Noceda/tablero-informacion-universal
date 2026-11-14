@@ -7,6 +7,12 @@ on:
     paths-ignore:
       - docs/informe.pdf
 
+env:
+  DOCS: docs
+  ENTRYPOINT: main.tex
+  OUTPUT: main.pdf
+  INFORME: informe.pdf
+
 jobs:
   build_latex:
     runs-on: ubuntu-latest
@@ -17,13 +23,13 @@ jobs:
       - name: Compile LaTeX document
         uses: xu-cheng/latex-action@v4
         with:
-          working_directory: docs
-          root_file: main.tex
+          working_directory: $DOCS
+          root_file: $ENTRYPOINT
 
       - uses: actions/upload-artifact@v7
         with:
           name: informe
-          path: docs/main.pdf
+          path: $DOCS/$OUTPUT
 
   commit:
     runs-on: ubuntu-slim
@@ -38,10 +44,11 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: informe
-          path: docs/informe.pdf
+          path: $DOCS
 
       - name: Add & Commit
         uses: EndBug/add-and-commit@v11
         with:
-          add: -f docs/informe.pdf
-          message: 'Re-compiled informe.pdf'
+          cwd: $DOCS
+          add: -f $INFORME
+          message: 'Re-compiled $INFORME'
