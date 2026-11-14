@@ -13,10 +13,11 @@ type BoardPostItTitle struct {
 }
 
 type BoardPostIt struct {
-	Id       uuid.UUID        `bson:"id" json:"id"`
-	Type     string           `bson:"type" json:"type"` // Reserved for future use
-	Title    BoardPostItTitle `bson:"title" json:"title"`
-	Position Position         `bson:"position" json:"position"`
+	Id        uuid.UUID        `bson:"id" json:"id"`
+	Type      string           `bson:"type" json:"type"` // Reserved for future use
+	Title     BoardPostItTitle `bson:"title" json:"title"`
+	Position  Position         `bson:"position" json:"position"`
+	CardStyle `bson:",inline"`
 }
 
 // BoardRole is what someone may do on a board: viewers look, editors work on

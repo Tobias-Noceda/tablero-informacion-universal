@@ -1,4 +1,4 @@
-import type { OneOffRequest, PostItSettings, SecretRef, Strand, UUID } from "$types/api";
+import type { CardStyle, OneOffRequest, PostItSettings, SecretRef, Strand, UUID } from "$types/api";
 
 import * as api from "$modules/api.svelte"
 import { mapPostitWithTitle, type PostItWithTitle } from "$lib/helpers/post-it";
@@ -85,4 +85,11 @@ export async function update_settings(
 
 export async function move(id: UUID, x: number, y: number) {
     await api.patch(`/v1/post-its/${id}/position`, { x, y });
+}
+
+// Changes only the fields sent; an empty value (0 for a size) goes back to
+// the default. Answers the card's resulting style.
+export async function style(id: UUID, patch: CardStyle): Promise<CardStyle> {
+    const res = await ensure(await api.patch(`/v1/post-its/${id}/style`, patch));
+    return await res.json() as CardStyle;
 }

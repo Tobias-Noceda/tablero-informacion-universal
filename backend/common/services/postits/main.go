@@ -22,6 +22,7 @@ var (
 	ErrNotAMember       = errors.New("Not found")
 	ErrInvalidBinding   = errors.New("Binding aliases must match [A-Z][A-Z0-9_]*")
 	ErrUnknownWellKnown = errors.New("Well Known post-it not found")
+	ErrInvalidCardStyle = models.ErrInvalidCardStyle
 )
 
 type PostItsService struct {
@@ -203,6 +204,36 @@ func (srv *PostItsService) MovePostIt(principal models.Principal, id uuid.UUID, 
 	}
 
 	return srv.db.MovePostIt(postit.Board, postit.Id, pos)
+}
+
+// StylePostIt changes part of how a card is drawn on its board. A patch
+// that changes nothing answers the style as it is.
+func (srv *PostItsService) StylePostIt(principal models.Principal, id uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error) {
+	postit, err := srv.load(principal, id, models.BoardEditor)
+	if err != nil {
+		return nil, err
+	}
+	patch, err = patch.Normalized()
+	if err != nil {
+		return nil, err
+	}
+	if !patch.Empty() {
+		style, err := srv.db.StylePostIt(postit.Board, postit.Id, patch)
+		if errors.Is(err, infrastructure.ErrPostItNotOnBoard) {
+			return nil, ErrNotAMember
+		}
+		return style, err
+	}
+	board, err := srv.db.FindBoard(postit.Board)
+	if err != nil || board == nil {
+		return nil, ErrNotAMember
+	}
+	for _, entry := range board.PostIts {
+		if entry.Id == postit.Id {
+			return &entry.CardStyle, nil
+		}
+	}
+	return nil, ErrNotAMember
 }
 
 func (srv *PostItsService) EditTitlePostIt(principal models.Principal, id uuid.UUID, title models.BoardPostItTitle) error {
