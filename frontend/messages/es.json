@@ -13,7 +13,8 @@
 		"empty": "Todavía no hay tableros. Creá uno para empezar.",
 		"empty_mobile": "Todavía no hay tableros. Creá uno desde una pantalla más grande.",
 		"cards": "{count} tarjetas",
-		"title_placeholder": "título",
+		"one_off_label": "API propia",
+		"template_label": "Plantilla",
 		"create_board": "Crear un nuevo tablero"
 	},
 	"user_info": {

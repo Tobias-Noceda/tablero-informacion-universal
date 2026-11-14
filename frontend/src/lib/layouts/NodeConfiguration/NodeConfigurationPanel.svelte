@@ -309,12 +309,12 @@
                             )}
                             class="w-full"
                             activatorClass={(isOpen) => cn(
-                                "rounded-md border border-border bg-transparent px-3 py-2 w-full!",
+                                "rounded-md border border-border bg-transparent text-foreground! px-3 py-2 w-full!",
                                 isOpen ? "outline-none ring-2 ring-main-border border-none" : ""
                             )}
                             drawerClass="rounded-md bg-background!"
                             sectionClass="font-semibold text-foreground!"
-                            itemClass={() => "bg-background! rounded-md hover:bg-main-hover!"}
+                            itemClass={() => "bg-background! text-foreground! rounded-md hover:bg-main-hover! hover:text-white! cursor-pointer"}
                             bind:value={pickedKeys[param.key]}
                         />
                     {/if}

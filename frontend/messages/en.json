@@ -12,7 +12,8 @@
 		"empty": "No boards yet. Create one to get started.",
 		"empty_mobile": "No boards yet. Create one from a larger screen.",
 		"cards": "{count} cards",
-		"title_placeholder": "title",
+		"one_off_label": "Custom API",
+		"template_label": "Template",
 		"create_board": "Create a new board"
 	},
 	"user_info": {
