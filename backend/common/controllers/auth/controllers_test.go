@@ -181,7 +181,7 @@ func TestVerify_ReturnsTokensAndSetsTheRefreshCookie(t *testing.T) {
 	if body.User.Email != "ana@example.com" || !body.User.EmailVerified || len(body.User.Identities) != 1 {
 		t.Errorf("user = %+v", body.User)
 	}
-	if strings.Contains(w.Body.String(), "refresh") || strings.Contains(w.Body.String(), "plain:") {
+	if strings.Contains(w.Body.String(), "refresh_token") || strings.Contains(w.Body.String(), "plain:") {
 		t.Errorf("body leaks session or hash material: %s", w.Body.String())
 	}
 

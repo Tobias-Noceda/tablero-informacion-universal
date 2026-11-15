@@ -26,6 +26,7 @@ type SecretsService struct {
 	handshakes infrastructure.HandshakeStore
 	groups     infrastructure.GroupReader
 	access     infrastructure.Access
+	plans      infrastructure.Entitlements
 }
 
 func New(
@@ -37,8 +38,40 @@ func New(
 	handshakes infrastructure.HandshakeStore,
 	groups infrastructure.GroupReader,
 	access infrastructure.Access,
+	plans infrastructure.Entitlements,
 ) *SecretsService {
-	return &SecretsService{store, policy, keyring, tokens, locks, handshakes, groups, access}
+	return &SecretsService{store, policy, keyring, tokens, locks, handshakes, groups, access, plans}
+}
+
+// admit decides whether (scope, name) may be stored and who it is billed to:
+// "" for one that already exists (rewriting a value is never a new secret)
+// and for the platform's own, otherwise the scope's payer, as long as their
+// plan has room for one more.
+func (srv *SecretsService) admit(scope models.SecretScope, name string) (string, error) {
+	if scope.Kind == models.ScopeSystem {
+		return "", nil
+	}
+
+	stored, err := srv.store.FindSecrets(scope, []string{name})
+	if err != nil {
+		return "", err
+	}
+	if len(stored) > 0 {
+		return "", nil
+	}
+
+	plan, err := srv.plans.ForSecretScope(scope)
+	if err != nil {
+		return "", err
+	}
+	left, err := srv.plans.SecretsLeft(plan)
+	if err != nil {
+		return "", err
+	}
+	if left <= 0 {
+		return "", plan.Refuse(models.LimitSecrets, plan.Limits.Secrets)
+	}
+	return plan.Payer, nil
 }
 
 // aad binds a ciphertext to the scope and name it was created under.
@@ -69,7 +102,12 @@ func (srv *SecretsService) Put(scope models.SecretScope, principal models.Princi
 		return fmt.Errorf("Unsupported secret kind")
 	}
 
-	return srv.seal(scope, name, kind, []byte(value), clear{})
+	payer, err := srv.admit(scope, name)
+	if err != nil {
+		return err
+	}
+
+	return srv.seal(scope, name, kind, []byte(value), clear{billedTo: payer})
 }
 
 func (srv *SecretsService) PutOAuth2(scope models.SecretScope, principal models.Principal, name string, material *models.OAuth2Material) error {
@@ -111,7 +149,12 @@ func (srv *SecretsService) PutOAuth2(scope models.SecretScope, principal models.
 	material.ExpiresAt = time.Time{}
 	material.Provider = ""
 
-	return srv.sealMaterial(scope, name, material, false)
+	payer, err := srv.admit(scope, name)
+	if err != nil {
+		return err
+	}
+
+	return srv.sealMaterial(scope, name, material, false, payer)
 }
 
 func validEndpoint(raw string) error {
@@ -225,13 +268,18 @@ type clear struct {
 	flow       string
 	authorized bool
 	provider   models.OAuthProvider
+	// billedTo is who a new secret counts against; the store ignores it on
+	// one that already exists.
+	billedTo string
 }
 
 func clearOf(s *models.Secret) clear {
 	return clear{flow: s.Flow, authorized: s.Authorized, provider: s.Provider}
 }
 
-func (srv *SecretsService) sealMaterial(scope models.SecretScope, name string, material *models.OAuth2Material, authorized bool) error {
+// sealMaterial stores an OAuth2 credential. billedTo is who a new one counts
+// against (see admit); "" when it rewrites one already stored.
+func (srv *SecretsService) sealMaterial(scope models.SecretScope, name string, material *models.OAuth2Material, authorized bool, billedTo string) error {
 	plaintext, err := json.Marshal(material.Persistable())
 	if err != nil {
 		return err
@@ -241,6 +289,7 @@ func (srv *SecretsService) sealMaterial(scope models.SecretScope, name string, m
 		flow:       material.Flow,
 		authorized: authorized,
 		provider:   material.Provider,
+		billedTo:   billedTo,
 	})
 }
 
@@ -265,6 +314,7 @@ func (srv *SecretsService) seal(scope models.SecretScope, name string, kind mode
 		Flow:       meta.flow,
 		Authorized: meta.authorized,
 		Provider:   meta.provider,
+		BilledTo:   meta.billedTo,
 	})
 }
 
@@ -323,7 +373,7 @@ func (srv *SecretsService) refresh(s *models.Secret, material *models.OAuth2Mate
 		return err
 	}
 
-	return srv.sealMaterial(s.Scope, s.Name, material, s.Authorized)
+	return srv.sealMaterial(s.Scope, s.Name, material, s.Authorized, "")
 }
 
 func (srv *SecretsService) Resolve(scope models.SecretScope, names []string) (map[string]string, error) {

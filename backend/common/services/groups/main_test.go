@@ -29,7 +29,7 @@ func (p *purgeRecorder) Purge(scope models.SecretScope) error {
 func service() (*GroupService, *mocks.MemoryGroupStore, *purgeRecorder) {
 	store := &mocks.MemoryGroupStore{}
 	purger := &purgeRecorder{}
-	return New(store, purger, access.New(nil)), store, purger
+	return New(store, purger, access.New(nil), mocks.StaticEntitlements{}), store, purger
 }
 
 func TestCreate_OwnerIsTheCaller(t *testing.T) {
@@ -158,7 +158,7 @@ var (
 
 func acmeService() (*GroupService, *mocks.MemoryGroupStore) {
 	store := &mocks.MemoryGroupStore{}
-	return New(store, &purgeRecorder{}, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}})), store
+	return New(store, &purgeRecorder{}, access.New(&mocks.MemoryOrgStore{Orgs: []models.Org{acme}}), mocks.StaticEntitlements{}), store
 }
 
 func TestCreate_InAnOrgTheCallerBelongsTo(t *testing.T) {

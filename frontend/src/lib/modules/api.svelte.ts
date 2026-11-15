@@ -16,6 +16,33 @@ export function authenticate(next: Authenticator | null) {
 	authenticator = next;
 }
 
+// A refusal for lack of plan: 402 {"error":"plan_limit","limit","max","plan"}.
+export type PlanLimit = { limit: string; max: number; plan: string };
+
+// Whoever shows such a refusal and reloads what the plan allows plugs in
+// here ($stores/plan.svelte.ts), for the same reason as the authenticator.
+let planLimitListener: ((refusal: PlanLimit) => void) | null = null;
+
+export function onPlanLimit(listener: ((refusal: PlanLimit) => void) | null) {
+	planLimitListener = listener;
+}
+
+// Reads a copy: the caller still gets the body.
+async function reportPlanLimit(response: Response) {
+	if (response.status !== 402 || !planLimitListener) return;
+	try {
+		const body = await response.clone().json();
+		if (body?.error !== 'plan_limit') return;
+		planLimitListener({
+			limit: String(body.limit ?? ''),
+			max: Number(body.max ?? 0),
+			plan: String(body.plan ?? '')
+		});
+	} catch {
+		// Not a plan refusal after all.
+	}
+}
+
 // The session protocol itself answers 401 for a bad password or a dead
 // cookie; renewing and retrying those would only hide the answer.
 const SESSION_PROTOCOL = '/v1/auth/';
@@ -50,11 +77,13 @@ export async function request(
 
 	const response = await send();
 	if (response.status !== 401 || !authenticator || path.startsWith(SESSION_PROTOCOL)) {
+		void reportPlanLimit(response);
 		return response;
 	}
 
 	const retried = (await authenticator.renew()) ? await send() : response;
 	if (retried.status === 401) authenticator.expired();
+	void reportPlanLimit(retried);
 	return retried;
 }
 

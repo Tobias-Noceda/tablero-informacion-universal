@@ -14,6 +14,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 
 	a_ctrl "github.com/Secreto31126/tesis/common/controllers/auth"
@@ -51,6 +52,12 @@ type stack struct {
 
 func newStack(t *testing.T) *stack {
 	t.Helper()
+	return newStackWith(t, nil)
+}
+
+// newStackWith is newStack with the configuration adjusted first.
+func newStackWith(t *testing.T, adjust func(*config)) *stack {
+	t.Helper()
 	gin.SetMode(gin.TestMode)
 
 	db, err := mongo.New()
@@ -86,6 +93,9 @@ func newStack(t *testing.T) *stack {
 
 	cfg := config{admins: []string{"admin@it.test", rootEmail}, accessTTL: DEFAULT_ACCESS_TTL, refreshTTL: DEFAULT_REFRESH_TTL, cookieSecure: true,
 		google: oidc.Config{Issuer: googleIssuer, ClientID: googleClientID, ClientSecret: googleClientSecret}}
+	if adjust != nil {
+		adjust(&cfg)
+	}
 	mailer := &mocks.RecordingMailer{}
 
 	return &stack{t: t, app: newApp(db, cache, kek, keys, cfg, mailer), db: db, cache: cache, mailer: mailer}
@@ -161,9 +171,20 @@ func (c *client) do(method, path string, body any) *httptest.ResponseRecorder {
 
 // signUp registers and verifies a fresh account; who only makes the address
 // readable, every call gets a new one.
+//
+// Most tests are not about plans, so the account is put on the max plan; a
+// test about limits registers with register and picks the plan itself.
 func (s *stack) signUp(who string) *client {
 	s.t.Helper()
-	return s.register(who + "-" + uuid.NewString()[:8] + "@it.test")
+	c := s.register(who + "-" + uuid.NewString()[:8] + "@it.test")
+	s.setPlan(c, models.PlanMax)
+	return c
+}
+
+// setPlan puts c on plan the way support would: as a platform admin.
+func (s *stack) setPlan(c *client, plan models.Plan) {
+	s.t.Helper()
+	s.mustJSON(s.admin().do(http.MethodPut, "/api/v1/system/users/"+c.id+"/plan", map[string]any{"plan": plan}), http.StatusNoContent, nil)
 }
 
 // freshAddress is a client address nobody used yet. Registering and signing
@@ -185,6 +206,24 @@ func (s *stack) register(email string) *client {
 
 // admin signs in as the seeded platform admin, registering it on first use.
 func (s *stack) admin() *client {
+	s.t.Helper()
+	// Signing in is limited per account, so one session serves the whole
+	// run: every stack shares signing keys and databases, and a session
+	// outlives the suite.
+	rootMu.Lock()
+	defer rootMu.Unlock()
+	if rootSession == nil {
+		rootSession = s.signInAdmin()
+	}
+	return &client{s, rootSession.id, rootSession.email, rootSession.token}
+}
+
+var (
+	rootMu      sync.Mutex
+	rootSession *client
+)
+
+func (s *stack) signInAdmin() *client {
 	s.t.Helper()
 	var session a_ctrl.SessionResponse
 	w := s.requestFrom(freshAddress(), "", http.MethodPost, "/api/v1/auth/login", map[string]string{"email": rootEmail, "password": itPassword})
@@ -209,6 +248,10 @@ func (c *client) newBoard(name string) models.Board {
 	return board
 }
 
+// publicBilling are the billing routes that need no session: the plans on
+// offer, and the webhook, which proves itself by its signature.
+var publicBilling = map[string]bool{"/api/v1/billing/plans": true, "/api/v1/billing/webhook": true}
+
 // Everything but /auth needs a token: the wiring is the only thing that puts
 // a route behind RequireAuth, so walk what is actually mounted.
 func TestEndToEnd_EveryPrivateRouteNeedsAToken(t *testing.T) {
@@ -217,7 +260,7 @@ func TestEndToEnd_EveryPrivateRouteNeedsAToken(t *testing.T) {
 
 	checked := 0
 	for _, route := range s.app.router.Routes() {
-		if strings.HasPrefix(route.Path, "/api/v1/auth/") {
+		if strings.HasPrefix(route.Path, "/api/v1/auth/") || publicBilling[route.Path] {
 			continue
 		}
 		checked++

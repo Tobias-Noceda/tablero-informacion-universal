@@ -38,6 +38,10 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 // An organization the caller is not in answers 404: whether it exists is not
 // disclosed, the same rule boards and groups follow.
 func (ctrl *Controller) fail(c *gin.Context, err error) {
+	if middleware.PlanLimit(c, err) {
+		return
+	}
+
 	switch {
 	case errors.Is(err, srv.ErrForbidden):
 		c.JSON(http.StatusNotFound, gin.H{"error": "Organization not found"})

@@ -62,11 +62,17 @@ export async function del(id: UUID): Promise<Strand[]> {
     return deletedEdges;
 }
 
-// `fresh` skips every cache on the way, so the card runs again now.
-export async function execute(id: UUID, { fresh = false }: { fresh?: boolean } = {}) {
+// `fresh` skips every cache on the way, so the card runs again now; only a
+// plan with manual refresh may ask for it (402 otherwise). `reload` only
+// skips the browser's copy: after an edit the backend has already dropped
+// its own, so a plain request runs the card again on any plan.
+export async function execute(
+    id: UUID,
+    { fresh = false, reload = false }: { fresh?: boolean; reload?: boolean } = {},
+) {
     const res = fresh
         ? await api.get(`/v1/post-its/${id}?fresh=1`, { cache: "no-store" })
-        : await api.get(`/v1/post-its/${id}`);
+        : await api.get(`/v1/post-its/${id}`, reload ? { cache: "no-store" } : undefined);
     return await res.json() as Record<string, string>;
 }
 

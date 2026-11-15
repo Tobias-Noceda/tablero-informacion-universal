@@ -47,7 +47,7 @@ func TestMaintenance_Rewrap(t *testing.T) {
 	spy := &maintainerSpy{}
 	var out bytes.Buffer
 
-	if err := flags.run(spy, &out); err != nil {
+	if err := flags.run(spy, nil, &out); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 	if !spy.rewrapped || !strings.Contains(out.String(), "3") {
@@ -67,7 +67,7 @@ func TestMaintenance_RotateOneScope(t *testing.T) {
 		flags, _ := parseMaintenance([]string{"-rotate-key", raw})
 		spy := &maintainerSpy{}
 
-		if err := flags.run(spy, &bytes.Buffer{}); err != nil {
+		if err := flags.run(spy, nil, &bytes.Buffer{}); err != nil {
 			t.Fatalf("%s: %v", raw, err)
 		}
 		if len(spy.rotated) != 1 || spy.rotated[0] != want {
@@ -81,7 +81,7 @@ func TestMaintenance_RejectsBadScopes(t *testing.T) {
 		flags, _ := parseMaintenance([]string{"-rotate-key", raw})
 		spy := &maintainerSpy{}
 
-		if err := flags.run(spy, &bytes.Buffer{}); err == nil && raw != "" {
+		if err := flags.run(spy, nil, &bytes.Buffer{}); err == nil && raw != "" {
 			t.Errorf("%q was accepted", raw)
 		}
 		if len(spy.rotated) != 0 {
@@ -94,7 +94,7 @@ func TestMaintenance_RotateAll(t *testing.T) {
 	flags, _ := parseMaintenance([]string{"-rotate-all-keys"})
 	spy := &maintainerSpy{}
 
-	if err := flags.run(spy, &bytes.Buffer{}); err != nil {
+	if err := flags.run(spy, nil, &bytes.Buffer{}); err != nil {
 		t.Fatalf("run: %v", err)
 	}
 	if !spy.rotatedAll {
@@ -119,6 +119,11 @@ func (s *schemaSpy) RenameLegacyCollections() error {
 func (s *schemaSpy) EnsureIndexes() error {
 	s.steps = append(s.steps, "indexes")
 	return s.indexErr
+}
+
+func (s *schemaSpy) BackfillBilling() error {
+	s.steps = append(s.steps, "backfill")
+	return nil
 }
 
 func (s *schemaSpy) SeedWellKnowns(defs []models.WellKnown) error {
@@ -146,8 +151,8 @@ func TestMaintenance_MigrateRenamesThenIndexesThenSeeds(t *testing.T) {
 	if err := migrate(spy); err != nil {
 		t.Fatalf("migrate: %v", err)
 	}
-	if strings.Join(spy.steps, ",") != "rename,indexes,seed" {
-		t.Errorf("steps = %v, want rename, indexes, then seed", spy.steps)
+	if strings.Join(spy.steps, ",") != "rename,indexes,backfill,seed" {
+		t.Errorf("steps = %v, want rename, indexes, backfill, then seed", spy.steps)
 	}
 	if len(spy.seeded) == 0 {
 		t.Error("no built-in well-known was seeded")
@@ -175,5 +180,30 @@ func TestMaintenance_MigrateOnBootExceptOnVercel(t *testing.T) {
 	}
 	if migrateOnBoot(env(map[string]string{"VERCEL": "1"})) {
 		t.Error("a Vercel instance migrated on boot")
+	}
+}
+
+type reconcilerSpy struct {
+	synced, failed int
+	err            error
+}
+
+func (r *reconcilerSpy) Reconcile() (int, int, error) { return r.synced, r.failed, r.err }
+
+func TestMaintenance_ReconcileBilling(t *testing.T) {
+	flags, err := parseMaintenance([]string{"-reconcile-billing"})
+	if err != nil || !flags.requested() || flags.migrate {
+		t.Fatalf("flags = %+v %v", flags, err)
+	}
+
+	var out bytes.Buffer
+	if err := flags.run(&maintainerSpy{}, &reconcilerSpy{synced: 4}, &out); err != nil || !strings.Contains(out.String(), "4 subscriptions") {
+		t.Errorf("run = %v %q", err, out.String())
+	}
+	if err := flags.run(&maintainerSpy{}, &reconcilerSpy{synced: 1, failed: 2}, &bytes.Buffer{}); err == nil {
+		t.Error("failures went unnoticed")
+	}
+	if err := flags.run(&maintainerSpy{}, &reconcilerSpy{err: errors.New("boom")}, &bytes.Buffer{}); err == nil {
+		t.Error("an error went unnoticed")
 	}
 }

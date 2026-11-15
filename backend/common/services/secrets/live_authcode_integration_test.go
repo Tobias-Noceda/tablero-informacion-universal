@@ -108,7 +108,7 @@ func TestLiveAuthorizationCode(t *testing.T) {
 	firstRefresh := stored.RefreshToken
 
 	stored.ExpiresAt = time.Now().Add(-time.Minute)
-	if err := srv.sealMaterial(board, "MOCKPROVIDER", &stored, true); err != nil {
+	if err := srv.sealMaterial(board, "MOCKPROVIDER", &stored, true, ""); err != nil {
 		t.Fatalf("reseal: %v", err)
 	}
 

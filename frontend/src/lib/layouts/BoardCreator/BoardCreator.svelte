@@ -7,7 +7,9 @@
     import { m } from '$lib/paraglide/messages';
 
     import { isCreatingBoard, setCreatingBoard } from "$stores/creating";
-	import { refreshBoards } from '$stores/boards';
+	import { boardList, refreshBoards } from '$stores/boards';
+	import { boardSpace } from '$stores/plan.svelte';
+	import { orgs } from '$stores/org.svelte';
 	
     import * as boardApi from '$services/board';
 	
@@ -18,17 +20,27 @@
 
     const { org } = $props();
 
+	// Never opens at the plan's board limit, whatever asked for it.
+	const space = $derived(boardSpace(org?.id, $boardList));
+
 	async function handleCreate() {
 		const trimmed = boardName.trim();
 		if (!trimmed) return;
 		const board = await boardApi.create(trimmed, org?.id);
+		// Refused (a limit reached from another tab): the notice says why.
+		if (!board?.id) {
+			setCreatingBoard(false);
+			return;
+		}
 		await refreshBoards();
+		// The organization's board count moved.
+		void orgs.refresh().catch(() => {});
 		setCreatingBoard(false);
 		await goto(resolve(boardPath(board.id, org?.id)));
 	}
 </script>
 
-{#if $isCreatingBoard}
+{#if $isCreatingBoard && space.allowed}
 	<Modal
 		onclose={() => setCreatingBoard(false)}
 		onaccept={handleCreate}

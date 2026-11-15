@@ -8,11 +8,16 @@
 	import { orgs } from '$stores/org.svelte';
 	import type { BoardRole, Org } from '$types/api';
 	import { setCreatingBoard } from '$stores/creating';
+	import { boardSpace } from '$stores/plan.svelte';
+	import PlanHint from '$components/PlanHint/PlanHint.svelte';
 
 	// The organization whose boards this is, or none for Personal.
 	let { org }: { org?: Org } = $props();
 
 	const boards = $derived($boardList.filter((board) => orgs.shows(board, org?.id)));
+
+	// At the plan's board limit there is no creator, only a line saying so.
+	const space = $derived(boardSpace(org?.id, $boardList));
 
 	const roleLabel: Record<BoardRole, () => string> = {
 		owner: m['members.role_owner'],
@@ -44,17 +49,28 @@
 				</div>
 			</a>
 		{/each}
-		<button
-			class="hidden aspect-4/3 cursor-pointer flex-col items-center md:flex justify-center gap-2 rounded-lg border-2 border-dashed border-main-border text-secondary transition-colors hover:border-main-border-hover hover:text-primary"
-			onclick={() => setCreatingBoard(true)}
-		>
-			<Icon name="plus" class="h-10 w-10" />
-			<span class="font-medium">{m['landing.create_board']()}</span>
-		</button>
+		{#if space.allowed}
+			<button
+				class="hidden aspect-4/3 cursor-pointer flex-col items-center md:flex justify-center gap-2 rounded-lg border-2 border-dashed border-main-border text-secondary transition-colors hover:border-main-border-hover hover:text-primary"
+				onclick={() => setCreatingBoard(true)}
+			>
+				<Icon name="plus" class="h-10 w-10" />
+				<span class="font-medium">{m['landing.create_board']()}</span>
+			</button>
+		{/if}
 	</div>
 
+	{#if !space.allowed}
+		<PlanHint
+			class="hidden md:block"
+			text={m['billing.hint.boards']({ count: space.count, max: space.max ?? space.count })}
+		/>
+	{/if}
+
 	{#if boards.length === 0}
-		<p class="hidden text-sm opacity-70 md:block">{m['landing.empty']()}</p>
+		{#if space.allowed}
+			<p class="hidden text-sm opacity-70 md:block">{m['landing.empty']()}</p>
+		{/if}
 		<p class="text-sm opacity-70 md:hidden">{m['landing.empty_mobile']()}</p>
 	{/if}
 </div>

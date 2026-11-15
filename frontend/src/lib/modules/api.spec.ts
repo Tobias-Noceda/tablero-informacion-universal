@@ -126,4 +126,40 @@ describe('api client', () => {
 
 		await expect(api.get('/v1/boards')).rejects.toMatchObject({ status: 503 });
 	});
+
+	describe('plan limits', () => {
+		const refusal = { error: 'plan_limit', limit: 'boards', max: 5, plan: 'free' };
+
+		function stubBody(status: number, body: unknown) {
+			vi.stubGlobal(
+				'fetch',
+				vi.fn(async () => new Response(JSON.stringify(body), { status }))
+			);
+		}
+
+		afterEach(() => api.onPlanLimit(null));
+
+		it('reports a 402 plan_limit and leaves the body to the caller', async () => {
+			const seen: api.PlanLimit[] = [];
+			api.onPlanLimit((limit) => seen.push(limit));
+			stubBody(402, refusal);
+
+			const response = await api.post('/v1/boards', { name: 'x' });
+
+			expect(await response.json()).toEqual(refusal);
+			await vi.waitFor(() => expect(seen).toEqual([{ limit: 'boards', max: 5, plan: 'free' }]));
+		});
+
+		it('ignores any other 402', async () => {
+			const seen: api.PlanLimit[] = [];
+			api.onPlanLimit((limit) => seen.push(limit));
+			stubBody(402, { error: 'payment_required' });
+
+			const response = await api.post('/v1/boards', { name: 'x' });
+			await response.json();
+			await new Promise((done) => setTimeout(done, 0));
+
+			expect(seen).toEqual([]);
+		});
+	});
 });

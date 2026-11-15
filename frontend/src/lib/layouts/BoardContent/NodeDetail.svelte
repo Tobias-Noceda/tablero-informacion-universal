@@ -24,6 +24,8 @@
 	import type { PostIt, PostItSettings, SecretRef } from '$types/api';
 	import { ONE_OFF } from '$lib/well-knowns/one-off';
 	import ImageView from '$components/Nodes/Image/ImageView.svelte';
+	import { boardPlan } from '$stores/plan.svelte';
+	import { canRefresh } from '$lib/billing/can';
 
 	export type PostItData = PostIt & {
 		title?: { text: string; vars: boolean };
@@ -120,6 +122,15 @@
 		);
 	}
 
+	// A stored body, indented to read; as it is when it is not JSON.
+	function prettyBody(body: string) {
+		try {
+			return JSON.stringify(JSON.parse(body), null, 2);
+		} catch {
+			return body;
+		}
+	}
+
 	function failure(err: unknown) {
 		return isHttpError(err) && err.status === 403
 			? m['node_detail.forbidden']()
@@ -170,12 +181,20 @@
 	<div class="flex flex-col gap-3">
 		{@render record(
 			[
+				[m['one_off.method'](), (s.request?.method || 'GET').toUpperCase()],
 				[m['one_off.url'](), s.resource ?? ''],
 				[m['one_off.response'](), (s.response ?? '').toUpperCase()],
 				[m['one_off.rate'](), m['one_off.seconds']({ value: String(s.rate) })]
 			],
 			m['node_detail.no_configuration']()
 		)}
+		{#if s.request?.method?.toUpperCase() === 'POST' && s.request.body}
+			<!-- Credentials are only their "$NAME" here: the values never leave the backend. -->
+			<div class="flex flex-col gap-1">
+				<h4 class="text-sm font-semibold">{m['one_off.body']()}</h4>
+				<pre class="overflow-x-auto rounded-md bg-background-hover/40 p-2 font-mono text-xs whitespace-pre-wrap break-all">{prettyBody(s.request.body)}</pre>
+			</div>
+		{/if}
 		<!-- {#each [[m['postit_templates.queries'](), s.request?.queries], [m['postit_templates.headers'](), s.request?.headers]] as const as [label, values] (label)}
 			{#if values && Object.keys(values).length > 0}
 				<div class="flex flex-col gap-1">
@@ -215,7 +234,7 @@
 {/snippet}
 
 <aside
-	class="absolute inset-0 z-25 flex flex-col gap-4 overflow-hidden bg-detail text-detail-text md:static md:h-auto md:max-h-full md:min-h-0 md:self-stretch md:w-100 md:shrink-0 md:rounded-l-2xl md:border-l md:border-detail-border"
+	class="absolute inset-0 z-25 flex flex-col gap-4 overflow-hidden bg-detail text-detail-text md:inset-auto md:top-0 md:right-0 md:bottom-0 md:my-4 md:mx-3 md:w-100 md:rounded-2xl md:border md:border-detail-border"
 >
 	<header class="flex shrink-0 items-start gap-2 p-4 pb-0">
 		<Tooltip
@@ -255,7 +274,12 @@
 		</div>
 
 		{#if canEdit && knownType}
-			<Tooltip content={m['node_detail.edit']()} placement="bottom" tooltipClass="max-w-60! -mt-1">
+			<!-- The last button in the row anchors its tooltip leftwards, so it stays on screen. -->
+			<Tooltip
+				content={m['node_detail.edit']()}
+				placement={canRefresh(boardPlan.limits) ? 'bottom' : 'bottom-left'}
+				tooltipClass={canRefresh(boardPlan.limits) ? 'max-w-60! -mt-1' : 'max-w-60! -mt-1 ml-11'}
+			>
 				<button
 					type="button"
 					class="cursor-pointer rounded-md p-2 hover:bg-detail-hover disabled:cursor-wait disabled:opacity-60"
@@ -276,21 +300,24 @@
 			</Tooltip>
 		{/if}
 
-		<Tooltip
-			content={m['node_detail.refresh']()}
-			placement="bottom-left"
-			tooltipClass="max-w-60! -mt-1 ml-11"
-		>
-			<button
-				type="button"
-				class="cursor-pointer rounded-md p-2 hover:bg-detail-hover disabled:cursor-wait disabled:opacity-60"
-				aria-label={m['node_detail.refresh']()}
-				disabled={refreshing}
-				onclick={refresh}
+		<!-- Running a card again past the cache is part of some plans only. -->
+		{#if canRefresh(boardPlan.limits)}
+			<Tooltip
+				content={m['node_detail.refresh']()}
+				placement="bottom-left"
+				tooltipClass="max-w-60! -mt-1 ml-11"
 			>
-				<Icon name="refresh" class={'stroke-2 w-5 h-5 ' + (refreshing ? 'animate-spin' : '')} />
-			</button>
-		</Tooltip>
+				<button
+					type="button"
+					class="cursor-pointer rounded-md p-2 hover:bg-detail-hover disabled:cursor-wait disabled:opacity-60"
+					aria-label={m['node_detail.refresh']()}
+					disabled={refreshing}
+					onclick={refresh}
+				>
+					<Icon name="refresh" class={'stroke-2 w-5 h-5 ' + (refreshing ? 'animate-spin' : '')} />
+				</button>
+			</Tooltip>
+		{/if}
 	</header>
 
 	<!-- Only the details scroll: the header and the delete button stay put. -->

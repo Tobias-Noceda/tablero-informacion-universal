@@ -50,6 +50,10 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 // A board the caller may not touch answers 404: whether it exists is not
 // disclosed, the same rule groups and the vault follow.
 func (ctrl *Controller) fail(c *gin.Context, err error) {
+	if middleware.PlanLimit(c, err) {
+		return
+	}
+
 	switch {
 	case errors.Is(err, b_srv.ErrForbidden):
 		c.JSON(http.StatusNotFound, gin.H{"error": "Board not found"})
@@ -110,7 +114,7 @@ func (ctrl *Controller) GetUserBoards(c *gin.Context) {
 
 // GetBoard godoc
 // @Summary      Get a specific board
-// @Description  Members only.
+// @Description  Members only. Comes with what the plan of whoever pays for the board allows (limits), how many people reach it (seats_used) and how many more secrets the payer may store (secrets_left).
 // @Tags         boards
 // @Produce      json
 // @Param        id   path      string  true  "Board UUID" format(uuid)
@@ -142,6 +146,7 @@ func (ctrl *Controller) GetBoard(c *gin.Context) {
 // @Param        request  body      CreateBoardRequest  true  "Board creation payload"
 // @Success      201      {object}  models.Board
 // @Failure      400      {object}  map[string]string{"error": "string"}
+// @Failure      402      {object}  map[string]string{"error": "plan_limit"}  "limit: boards"
 // @Failure      404      {object}  map[string]string{"error": "string"}  "org_not_found"
 // @Router       /boards [post]
 func (ctrl *Controller) CreateBoard(c *gin.Context) {
@@ -241,6 +246,7 @@ func (ctrl *Controller) GetMembers(c *gin.Context) {
 // @Param        request  body      SetMemberRequest   true  "Who and with which role"
 // @Success      200      {object}  models.BoardMemberSummary
 // @Failure      400      {object}  map[string]string{"error": "invalid_role | owner_role"}
+// @Failure      402      {object}  map[string]string{"error": "plan_limit"}  "limit: seats"
 // @Failure      404      {object}  map[string]string{"error": "user_not_found"}
 // @Router       /boards/{id}/members [put]
 func (ctrl *Controller) SetMember(c *gin.Context) {

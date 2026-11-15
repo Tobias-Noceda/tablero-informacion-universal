@@ -22,7 +22,78 @@ export type Profile = {
     admin: boolean;
     identities: IdentityProvider[];
     created_at: string;
+    // What they subscribed to and what it allows. An older backend sends
+    // neither: read them through limitsOf ($lib/billing/can.ts).
+    plan?: Plan;
+    // When a paid plan stops unless it is charged again (RFC 3339).
+    plan_expires?: string;
+    limits?: Limits;
 }
+
+export type Plan = 'free' | 'pro' | 'max';
+
+// What a plan allows. A board's are those of whoever pays for it: its owner,
+// or the owner of its organization.
+export type Limits = {
+    orgs: number;
+    boards_per_space: number;
+    // People on a board or an organization, its owner included.
+    seats: number;
+    // Everyone but the owner joins a board as a viewer (Free).
+    viewers_only: boolean;
+    nodes_per_board: number;
+    user_templates: number;
+    board_templates: number;
+    org_templates: number;
+    secrets: number;
+    groups: number;
+    // The shortest a card's result is kept before it runs again, in seconds.
+    min_rate: number;
+    force_refresh: boolean;
+    api_access: boolean;
+    price_usd: number;
+};
+
+// A refusal for lack of plan (HTTP 402, error "plan_limit").
+export type PlanLimitCode =
+    | 'orgs' | 'boards' | 'seats' | 'nodes'
+    | 'user_templates' | 'board_templates' | 'org_templates'
+    | 'secrets' | 'groups' | 'force_refresh' | 'api_access' | 'editors';
+
+export type PlanInfo = {
+    plan: Plan;
+    price_usd: number;
+    price_ars: number;
+    limits: Limits;
+};
+
+// GET /billing/plans. Without checkout the plans are only shown.
+export type PlanCatalogue = {
+    checkout: boolean;
+    currency: string;
+    plans: PlanInfo[];
+};
+
+export type SubscriptionStatus = 'none' | 'pending' | 'authorized' | 'paused' | 'canceled';
+
+export type Subscription = {
+    plan: Plan;
+    status: SubscriptionStatus;
+    // A downgrade that applies on the next charge.
+    pending_plan?: Plan;
+    amount_ars?: number;
+    next_payment?: string;
+    // Until when a cancelled plan lasts.
+    expires?: string;
+};
+
+// How much of their own limits the caller uses.
+export type Usage = {
+    orgs: number;
+    groups: number;
+    secrets: number;
+    user_templates: number;
+};
 
 // What anyone else gets to see about a user.
 export type UserSummary = {
@@ -68,6 +139,13 @@ export type Org = {
     members: { user: UUID; role: OrgRole }[];
     created_at: string;
     role: OrgRole; // the caller's
+    // Who pays for it; absent on organizations from before plans existed.
+    owner?: UUID;
+    // The payer's plan, whoever asks, and what the organization holds of it
+    // (people, and boards of any member). Absent from older backends.
+    limits?: Limits;
+    seats_used?: number;
+    boards_used?: number;
 };
 
 export type OrgMemberSummary = {
@@ -124,15 +202,25 @@ export type PostItSettings = {
         method: string;
         headers: Record<string, string> | null;
         queries: Record<string, string> | null;
+        // A POST's JSON body, as text; credentials appear in it as "$NAME".
+        body?: string;
     };
     response?: 'json' | 'html' | '';
     query?: Record<string, string> | null;
 }
 
+// A one-off card reads with a GET, or a POST with a JSON body.
+export type OneOffMethod = 'GET' | 'POST';
+
 // What a one-off card is created or edited with.
 export type OneOffRequest = {
     resource: string;
-    request: { method: 'GET'; headers: Record<string, string>; queries: Record<string, string> };
+    request: {
+        method: OneOffMethod;
+        headers: Record<string, string>;
+        queries: Record<string, string>;
+        body?: string;
+    };
     response: 'json' | 'html';
     query: Record<string, string>;
     rate: number;
@@ -146,6 +234,10 @@ export type Board = {
     members: BoardMember[]; // everyone else on the board
     org?: UUID; // the organization it belongs to; none for a personal board
     role?: BoardRole; // the caller's
+    // Only on GET /boards/:id, all three from whoever pays for the board.
+    limits?: Limits;
+    seats_used?: number;
+    secrets_left?: number;
     postits: ({
         id: UUID;
         type?: string;

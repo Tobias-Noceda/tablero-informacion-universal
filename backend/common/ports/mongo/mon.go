@@ -21,14 +21,15 @@ const (
 )
 
 type MongoDB struct {
-	client   *mongo.Client
-	users    *mongo.Collection
-	boards   *mongo.Collection
-	postit   *mongo.Collection
-	secrets  *mongo.Collection
-	dataKeys *mongo.Collection
-	groups   *mongo.Collection
-	orgs     *mongo.Collection
+	client        *mongo.Client
+	users         *mongo.Collection
+	boards        *mongo.Collection
+	postit        *mongo.Collection
+	secrets       *mongo.Collection
+	dataKeys      *mongo.Collection
+	groups        *mongo.Collection
+	orgs          *mongo.Collection
+	subscriptions *mongo.Collection
 
 	wellKnowns      *mongo.Collection
 	postitTemplates *mongo.Collection
@@ -74,6 +75,7 @@ func New() (*MongoDB, error) {
 	db.dataKeys = db.client.Database(name).Collection("data_keys")
 	db.groups = db.client.Database(name).Collection("groups")
 	db.orgs = db.client.Database(name).Collection("orgs")
+	db.subscriptions = db.client.Database(name).Collection("subscriptions")
 	db.accessTokens = db.client.Database(name).Collection("access_tokens")
 	db.wellKnowns = db.client.Database(name).Collection("well_knowns")
 	db.postitTemplates = db.client.Database(name).Collection("postit_templates")
@@ -113,6 +115,10 @@ func (db *MongoDB) EnsureIndexes() error {
 	}
 
 	if err := db.ensurePostitTemplateIndexes(); err != nil {
+		return err
+	}
+
+	if err := db.ensureSubscriptionIndexes(); err != nil {
 		return err
 	}
 
@@ -305,6 +311,14 @@ func (db *MongoDB) UpdateBoardName(id uuid.UUID, name string) error {
 		bson.M{"_id": id},
 		bson.M{"$set": bson.M{"name": name}},
 	)
+}
+
+// CountPersonalBoards counts the boards user owns outside any organization.
+func (db *MongoDB) CountPersonalBoards(user string) (int64, error) {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	return db.boards.CountDocuments(ctx, bson.M{"owner": user, "org": nil})
 }
 
 func (db *MongoDB) CreateBoard(name string, owner string, org *uuid.UUID) (*models.Board, error) {
@@ -512,7 +526,12 @@ func (db *MongoDB) ensureBoardIndexes() error {
 		{Keys: bson.D{{Key: "members.user", Value: 1}}},
 		{Keys: bson.D{{Key: "org", Value: 1}}},
 	})
+	if err != nil {
+		return err
+	}
 
+	// A board's cards are read by board every time it is opened.
+	_, err = db.postit.Indexes().CreateOne(ctx, mongo.IndexModel{Keys: bson.D{{Key: "board", Value: 1}}})
 	return err
 }
 

@@ -65,6 +65,13 @@ func (db *MongoDB) FindUserGroups(userID string, orgs []uuid.UUID) ([]models.Gro
 	return groups, nil
 }
 
+func (db *MongoDB) CountOwnedGroups(userID string) (int64, error) {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	return db.groups.CountDocuments(ctx, bson.M{"owner": userID})
+}
+
 func (db *MongoDB) DeleteGroup(id uuid.UUID) error {
 	ctx, cancel := timeout()
 	defer cancel()

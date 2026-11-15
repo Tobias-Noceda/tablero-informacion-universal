@@ -107,6 +107,11 @@ var (
 
 func service(t *testing.T, store *memoryStore) *SecretsService {
 	t.Helper()
+	return serviceOn(t, store, mocks.StaticEntitlements{})
+}
+
+func serviceOn(t *testing.T, store *memoryStore, plans mocks.StaticEntitlements) *SecretsService {
+	t.Helper()
 	key := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0x2B}, 32))
 	sealer, err := crypto.NewFromKeys("1:" + key)
 	if err != nil {
@@ -117,7 +122,7 @@ func service(t *testing.T, store *memoryStore) *SecretsService {
 			return &models.Board{Id: id, Owner: owner.ID, Members: []models.BoardMember{{User: collaborator.ID, Role: models.BoardEditor}}}, nil
 		},
 	}
-	return New(store, NewPolicy(boards, store.groups, access.New(nil)), crypto.NewKeyring(sealer, store.keys), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, store.groups, access.New(nil))
+	return New(store, NewPolicy(boards, store.groups, access.New(nil)), crypto.NewKeyring(sealer, store.keys), &mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, store.groups, access.New(nil), plans)
 }
 
 func TestPut_StoresOnlyCiphertext(t *testing.T) {

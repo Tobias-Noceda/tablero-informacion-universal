@@ -2,6 +2,7 @@
 	import Button from '$components/Button/Button.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import Modal from '$components/Modal/Modal.svelte';
+	import Dropdown from '$components/Dropdown/Dropdown.svelte';
 	import * as secretsApi from '$services/secrets';
 	import { session } from '$modules/session.svelte';
 	import type { OAuth2Flow, OAuthProvider, OAuthProviderStatus, SecretMeta, UUID } from '$types/api';
@@ -9,6 +10,9 @@
 	type StaticKind = 'api_key' | 'bearer' | 'basic';
 	import { m } from '$lib/paraglide/messages';
 	import { cn } from '$lib/utils';
+	import { boardPlan, plan } from '$stores/plan.svelte';
+	import { canAddOwnSecret, canAddSecret } from '$lib/billing/can';
+	import PlanHint from '$components/PlanHint/PlanHint.svelte';
 
 	let { board, onclose }: { board: UUID; onclose: () => void } = $props();
 
@@ -19,6 +23,26 @@
 	const scope = $derived(
 		tab === 'board' ? secretsApi.boardScope(board) : secretsApi.memberScope(board, session.userId)
 	);
+
+	// A board credential counts against whoever pays for the board, one of
+	// "only mine" against the caller. With no room left there is no form.
+	const canAdd = $derived(
+		tab === 'board'
+			? canAddSecret(boardPlan.secretsLeft)
+			: canAddOwnSecret(plan.limits, plan.usage?.secrets)
+	);
+	const limitHint = $derived(
+		tab === 'board'
+			? { count: boardPlan.limits.secrets, max: boardPlan.limits.secrets }
+			: { count: plan.usage?.secrets ?? plan.limits.secrets, max: plan.limits.secrets }
+	);
+
+	// What is left after a credential was added or removed.
+	function recount() {
+		void boardPlan.reload();
+		void plan.refreshUsage();
+	}
+	recount();
 
 	let secrets = $state<SecretMeta[]>([]);
 	let providers = $state<OAuthProviderStatus[]>([]);
@@ -117,6 +141,7 @@
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		}
+		recount();
 	}
 
 	async function remove(secret: SecretMeta) {
@@ -124,6 +149,7 @@
 		try {
 			await secretsApi.del(scope, secret.name);
 			await refresh();
+			recount();
 		} catch (e) {
 			error = e instanceof Error ? e.message : String(e);
 		}
@@ -213,7 +239,9 @@
 		</ul>
 	{/if}
 
-	{#if drafting === null}
+	{#if !canAdd}
+		<PlanHint text={m['billing.hint.secrets'](limitHint)} />
+	{:else if drafting === null}
 		<div class="flex gap-2">
 			<Button variant="primary" onclick={() => (drafting = 'static')}>
 				{m['secrets.add_static']()}
@@ -235,14 +263,18 @@
 			{/if}
 
 			{#if drafting === 'static'}
-				<label class="flex flex-col gap-1 text-sm">
-					{m['secrets.method']()}
-					<select class="bg-background border border-main-border rounded-md px-2 py-1" bind:value={kind}>
-						<option value="api_key">{m['secrets.method_api_key']()}</option>
-						<option value="bearer">{m['secrets.method_bearer']()}</option>
-						<option value="basic">{m['secrets.method_basic']()}</option>
-					</select>
-				</label>
+				<Dropdown
+					floating
+					variant="plain"
+					label={m['secrets.method']()}
+					class="w-full"
+					options={(['api_key', 'bearer', 'basic'] as const).map((k) => ({
+						value: k,
+						label: m[`secrets.method_${k}`]()
+					}))}
+					value={kind}
+					onchange={(selected) => (kind = selected as StaticKind)}
+				/>
 				<p class="text-xs opacity-70">{m[`secrets.method_${kind}_hint`]()}</p>
 
 				{#if kind === 'basic'}
@@ -252,23 +284,29 @@
 					<Input label={m['secrets.value']()} type="password" bind:value required />
 				{/if}
 			{:else if drafting === 'connect'}
-				<label class="flex flex-col gap-1 text-sm">
-					{m['secrets.provider']()}
-					<select class="bg-background border border-main-border rounded-md px-2 py-1" bind:value={provider}>
-						{#each connectable as p (p.provider)}
-							<option value={p.provider}>{p.provider}</option>
-						{/each}
-					</select>
-				</label>
+				<Dropdown
+					floating
+					variant="plain"
+					label={m['secrets.provider']()}
+					class="w-full"
+					options={connectable.map((p) => ({ value: p.provider, label: p.provider }))}
+					value={provider}
+					onchange={(selected) => (provider = selected as OAuthProvider)}
+				/>
 				<p class="text-xs opacity-70">{m['secrets.connect_hint']()}</p>
 			{:else}
-				<label class="flex flex-col gap-1 text-sm">
-					{m['secrets.flow']()}
-					<select class="bg-background border border-main-border rounded-md px-2 py-1" bind:value={flow}>
-						<option value="client_credentials">client_credentials</option>
-						<option value="authorization_code">authorization_code</option>
-					</select>
-				</label>
+				<Dropdown
+					floating
+					variant="plain"
+					label={m['secrets.flow']()}
+					class="w-full"
+					options={(['client_credentials', 'authorization_code'] as const).map((f) => ({
+						value: f,
+						label: f
+					}))}
+					value={flow}
+					onchange={(selected) => (flow = selected as OAuth2Flow)}
+				/>
 				<Input label={m['secrets.client_id']()} bind:value={clientId} required />
 				<Input label={m['secrets.client_secret']()} type="password" bind:value={clientSecret} required />
 				<Input label={m['secrets.token_url']()} placeholder="https://provider.example/oauth/token" bind:value={tokenUrl} required />

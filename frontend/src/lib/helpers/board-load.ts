@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import * as boardApi from '$services/board';
 import { orgs } from '$stores/org.svelte';
+import { boardPlan } from '$stores/plan.svelte';
 import { wellKnowns } from '$stores/well-knowns.svelte';
 import type { UUID } from '$types/api';
 import type { BoardData } from '$layouts/BoardContent/type';
@@ -21,6 +22,8 @@ export async function loadBoard(id: UUID, orgId?: UUID): Promise<BoardData> {
 
 	if (orgs.orgOf(board) !== orgId) error(404);
 	orgs.remember(orgId);
+	// What the board allows comes from whoever pays for it.
+	boardPlan.adopt(board);
 
 	return {
 		boardId: id,

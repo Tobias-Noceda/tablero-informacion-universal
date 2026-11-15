@@ -20,11 +20,18 @@ type keyMaintainer interface {
 	RotateAll() error
 }
 
+// billingReconciler is the slice of the billing service the reconcile command
+// needs.
+type billingReconciler interface {
+	Reconcile() (synced, failed int, err error)
+}
+
 type maintenanceFlags struct {
-	migrate       bool
-	rewrapKeys    bool
-	rotateKey     string
-	rotateAllKeys bool
+	migrate          bool
+	rewrapKeys       bool
+	rotateKey        string
+	rotateAllKeys    bool
+	reconcileBilling bool
 }
 
 // schema is what migrate needs from the database: its collections, their
@@ -32,19 +39,25 @@ type maintenanceFlags struct {
 type schema interface {
 	RenameLegacyCollections() error
 	EnsureIndexes() error
+	BackfillBilling() error
 	infrastructure.WellKnownStore
 }
 
 // migrate moves renamed collections to their current name, creates the
-// indexes the stores rely on and inserts the built-in well-knowns not stored
-// yet (edited or deleted ones are left alone). All three are idempotent, and
-// the renames go first so the indexes land on the moved collections.
+// indexes the stores rely on, gives the organizations and secrets stored
+// before plans existed someone to bill, and inserts the built-in well-knowns
+// not stored yet (edited or deleted ones are left alone). All four are
+// idempotent, and the renames go first so the indexes land on the moved
+// collections.
 func migrate(db schema) error {
 	if err := db.RenameLegacyCollections(); err != nil {
 		return fmt.Errorf("rename collections: %w", err)
 	}
 	if err := db.EnsureIndexes(); err != nil {
 		return fmt.Errorf("ensure indexes: %w", err)
+	}
+	if err := db.BackfillBilling(); err != nil {
+		return fmt.Errorf("backfill billing: %w", err)
 	}
 	if err := wellknowns.New(db).Seed(); err != nil {
 		return fmt.Errorf("seed well-knowns: %w", err)
@@ -69,6 +82,8 @@ func parseMaintenance(args []string) (*maintenanceFlags, error) {
 	set.StringVar(&flags.rotateKey, "rotate-key", "", "rotate the data key of one scope (<kind>:<owner>, or 'system'), then exit")
 	set.BoolVar(&flags.rotateAllKeys, "rotate-all-keys", false, "rotate the data key of every scope, then exit")
 
+	set.BoolVar(&flags.reconcileBilling, "reconcile-billing", false, "sync every subscription that is not canceled with Mercado Pago, then exit")
+
 	if err := set.Parse(args); err != nil {
 		return nil, err
 	}
@@ -76,14 +91,14 @@ func parseMaintenance(args []string) (*maintenanceFlags, error) {
 	return flags, nil
 }
 
-// requested reports whether a key maintenance command was asked for. -migrate
+// requested reports whether a maintenance command that needs the services was asked for. -migrate
 // is not one: it only needs the database and runs before the rest boots.
 func (f *maintenanceFlags) requested() bool {
-	return f.rewrapKeys || f.rotateKey != "" || f.rotateAllKeys
+	return f.rewrapKeys || f.rotateKey != "" || f.rotateAllKeys || f.reconcileBilling
 }
 
 // run executes the requested maintenance and reports what it did.
-func (f *maintenanceFlags) run(secrets keyMaintainer, out io.Writer) error {
+func (f *maintenanceFlags) run(secrets keyMaintainer, billing billingReconciler, out io.Writer) error {
 	if f.rewrapKeys {
 		rewrapped, err := secrets.Rewrap()
 		if err != nil {
@@ -108,6 +123,17 @@ func (f *maintenanceFlags) run(secrets keyMaintainer, out io.Writer) error {
 			return err
 		}
 		fmt.Fprintln(out, "rotated every data key")
+	}
+
+	if f.reconcileBilling {
+		synced, failed, err := billing.Reconcile()
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(out, "reconciled %d subscriptions, %d failed\n", synced, failed)
+		if failed > 0 {
+			return fmt.Errorf("%d subscriptions could not be reconciled", failed)
+		}
 	}
 
 	return nil

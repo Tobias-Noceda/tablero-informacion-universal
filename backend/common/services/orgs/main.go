@@ -30,10 +30,11 @@ type OrgService struct {
 	users   infrastructure.UserReader
 	secrets infrastructure.ScopePurger
 	limiter infrastructure.RateLimiter
+	plans   infrastructure.Entitlements
 }
 
-func New(store infrastructure.OrgStore, users infrastructure.UserReader, secrets infrastructure.ScopePurger, limiter infrastructure.RateLimiter) *OrgService {
-	return &OrgService{store, users, secrets, limiter}
+func New(store infrastructure.OrgStore, users infrastructure.UserReader, secrets infrastructure.ScopePurger, limiter infrastructure.RateLimiter, plans infrastructure.Entitlements) *OrgService {
+	return &OrgService{store, users, secrets, limiter, plans}
 }
 
 // member loads an organization the principal belongs to, with their role
@@ -67,6 +68,8 @@ func (srv *OrgService) admin(principal models.Principal, id uuid.UUID) (*models.
 	return org, nil
 }
 
+// Create makes the caller the organization's first admin and its owner: the
+// one whose plan it, and every board in it, runs on.
 func (srv *OrgService) Create(principal models.Principal, name string) (*models.Org, error) {
 	if principal.Anonymous() {
 		return nil, ErrForbidden
@@ -77,18 +80,53 @@ func (srv *OrgService) Create(principal models.Principal, name string) (*models.
 		return nil, ErrInvalidName
 	}
 
+	plan, err := srv.plans.ForUser(principal.ID)
+	if err != nil {
+		return nil, err
+	}
+	owned, err := srv.store.CountOwnedOrgs(principal.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := plan.Admits(models.LimitOrgs, int(owned), plan.Limits.Orgs); err != nil {
+		return nil, err
+	}
+
 	org := &models.Org{
 		Id:        uuid.New(),
 		Name:      name,
 		Members:   []models.OrgMember{{User: principal.ID, Role: models.OrgRoleAdmin}},
 		CreatedAt: time.Now().UTC(),
+		Owner:     principal.ID,
 	}
 	if err := srv.store.CreateOrg(org); err != nil {
 		return nil, err
 	}
 
 	org.Role = models.OrgRoleAdmin
+	if err := srv.fillUsage(org); err != nil {
+		return nil, err
+	}
 	return org, nil
+}
+
+// usage is the payer's limits and what the organization holds of them.
+func (srv *OrgService) usage(org *models.Org) (*models.Limits, *int, *int, error) {
+	plan, err := srv.plans.ForOrg(org)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	boards, err := srv.store.CountOrgBoards(org.Id)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	seats, used := len(org.Members), int(boards)
+	return &plan.Limits, &seats, &used, nil
+}
+
+func (srv *OrgService) fillUsage(org *models.Org) (err error) {
+	org.Limits, org.SeatsUsed, org.BoardsUsed, err = srv.usage(org)
+	return err
 }
 
 func (srv *OrgService) ListMine(principal models.Principal) ([]models.Org, error) {
@@ -105,6 +143,9 @@ func (srv *OrgService) ListMine(principal models.Principal) ([]models.Org, error
 	}
 	for i := range orgs {
 		orgs[i].Role = orgs[i].RoleOf(principal.ID)
+		if err := srv.fillUsage(&orgs[i]); err != nil {
+			return nil, err
+		}
 	}
 	return orgs, nil
 }
@@ -136,7 +177,12 @@ func (srv *OrgService) Get(principal models.Principal, id uuid.UUID) (*models.Or
 		members = append(members, models.OrgMemberSummary{User: summary, Role: member.Role})
 	}
 
-	return &models.OrgDetail{Id: org.Id, Name: org.Name, Role: org.Role, Members: members, CreatedAt: org.CreatedAt}, nil
+	detail := &models.OrgDetail{Id: org.Id, Name: org.Name, Role: org.Role, Members: members, CreatedAt: org.CreatedAt, Owner: org.Owner}
+	detail.Limits, detail.SeatsUsed, detail.BoardsUsed, err = srv.usage(org)
+	if err != nil {
+		return nil, err
+	}
+	return detail, nil
 }
 
 func (srv *OrgService) Rename(principal models.Principal, id uuid.UUID, name string) error {
@@ -172,9 +218,11 @@ func (srv *OrgService) Delete(principal models.Principal, id uuid.UUID) error {
 }
 
 // SetMember adds the account registered under email, or changes its role.
-// The store refuses to demote the last admin.
+// The store refuses to demote the last admin. Only a new member takes one of
+// the seats the payer's plan gives the organization.
 func (srv *OrgService) SetMember(principal models.Principal, id uuid.UUID, email string, role models.OrgRole) (*models.OrgMemberSummary, error) {
-	if _, err := srv.admin(principal, id); err != nil {
+	org, err := srv.admin(principal, id)
+	if err != nil {
 		return nil, err
 	}
 	if !role.Valid() {
@@ -191,6 +239,16 @@ func (srv *OrgService) SetMember(principal models.Principal, id uuid.UUID, email
 	user, err := srv.users.FindUserByEmail(models.NormalizeEmail(email))
 	if err != nil {
 		return nil, err
+	}
+
+	if org.RoleOf(user.Id.String()) == "" {
+		plan, err := srv.plans.ForOrg(org)
+		if err != nil {
+			return nil, err
+		}
+		if err := plan.Admits(models.LimitSeats, len(org.Members), plan.Limits.Seats); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := srv.store.SetOrgMember(id, user.Id.String(), role); err != nil {

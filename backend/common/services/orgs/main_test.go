@@ -38,7 +38,7 @@ func serviceWith(limiter infrastructure.RateLimiter) (*OrgService, *mocks.Memory
 	store := &mocks.MemoryOrgStore{Boards: map[uuid.UUID]int64{}, Groups: map[uuid.UUID]int64{}, OrgBoards: map[uuid.UUID][]models.Board{}}
 	users := &mocks.MemoryUserStore{Users: []models.User{anaUser, bobUser, cyUser, eveUser}}
 	purger := &purgeRecorder{}
-	return New(store, users, purger, limiter), store, purger
+	return New(store, users, purger, limiter, mocks.StaticEntitlements{}), store, purger
 }
 
 // acme is created by ana, with bob as a member.
