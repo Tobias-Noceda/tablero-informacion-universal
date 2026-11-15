@@ -202,15 +202,25 @@ export type PostItSettings = {
         method: string;
         headers: Record<string, string> | null;
         queries: Record<string, string> | null;
+        // A POST's JSON body, as text; credentials appear in it as "$NAME".
+        body?: string;
     };
     response?: 'json' | 'html' | '';
     query?: Record<string, string> | null;
 }
 
+// A one-off card reads with a GET, or a POST with a JSON body.
+export type OneOffMethod = 'GET' | 'POST';
+
 // What a one-off card is created or edited with.
 export type OneOffRequest = {
     resource: string;
-    request: { method: 'GET'; headers: Record<string, string>; queries: Record<string, string> };
+    request: {
+        method: OneOffMethod;
+        headers: Record<string, string>;
+        queries: Record<string, string>;
+        body?: string;
+    };
     response: 'json' | 'html';
     query: Record<string, string>;
     rate: number;

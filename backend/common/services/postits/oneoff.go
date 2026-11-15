@@ -27,8 +27,10 @@ func invalidOneOff(format string, args ...any) error {
 }
 
 // validateOneOff checks a card that carries its own request (no card type)
-// the way the catalogue checks its definitions: a GET to an http(s) URL whose
-// answer the query maps to outputs. It normalises the method and drops a body.
+// the way the catalogue checks its definitions: a GET or a POST to an http(s)
+// URL whose answer the query maps to outputs. It normalises the method; a POST
+// may carry a JSON body of at most models.MaxRequestBody bytes, a GET never
+// does.
 func validateOneOff(postIt *models.PostIts) error {
 	resource := postIt.Resource
 	if resource == nil || (resource.Scheme != "http" && resource.Scheme != "https") || resource.Host == "" {
@@ -38,10 +40,22 @@ func validateOneOff(postIt *models.PostIts) error {
 	switch strings.ToUpper(postIt.Request.Method) {
 	case "", "GET":
 		postIt.Request.Method = "GET"
+		postIt.Request.Body = ""
+	case "POST":
+		postIt.Request.Method = "POST"
+		if strings.TrimSpace(postIt.Request.Body) == "" {
+			postIt.Request.Body = ""
+			break
+		}
+		if len(postIt.Request.Body) > models.MaxRequestBody {
+			return invalidOneOff("the request body is larger than %d bytes", models.MaxRequestBody)
+		}
+		if _, err := models.BodyStrings(postIt.Request.Body); err != nil {
+			return invalidOneOff("the request body must be one JSON document")
+		}
 	default:
-		return invalidOneOff("request method must be GET")
+		return invalidOneOff("request method must be GET or POST")
 	}
-	postIt.Request.Body = ""
 
 	if postIt.Response != "json" && postIt.Response != "html" {
 		return invalidOneOff("response must be json or html")

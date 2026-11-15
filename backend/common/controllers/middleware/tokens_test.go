@@ -30,6 +30,10 @@ func restricted() *gin.Engine {
 	api.GET("/boards/:id/secrets", ok)
 	api.GET("/system/keys", ok)
 	api.GET("/post-its/:id/settings", ok)
+	api.DELETE("/boards/:id", ok)
+	api.DELETE("/boards/:id/strands/:strand", ok)
+	api.DELETE("/boards/:id/members/:user", ok)
+	api.DELETE("/post-its/:id", ok)
 	return r
 }
 
@@ -46,7 +50,14 @@ func TestRestrictAccessTokens(t *testing.T) {
 		{"pat", http.MethodPut, "/api/v1/boards/b1/members", http.StatusForbidden},
 		{"pat", http.MethodGet, "/api/v1/boards/b1/secrets", http.StatusForbidden},
 		{"pat", http.MethodGet, "/api/v1/system/keys", http.StatusForbidden},
-		{"pat", http.MethodGet, "/api/v1/post-its/p1/settings", http.StatusForbidden},
+		// What a card reads (credentials only by name), so an agent can fix it.
+		{"pat", http.MethodGet, "/api/v1/post-its/p1/settings", http.StatusNoContent},
+		// An agent can undo its own mistakes: boards, cards and strands.
+		{"pat", http.MethodDelete, "/api/v1/boards/b1", http.StatusNoContent},
+		{"pat", http.MethodDelete, "/api/v1/boards/b1/strands/s1", http.StatusNoContent},
+		{"pat", http.MethodDelete, "/api/v1/post-its/p1", http.StatusNoContent},
+		// Removing someone is sharing, which stays with the people.
+		{"pat", http.MethodDelete, "/api/v1/boards/b1/members/u2", http.StatusForbidden},
 		// A browser session is not restricted.
 		{"session", http.MethodPost, "/api/v1/boards", http.StatusNoContent},
 		{"session", http.MethodGet, "/api/v1/boards/b1/secrets", http.StatusNoContent},

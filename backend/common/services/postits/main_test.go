@@ -677,3 +677,20 @@ func TestStylePostIt_CardNotOnItsBoardIsNotAMember(t *testing.T) {
 		t.Errorf("err = %v, want ErrNotAMember", err)
 	}
 }
+
+func TestSecretRefs_ReadsTheJSONBody(t *testing.T) {
+	postit := &models.PostIts{
+		Request: models.Request{
+			Method:  "POST",
+			Headers: map[string]string{"X-Api-Key": "$IGNAV"},
+			Body:    `{"origin":"EZE","auth":{"token":"$PARTNER"},"note":"not $THIS","list":["$IGNAV"]}`,
+		},
+	}
+
+	got := secretRefs(postit)
+	slices.Sort(got)
+
+	if want := []string{"IGNAV", "PARTNER"}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v (only whole string values name a credential)", got, want)
+	}
+}

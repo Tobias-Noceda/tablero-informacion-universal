@@ -7,8 +7,9 @@ An [xmcp](https://xmcp.dev) server (Streamable HTTP, `/mcp`) that lets an agent 
 | `list_pkgs` | Every board the user can see (`id - organization - name`) |
 | `create_pkg` / `delete_pkg` | Create or delete a board |
 | `memories` | The post-its of one board (`id - (x; y) - title`) |
-| `retrieve` | One post-it: its title, its data and the post-its connected to it, each with the relation's direction (`→` `←` `↔` `—`) and label |
+| `retrieve` | One post-it: its title, its data, how it reads when it is a live memory (method, address, query string, headers, body and the expression behind each value, credentials only as `$NAME`) and the post-its connected to it, each with the relation's direction (`→` `←` `↔` `—`) and label |
 | `consolidate` | Save a text memory (a `static_card`) at a position, connected to related ones |
+| `perceive` | Save a live memory: a card with its own GET or POST request (an http(s) address, a POST's JSON `body` of at most 16 KB, `json` read with jq or `html` read with CSS selectors, optional headers and query parameters, a refresh rate) that reads the address once and answers what it read; a read that fails keeps nothing. A header, query or body value written as `$NAME` uses the board credential of that name, so secrets never go through the agent |
 | `reconsolidate` | Change a memory's title or text |
 | `associate` | Connect a memory to others, optionally with a label and a direction; an existing connection is updated, never duplicated |
 | `dissociate` | Remove the connection between two memories |

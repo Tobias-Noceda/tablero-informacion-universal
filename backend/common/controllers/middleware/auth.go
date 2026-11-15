@@ -49,6 +49,7 @@ var accessTokenRoutes = map[string]bool{
 	"GET /api/v1/boards/:id/post-its":                true,
 	"GET /api/v1/boards/:id/members":                 true,
 	"GET /api/v1/post-its/:id":                       true,
+	"GET /api/v1/post-its/:id/settings":              true,
 	"GET /api/v1/users/:id":                          true,
 	"GET /api/v1/orgs":                               true,
 	"GET /api/v1/orgs/:id":                           true,

@@ -13,7 +13,10 @@
 	import { renderTitle } from '$lib/title';
 	import { cn } from '$lib/utils';
 	import {
+		bodyCredentialNames,
 		emptyOneOff,
+		insertCredential,
+		MAX_REQUEST_BODY,
 		ONE_OFF,
 		oneOffBody,
 		oneOffFrom,
@@ -24,7 +27,7 @@
 	} from '$lib/well-knowns/one-off';
 	import { session } from '$modules/session.svelte';
 	import * as postItsApi from '$services/post-it';
-	import type { PostItSettings, SecretMeta, UUID } from '$types/api';
+	import type { OneOffMethod, PostItSettings, SecretMeta, UUID } from '$types/api';
 
 	interface Props {
 		boardId: UUID;
@@ -88,6 +91,25 @@
 		)
 	);
 
+	// The body editor, to insert a credential where the cursor is.
+	let bodyField = $state<HTMLTextAreaElement>();
+	const bodyBytes = $derived(new TextEncoder().encode(draft.body.trim()).length);
+	// Said while typing: a body that is not JSON is the usual slip.
+	const bodyIsJson = $derived(!draft.body.trim() || bodyCredentialNames(draft.body) !== null);
+
+	function pickBodyCredential(key: string) {
+		const secret = usableSecrets.find((s) => refKey(s) === key);
+		if (!secret) return;
+		const cursor = bodyField?.selectionStart ?? draft.body.length;
+		const inserted = insertCredential(draft.body, cursor, secret.name);
+		draft.body = inserted.body;
+		draft.bodySecrets[secret.name] = key;
+		requestAnimationFrame(() => {
+			bodyField?.focus();
+			bodyField?.setSelectionRange(inserted.cursor, inserted.cursor);
+		});
+	}
+
 	function describe(problem: OneOffProblem) {
 		switch (problem.code) {
 			case 'resource':
@@ -106,6 +128,12 @@
 				return m['postit_templates.err_duplicate']({ key: problem.value });
 			case 'title':
 				return m['postit_templates.err_title']({ syntax: '{{name}}' });
+			case 'body_json':
+				return m['one_off.err_body_json']();
+			case 'body_size':
+				return m['one_off.err_body_size']({ max: String(MAX_REQUEST_BODY / 1024) });
+			case 'body_credential':
+				return m['one_off.err_body_credential']({ name: problem.value });
 		}
 	}
 
@@ -238,13 +266,76 @@
 	<p class="text-xs opacity-70">{m['one_off.hint']()}</p>
 
 	<div class="flex flex-col gap-3 border-t border-main-border pt-3">
-		<Input
-			label={m['postit_templates.resource']()}
-			labelClass="font-semibold"
-			placeholder="https://api.example.com/v1/data"
-			bind:value={draft.resource}
-			required
-		/>
+		<div class="flex items-end gap-2">
+			<div class="flex flex-col gap-1 text-sm">
+				<span class="font-semibold">{m['one_off.method']()}</span>
+				<div class="flex rounded-md border border-border p-0.5" role="radiogroup" aria-label={m['one_off.method']()}>
+					{#each ['GET', 'POST'] as const as method (method)}
+						<button
+							type="button"
+							role="radio"
+							aria-checked={draft.method === method}
+							class={cn(
+								'cursor-pointer rounded px-3 py-1 font-mono text-xs transition-colors',
+								draft.method === method ? 'bg-main text-main-text' : 'hover:bg-background-hover'
+							)}
+							onclick={() => (draft.method = method as OneOffMethod)}
+						>
+							{method}
+						</button>
+					{/each}
+				</div>
+			</div>
+			<div class="min-w-0 flex-1">
+				<Input
+					label={m['postit_templates.resource']()}
+					labelClass="font-semibold"
+					placeholder="https://api.example.com/v1/data"
+					bind:value={draft.resource}
+					required
+				/>
+			</div>
+		</div>
+
+		{#if draft.method === 'POST'}
+			<fieldset class="flex flex-col gap-1">
+				<legend class="text-sm font-semibold">{m['one_off.body']()}</legend>
+				<p class="text-xs opacity-70">{m['one_off.body_hint']({ example: '"$NAME"' })}</p>
+				<textarea
+					bind:this={bodyField}
+					bind:value={draft.body}
+					rows="6"
+					spellcheck="false"
+					class={cn(fieldClass, 'resize-y font-mono text-xs', !bodyIsJson && 'border-destructive!')}
+					placeholder={'{"origin": "EZE", "destination": "NRT"}'}
+				></textarea>
+				<div class="flex items-center justify-between gap-2 text-xs">
+					<span class={cn('opacity-70', !bodyIsJson && 'text-destructive opacity-100')}>
+						{bodyIsJson ? m['one_off.body_size']({ used: String(bodyBytes), max: String(MAX_REQUEST_BODY) }) : m['one_off.err_body_json']()}
+					</span>
+					{#if pickable.length > 0}
+						<div class="w-56">
+							<Dropdown
+								placeholder={m['one_off.body_insert_credential']()}
+								options={credentialOptions}
+								value=""
+								onchange={pickBodyCredential}
+								class="w-full!"
+								activatorClass={(isOpen) =>
+									cn(
+										fieldClass,
+										'w-full text-xs hover:border-sidebar',
+										isOpen ? 'outline-none ring-2 ring-main-border border-none' : 'focus:ring-0!'
+									)}
+								drawerClass="rounded-md bg-background!"
+								sectionClass="font-semibold text-foreground!"
+								itemClass={() => 'bg-background! rounded-md hover:bg-main-hover!'}
+							/>
+						</div>
+					{/if}
+				</div>
+			</fieldset>
+		{/if}
 		<div class="flex gap-2">
 			<label class="flex flex-1 flex-col gap-1 text-sm">
 				<span class="font-semibold">{m['postit_templates.response']()}</span>
