@@ -96,3 +96,49 @@ func TestLoadConfig_ResendNeedsAValidSender(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadConfig_Billing(t *testing.T) {
+	clear := func() {
+		for _, env := range []string{ENV_MP_ACCESS_TOKEN, ENV_MP_WEBHOOK_SECRET, ENV_BILLING_USD_ARS} {
+			t.Setenv(env, "")
+		}
+	}
+
+	clear()
+	cfg, err := loadConfig()
+	if err != nil || cfg.paymentGateway() != nil {
+		t.Errorf("without a token billing must be off: %v %v", err, cfg.paymentGateway())
+	}
+
+	for name, env := range map[string]map[string]string{
+		"token alone":          {ENV_MP_ACCESS_TOKEN: "tok"},
+		"token without rate":   {ENV_MP_ACCESS_TOKEN: "tok", ENV_MP_WEBHOOK_SECRET: "s"},
+		"token without secret": {ENV_MP_ACCESS_TOKEN: "tok", ENV_BILLING_USD_ARS: "1570"},
+		"rate is not a number": {ENV_BILLING_USD_ARS: "much"},
+		"rate is not positive": {ENV_BILLING_USD_ARS: "0"},
+	} {
+		clear()
+		for k, v := range env {
+			t.Setenv(k, v)
+		}
+		if _, err := loadConfig(); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+
+	clear()
+	t.Setenv(ENV_MP_ACCESS_TOKEN, "tok")
+	t.Setenv(ENV_MP_WEBHOOK_SECRET, "s")
+	t.Setenv(ENV_BILLING_USD_ARS, " 1570.5 ")
+	cfg, err = loadConfig()
+	if err != nil || cfg.billingUSDARS != 1570.5 || cfg.paymentGateway() == nil {
+		t.Errorf("complete: %+v %v", cfg, err)
+	}
+
+	// A rate and a secret without a token only price the plans for show.
+	clear()
+	t.Setenv(ENV_BILLING_USD_ARS, "1570")
+	if cfg, err := loadConfig(); err != nil || cfg.paymentGateway() != nil || cfg.billingUSDARS != 1570 {
+		t.Errorf("rate only: %+v %v", cfg, err)
+	}
+}

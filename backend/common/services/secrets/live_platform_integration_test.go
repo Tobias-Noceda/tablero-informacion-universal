@@ -104,7 +104,7 @@ func TestLivePlatformConnect(t *testing.T) {
 
 	firstAccess := stored.AccessToken
 	stored.ExpiresAt = time.Now().Add(-time.Minute)
-	if err := srv.sealMaterial(board, "MOCKGRANT", &stored, true); err != nil {
+	if err := srv.sealMaterial(board, "MOCKGRANT", &stored, true, ""); err != nil {
 		t.Fatalf("reseal expired: %v", err)
 	}
 

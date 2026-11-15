@@ -15,24 +15,26 @@ var ErrCacheMiss = errors.New("cache miss")
 
 // MockDB is a configurable test double for infrastructure.Database.
 type MockDB struct {
-	FindUserBoardsFn    func(user string, orgs []uuid.UUID) ([]models.Board, error)
-	FindBoardPostItsFn  func(id uuid.UUID) ([]models.PostIts, error)
-	FindPostItFn        func(id uuid.UUID) (*models.PostIts, error)
-	FindBoardFn         func(id uuid.UUID) (*models.Board, error)
-	DeletePostItFn      func(id uuid.UUID) ([]models.Strand, error)
-	DeleteBoardFn       func(id uuid.UUID) error
-	UpdatePostItFn      func(id uuid.UUID, set map[string]any) error
-	CreatePostItFn      func(postIt *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error)
-	CreateBoardFn       func(name, owner string, org *uuid.UUID) (*models.Board, error)
-	SetBoardMemberFn    func(boardID uuid.UUID, user string, role models.BoardRole) error
-	RemoveBoardMemberFn func(boardID uuid.UUID, user string) error
-	DisconnectPostItsFn func(boardID, strandID uuid.UUID) error
-	ConnectPostItsFn    func(boardID uuid.UUID, strand models.Strand) (*models.Strand, error)
-	UpdateStrandFn      func(boardID, strandID uuid.UUID, patch models.StrandPatch) (*models.Strand, error)
-	MovePostItFn        func(boardID, postItID uuid.UUID, pos models.Position) error
-	EditTitlePostItFn   func(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error
-	StylePostItFn       func(boardID, postItID uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error)
-	UpdateBoardNameFn   func(id uuid.UUID, name string) error
+	FindUserBoardsFn      func(user string, orgs []uuid.UUID) ([]models.Board, error)
+	FindBoardPostItsFn    func(id uuid.UUID) ([]models.PostIts, error)
+	FindPostItFn          func(id uuid.UUID) (*models.PostIts, error)
+	FindBoardFn           func(id uuid.UUID) (*models.Board, error)
+	DeletePostItFn        func(id uuid.UUID) ([]models.Strand, error)
+	DeleteBoardFn         func(id uuid.UUID) error
+	UpdatePostItFn        func(id uuid.UUID, set map[string]any) error
+	CreatePostItFn        func(postIt *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error)
+	CreateBoardFn         func(name, owner string, org *uuid.UUID) (*models.Board, error)
+	SetBoardMemberFn      func(boardID uuid.UUID, user string, role models.BoardRole) error
+	RemoveBoardMemberFn   func(boardID uuid.UUID, user string) error
+	DisconnectPostItsFn   func(boardID, strandID uuid.UUID) error
+	ConnectPostItsFn      func(boardID uuid.UUID, strand models.Strand) (*models.Strand, error)
+	UpdateStrandFn        func(boardID, strandID uuid.UUID, patch models.StrandPatch) (*models.Strand, error)
+	MovePostItFn          func(boardID, postItID uuid.UUID, pos models.Position) error
+	EditTitlePostItFn     func(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error
+	StylePostItFn         func(boardID, postItID uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error)
+	UpdateBoardNameFn     func(id uuid.UUID, name string) error
+	CountPersonalBoardsFn func(user string) (int64, error)
+	CountOrgBoardsFn      func(org uuid.UUID) (int64, error)
 }
 
 var _ infrastructure.Database = (*MockDB)(nil)
@@ -164,6 +166,20 @@ func (m *MockDB) UpdateBoardName(id uuid.UUID, name string) error {
 	return nil
 }
 
+func (m *MockDB) CountPersonalBoards(user string) (int64, error) {
+	if m.CountPersonalBoardsFn != nil {
+		return m.CountPersonalBoardsFn(user)
+	}
+	return 0, nil
+}
+
+func (m *MockDB) CountOrgBoards(org uuid.UUID) (int64, error) {
+	if m.CountOrgBoardsFn != nil {
+		return m.CountOrgBoardsFn(org)
+	}
+	return 0, nil
+}
+
 // MockCache is a configurable test double for infrastructure.Cache.
 type MockCache struct {
 	FindPostItResultFn func(id uuid.UUID) (any, error)
@@ -268,13 +284,14 @@ func (m *MockScopePolicy) CanUse(principal models.Principal, board uuid.UUID, se
 }
 
 type MockSecretStore struct {
-	UpsertSecretFn  func(secret *models.Secret) error
-	FindSecretsFn   func(scope models.SecretScope, names []string) ([]models.Secret, error)
-	ListSecretsFn   func(scope models.SecretScope) ([]models.Secret, error)
-	DeleteSecretFn  func(scope models.SecretScope, name string) error
-	DeleteSecretsFn func(scope models.SecretScope) error
-	SetGrantsFn     func(scope models.SecretScope, name string, grants []models.Grant) error
-	FindGrantedFn   func(audiences []models.Audience) ([]models.Secret, error)
+	UpsertSecretFn         func(secret *models.Secret) error
+	FindSecretsFn          func(scope models.SecretScope, names []string) ([]models.Secret, error)
+	ListSecretsFn          func(scope models.SecretScope) ([]models.Secret, error)
+	DeleteSecretFn         func(scope models.SecretScope, name string) error
+	DeleteSecretsFn        func(scope models.SecretScope) error
+	SetGrantsFn            func(scope models.SecretScope, name string, grants []models.Grant) error
+	FindGrantedFn          func(audiences []models.Audience) ([]models.Secret, error)
+	CountSecretsBilledToFn func(userID string) (int64, error)
 }
 
 var _ infrastructure.SecretStore = (*MockSecretStore)(nil)
@@ -326,6 +343,13 @@ func (m *MockSecretStore) FindGranted(audiences []models.Audience) ([]models.Sec
 		return m.FindGrantedFn(audiences)
 	}
 	return nil, nil
+}
+
+func (m *MockSecretStore) CountSecretsBilledTo(userID string) (int64, error) {
+	if m.CountSecretsBilledToFn != nil {
+		return m.CountSecretsBilledToFn(userID)
+	}
+	return 0, nil
 }
 
 // MockTokenClient is a configurable test double for infrastructure.TokenClient.
@@ -441,6 +465,16 @@ func (m *MemoryGroupStore) FindUserGroups(userID string, orgs []uuid.UUID) ([]mo
 		}
 	}
 	return out, nil
+}
+
+func (m *MemoryGroupStore) CountOwnedGroups(userID string) (int64, error) {
+	var owned int64
+	for _, group := range m.Groups {
+		if group.Owner == userID {
+			owned++
+		}
+	}
+	return owned, nil
 }
 
 func (m *MemoryGroupStore) DeleteGroup(id uuid.UUID) error {

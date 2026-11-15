@@ -1,6 +1,6 @@
 import { bindingsFor, refKey } from '$lib/secrets/binding';
 import { analyzeTitle } from '$lib/title';
-import type { OneOffRequest, PostItSettings, SecretMeta, SecretRef, UUID } from '$types/api';
+import type { OneOffMethod, OneOffRequest, PostItSettings, SecretMeta, SecretRef, UUID } from '$types/api';
 
 // A card with its own request and no card type (a "one-off" card). The board
 // stores it with an empty type; the canvas knows it by this key.
@@ -16,9 +16,17 @@ export function nodeType(type: string | undefined | null) {
 export type ValueRow = { key: string; value: string; credential: boolean; secret: string };
 export type OutputRow = { key: string; query: string };
 
+// What the backend keeps (models.MaxRequestBody), in bytes.
+export const MAX_REQUEST_BODY = 16 << 10;
+
 export type OneOffDraft = {
 	title: string;
 	resource: string;
+	method: OneOffMethod;
+	// A POST's JSON body as typed; a credential in it is a string value "$NAME".
+	body: string;
+	// Which credential each "$NAME" of the body was picked as (its refKey).
+	bodySecrets: Record<string, string>;
 	response: 'json' | 'html';
 	rate: number;
 	queries: ValueRow[];
@@ -30,6 +38,9 @@ export function emptyOneOff(): OneOffDraft {
 	return {
 		title: '',
 		resource: '',
+		method: 'GET',
+		body: '',
+		bodySecrets: {},
 		response: 'json',
 		rate: 600,
 		queries: [],
@@ -55,12 +66,55 @@ function rowsOf(
 	});
 }
 
+// The credentials a JSON body names, as whole string values "$NAME", at any
+// depth; null when the body is not JSON.
+export function bodyCredentialNames(body: string): string[] | null {
+	let document: unknown;
+	try {
+		document = JSON.parse(body);
+	} catch {
+		return null;
+	}
+	const names = new Set<string>();
+	const walk = (node: unknown) => {
+		if (typeof node === 'string') {
+			const name = SECRET_REF.exec(node)?.[1];
+			if (name) names.add(name);
+		} else if (Array.isArray(node)) {
+			node.forEach(walk);
+		} else if (node && typeof node === 'object') {
+			Object.values(node).forEach(walk);
+		}
+	};
+	walk(document);
+	return [...names];
+}
+
+// The body with a credential inserted at the cursor, as a JSON string, and
+// where the cursor goes after it.
+export function insertCredential(body: string, cursor: number, name: string) {
+	const at = Math.max(0, Math.min(cursor, body.length));
+	const token = `"$${name}"`;
+	return { body: body.slice(0, at) + token + body.slice(at), cursor: at + token.length };
+}
+
 // The draft of a stored one-off card, to edit it.
 export function oneOffFrom(settings: PostItSettings, title: string, board: UUID): OneOffDraft {
 	const bindings = settings.bindings ?? {};
+	const method: OneOffMethod = settings.request?.method?.toUpperCase() === 'POST' ? 'POST' : 'GET';
+	const body = method === 'POST' ? (settings.request?.body ?? '') : '';
+	const bodySecrets = Object.fromEntries(
+		(bodyCredentialNames(body) ?? []).map((name) => [
+			name,
+			refKey(bindings[name] ?? { scope: { kind: 'board', owner: board }, name })
+		])
+	);
 	return {
 		title,
 		resource: settings.resource ?? '',
+		method,
+		body,
+		bodySecrets,
 		response: settings.response === 'html' ? 'html' : 'json',
 		rate: settings.rate,
 		queries: rowsOf(settings.request?.queries, bindings, board),
@@ -103,6 +157,15 @@ export function oneOffBody(
 
 	const queries = values(draft.queries, 'q');
 	const headers = values(draft.headers, 'h');
+
+	// The body keeps its "$NAME"s as typed; a credential outside the board's
+	// own scope still needs a binding.
+	const body = draft.method === 'POST' ? draft.body.trim() : '';
+	(bodyCredentialNames(body) ?? []).forEach((name, i) => {
+		const secret = byKey.get(draft.bodySecrets[name] ?? '') ?? bodySecretByName(usable, name, board);
+		if (secret) picked[`b${i}`] = secret;
+	});
+
 	const secrets = bindingsFor(picked, board);
 	for (const record of [queries, headers]) {
 		for (const [key, slot] of Object.entries(record)) {
@@ -122,7 +185,7 @@ export function oneOffBody(
 		},
 		body: {
 			resource: draft.resource.trim(),
-			request: { method: 'GET', headers, queries },
+			request: { method: draft.method, headers, queries, ...(body && { body }) },
 			response: draft.response,
 			query: Object.fromEntries(outputs.map((o) => [o.key, o.query])),
 			rate: Math.max(0, Math.round(Number(draft.rate) || 0)),
@@ -131,9 +194,26 @@ export function oneOffBody(
 	};
 }
 
+// A credential typed by name in the body: the board's own first, then any
+// other the user may use.
+function bodySecretByName(usable: SecretMeta[], name: string, board: UUID) {
+	const named = usable.filter((s) => s.name === name);
+	return named.find((s) => s.scope.kind === 'board' && s.scope.owner === board) ?? named[0];
+}
+
 export type OneOffProblem =
-	| { code: 'resource' | 'outputs' | 'output_query' | 'row_key' | 'credential' | 'title' }
-	| { code: 'output_key' | 'duplicate'; value: string };
+	| {
+			code:
+				| 'resource'
+				| 'outputs'
+				| 'output_query'
+				| 'row_key'
+				| 'credential'
+				| 'title'
+				| 'body_json'
+				| 'body_size';
+	  }
+	| { code: 'output_key' | 'duplicate' | 'body_credential'; value: string };
 
 // What the backend would refuse, so the form can say it before saving.
 export function oneOffProblems(draft: OneOffDraft, usable: SecretMeta[]): OneOffProblem[] {
@@ -157,6 +237,19 @@ export function oneOffProblems(draft: OneOffDraft, usable: SecretMeta[]): OneOff
 			else if (seen.has(key)) found.push({ code: 'duplicate', value: key });
 			seen.add(key);
 			if (row.credential && !known.has(row.secret)) found.push({ code: 'credential' });
+		}
+	}
+
+	const body = draft.method === 'POST' ? draft.body.trim() : '';
+	if (body) {
+		const names = bodyCredentialNames(body);
+		if (names === null) found.push({ code: 'body_json' });
+		if (new TextEncoder().encode(body).length > MAX_REQUEST_BODY) found.push({ code: 'body_size' });
+		for (const name of names ?? []) {
+			const picked = draft.bodySecrets[name];
+			if (!(picked && known.has(picked)) && !usable.some((s) => s.name === name)) {
+				found.push({ code: 'body_credential', value: name });
+			}
 		}
 	}
 

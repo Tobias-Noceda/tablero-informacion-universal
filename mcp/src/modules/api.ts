@@ -5,15 +5,21 @@ export class ApiError extends Error {
     constructor(
         readonly status: number,
         readonly code: string,
+        // Which plan limit refused it (a 402 `plan_limit`), if any.
+        readonly limit?: string,
     ) {
-        super(describe(status, code));
+        super(describe(status, code, limit));
         this.name = "ApiError";
     }
 }
 
 // What the agent (and the person behind it) should read for each failure.
-function describe(status: number, code: string) {
+function describe(status: number, code: string, limit?: string) {
     switch (status) {
+        case 402:
+            return limit === "api_access"
+                ? "The MCP server requires a Pro or Max plan. Upgrade the account that created this access token."
+                : `Plan limit reached (${limit ?? code}). Upgrade the plan of whoever owns the board, or remove something first.`;
         case 401:
             return "The access token is invalid, expired or revoked. Create a new one in your profile.";
         case 403:
@@ -66,6 +72,7 @@ async function request(
         throw new ApiError(
             response.status,
             typeof payload?.error === "string" ? payload.error : "unknown",
+            typeof payload?.limit === "string" ? payload.limit : undefined,
         );
     }
 

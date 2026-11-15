@@ -77,10 +77,10 @@
 		--app-error-bg: rgba(220, 38, 38, 0.15);
 		--app-error-text: #fca5a5;
 
-		--app-detail: #44403c;
-		--app-detail-hover: #524d47;
-		--app-detail-border: #5f5953;
-		--app-detail-text: #f3ead6;
+		--app-detail: #5b5348;
+		--app-detail-hover: #695f52;
+		--app-detail-border: #786d5f;
+		--app-detail-text: #f7efdc;
 	}
 }
 
@@ -98,10 +98,10 @@
 	--app-error-bg: rgba(220, 38, 38, 0.15);
 	--app-error-text: #fca5a5;
 
-	--app-detail: #44403c;
-	--app-detail-hover: #524d47;
-	--app-detail-border: #5f5953;
-	--app-detail-text: #f3ead6;
+	--app-detail: #5b5348;
+	--app-detail-hover: #695f52;
+	--app-detail-border: #786d5f;
+	--app-detail-text: #f7efdc;
 }
 
 :root[data-theme='light'] {

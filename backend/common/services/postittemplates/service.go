@@ -15,11 +15,7 @@ var (
 	// to a stranger they do not exist.
 	ErrNotFound = errors.New("not_found")
 	ErrInvalid  = errors.New("invalid_postit_template")
-	ErrLimit    = errors.New("limit_reached")
 )
-
-// Limit is how many card types one scope may hold.
-const Limit = 50
 
 type boardFinder interface {
 	FindBoard(id uuid.UUID) (*models.Board, error)
@@ -41,11 +37,25 @@ type Service struct {
 	store  infrastructure.PostitTemplateStore
 	boards boardFinder
 	access infrastructure.Access
+	plans  infrastructure.Entitlements
 	now    func() time.Time
 }
 
-func New(store infrastructure.PostitTemplateStore, boards boardFinder, access infrastructure.Access) *Service {
-	return &Service{store: store, boards: boards, access: access, now: time.Now}
+func New(store infrastructure.PostitTemplateStore, boards boardFinder, access infrastructure.Access, plans infrastructure.Entitlements) *Service {
+	return &Service{store: store, boards: boards, access: access, plans: plans, now: time.Now}
+}
+
+// limitOf is how many card types a scope may hold on plan, and the name the
+// API gives that limit.
+func limitOf(kind models.PostitTemplateScopeKind, plan models.Limits) (string, int) {
+	switch kind {
+	case models.TemplateScopeBoard:
+		return models.LimitBoardTemplates, plan.BoardTemplates
+	case models.TemplateScopeOrg:
+		return models.LimitOrgTemplates, plan.OrgTemplates
+	default:
+		return models.LimitUserTemplates, plan.UserTemplates
+	}
 }
 
 func (srv *Service) List(principal models.Principal, scope models.PostitTemplateScope) ([]models.PostitTemplate, error) {
@@ -66,7 +76,9 @@ func (srv *Service) Get(principal models.Principal, key string) (*models.PostitT
 	return c, nil
 }
 
-// Create stores a new card type in scope; the key is generated here.
+// Create stores a new card type in scope; the key is generated here. A
+// scope holds as many as the plan of whoever pays for it allows: the user,
+// the board's payer or the organization's.
 func (srv *Service) Create(principal models.Principal, scope models.PostitTemplateScope, body models.PostitTemplate) (*models.PostitTemplate, error) {
 	if !srv.allowed(principal, scope, true) {
 		return nil, ErrNotFound
@@ -76,8 +88,13 @@ func (srv *Service) Create(principal models.Principal, scope models.PostitTempla
 	if err != nil {
 		return nil, err
 	}
-	if count >= Limit {
-		return nil, ErrLimit
+	plan, err := srv.plans.ForTemplateScope(scope)
+	if err != nil {
+		return nil, err
+	}
+	limit, most := limitOf(scope.Kind, plan.Limits)
+	if err := plan.Admits(limit, int(count), most); err != nil {
+		return nil, err
 	}
 
 	now := srv.now().UTC()

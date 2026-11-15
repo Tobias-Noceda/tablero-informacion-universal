@@ -32,4 +32,6 @@ type OrgStore interface {
 	CountOrgBoards(id uuid.UUID) (int64, error)
 	FindOrgBoards(id uuid.UUID) ([]models.Board, error)
 	CountOrgGroups(id uuid.UUID) (int64, error)
+	// CountOwnedOrgs counts the organizations userID pays for.
+	CountOwnedOrgs(userID string) (int64, error)
 }

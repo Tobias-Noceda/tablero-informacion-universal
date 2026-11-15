@@ -20,7 +20,7 @@ func TestCreatePostIt_RefusesUnknownAndDeletedWellKnowns(t *testing.T) {
 	db.CreatePostItFn = func(p *models.PostIts, _ models.BoardPostItTitle, _ string, _ models.Position) (*models.PostIts, error) {
 		return p, nil
 	}
-	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, &mocks.MockSecretResolver{}, access.New(nil), store, nil)
+	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, &mocks.MockSecretResolver{}, access.New(nil), store, nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	for _, key := range []string{"dog_facts", "nope"} {
 		_, err := svc.CreatePostIt(boardOwner, nil, &models.PostIts{Board: uuid.New(), WellKnown: key})
@@ -46,7 +46,7 @@ func TestSystemParams_StillResolvedForADeletedWellKnown(t *testing.T) {
 			return map[string]string{"$" + string(models.SystemNasaApiKey): "platform-key"}, nil
 		},
 	}
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), store, nil)
+	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), store, nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	params, err := svc.systemParams(&models.PostIts{WellKnown: "nasa_apod"})
 	if err != nil {
@@ -97,7 +97,7 @@ func TestCreatePostIt_FromPostitTemplate(t *testing.T) {
 		ptype = kind
 		return p, nil
 	}
-	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, &mocks.MockSecretResolver{}, access.New(nil), builtins(), templates)
+	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, &mocks.MockSecretResolver{}, access.New(nil), builtins(), templates, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	postit, err := svc.CreatePostIt(boardOwner, nil, &models.PostIts{Board: uuid.New(), WellKnown: key, Params: map[string]string{"$max": "80"}})
 	if err != nil {
@@ -111,7 +111,7 @@ func TestCreatePostIt_FromPostitTemplate(t *testing.T) {
 	if _, err := svc.CreatePostIt(boardOwner, nil, &models.PostIts{Board: uuid.New(), WellKnown: models.NewPostitTemplateKey()}); !errors.Is(err, ErrUnknownWellKnown) {
 		t.Errorf("unusable: err = %v", err)
 	}
-	none := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, &mocks.MockSecretResolver{}, access.New(nil), builtins(), nil)
+	none := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, &mocks.MockSecretResolver{}, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 	if _, err := none.CreatePostIt(boardOwner, nil, &models.PostIts{Board: uuid.New(), WellKnown: key}); !errors.Is(err, ErrUnknownWellKnown) {
 		t.Errorf("without templates: err = %v", err)
 	}

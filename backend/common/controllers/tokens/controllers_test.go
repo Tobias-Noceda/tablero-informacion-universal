@@ -26,7 +26,7 @@ var (
 // the token verifier, and behind RestrictAccessTokens.
 func setup() (*gin.Engine, *mocks.MemoryAccessTokenStore) {
 	store := &mocks.MemoryAccessTokenStore{}
-	service := srv.New(store, &mocks.CountingLimiter{}, time.Now)
+	service := srv.New(store, &mocks.CountingLimiter{}, mocks.StaticEntitlements{}, time.Now)
 	verifier := service.Verifier(mocks.StaticVerifier{
 		"ana": infrastructure.Claims{Subject: ana},
 		"bob": infrastructure.Claims{Subject: bob},
@@ -119,5 +119,22 @@ func TestTokens_Validation(t *testing.T) {
 		if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), want) {
 			t.Errorf("%s: %d %s", body, w.Code, w.Body.String())
 		}
+	}
+}
+
+func TestTokens_FreePlanIsPaymentRequired(t *testing.T) {
+	store := &mocks.MemoryAccessTokenStore{}
+	service := srv.New(store, &mocks.CountingLimiter{}, mocks.StaticEntitlements{Plan: "free"}, time.Now)
+	verifier := service.Verifier(mocks.StaticVerifier{"ana": infrastructure.Claims{Subject: ana}})
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	NewController(service).RegisterRoutes(r.Group("/api/v1", middleware.RequireAuth(verifier), middleware.RestrictAccessTokens()))
+
+	w := do(r, http.MethodPost, "/api/v1/users/"+ana+"/tokens", `{"name":"laptop"}`, "ana")
+	if w.Code != http.StatusPaymentRequired || w.Body.String() != `{"error":"plan_limit","limit":"api_access","max":0,"plan":"free"}` {
+		t.Errorf("create: %d %s", w.Code, w.Body.String())
+	}
+	if len(store.Tokens) != 0 {
+		t.Error("a token was stored")
 	}
 }

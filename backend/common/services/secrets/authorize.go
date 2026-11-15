@@ -143,7 +143,7 @@ func (srv *SecretsService) Callback(principal models.Principal, state, code stri
 		return err
 	}
 
-	return srv.sealMaterial(secret.Scope, secret.Name, material, true)
+	return srv.sealMaterial(secret.Scope, secret.Name, material, true, "")
 }
 
 // handshakeKey files the handshake under the user who started it, so a state

@@ -1,8 +1,12 @@
 package middleware
 
 import (
+	"errors"
+	"fmt"
+	"github.com/Secreto31126/tesis/common/models"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
@@ -26,6 +30,10 @@ func restricted() *gin.Engine {
 	api.GET("/boards/:id/secrets", ok)
 	api.GET("/system/keys", ok)
 	api.GET("/post-its/:id/settings", ok)
+	api.DELETE("/boards/:id", ok)
+	api.DELETE("/boards/:id/strands/:strand", ok)
+	api.DELETE("/boards/:id/members/:user", ok)
+	api.DELETE("/post-its/:id", ok)
 	return r
 }
 
@@ -42,7 +50,14 @@ func TestRestrictAccessTokens(t *testing.T) {
 		{"pat", http.MethodPut, "/api/v1/boards/b1/members", http.StatusForbidden},
 		{"pat", http.MethodGet, "/api/v1/boards/b1/secrets", http.StatusForbidden},
 		{"pat", http.MethodGet, "/api/v1/system/keys", http.StatusForbidden},
-		{"pat", http.MethodGet, "/api/v1/post-its/p1/settings", http.StatusForbidden},
+		// What a card reads (credentials only by name), so an agent can fix it.
+		{"pat", http.MethodGet, "/api/v1/post-its/p1/settings", http.StatusNoContent},
+		// An agent can undo its own mistakes: boards, cards and strands.
+		{"pat", http.MethodDelete, "/api/v1/boards/b1", http.StatusNoContent},
+		{"pat", http.MethodDelete, "/api/v1/boards/b1/strands/s1", http.StatusNoContent},
+		{"pat", http.MethodDelete, "/api/v1/post-its/p1", http.StatusNoContent},
+		// Removing someone is sharing, which stays with the people.
+		{"pat", http.MethodDelete, "/api/v1/boards/b1/members/u2", http.StatusForbidden},
 		// A browser session is not restricted.
 		{"session", http.MethodPost, "/api/v1/boards", http.StatusNoContent},
 		{"session", http.MethodGet, "/api/v1/boards/b1/secrets", http.StatusNoContent},
@@ -74,4 +89,66 @@ func TestRequireAuth_MarksAccessTokenPrincipals(t *testing.T) {
 	if w.Code != http.StatusNoContent {
 		t.Errorf("status = %d", w.Code)
 	}
+}
+
+func TestPlanLimit_AnswersPaymentRequired(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.GET("/limit", func(c *gin.Context) {
+		if !PlanLimit(c, &models.LimitError{Limit: models.LimitBoards, Max: 5, Plan: models.PlanFree}) {
+			t.Error("a LimitError was not recognised")
+		}
+	})
+	r.GET("/wrapped", func(c *gin.Context) {
+		PlanLimit(c, fmt.Errorf("create: %w", &models.LimitError{Limit: models.LimitAPIAccess, Plan: models.PlanFree}))
+	})
+	r.GET("/other", func(c *gin.Context) {
+		if PlanLimit(c, errors.New("boom")) {
+			t.Error("a plain error was taken for a plan limit")
+		}
+	})
+
+	for path, want := range map[string]string{
+		"/limit":   `{"error":"plan_limit","limit":"boards","max":5,"plan":"free"}`,
+		"/wrapped": `{"error":"plan_limit","limit":"api_access","max":0,"plan":"free"}`,
+	} {
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
+		if w.Code != http.StatusPaymentRequired || w.Body.String() != want {
+			t.Errorf("%s: %d %s", path, w.Code, w.Body.String())
+		}
+	}
+	r.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/other", nil))
+}
+
+func TestAccessTokenAllowlist_NeverOpensBillingOrSystem(t *testing.T) {
+	for route := range accessTokenRoutes {
+		if strings.Contains(route, "/billing") || strings.Contains(route, "/system") {
+			t.Errorf("%s is open to access tokens", route)
+		}
+	}
+	if !accessTokenRoutes["DELETE /api/v1/boards/:id/strands/:strand"] {
+		t.Error("tokens cannot remove a strand")
+	}
+}
+
+func TestRequireAuth_AccessTokenWithoutAPIAccessIsPaymentRequired(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	r.Use(RequireAuth(failingVerifier{&models.LimitError{Limit: models.LimitAPIAccess, Plan: models.PlanFree}}))
+	r.GET("/x", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+
+	req := httptest.NewRequest(http.MethodGet, "/x", nil)
+	req.Header.Set("Authorization", "Bearer tiu_pat_x")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusPaymentRequired || !strings.Contains(w.Body.String(), `"limit":"api_access"`) {
+		t.Errorf("%d %s", w.Code, w.Body.String())
+	}
+}
+
+type failingVerifier struct{ err error }
+
+func (f failingVerifier) Verify(string) (infrastructure.Claims, error) {
+	return infrastructure.Claims{}, f.err
 }

@@ -59,7 +59,7 @@ func integrationService(t *testing.T, db *MongoDB, kekEntries string) *secretsrv
 		t.Fatalf("kek: %v", err)
 	}
 	return secretsrv.New(db, &mocks.MockScopePolicy{}, crypto.NewKeyring(kek, db),
-		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, db, access.New(nil))
+		&mocks.MockTokenClient{}, &mocks.MockLocker{}, &mocks.MockHandshakeStore{}, db, access.New(nil), mocks.StaticEntitlements{})
 }
 
 func kek(version int, fill byte) string {

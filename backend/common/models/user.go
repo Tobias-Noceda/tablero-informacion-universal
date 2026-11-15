@@ -34,6 +34,31 @@ type User struct {
 	Identities    []Identity `bson:"identities" json:"-"`
 	CreatedAt     time.Time  `bson:"createdat" json:"created_at"`
 	UpdatedAt     time.Time  `bson:"updatedat" json:"updated_at"`
+
+	// Plan is what the user subscribed to, until PlanExpires when set. Read
+	// it through EffectivePlan: an empty or lapsed one is the free plan.
+	Plan        Plan       `bson:"plan,omitempty" json:"-"`
+	PlanExpires *time.Time `bson:"plan_expires,omitempty" json:"-"`
+}
+
+// EffectivePlan is the plan the user has at now: the stored one while it
+// lasts, free otherwise. Platform admins are never limited below max.
+func (u *User) EffectivePlan(now time.Time) Plan {
+	if u.Admin {
+		return PlanMax
+	}
+	if !u.Plan.Valid() {
+		return PlanFree
+	}
+	if u.PlanExpires != nil && !u.PlanExpires.After(now) {
+		return PlanFree
+	}
+	return u.Plan
+}
+
+// Entitlement is the user's own plan at now, with the user as its payer.
+func (u *User) Entitlement(now time.Time) Entitlement {
+	return EntitlementOf(u.Id.String(), u.EffectivePlan(now))
 }
 
 // UserSummary is what other users get to see about someone.
@@ -99,10 +124,24 @@ type Profile struct {
 	Admin         bool               `json:"admin"`
 	Identities    []IdentityProvider `json:"identities"`
 	CreatedAt     time.Time          `json:"created_at"`
+
+	// Plan is the effective plan; PlanExpires is when a paid one lapses.
+	Plan        Plan       `json:"plan"`
+	PlanExpires *time.Time `json:"plan_expires,omitempty"`
+	Limits      Limits     `json:"limits"`
 }
 
 func (u *User) Profile() Profile {
+	plan := u.EffectivePlan(time.Now())
+	var expires *time.Time
+	if plan == u.Plan && plan != PlanFree {
+		expires = u.PlanExpires
+	}
+
 	return Profile{
+		Plan:          plan,
+		PlanExpires:   expires,
+		Limits:        LimitsFor(plan),
 		Id:            u.Id,
 		Email:         u.Email,
 		EmailVerified: u.EmailVerified,

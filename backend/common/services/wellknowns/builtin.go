@@ -218,8 +218,8 @@ func Builtin() []models.WellKnown {
 				{Key: "$longitude", LabelEn: "Longitude", LabelEs: "Longitud", Type: models.ParameterNumber, Default: new("-58.3772")},
 			},
 			Outputs: []models.WellKnownOutput{
-				{Key: "aqi", LabelEn: "US AQI", LabelEs: "AQI de EE.UU.", ExampleEn: 42, ExampleEs: 42},
-				{Key: "pm25", LabelEn: "PM2.5", LabelEs: "PM2.5", ExampleEn: 8.3, ExampleEs: 8.3},
+				{Key: "aqi", LabelEn: "Air Quality Index (AQI)", LabelEs: "Índice de Calidad del Aire (AQI)", ExampleEn: 42, ExampleEs: 42},
+				{Key: "pm25", LabelEn: "Particulate Matter 2.5", LabelEs: "Materia Particulada 2.5", ExampleEn: 8.3, ExampleEs: 8.3},
 				{Key: "time", LabelEn: "Measured at", LabelEs: "Medido a las", ExampleEn: "2026-10-04T12:00", ExampleEs: "2026-10-04T12:00"},
 			},
 		},

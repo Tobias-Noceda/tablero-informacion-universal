@@ -27,7 +27,7 @@ func newService(db *mocks.MockDB, cache *mocks.MockCache, run *mocks.MockExecute
 	if run == nil {
 		run = &mocks.MockExecuter{}
 	}
-	return New(db, cache, run, &mocks.MockSecretResolver{}, access.New(nil), builtins(), nil)
+	return New(db, cache, run, &mocks.MockSecretResolver{}, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 }
 
 func TestCreatePostIt_PlainPassesThrough(t *testing.T) {
@@ -388,7 +388,7 @@ func TestViewer_ReadsAndRunsButCannotChangeCards(t *testing.T) {
 		},
 	}
 	run := &mocks.MockExecuter{ExecuteFn: func(*models.PostIts) (any, error) { return "data", nil }}
-	svc := New(db, &mocks.MockCache{}, run, &mocks.MockSecretResolver{}, access.New(nil), builtins(), nil)
+	svc := New(db, &mocks.MockCache{}, run, &mocks.MockSecretResolver{}, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	postit, err := svc.GetPostIt(viewer, id)
 	if err != nil {
@@ -474,7 +474,7 @@ func TestExecutePostIt_DoesNotLeakSecretsOntoTheCaller(t *testing.T) {
 		},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver, access.New(nil), builtins(), nil)
+	svc := New(boardOf(boardOwner), &mocks.MockCache{}, run, resolver, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	if _, err := svc.ExecutePostIt(postit); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -519,7 +519,7 @@ func TestExecutePostIt_ResourcelessPostItNeverResolvesSecrets(t *testing.T) {
 		},
 	}
 
-	svc := New(&mocks.MockDB{}, &mocks.MockCache{}, run, resolver, access.New(nil), builtins(), nil)
+	svc := New(boardOf(boardOwner), &mocks.MockCache{}, run, resolver, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	out, err := svc.ExecutePostIt(postit)
 	if err != nil {
@@ -675,5 +675,22 @@ func TestStylePostIt_CardNotOnItsBoardIsNotAMember(t *testing.T) {
 	_, err := newService(db, nil, nil).StylePostIt(boardOwner, uuid.New(), models.CardStylePatch{Border: new(models.CardBorderSolid)})
 	if !errors.Is(err, ErrNotAMember) {
 		t.Errorf("err = %v, want ErrNotAMember", err)
+	}
+}
+
+func TestSecretRefs_ReadsTheJSONBody(t *testing.T) {
+	postit := &models.PostIts{
+		Request: models.Request{
+			Method:  "POST",
+			Headers: map[string]string{"X-Api-Key": "$IGNAV"},
+			Body:    `{"origin":"EZE","auth":{"token":"$PARTNER"},"note":"not $THIS","list":["$IGNAV"]}`,
+		},
+	}
+
+	got := secretRefs(postit)
+	slices.Sort(got)
+
+	if want := []string{"IGNAV", "PARTNER"}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v (only whole string values name a credential)", got, want)
 	}
 }

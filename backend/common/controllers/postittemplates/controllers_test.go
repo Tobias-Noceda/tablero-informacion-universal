@@ -54,7 +54,7 @@ func setup(t *testing.T) (http.Handler, uuid.UUID) {
 
 	r := gin.New()
 	api := r.Group("/api/v1", middleware.RequireAuth(tokenVerifier{}), middleware.RestrictAccessTokens())
-	NewController(srv.New(mocks.NewMemoryPostitTemplateStore(), db, access.New(nil))).RegisterRoutes(api)
+	NewController(srv.New(mocks.NewMemoryPostitTemplateStore(), db, access.New(nil), mocks.StaticEntitlements{})).RegisterRoutes(api)
 	return r, board.Id
 }
 

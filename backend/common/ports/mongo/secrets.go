@@ -22,6 +22,7 @@ func (db *MongoDB) ensureSecretIndexes() error {
 			Options: options.Index().SetUnique(true),
 		},
 		{Keys: bson.D{{Key: "grants.to.kind", Value: 1}, {Key: "grants.to.id", Value: 1}}},
+		{Keys: bson.D{{Key: "billed_to", Value: 1}}},
 	})
 
 	return err
@@ -34,6 +35,18 @@ func (db *MongoDB) UpsertSecret(secret *models.Secret) error {
 	filter := scopeFilter(secret.Scope)
 	filter["name"] = secret.Name
 
+	insert := bson.M{
+		"_id":       secret.Id,
+		"scope":     secret.Scope,
+		"name":      secret.Name,
+		"createdat": secret.CreatedAt,
+		"grants":    []models.Grant{},
+	}
+	// Only a new secret is billed; rewriting one keeps who pays for it.
+	if secret.BilledTo != "" {
+		insert["billed_to"] = secret.BilledTo
+	}
+
 	_, err := db.secrets.UpdateOne(ctx, filter, bson.M{
 		"$set": bson.M{
 			"kind":       secret.Kind,
@@ -45,16 +58,17 @@ func (db *MongoDB) UpsertSecret(secret *models.Secret) error {
 			"authorized": secret.Authorized,
 			"provider":   secret.Provider,
 		},
-		"$setOnInsert": bson.M{
-			"_id":       secret.Id,
-			"scope":     secret.Scope,
-			"name":      secret.Name,
-			"createdat": secret.CreatedAt,
-			"grants":    []models.Grant{},
-		},
+		"$setOnInsert": insert,
 	}, options.UpdateOne().SetUpsert(true))
 
 	return err
+}
+
+func (db *MongoDB) CountSecretsBilledTo(userID string) (int64, error) {
+	ctx, cancel := timeout()
+	defer cancel()
+
+	return db.secrets.CountDocuments(ctx, bson.M{"billed_to": userID})
 }
 
 func (db *MongoDB) FindSecrets(scope models.SecretScope, names []string) ([]models.Secret, error) {

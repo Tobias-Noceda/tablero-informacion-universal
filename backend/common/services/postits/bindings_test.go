@@ -77,7 +77,7 @@ func TestCreatePostIt_ValidatesBindingsAsTheCreator(t *testing.T) {
 			return nil
 		},
 	}
-	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil)
+	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	created, err := svc.CreatePostIt(member, &models.BoardPostItTitle{Text: "Hi"}, &models.PostIts{
 		Board:     board,
@@ -103,7 +103,7 @@ func TestCreatePostIt_RefusesWhatCannotBeBound(t *testing.T) {
 			return infrastructure.ErrForbidden
 		},
 	}
-	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil)
+	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	_, err := svc.CreatePostIt(member, &models.BoardPostItTitle{Text: "Hi"}, oneOff(board, map[string]models.SecretRef{"THEIRS": {Scope: models.MemberScope(board, boardOwner.ID), Name: "THEIRS"}}))
 	if !errors.Is(err, infrastructure.ErrForbidden) {
@@ -143,7 +143,7 @@ func TestUpdatePostIt_RebindsAsTheEditor(t *testing.T) {
 			return nil
 		},
 	}
-	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil)
+	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	err := svc.UpdatePostIt(member, id, map[string]any{
 		"params":   map[string]string{"$credential": "$MINE"},
@@ -176,7 +176,7 @@ func TestUpdatePostIt_KeepsBindingsWhenOnlyParamsChange(t *testing.T) {
 			return nil
 		},
 	}
-	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil)
+	svc := New(db, &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	if err := svc.UpdatePostIt(member, id, map[string]any{"params": map[string]string{"$base": "EUR"}}); err != nil {
 		t.Fatalf("update: %v", err)
@@ -266,7 +266,7 @@ func TestExecutePostIt_ResolvesEveryTokenAsWhoTheCardRunsAs(t *testing.T) {
 			return map[string]any{}, nil
 		},
 	}
-	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, run, resolver, access.New(nil), builtins(), nil)
+	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, run, resolver, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	if _, err := svc.ExecutePostIt(postit); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -294,7 +294,7 @@ func TestExecutePostIt_CardsWithoutRunAsRunAsTheBoardOwner(t *testing.T) {
 			return map[models.SecretRef]string{postit.Bindings["MINE"]: "v"}, nil
 		},
 	}
-	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil)
+	svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, &mocks.MockExecuter{}, resolver, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 	if _, err := svc.ExecutePostIt(postit); err != nil {
 		t.Fatalf("execute: %v", err)
@@ -332,7 +332,7 @@ func TestExecutePostIt_UnavailableBindingStopsTheCard(t *testing.T) {
 			ran = true
 			return nil, nil
 		}}
-		svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, run, c.resolver, access.New(nil), builtins(), nil)
+		svc := New(boardOf(boardOwner, member), &mocks.MockCache{}, run, c.resolver, access.New(nil), builtins(), nil, mocks.StaticEntitlements{}, &mocks.CountingLimiter{})
 
 		_, err := svc.ExecutePostIt(boundCard(board, member.ID))
 		if !errors.Is(err, ErrCredentialUnavailable) {

@@ -103,6 +103,10 @@ func (ctrl *Controller) registerScoped(group *gin.RouterGroup, s scoping) {
 }
 
 func fail(c *gin.Context, err error) {
+	if middleware.PlanLimit(c, err) {
+		return
+	}
+
 	if errors.Is(err, srv.ErrForbidden) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Not found",

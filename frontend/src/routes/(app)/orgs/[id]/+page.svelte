@@ -5,19 +5,26 @@
 	import Dropdown from '$components/Dropdown/Dropdown.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import { cn } from '$lib/utils';
 	import { session } from '$modules/session.svelte';
 	import * as orgsApi from '$services/orgs';
 	import { refreshBoards } from '$stores/boards';
 	import { orgs } from '$stores/org.svelte';
 	import type { OrgMemberSummary, OrgRole } from '$types/api';
 	import type { PageProps } from './$types';
+	import { plan } from '$stores/plan.svelte';
+	import { canInvite, orgLimits } from '$lib/billing/can';
+	import PlanHint from '$components/PlanHint/PlanHint.svelte';
 
 	let { data }: PageProps = $props();
 
 	const org = $derived(data.org);
 	const isAdmin = $derived(org.role === 'admin');
 	const roles: OrgRole[] = ['admin', 'member'];
+
+	// An organization runs on its payer's plan, which the backend reports with
+	// it. Without that (an older backend) the form stays and the backend answers.
+	const limits = $derived(orgLimits(org, session.userId, plan.limits));
+	const canAdd = $derived(!limits || canInvite(limits, org.seats_used ?? org.members.length));
 
 	let name = $derived(org.name);
 	let email = $state('');
@@ -29,6 +36,7 @@
 		invalid_role: m['orgs.error_invalid_role'],
 		invalid_name: m['orgs.error_invalid_name'],
 		last_admin: m['orgs.error_last_admin'],
+		plan_limit: m['billing.limit.title'],
 		org_not_empty: m['orgs.error_org_not_empty'],
 		rate_limited: m['orgs.error_rate_limited']
 	};
@@ -142,17 +150,11 @@
 						{#if isAdmin}
 							{#if member.user.id !== session.userId}
 								<Dropdown
-									labelClass="font-semibold"
+									variant="plain"
 									options={roles.map((role) => ({ label: m[`orgs.role_${role}`](), value: role }))}
 									class="w-fit!"
-									activatorClass={(isOpen) => cn(
-										"rounded-md border border-border bg-transparent px-3 py-2 w-fit!",
-										isOpen ? "border-main-border hover:border-main-border" : ""
-									)}
+									activatorClass={() => 'w-fit!'}
 									value={member.role}
-									drawerClass="rounded-md bg-background!"
-									sectionClass="font-semibold text-foreground!"
-									itemClass={() => "bg-background! rounded-md hover:bg-main-hover!"}
 									onchange={(selectedId) => change(member, selectedId as OrgRole)}
 								/>
 								<Button variant="destructive" onclick={() => remove(member)}>
@@ -168,7 +170,12 @@
 		</ul>
 	</section>
 
-	{#if isAdmin}
+	{#if isAdmin && limits && !canAdd}
+		<PlanHint
+			class="border-t border-main-border pt-4"
+			text={m['billing.hint.seats']({ count: org.members.length, max: limits.seats })}
+		/>
+	{:else if isAdmin}
 		<form class="flex flex-col gap-2 border-t border-main-border pt-4" onsubmit={add}>
 			<Input
 				id="member-email"
@@ -179,15 +186,14 @@
 				required
 			/>
 			<div class="flex gap-2">
-				<select
-					class="rounded-md border border-main-border bg-background px-2 py-1 text-sm"
-					aria-label={m['orgs.members']()}
-					bind:value={newRole}
-				>
-					{#each roles as option (option)}
-						<option value={option}>{m[`orgs.role_${option}`]()}</option>
-					{/each}
-				</select>
+				<Dropdown
+					variant="plain"
+					options={roles.map((role) => ({ label: m[`orgs.role_${role}`](), value: role }))}
+					class="w-fit!"
+					activatorClass={() => 'w-fit!'}
+					value={newRole}
+					onchange={(selected) => (newRole = selected as OrgRole)}
+				/>
 				<Button variant="primary" type="submit" disabled={email.trim() === ''}>
 					{m['orgs.add']()}
 				</Button>

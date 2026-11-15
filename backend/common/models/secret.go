@@ -45,6 +45,10 @@ type Secret struct {
 
 	// Who else may bind it. Survives a value rewrite and a reseal.
 	Grants []Grant `bson:"grants" json:"grants,omitempty"`
+
+	// BilledTo is the user whose plan the secret counts against, stamped
+	// when it is first stored. Empty for the platform's own.
+	BilledTo string `bson:"billed_to,omitempty" json:"-"`
 }
 
 // SecretRef is how a post-it names a secret outside its board: the pair the

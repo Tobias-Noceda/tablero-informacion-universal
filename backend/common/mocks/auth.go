@@ -78,6 +78,16 @@ func (m *MemoryUserStore) UpdateUser(id uuid.UUID, set map[string]any) error {
 	return nil
 }
 
+func (m *MemoryUserStore) SetUserPlan(id uuid.UUID, plan models.Plan, expires *time.Time) error {
+	user := m.at(id)
+	if user == nil {
+		return infrastructure.ErrUserNotFound
+	}
+	user.Plan, user.PlanExpires = plan, expires
+	user.UpdatedAt = time.Now()
+	return nil
+}
+
 func (m *MemoryUserStore) ReplaceIdentities(id uuid.UUID, identities []models.Identity) error {
 	user := m.at(id)
 	if user == nil {

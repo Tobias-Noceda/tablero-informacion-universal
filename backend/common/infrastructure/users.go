@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"errors"
+	"time"
 
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/google/uuid"
@@ -24,4 +25,6 @@ type UserStore interface {
 	FindUserByIdentity(provider models.IdentityProvider, subject string) (*models.User, error)
 	UpdateUser(id uuid.UUID, set map[string]any) error
 	ReplaceIdentities(id uuid.UUID, identities []models.Identity) error
+	// SetUserPlan stores the user's plan and when it lapses; nil never does.
+	SetUserPlan(id uuid.UUID, plan models.Plan, expires *time.Time) error
 }

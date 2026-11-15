@@ -11,6 +11,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/itchyny/gojq v0.12.19
+	github.com/mercadopago/sdk-go v1.14.0
 	github.com/redis/go-redis/v9 v9.20.1
 	github.com/resend/resend-go/v4 v4.8.2
 	go.mongodb.org/mongo-driver/v2 v2.6.0

@@ -3,9 +3,11 @@ package users
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	"github.com/Secreto31126/tesis/common/infrastructure"
+	"github.com/Secreto31126/tesis/common/models"
 	srv "github.com/Secreto31126/tesis/common/services/users"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -25,6 +27,48 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 		users.GET("/:id", ctrl.GetUser)
 		users.PATCH("/:id", ctrl.UpdateUser)
 	}
+
+	// The service refuses anyone but an admin as well; this keeps the
+	// operator route from even parsing a stranger's request.
+	router.Group("/system", middleware.RequireAdmin()).PUT("/users/:id/plan", ctrl.SetPlan)
+}
+
+type SetPlanRequest struct {
+	Plan models.Plan `json:"plan"`
+	// Expires is when the plan lapses back to free; omitted, it never does.
+	Expires *time.Time `json:"expires"`
+}
+
+// SetPlan godoc
+// @Summary      Put a user on a plan
+// @Description  Platform admins only. Overrides whatever the user subscribed to, until expires (RFC 3339) when given.
+// @Tags         users, system
+// @Accept       json
+// @Param        id    path  string          true  "User id"
+// @Param        body  body  SetPlanRequest  true  "free, pro or max, and optionally when it lapses"
+// @Success      204
+// @Failure      400  "invalid_plan"
+// @Failure      403  "Not a platform admin"
+// @Failure      404  "No such user"
+// @Router       /system/users/{id}/plan [put]
+func (ctrl *Controller) SetPlan(c *gin.Context) {
+	id, ok := userID(c)
+	if !ok {
+		return
+	}
+
+	var req SetPlanRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": srv.ErrInvalidPlan.Error()})
+		return
+	}
+
+	if err := ctrl.service.SetPlan(middleware.Principal(c), id, req.Plan, req.Expires); err != nil {
+		fail(c, err)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 type UpdateUserRequest struct {
@@ -111,7 +155,7 @@ func fail(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, srv.ErrForbidden), errors.Is(err, infrastructure.ErrUserNotFound):
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-	case errors.Is(err, srv.ErrInvalidName), errors.Is(err, srv.ErrInvalidLocale), errors.Is(err, srv.ErrNothingToUpdate):
+	case errors.Is(err, srv.ErrInvalidName), errors.Is(err, srv.ErrInvalidLocale), errors.Is(err, srv.ErrNothingToUpdate), errors.Is(err, srv.ErrInvalidPlan):
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 	default:
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal"})
