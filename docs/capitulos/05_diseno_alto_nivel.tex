@@ -377,7 +377,14 @@ La Figura~\ref{fig:modelo_boveda} muestra el área de la bóveda, en la cual cad
 \end{figure}
 
 \subsection{Planes y suscripciones}
-Por último, cada usuario tiene un plan (\texttt{free}, \texttt{pro} o \texttt{max}) con una fecha de vencimiento opcional, y puede tener suscripciones de Mercado Pago que lo mantienen vigente. Los límites de cada plan forman una única tabla (\texttt{Limits}). Cada recurso limitado se factura a un usuario: un tablero a su dueño o al pagador de su organización (\texttt{Org.owner}), y un secreto al usuario indicado en \texttt{billed\_to}. La combinación de pagador, plan y límites que aplica a un recurso se representa con \texttt{Entitlement}.
+Por último, cada usuario tiene un plan (\texttt{free}, \texttt{pro} o \texttt{max}) con una fecha de vencimiento opcional, y puede tener suscripciones de Mercado Pago que lo mantienen vigente. Los límites de cada plan forman una única tabla (\texttt{Limits}). Cada recurso limitado se factura a un usuario: un tablero a su dueño o al pagador de su organización (\texttt{Org.owner}), y un secreto al usuario indicado en \texttt{billed\_to}. La combinación de pagador, plan y límites que aplica a un recurso se representa con \texttt{Entitlement}. La Figura~\ref{fig:modelo_planes} muestra estas relaciones.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\textwidth]{figuras/fig40.png}
+  \caption{Modelo de planes y suscripciones}
+  \label{fig:modelo_planes}
+\end{figure}
 
 \section{Descripción de sistemas, servicios y plataformas}
 A continuación se describe cada componente del sistema, su stack tecnológico, su responsabilidad y la justificación de la elección. Los componentes marcados como planificados forman parte del alcance del proyecto pero no están implementados en el incremento actual.

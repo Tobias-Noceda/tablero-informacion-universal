@@ -297,6 +297,17 @@ El servicio \texttt{entitlements} resuelve, para cada recurso, quién lo paga: u
 
 El cobro se realiza mediante suscripciones mensuales de Mercado Pago, con un precio en pesos calculado a partir del precio en dólares de cada plan. Al suscribirse, el backend crea la suscripción y devuelve la URL del checkout del proveedor, que al finalizar redirige al frontend para sincronizarla. Cada cambio posterior llega por un webhook cuya firma HMAC se verifica, y el backend nunca confía en su contenido: ante cada notificación vuelve a leer la suscripción desde Mercado Pago. El plan queda vigente hasta cinco días después del próximo pago esperado, por lo que una suscripción cancelada o impaga vuelve sola al plan gratuito. Subir de plan se aplica de inmediato, mientras que bajarlo se aplica con la siguiente factura pagada.
 
+Las clases que intervienen se muestran en la Figura~\ref{fig:clases_billing}. \texttt{EntitlementsService} implementa el puerto \texttt{Entitlements} que consultan los demás servicios, y para ello lee usuarios, organizaciones, tableros y grupos, y obtiene del puerto \texttt{Counter} los conteos de cada límite. \texttt{BillingService} depende del puerto \texttt{PaymentGateway}, implementado por el adaptador \texttt{Gateway} sobre el SDK de Mercado Pago, y de \texttt{SubscriptionStore} para guardar el estado conocido de cada suscripción.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{figuras/fig41.png}
+  \caption{Diagrama de clases de planes y facturación}
+  \label{fig:clases_billing}
+\end{figure}
+
+Los endpoints de este componente se resumen en la Tabla~\ref{tab:endpoints_billing}.
+
 \begin{tablaendpoints}{Endpoints de Billing}{tab:endpoints_billing}
   GET & /billing/plans & Listar los planes con sus límites y precios (público). \\
   POST & /billing/webhook & Recibir las notificaciones de Mercado Pago (público, con firma). \\
