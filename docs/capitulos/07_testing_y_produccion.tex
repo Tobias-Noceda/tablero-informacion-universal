@@ -76,7 +76,7 @@ Estas pruebas validan el almacenamiento seguro de credenciales exigido por el RN
 \section{Resultados de Testing}
 Se desarrollaron los tests unitarios, de integración y de punta a punta, con el objeto de corroborar la correcta implementación del sistema en base a las pruebas definidas. Se configuró un sistema de CI/CD para asegurar la consistencia del código fuente a medida que avanza el equipo. En la Tabla~\ref{tab:resultados_testing} se resumen los resultados de la última ejecución.
 
-En el backend, la cobertura se calcula sobre los paquetes propios, excluyendo los adaptadores de MongoDB y Redis, que se validan con 52 pruebas de integración ejecutadas contra instancias reales de ambas bases y un servidor OAuth2 simulado. Las suites del backend y del servicio de tiempo real se ejecutan automáticamente en GitHub Actions ante cada cambio, mientras que las del frontend se ejecutan de forma local.
+En el backend, la cobertura se calcula sobre los paquetes propios, excluyendo los adaptadores de MongoDB y Redis, que se validan con 56 pruebas de integración ejecutadas contra instancias reales de ambas bases y un servidor OAuth2 simulado. Las suites del backend y del servicio de tiempo real se ejecutan automáticamente en GitHub Actions ante cada cambio, mientras que las del frontend y del servidor MCP se ejecutan de forma local.
 
 \begin{table}[H]
   \centering
@@ -85,11 +85,11 @@ En el backend, la cobertura se calcula sobre los paquetes propios, excluyendo lo
     \toprule
     Servicio & Tipo de pruebas & Tests & Cobertura \\
     \midrule
-    Backend (Go) & Unitarias y de controladores & 474 & 81,7 \% de sentencias \\
-    Backend (Go) & Integración con MongoDB, Redis y OAuth2 simulado & 52 & No aplica \\
+    Backend (Go) & Unitarias y de controladores & 582 & 85,7 \% de sentencias \\
+    Backend (Go) & Integración con MongoDB, Redis y OAuth2 simulado & 56 & No aplica \\
     Tiempo real (Node.js) & Unitarias & 19 & 97,5 \% de líneas \\
-    Frontend (SvelteKit) & Unitarias de módulos y lógica & 91 & 39,3 \% de sentencias \\
-    Servidor MCP (xmcp) & Sin pruebas automatizadas & 0 & No aplica \\
+    Frontend (SvelteKit) & Unitarias de módulos y lógica & 154 & 39,6 \% de sentencias \\
+    Servidor MCP (xmcp) & Unitarias de las herramientas & 18 & 99,7 \% de líneas \\
     \bottomrule
   \end{tabularx}
   \caption{Resultados de las pruebas automatizadas por servicio}
