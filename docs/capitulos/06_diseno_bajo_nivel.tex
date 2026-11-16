@@ -5,7 +5,7 @@ Siguiendo una arquitectura hexagonal, se desarrolló una capa de servicios que c
 
 La Figura~\ref{fig:capas_backend} esquematiza la organización en capas del backend y la interacción entre sus componentes. Cada solicitud HTTP atraviesa primero los middlewares de autenticación y autorización. Luego, el controlador del recurso se encarga de interpretar la solicitud y construir la respuesta correspondiente, delegando la ejecución del caso de uso al servicio.
 
-Los servicios dependen únicamente de las interfaces definidas en el paquete \texttt{infrastructure}, que actúan como puertos de la arquitectura. Por su parte, los adaptadores del paquete \texttt{ports} implementan dichas interfaces mediante tecnologías concretas, como MongoDB, Redis, JWT, Argon2id, OIDC, mecanismos de cifrado, OAuth2, el motor de integraciones y el servicio de correo. Finalmente, los tipos de dominio definidos en el paquete \texttt{models} son compartidos por las distintas capas del backend.
+Los servicios dependen únicamente de las interfaces definidas en el paquete \texttt{infrastructure}, que actúan como puertos de la arquitectura. Por su parte, los adaptadores del paquete \texttt{ports} implementan dichas interfaces mediante tecnologías concretas, como MongoDB, Redis, JWT, Argon2id, OIDC, mecanismos de cifrado, OAuth2, el cliente HTTP seguro, el motor de integraciones, el servicio de correo y la pasarela de pagos de Mercado Pago. Finalmente, los tipos de dominio definidos en el paquete \texttt{models} son compartidos por las distintas capas del backend.
 
 \begin{figure}[H]
   \centering
@@ -42,22 +42,28 @@ En la siguiente tabla se resumen los endpoints implementados para el servicio.
   POST & /auth/password/reset & Restablecer la contraseña con el token recibido. \\
   GET & /auth/google/start & Iniciar el flujo de inicio de sesión con Google. \\
   POST & /auth/google/callback & Completar el inicio de sesión con Google. \\
-  GET & /users/\{id\} & Obtener el perfil propio. \\
+  GET & /users/\{id\} & Obtener el perfil propio, con su plan y sus límites. \\
   PATCH & /users/\{id\} & Editar el perfil propio (nombre, idioma). \\
+  GET & /users/\{id\}/tokens & Listar los tokens personales propios (sin su valor). \\
+  POST & /users/\{id\}/tokens & Crear un token personal (7, 15 o 30 días); su valor se muestra una única vez. \\
+  DELETE & /users/\{id\}/tokens/\{token\} & Revocar un token personal. \\
+  PUT & /system/users/\{id\}/plan & Asignar un plan sin pago (solo administradores). \\
 \end{tablaendpoints}
 
 Los endpoints de login, registro y recuperación aplican límites de tasa tanto por dirección de origen como por cuenta, respondiendo 429 al superarlos, lo que dificulta los ataques de fuerza bruta y el envío masivo de correos.
+
+Los tokens personales, en el paquete \texttt{tokens}, permiten que herramientas externas como el servidor MCP actúen en nombre de un usuario. El verificador de tokens envuelve al de los JWT, de modo que el middleware de autenticación acepta ambos: un token personal se reconoce por su prefijo \texttt{tiu\_pat\_}, se busca por su hash SHA-256 y produce un principal marcado como token, que nunca es administrador. Un segundo middleware limita ese principal a una lista explícita de rutas (lectura de tableros, tarjetas, organizaciones, el perfil y el catálogo, y creación, edición y eliminación de tableros, tarjetas e hilos), por lo que toda ruta nueva queda cerrada a los tokens hasta que se la habilite. Cada usuario puede tener hasta diez tokens activos, la creación está limitada a diez por hora, y tanto la creación como cada uso verifican que el plan del usuario incluya acceso por API.
 
 \section{Control de acceso y organizaciones}
 El control de acceso se concentra en el paquete \texttt{access}, que constituye el único lugar del sistema donde se decide el rol de un principal sobre un recurso. Los servicios nunca comparan identificadores por su cuenta, sino que consultan al puerto \texttt{infrastructure.Access} y comparan el rol obtenido con el mínimo requerido mediante \texttt{AtLeast}.
 
 Sobre un tablero existen tres roles jerárquicos: \texttt{owner}, \texttt{editor} y \texttt{viewer}. Los viewers pueden leer el tablero, sus miembros y los resultados de las tarjetas; los editors pueden además crear, editar, mover y eliminar tarjetas y dibujar hilos; finalmente, el owner puede también renombrar, eliminar y compartir el tablero. Por debajo del rol que una ruta requiere, el tablero responde 404.
 
-Por su parte, las organizaciones, en el paquete \texttt{orgs}, funcionan como un tenant mínimo con roles \texttt{admin} y \texttt{member}. Un tablero creado dentro de una organización alcanza a todos sus miembros sin necesidad de compartirlo: los admins actúan como owners y los members como viewers, prevaleciendo el mayor entre ese rol y el asignado explícitamente en el tablero. La invariante de que una organización conserve al menos un administrador se garantiza en el propio filtro de MongoDB, evitando condiciones de carrera entre degradaciones concurrentes, y una organización solo puede eliminarse cuando ningún tablero ni grupo la referencia.
+Por su parte, las organizaciones, en el paquete \texttt{orgs}, funcionan como un tenant mínimo con roles \texttt{admin} y \texttt{member}. Un tablero creado dentro de una organización alcanza a todos sus miembros sin necesidad de compartirlo: los admins actúan como owners y los members como viewers, prevaleciendo el mayor entre ese rol y el asignado explícitamente en el tablero. La invariante de que una organización conserve al menos un administrador se garantiza en el propio filtro de MongoDB, evitando condiciones de carrera entre degradaciones concurrentes, y una organización solo puede eliminarse cuando ningún tablero ni grupo la referencia. Cada organización tiene además un pagador, su dueño o en su defecto su primer administrador, cuyo plan determina los límites de la organización y de sus tableros.
 
 Los grupos, en el paquete \texttt{groups}, agrupan usuarios con el propósito principal de compartir secretos. En un grupo perteneciente a una organización, los admins actúan como owners y los members solo lo ven, de modo que los secretos del grupo permanecen restringidos a las personas que este lista.
 
-Las clases que intervienen se muestran en la Figura~\ref{fig:clases_access}. El \texttt{Resolver} implementa el puerto \texttt{Access} que consultan los demás servicios para conocer el rol de un principal, mientras que \texttt{OrgService} y \texttt{GroupService} gestionan los miembros y delegan en el puerto \texttt{ScopePurger} la eliminación de los secretos de quien deja de pertenecer.
+Las clases que intervienen se muestran en la Figura~\ref{fig:clases_access}. El \texttt{Resolver} implementa el puerto \texttt{Access} que consultan los demás servicios para conocer el rol de un principal, mientras que \texttt{OrgService} y \texttt{GroupService} gestionan los miembros y delegan en el puerto \texttt{ScopePurger} la eliminación de los secretos de quien deja de pertenecer. Ambos servicios consultan además el puerto \texttt{Entitlements} para rechazar, con 402, la creación de organizaciones o grupos y el ingreso de miembros que excedan el plan correspondiente.
 
 \begin{figure}[H]
   \centering
@@ -69,7 +75,7 @@ Las clases que intervienen se muestran en la Figura~\ref{fig:clases_access}. El 
 \begin{tablaendpoints}{Endpoints de Orgs y Groups}{tab:endpoints_orgs_groups}
   GET & /orgs & Listar las organizaciones del usuario. \\
   POST & /orgs & Crear una organización. \\
-  GET & /orgs/\{id\} & Obtener una organización con sus miembros. \\
+  GET & /orgs/\{id\} & Obtener una organización con sus miembros, su plan y su uso. \\
   PATCH & /orgs/\{id\} & Renombrar la organización. \\
   DELETE & /orgs/\{id\} & Eliminar la organización si está vacía. \\
   PUT & /orgs/\{id\}/members & Agregar un miembro por correo o cambiar su rol. \\
@@ -86,7 +92,7 @@ Este componente, materializado en el paquete \texttt{boards}, es responsable del
 
 El controlador, en \texttt{controllers/boards/controllers.go}, expone los endpoints REST bajo \texttt{/v1/boards}. El servicio, en \texttt{services/boards/main.go}, verifica el rol del llamante a través del puerto \texttt{Access}, orquesta las operaciones de dominio y delega la persistencia en el puerto \texttt{infrastructure.Database}, sin acoplarse a ninguna tecnología concreta. Finalmente, el adaptador en \texttt{ports/mongo/mon.go} provee la implementación concreta sobre MongoDB.
 
-Esta estructura se refleja en la Figura~\ref{fig:clases_boards}, donde \texttt{BoardService} depende de los puertos \texttt{Database} y \texttt{Access} para persistir y autorizar, de \texttt{UserReader} para resolver a los miembros por correo, de \texttt{ScopePurger} para purgar sus secretos y de \texttt{RateLimiter} para limitar las invitaciones.
+Esta estructura se refleja en la Figura~\ref{fig:clases_boards}, donde \texttt{BoardService} depende de los puertos \texttt{Database} y \texttt{Access} para persistir y autorizar, de \texttt{UserReader} para resolver a los miembros por correo, de \texttt{ScopePurger} para purgar sus secretos, de \texttt{RateLimiter} para limitar las invitaciones, de \texttt{OrgReader} para conocer la organización del tablero y de \texttt{Entitlements} para aplicar los límites del plan de quien lo paga.
 
 \begin{figure}[H]
   \centering
@@ -120,6 +126,8 @@ Por su parte, la eliminación, en \texttt{DeletePostIt}, preserva la integridad 
 
 Finalmente, quitar a un miembro o eliminar el tablero desencadena la purga de los secretos que ese miembro guardaba para sí en el tablero, junto con sus claves de datos, evitando que queden credenciales huérfanas.
 
+Las operaciones de creación consultan además el plan de quien paga el tablero, su dueño o el pagador de su organización. Crear un tablero verifica la cantidad de tableros del espacio, y agregar una persona verifica la cantidad de asientos. Al superar un límite, la operación responde 402 indicando qué límite se alcanzó, pero nunca se elimina lo que ya existe. La respuesta de un tablero informa sus límites, los asientos ocupados y los secretos disponibles, para que el frontend anticipe estas restricciones.
+
 \section{Motor de Tarjetas}
 El motor de tarjetas, en el paquete \texttt{postits}, se encarga de crear, configurar, mover y ejecutar tarjetas, cubriendo los requisitos RF-05, RF-07, RF-08, RF-12 y la configuración del rate de RF-09.
 
@@ -127,9 +135,11 @@ El principio de diseño central de este componente es que una tarjeta constituye
 
 Las escrituras sobre una tarjeta actúan en nombre del llamante. Al crearla, o cada vez que cambian sus \texttt{params} o \texttt{bindings}, se registra en el campo \texttt{RunAs} la identidad de quien la configuró, y es con esa identidad que luego se resuelven sus credenciales. Esto impide que un editor utilice, a través de una tarjeta, secretos a los que no tiene acceso, y garantiza que degradar a un usuario a viewer detenga las tarjetas que se ejecutan en su nombre.
 
+Una tarjeta personalizada, que no proviene del catálogo ni de una plantilla, define su propia petición, y el servicio la valida al crearla y al editarla: la URL debe usar \texttt{http} o \texttt{https}, el método puede ser \texttt{GET} o \texttt{POST} (este último con un cuerpo JSON de hasta 16 KB), la respuesta se interpreta como JSON o HTML, debe haber al menos una salida, y no puede haber más de veinte headers, parámetros o salidas. La petición de una tarjeta creada desde el catálogo o una plantilla, en cambio, es fija. Toda creación verifica además el límite de tarjetas por tablero del plan.
+
 El estilo visual de cada tarjeta, correspondiente al RF-12, se guarda junto a su entrada en el documento del tablero, por lo que llega a los demás usuarios por el mismo canal de tiempo real que el resto de los cambios del tablero. La operación \texttt{StylePostIt}, reservada a los editores, valida el color, el borde, la alineación del texto y el tamaño, redondea las dimensiones a píxeles enteros dentro de los límites admitidos y actualiza únicamente los campos enviados mediante los operadores posicionales \texttt{\$set} y \texttt{\$unset}, de modo que un valor por defecto nunca se almacena.
 
-En la Figura~\ref{fig:clases_postits} se observa que \texttt{PostItsService} no conoce el motor de integraciones concreto: depende del puerto \texttt{Executer}, implementado por el adaptador \texttt{DewIt}, del puerto \texttt{Cache} para el resultado de cada tarjeta y del puerto \texttt{SecretResolver} para obtener las credenciales en nombre de \texttt{RunAs}.
+En la Figura~\ref{fig:clases_postits} se observa que \texttt{PostItsService} no conoce el motor de integraciones concreto: depende del puerto \texttt{Executer}, implementado por el adaptador \texttt{DewIt}, del puerto \texttt{Cache} para el resultado de cada tarjeta y del puerto \texttt{SecretResolver} para obtener las credenciales en nombre de \texttt{RunAs}. Además, consulta el catálogo (\texttt{WellKnownReader}) y las plantillas (\texttt{PostitTemplates}) para crear tarjetas a partir de ellos, el puerto \texttt{Entitlements} para aplicar el límite de tarjetas por tablero y el tiempo mínimo en caché del plan, y \texttt{RateLimiter} para limitar las actualizaciones forzadas.
 
 \begin{figure}[H]
   \centering
@@ -144,7 +154,7 @@ Sus endpoints se resumen en la siguiente tabla.
   POST & /post-its & Crear tarjeta (eventualmente desde un well-known). & editor \\
   GET & /post-its/\{id\} & Ejecutar la tarjeta y devolver el dato proyectado. & viewer \\
   GET & /post-its/\{id\}/settings & Obtener la configuración. & viewer \\
-  PATCH & /post-its/\{id\}/settings & Editar params, query, response o rate. & editor \\
+  PATCH & /post-its/\{id\}/settings & Editar params, bindings, query, response o rate, y para las tarjeta personalizada, también la URL y la petición. & editor \\
   PATCH & /post-its/\{id\}/position & Mover la tarjeta dentro del board. & editor \\
   PATCH & /post-its/\{id\}/title & Editar el título de la tarjeta. & editor \\
   PATCH & /post-its/\{id\}/style & Cambiar el estilo visual de la tarjeta (color, borde, alineación del texto y tamaño). & editor \\
@@ -152,11 +162,11 @@ Sus endpoints se resumen en la siguiente tabla.
 \end{tablaendpointsrol}
 
 \section{Integración con APIs}
-El motor de integración, en el paquete \texttt{executer}, es responsable de resolver un PostIt a un valor concreto, cubriendo la capa de ejecución de los requisitos RF-07 y RF-08. Antes de invocarlo, el servicio de tarjetas prepara una copia del PostIt: cada placeholder \texttt{\$TOKEN} presente en \texttt{params}, \texttt{headers} o \texttt{queries} se mapea a una referencia de secreto, tomando el binding explícito de la tarjeta si existe. Esas referencias se resuelven como el principal \texttt{RunAs}, verificando nuevamente que pueda utilizarlas, y por último se inyectan los secretos de sistema que requiera el well-known. A continuación, cada llamada a \texttt{DewIt.Execute} recorre cinco pasos.
+El motor de integración, en el paquete \texttt{executer}, es responsable de resolver un PostIt a un valor concreto, cubriendo la capa de ejecución de los requisitos RF-07 y RF-08. Antes de invocarlo, el servicio de tarjetas prepara una copia del PostIt: cada placeholder \texttt{\$TOKEN} presente en \texttt{params}, \texttt{headers}, \texttt{queries} o en un valor del cuerpo JSON se mapea a una referencia de secreto, tomando el binding explícito de la tarjeta si existe. Esas referencias se resuelven como el principal \texttt{RunAs}, verificando nuevamente que pueda utilizarlas, y por último se inyectan los secretos de sistema que requiera el well-known. A continuación, cada llamada a \texttt{DewIt.Execute} recorre seis pasos.
 
-En primer lugar, un short-circuit estático: si el campo \texttt{Resource} es nil, se devuelven los \texttt{Params} tal cual, lo que da soporte a las integraciones \texttt{static\_card} e \texttt{image} y a cualquier tarjeta sin fuente externa. A continuación, la sustitución de variables, en la que \texttt{populate} reemplaza dentro de las queries y los headers aquellos valores cuyo contenido coincida con el nombre de un Param definido por el usuario, identificados por el prefijo \texttt{\$}. Luego se realiza la petición HTTP, creada con un \texttt{context.WithTimeout} de diez segundos, ensamblando querystring y headers y exigiendo un status 200 OK; cualquier otro código se reporta como error de la tarjeta.
+En primer lugar, un short-circuit estático: si el campo \texttt{Resource} es nil, se devuelven los \texttt{Params} tal cual, lo que da soporte a las integraciones \texttt{static\_card} e \texttt{image} y a cualquier tarjeta sin fuente externa. Luego se elige el intérprete según el campo \texttt{response}: JSON con \texttt{gojq} o HTML con \texttt{goquery}. A continuación, la sustitución de variables, en la que \texttt{populate} reemplaza dentro de las queries y los headers aquellos valores cuyo contenido coincida con el nombre de un Param, identificados por el prefijo \texttt{\$}. En una petición \texttt{POST}, el cuarto paso aplica la misma sustitución a cada valor de texto del cuerpo JSON.
 
-El cuarto paso es el parseo, donde el cuerpo de la respuesta se decodifica como JSON genérico. Por último, la proyección compila la expresión \texttt{Query} con \texttt{gojq.Parse} y la ejecuta sobre el JSON con un timeout de doscientos cincuenta milisegundos, mientras que para HTML se evalúan como selectores CSS mediante \texttt{goquery}, devolviendo al servicio un objeto con un valor por clave.
+El quinto paso es la petición HTTP, creada con un \texttt{context.WithTimeout} de diez segundos, ensamblando querystring, headers y, si corresponde, el cuerpo como \texttt{application/json}, y exigiendo un status 200 OK; cualquier otro código se reporta como error de la tarjeta. Por último, el cuerpo de la respuesta, leído hasta un máximo de 2MB, se interpreta con el parser elegido: para JSON se compila cada expresión con \texttt{gojq.Parse} y se ejecuta con un timeout de doscientos cincuenta milisegundos, mientras que para HTML cada valor es un selector jquery evaluado con \texttt{goquery}, devolviendo al servicio un objeto con un valor por clave.
 
 La siguiente tabla detalla las integraciones predefinidas que el sistema carga inicialmente en el catálogo.
 
@@ -194,7 +204,7 @@ La siguiente tabla detalla las integraciones predefinidas que el sistema carga i
   image & Interna & — & — & — \\
   temperature & Open-Meteo & mín./máx. de temperatura horaria & 30 s & — \\
   air\_quality & Open-Meteo & Índice de calidad del aire, Material particulado 2.5 y fecha y hora de medida & 15 min & — \\
-  events\_search & Ticketmaster & nombre, fecha e imagen del primer evento & 120 s & del usuario \\
+  events\_search & Ticketmaster & nombre, inicio de venta, imagen, fecha, lugar, ciudad y URL del primer evento & 120 s & del usuario \\
   dog\_facts & Dog API & atributos del primer fact & 5 s & — \\
   dolar\_oficial & dolarapi.com & compra/venta & 120 s & — \\
   exchange\_rate & currencyapi.com & código, valor y fecha & 60 min & del usuario \\
@@ -209,11 +219,13 @@ La siguiente tabla detalla las integraciones predefinidas que el sistema carga i
 
 El catálogo se almacena en la colección \texttt{well\_knowns} y lo administra el servicio \texttt{wellknowns}. Cada definición contiene la petición a realizar, la query de proyección, el rate por defecto, los parámetros que debe completar el usuario y las salidas que produce, con sus textos en español e inglés, además de los secretos de sistema que necesita. Los administradores de la plataforma pueden crear, modificar, eliminar y restaurar definiciones sin desplegar una nueva versión del backend.
 
-La eliminación es lógica, de modo que las tarjetas creadas a partir de una definición borrada siguen funcionando. Al iniciar, el sistema carga las integraciones incorporadas que todavía no figuran en la colección, sin sobrescribir las que ya existen. Los placeholders de las definiciones se escriben en minúsculas (\texttt{\$credential}, \texttt{\$api\_key}), mientras que los nombres de los secretos del usuario van en mayúsculas (\texttt{\$MY\_KEY}), lo que evita colisiones entre ambos.
+El rate indicado es el valor por defecto de cada definición, y el tiempo que un resultado permanece en caché nunca es menor al mínimo del plan de quien paga el tablero (600, 150 o 60 segundos en los planes Free, Pro y Max, respectivamente).
+
+La eliminación es lógica, de modo que las tarjetas creadas a partir de una definición borrada siguen funcionando. Durante las migraciones, el sistema carga las integraciones incorporadas que todavía no figuran en la colección, sin sobrescribir las que ya existen. Los placeholders de las definiciones se escriben en minúsculas (\texttt{\$credential}, \texttt{\$api\_key}), mientras que los nombres de los secretos del usuario van en mayúsculas (\texttt{\$MY\_KEY}), lo que evita colisiones entre ambos.
 
 Los secretos del sistema, como la clave de la API de NASA, se resuelven al momento de la ejecución y nunca se almacenan en la tarjeta. Una integración personalizada, correspondiente al RF-08, reutiliza exactamente la misma estructura \texttt{PostIts} que un well-known, con el campo \texttt{WellKnown} vacío y todos los demás campos suministrados por el usuario, lo que la vuelve fácilmente extensible.
 
-Las plantillas de tarjeta, en el paquete \texttt{postittemplates}, permiten guardar la configuración de una integración personalizada como un tipo de tarjeta reutilizable. Cada plantilla pertenece a un usuario, a un tablero o a una organización, y su clave comienza con el prefijo \texttt{custom\_} para no confundirse con las definiciones del catálogo. Quién puede verla, usarla o modificarla depende de ese ámbito, que se resuelve a través del puerto \texttt{Access}. Al crear una tarjeta a partir de una plantilla, esta se convierte a la misma forma que una definición del catálogo, por lo que el motor la ejecuta sin distinción.
+Las plantillas de tarjeta, en el paquete \texttt{postittemplates}, permiten guardar la configuración de una integración personalizada como un tipo de tarjeta reutilizable. Cada plantilla pertenece a un usuario, a un tablero o a una organización, y su clave comienza con el prefijo \texttt{custom\_} para no confundirse con las definiciones del catálogo. Quién puede verla, usarla o modificarla depende de ese ámbito, que se resuelve a través del puerto \texttt{Access}. Al crear una tarjeta a partir de una plantilla, esta se convierte a la misma forma que una definición del catálogo, por lo que el motor la ejecuta sin distinción. A diferencia del catálogo, una plantilla está en un único idioma, siempre realiza una petición \texttt{GET} y no puede utilizar secretos del sistema. La cantidad de plantillas de cada ámbito está limitada por el plan de quien lo paga, y eliminar una plantilla es definitivo: las tarjetas creadas a partir de ella siguen funcionando con su copia, pero ya no pueden editarse.
 
 La Figura~\ref{fig:clases_wellknowns} muestra las clases de ambos servicios. \texttt{WellKnownService} administra el catálogo, mientras que \texttt{PostitTemplateService} implementa el puerto \texttt{PostitTemplates}, que el servicio de tarjetas consulta para obtener la definición de una plantilla utilizable en un tablero.
 
@@ -247,7 +259,7 @@ Los valores se cifran con AES-GCM utilizando la clave de datos del ámbito, que 
 
 La política de acceso, en \texttt{policy.go}, constituye la única costura de autorización de la bóveda y expone tres preguntas: \texttt{CanManage}, \texttt{CanView} y \texttt{CanUse}. Un principal puede utilizar un secreto en un tablero si es editor de ese tablero y, además, el ámbito lo admite o alguno de los grants del secreto lo alcanza. Los grants permiten compartir un secreto con un usuario, un grupo o un tablero, opcionalmente limitados a un tablero específico, sin revelar nunca su valor.
 
-El diagrama de clases de la bóveda se presenta en la Figura~\ref{fig:clases_boveda}. La política queda aislada en la clase \texttt{policy}, que implementa \texttt{ScopePolicy}, y el servicio combina el almacenamiento de secretos y el anillo de claves con los puertos que requieren los flujos OAuth2: \texttt{TokenClient}, \texttt{Locker} y \texttt{HandshakeStore}.
+El diagrama de clases de la bóveda se presenta en la Figura~\ref{fig:clases_boveda}. La política queda aislada en la clase \texttt{policy}, que implementa \texttt{ScopePolicy}, y el servicio combina el almacenamiento de secretos y el anillo de claves con los puertos que requieren los flujos OAuth2: \texttt{TokenClient}, \texttt{Locker} y \texttt{HandshakeStore}. Además, consulta \texttt{GroupReader} y \texttt{Access} para resolver los grants, y \texttt{Entitlements} para limitar la cantidad de secretos según el plan de quien paga el ámbito.
 
 \begin{figure}[H]
   \centering
@@ -267,21 +279,43 @@ El diagrama de clases de la bóveda se presenta en la Figura~\ref{fig:clases_bov
   GET & /boards/\{id\}/secrets/usable & Listar los secretos que el llamante puede vincular en el tablero. \\
   GET & /oauth2/providers & Listar los proveedores de la plataforma y si están configurados. \\
   GET & /oauth2/callback & Completar el consentimiento OAuth2 (solo quien lo inició). \\
-  GET/PUT/DELETE & /system/secrets & Gestionar los secretos de sistema (solo administradores). \\
+  GET/PUT & /system/secrets & Listar o crear un secreto de sistema (solo administradores). \\
+  DELETE & /system/secrets/\{name\} & Eliminar un secreto de sistema (solo administradores). \\
+  PUT & /system/oauth2 & Configurar una credencial OAuth2 del ámbito sistema (solo administradores). \\
   PUT & /system/oauth2/clients & Configurar el cliente OAuth2 de un proveedor de la plataforma. \\
   GET & /system/keys & Listar el estado de las claves de datos. \\
 \end{tablaendpoints}
 
-Las credenciales OAuth2 pueden obtenerse con un cliente propio del usuario o a través de un proveedor administrado por la plataforma (Google, Discord), en cuyo caso el client id y el client secret se almacenan como secreto de sistema y se incorporan a la credencial únicamente en memoria. Los access tokens se renuevan automáticamente un minuto antes de su vencimiento, utilizando un lock distribuido en Redis para que dos ejecuciones concurrentes no consuman el mismo refresh token. Ningún handler devuelve jamás el valor de un secreto, un client secret ni un token.
+Las credenciales OAuth2 pueden obtenerse con un cliente propio del usuario o a través de un proveedor administrado por la plataforma (Google, Discord), en cuyo caso el client id y el client secret se almacenan como secreto de sistema y se incorporan a la credencial únicamente en memoria. Los access tokens se renuevan automáticamente un minuto antes de su vencimiento, utilizando un lock distribuido en Redis para que dos ejecuciones concurrentes no consuman el mismo refresh token. Ningún handler devuelve jamás el valor de un secreto, un client secret ni un token. Cada secreto se descuenta del plan del usuario que paga su ámbito, registrado en \texttt{billed\_to}.
+
+\section{Planes y facturación}
+Este componente, materializado en los paquetes \texttt{entitlements} y \texttt{billing} y en el adaptador \texttt{mercadopago}, define qué permite cada plan y cobra las suscripciones de los planes pagos.
+
+Cada usuario tiene un plan (\texttt{free}, \texttt{pro} o \texttt{max}) y una fecha de vencimiento opcional. Los límites de cada plan forman una única tabla en el código, que el frontend recibe para mostrarlos: cantidad de organizaciones, tableros por espacio, asientos, tarjetas por tablero, plantillas por ámbito, secretos y grupos, el tiempo mínimo de un resultado en caché, y si el plan permite forzar actualizaciones y usar tokens personales.
+
+El servicio \texttt{entitlements} resuelve, para cada recurso, quién lo paga: un tablero personal lo paga su dueño, uno de organización el pagador de la organización, y un secreto el usuario indicado en \texttt{billed\_to}. Los demás servicios consultan este puerto antes de crear algo y, si el plan del pagador no lo admite, responden 402 con el nombre del límite alcanzado, su máximo y el plan vigente. Solo se rechazan las creaciones nuevas, de modo que una cuenta que baja de plan conserva lo que ya tiene.
+
+El cobro se realiza mediante suscripciones mensuales de Mercado Pago, con un precio en pesos calculado a partir del precio en dólares de cada plan. Al suscribirse, el backend crea la suscripción y devuelve la URL del checkout del proveedor, que al finalizar redirige al frontend para sincronizarla. Cada cambio posterior llega por un webhook cuya firma HMAC se verifica, y el backend nunca confía en su contenido: ante cada notificación vuelve a leer la suscripción desde Mercado Pago. El plan queda vigente hasta cinco días después del próximo pago esperado, por lo que una suscripción cancelada o impaga vuelve sola al plan gratuito. Subir de plan se aplica de inmediato, mientras que bajarlo se aplica con la siguiente factura pagada.
+
+\begin{tablaendpoints}{Endpoints de Billing}{tab:endpoints_billing}
+  GET & /billing/plans & Listar los planes con sus límites y precios (público). \\
+  POST & /billing/webhook & Recibir las notificaciones de Mercado Pago (público, con firma). \\
+  GET & /billing/usage & Obtener el uso de la cuenta (organizaciones, grupos, secretos y plantillas). \\
+  GET & /billing/subscription & Obtener el plan vigente y el estado de la suscripción. \\
+  POST & /billing/subscribe & Iniciar una suscripción y obtener la URL del checkout. \\
+  POST & /billing/sync & Sincronizar la suscripción tras volver del checkout. \\
+  PUT & /billing/subscription & Cambiar de plan. \\
+  DELETE & /billing/subscription & Cancelar la suscripción. \\
+\end{tablaendpoints}
 
 \section{Persistencia y caché}
 Los adaptadores de persistencia y caché, en los paquetes \texttt{mongo} y \texttt{redis}, proveen las implementaciones concretas de los puertos de infraestructura de los que dependen los servicios.
 
-El adaptador \texttt{mongo} implementa los puertos \texttt{Database}, \texttt{UserStore}, \texttt{GroupStore}, \texttt{OrgStore}, \texttt{SecretStore}, \texttt{KeyStore}, \texttt{AccessTokenStore}, \texttt{WellKnownStore} y \texttt{PostitTemplateStore}, junto con las interfaces de solo lectura \texttt{UserReader}, \texttt{OrgReader}, \texttt{GroupReader} y \texttt{BoardReader}, encapsulando la lógica de persistencia descrita en los componentes anteriores. Al iniciar, \texttt{EnsureIndexes} crea de forma idempotente los índices de los que dependen las invariantes de unicidad, como el correo de cada usuario, el par \texttt{(scope, name)} de cada secreto o la existencia de una única clave de datos activa por ámbito.
+El adaptador \texttt{mongo} implementa los puertos \texttt{Database}, \texttt{UserStore}, \texttt{GroupStore}, \texttt{OrgStore}, \texttt{SecretStore}, \texttt{KeyStore}, \texttt{AccessTokenStore}, \texttt{WellKnownStore}, \texttt{PostitTemplateStore} y \texttt{SubscriptionStore}, junto con las interfaces de solo lectura \texttt{UserReader}, \texttt{OrgReader}, \texttt{GroupReader} y \texttt{BoardReader}, encapsulando la lógica de persistencia descrita en los componentes anteriores, así como los conteos que necesita el servicio de planes para verificar cada límite. Al iniciar, \texttt{EnsureIndexes} crea de forma idempotente los índices de los que dependen las invariantes de unicidad, como el correo de cada usuario, el par \texttt{(scope, name)} de cada secreto o la existencia de una única clave de datos activa por ámbito.
 
 Antes de crear los índices se ejecutan las migraciones, como el renombre de colecciones heredadas, y luego se carga el catálogo inicial de integraciones. En Vercel este paso no se ejecuta en cada arranque en frío, sino una única vez por despliegue de producción, mediante el comando \texttt{-migrate} durante la compilación.
 
-El adaptador \texttt{redis}, por su parte, implementa el puerto \texttt{Caché} mediante las operaciones \texttt{FindPostItResult} y \texttt{AddPostItResult}, almacenando el último resultado de cada tarjeta con un tiempo de vida igual a su rate configurado. Además, implementa las sesiones de refresco (claves \texttt{session:}, \texttt{spent:}, \texttt{family:} y \texttt{user-families:}), los límites de tasa (\texttt{rate:}), los locks distribuidos (\texttt{lock:}) y los handshakes de los flujos OAuth2.
+El adaptador \texttt{redis}, por su parte, implementa el puerto \texttt{Caché} mediante las operaciones \texttt{FindPostItResult}, \texttt{AddPostItResult} y \texttt{DropPostItResult}, almacenando el último resultado de cada tarjeta bajo su identificador, con un tiempo de vida igual a su rate, y descartándolo cuando la tarjeta se edita o se elimina. Además, implementa las sesiones de refresco (claves \texttt{session:}, \texttt{spent:}, \texttt{family:} y \texttt{user-families:}), los límites de tasa (\texttt{rate:}, por ejemplo para inicios de sesión, invitaciones, creación de tokens y actualizaciones forzadas), los locks distribuidos (\texttt{lock:}) y los handshakes de los flujos OAuth2 (\texttt{oauth-handshake:}). La presencia de los usuarios en cada tablero (\texttt{board:\{id\}:online}) la escribe únicamente el servicio de tiempo real.
 
 La relación entre estos adaptadores y los puertos que satisfacen se ilustra en la Figura~\ref{fig:adaptadores_persistencia}. Gracias a esta inversión de dependencias, cualquiera de estas tecnologías podría reemplazarse sin alterar la lógica de negocio. Cada círculo representa una interfaz provista por el adaptador, según la notación de UML.
 
@@ -295,9 +329,9 @@ La relación entre estos adaptadores y los puertos que satisfacen se ilustra en 
 \section{Estrategia de actualización y caché}
 A diferencia de los componentes anteriores, la actualización de las tarjetas no constituye un paquete independiente, sino una capacidad transversal que emerge de la colaboración entre el motor de tarjetas, el adaptador de caché y el frontend. Su objetivo es garantizar que las tarjetas reflejen el último dato disponible sin intervención del usuario, según lo establecido por el RF-09.
 
-El mecanismo principal es un caché por tarjeta: al ejecutar una tarjeta, el servicio consulta primero Redis mediante \texttt{FindPostItResult} y, si existe un valor cacheado, lo devuelve sin tocar la fuente externa; en caso contrario, ejecuta el pipeline del executer y persiste el resultado con \texttt{AddPostItResult}, que aplica un \texttt{SET} con expiración igual al rate, de modo que el tiempo de vida natural del dato coincide con su frecuencia de actualización. Así, todos los usuarios que observan una misma tarjeta comparten un único resultado y la API externa se consulta como máximo una vez por período. Este recorrido corresponde al diagrama de secuencia de la Figura~\ref{fig:seq_ejecucion}.
+El mecanismo principal es un caché por tarjeta: al ejecutar una tarjeta, el servicio consulta primero Redis mediante \texttt{FindPostItResult} y, si existe un valor cacheado, lo devuelve sin tocar la fuente externa; en caso contrario, ejecuta el pipeline del executer y persiste el resultado con \texttt{AddPostItResult}, que aplica un \texttt{SET} con expiración igual al rate de la tarjeta o, si es menor, al tiempo mínimo que fija el plan, de modo que el tiempo de vida natural del dato coincide con su frecuencia de actualización sin que un rate muy bajo multiplique las consultas. Así, todos los usuarios que observan una misma tarjeta comparten un único resultado y la API externa se consulta como máximo una vez por período. Editar o eliminar la tarjeta descarta su resultado, y en el plan Max el usuario puede forzar una nueva ejecución. Este recorrido corresponde al diagrama de secuencia de la Figura~\ref{fig:seq_ejecucion}.
 
-A esto se suma el header \texttt{Cache-Control: private, max-age=10} en la respuesta de ejecución, que permite que el navegador absorba parte de la carga, y el servicio de tiempo real, que notifica a cada cliente los cambios estructurales del tablero, como tarjetas agregadas, movidas o reconfiguradas, para que vuelva a cargarlo sin necesidad de polling.
+A esto se suma el header \texttt{Cache-Control: private, max-age=10} (o \texttt{no-store} en una actualización forzada) en la respuesta de ejecución, que permite que el navegador absorba parte de la carga, y el servicio de tiempo real, que notifica a cada cliente los cambios estructurales del tablero, como tarjetas agregadas, movidas o reconfiguradas, para que vuelva a cargarlo sin necesidad de polling.
 
 \section{Notificaciones por correo}
 El adaptador \texttt{mail} implementa el puerto \texttt{Mailer}, encargado de enviar los correos de verificación de cuenta y de recuperación de contraseña, así como el aviso que recibe el titular de una cuenta cuando alguien intenta registrarse con su correo, lo que evita revelar en la respuesta del registro si una dirección ya existe. Cada correo se renderiza a partir de plantillas embebidas en el binario, una por idioma, y se envía en el idioma preferido del destinatario. Al iniciar, el servicio verifica que cada plantilla exista en todos los idiomas soportados, rechazando el arranque en caso contrario.
@@ -316,9 +350,9 @@ La Figura~\ref{fig:clases_mail} muestra las clases del adaptador. \texttt{Mailer
 \section{Tiempo real}
 El servicio de tiempo real, en la carpeta \texttt{realtime}, es un proceso Node independiente del backend encargado de propagar los cambios de un tablero a todos los usuarios conectados. Escucha la colección \texttt{boards} mediante un change stream de MongoDB y, ante cada actualización, emite un evento \texttt{update} a la sala de \texttt{socket.io} correspondiente al tablero.
 
-Al conectarse, el cliente envía su token de acceso y el servicio consulta al backend \texttt{GET /boards/\{id\}} con ese mismo token: si no obtiene un 200 con un rol, rechaza la conexión. De esta forma, el servicio nunca verifica un JWT por sí mismo y el backend sigue siendo la única autoridad de autorización. Un minuto antes de que el token expire, el servidor solicita uno nuevo y vuelve a verificar el rol, de modo que un miembro removido pierde las actualizaciones a más tardar en la siguiente renovación.
+Al conectarse, el cliente envía su token de acceso y el servicio consulta al backend \texttt{GET /boards/\{id\}} con ese mismo token: si no obtiene un 200 con un rol, rechaza la conexión. De esta forma, el servicio nunca verifica un JWT por sí mismo y el backend sigue siendo la única autoridad de autorización. Un minuto antes de que el token expire, el servidor solicita uno nuevo y vuelve a verificar el rol, de modo que un miembro removido pierde las actualizaciones a más tardar en la siguiente renovación. Si el cliente no presenta un token nuevo dentro de los treinta segundos posteriores al vencimiento, se lo desconecta.
 
-La presencia de los usuarios en cada tablero se mantiene en el hash \texttt{board:\{id\}:online} de Redis, mientras que los cursores se comparten de manera peer-to-peer mediante WebRTC (PeerJS), sin pasar por el servidor.
+La presencia de los usuarios en cada tablero se mantiene en el hash \texttt{board:\{id\}:online} de Redis, mientras que los cursores se comparten de manera peer-to-peer mediante WebRTC (PeerJS), sin pasar por el servidor. La entrada de presencia expira veinte minutos después de la última conexión o renovación.
 
 La organización interna del servicio se representa en la Figura~\ref{fig:modulos_realtime}. El módulo \texttt{mongo} recibe los cambios del change stream y se los entrega a \texttt{socket}, que administra las salas. Este último consulta los roles a través de \texttt{auth}, que a su vez interroga al backend, y registra la presencia mediante el módulo \texttt{redis}.
 
