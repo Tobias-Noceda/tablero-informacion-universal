@@ -44,7 +44,7 @@ Para el desarrollo local, se utiliza un conjunto de contenedores orquestados con
   \label{fig:arq_docker}
 \end{figure}
 
-Como trabajo futuro, se plantea un análisis de costos y del mercado, contemplando el escalamiento del producto a medida que aumenta la adopción del mismo, con el objeto de predecir las necesidades del sistema y los requisitos técnicos de migrar el despliegue según sea rentable.
+El análisis de costos y del mercado, que contempla el escalamiento del producto a medida que aumenta la adopción del mismo, con el objeto de predecir las necesidades del sistema y los requisitos técnicos de migrar el despliegue según sea rentable, se desarrolla en el Capítulo~\ref{chap:monetizacion}.
 
 La Figura~\ref{fig:arq_aws} es una propuesta de arquitectura de despliegue del sistema sobre AWS, que no se encuentra implementada y se plantea como posible evolución del despliegue actual en Vercel. En ella, el tráfico de los usuarios ingresa a través de Route 53 y CloudFront, con Cognito resolviendo la autenticación y WAF la protección perimetral. El frontend estático se sirve desde S3, mientras que la lógica de aplicación se concentra en funciones Lambda que orquestan el acceso a la base de datos, el caché y el motor de integraciones. Esta topología materializa la separación de responsabilidades descrita en la sección anterior y permite escalar de forma independiente cada componente.
 
