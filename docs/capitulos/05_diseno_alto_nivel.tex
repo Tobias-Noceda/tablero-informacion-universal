@@ -2,11 +2,11 @@
 \chapter{Diseño de Alto Nivel}
 
 \section{Arquitectura general del sistema}
-El sistema sigue una arquitectura cliente-servidor, y está particionado en 4 componentes lógicos propietarios y 4 servicios: Un frontend desarrollado en SvelteKit \cite{sveltekit_docs}, un backend en GoLang \cite{go_docs}, un módulo de actualizaciones realtime en NodeJS \cite{nodejs_docs}, un servidor MCP con xMCP \cite{xmcp_docs} en NodeJS, una base de datos no relacional de documentos, una base de datos key-value, un servidor STUN, y un proveedor de mailing.
+El sistema sigue una arquitectura cliente-servidor, y está particionado en 4 componentes lógicos propietarios y 5 servicios: Un frontend desarrollado en SvelteKit \cite{sveltekit_docs}, un backend en GoLang \cite{go_docs}, un módulo de actualizaciones realtime en NodeJS \cite{nodejs_docs}, un servidor MCP con xMCP \cite{xmcp_docs} en NodeJS, una base de datos no relacional de documentos, una base de datos key-value, un servidor STUN, un proveedor de mailing y un proveedor de pagos.
 
 El frontend es una SPA que renderiza el tablero tipo lienzo y consume la API REST del backend. El backend, estructurado con una arquitectura hexagonal, orquesta la persistencia en MongoDB, el caché en Redis y la ejecución de integraciones contra fuentes externas a través del motor Executer.
 
-La Figura~\ref{fig:diagrama_contexto} corresponde al diagrama de contexto del sistema, en el cual se identifican los actores que interactúan con él y los servicios externos de los que depende. El usuario accede desde el navegador por HTTPS y WebSocket; un agente de IA lo hace a través del protocolo MCP, autenticado con un token personal del usuario; y el administrador de la plataforma gestiona los secretos del sistema. Hacia afuera, el sistema consulta las APIs de terceros que configura cada tarjeta, utiliza Google para el inicio de sesión y los consentimientos OAuth2 \cite{rfc6749}, y Resend \cite{resend_docs} para el envío de correos. Los cursores de los participantes de un tablero viajan directamente entre navegadores mediante WebRTC, con el servidor de señalización de PeerJS \cite{peerjs_docs} como intermediario para establecer la conexión.
+La Figura~\ref{fig:diagrama_contexto} corresponde al diagrama de contexto del sistema, en el cual se identifican los actores que interactúan con él y los servicios externos de los que depende. El usuario accede desde el navegador por HTTPS y WebSocket, mientras que un agente de IA lo hace a través del protocolo MCP, autenticado con un token personal del usuario. Hacia afuera, el sistema consulta las APIs de terceros que configura cada tarjeta, utiliza Google para el inicio de sesión y los consentimientos OAuth2 \cite{rfc6749}, y Resend \cite{resend_docs} para el envío de correos. Los cursores de los participantes de un tablero viajan directamente entre navegadores mediante WebRTC, con el servidor de señalización de PeerJS \cite{peerjs_docs} como intermediario para establecer la conexión. Por último, el sistema cobra las suscripciones de los planes pagos a través de Mercado Pago \cite{mercadopago_docs}.
 
 \begin{figure}[H]
   \centering
@@ -15,7 +15,7 @@ La Figura~\ref{fig:diagrama_contexto} corresponde al diagrama de contexto del si
   \label{fig:diagrama_contexto}
 \end{figure}
 
-En la Figura~\ref{fig:diagrama_servicios} se representa el diagrama de servicios, en el cual se detallan los componentes que conforman el sistema y la forma en la que se comunican. Todos los servicios se publican detrás de un único origen, y un proxy inverso distribuye cada pedido según el prefijo de su ruta: \texttt{/api} al backend, \texttt{/ws} al servicio de tiempo real, \texttt{/mcp} al servidor MCP y el resto al frontend. El backend es el único servicio que escribe los datos de negocio en MongoDB, y utiliza Redis como caché de resultados, almacén de sesiones y registro de límites de frecuencia de solicitudes. El servicio de tiempo real no modifica datos: recibe los cambios de la colección de tableros mediante un change stream de MongoDB y consulta al backend el rol de cada usuario que se conecta. De la misma forma, el servidor MCP no accede a las bases de datos, sino que reenvía al backend cada operación del agente con el token del usuario, por lo que se aplican las mismas reglas de autorización que en la aplicación web.
+En la Figura~\ref{fig:diagrama_servicios} se representa el diagrama de servicios, en el cual se detallan los componentes que conforman el sistema y la forma en la que se comunican. Todos los servicios se publican detrás de un único origen, y un proxy inverso distribuye cada pedido según el prefijo de su ruta: \texttt{/api} al backend, \texttt{/ws} al servicio de tiempo real, \texttt{/mcp} al servidor MCP y el resto al frontend. El backend es el único servicio que escribe los datos de negocio en MongoDB, utiliza Redis como caché de resultados, almacén de sesiones y registro de límites de frecuencia de solicitudes, y con Mercado Pago crea y modifica las suscripciones a través de su API y maneja webhooks. El servicio de tiempo real no modifica datos: recibe los cambios de la colección de tableros mediante un change stream de MongoDB y consulta al backend el rol de cada usuario que se conecta. De la misma forma, el servidor MCP no accede a las bases de datos, sino que reenvía al backend cada operación del agente con el token del usuario, por lo que se aplican las mismas reglas de autorización que en la aplicación web.
 
 \begin{figure}[H]
   \centering
@@ -24,7 +24,7 @@ En la Figura~\ref{fig:diagrama_servicios} se representa el diagrama de servicios
   \label{fig:diagrama_servicios}
 \end{figure}
 
-Para la primera fase de desarrollo del producto, el sistema se despliega en Vercel \cite{vercel_docs}, el cual provee el hosting de la web, las funciones serverless de Go y Node, y el dominio. Para las bases de datos, se utilizan los servicios de MongoDB Atlas \cite{mongodb_docs} y Redis Cloud \cite{redis_docs} respectivamente. El servicio STUN está provisto por PeerJS, y el de envío de mensajes está gestionado por Resend.
+Para la primera fase de desarrollo del producto, el sistema se despliega en Vercel \cite{vercel_docs}, el cual provee el hosting de la web, las funciones serverless de Go y Node, y el dominio. Para las bases de datos, se utilizan los servicios de MongoDB Atlas \cite{mongodb_docs} y Redis Cloud \cite{redis_docs} respectivamente. El servicio STUN está provisto por PeerJS, el envío de mensajes está gestionado por Resend, y los pagos se procesan con Mercado Pago.
 
 La Figura~\ref{fig:arq_vercel} representa el despliegue en Vercel, en el cual cada carpeta del repositorio se publica como un servicio del mismo proyecto: el frontend con el adaptador de SvelteKit para Vercel, el backend como función de Go, y los servicios de tiempo real y MCP como funciones de Node.js. Las reglas de reescritura del archivo \texttt{vercel.json} cumplen la funcion del proxy inverso, dirigiendo \texttt{/api}, \texttt{/ws} y \texttt{/mcp} a su respectivo servicio y el resto al frontend. Las líneas punteadas representan la variable \texttt{API\_URL}, mediante la cual Vercel les indica a los servicios de tiempo real y MCP la dirección del backend. Servir todo desde un mismo origen evita configurar CORS, permite que la cookie de sesión se envíe con la política \texttt{SameSite=Strict} y hace que una misma compilación del frontend funcione en cualquier dominio, incluidas las URLs de vista previa.
 
@@ -75,9 +75,9 @@ En cada renovación, el backend rota el token de refresco y actualiza su registr
 \subsection{Ejecución de una tarjeta}
 La Figura~\ref{fig:seq_ejecucion} ilustra el flujo de ejecución de una tarjeta, uno de los procesos centrales del producto. Ante una solicitud del frontend, el backend verifica que el usuario tenga, como mínimo, el rol de lector sobre el tablero y consulta Redis para determinar si existe un resultado previamente almacenado en caché.
 
-Si no encuentra un resultado, resuelve las credenciales referenciadas por la tarjeta mediante \texttt{\$TOKEN}, utilizando la identidad del usuario indicado en \texttt{RunAs} y verificando que dichas credenciales continúen siendo válidas. Luego, entrega la configuración de la tarjeta al motor de integraciones, que realiza la petición HTTP mediante un cliente que bloquea el acceso a direcciones internas. Una vez obtenida la respuesta, el motor la interpreta como JSON o HTML, según el valor del campo \texttt{response}, y aplica la consulta definida en la tarjeta.
+Si no encuentra un resultado, resuelve las credenciales referenciadas por la tarjeta mediante \texttt{\$TOKEN}, utilizando la identidad del usuario indicado en \texttt{RunAs} y verificando que dichas credenciales continúen siendo válidas. Luego, entrega la configuración de la tarjeta al motor de integraciones, que realiza la petición HTTP mediante un cliente que bloquea el acceso a direcciones internas y limita la respuesta a 2 MB y diez segundos. Una vez obtenida la respuesta, el motor la interpreta como JSON o HTML, según el valor del campo \texttt{response}, y aplica la consulta definida en la tarjeta.
 
-Finalmente, el resultado se almacena en Redis durante la cantidad de segundos indicada en \texttt{rate}, de manera que las solicitudes posteriores puedan reutilizarlo sin necesidad de volver a consultar la API externa. En el diagrama, el fragmento \texttt{alt} representa los dos caminos posibles del flujo, según exista o no un resultado disponible en caché.
+Finalmente, el resultado se almacena en Redis durante la cantidad de segundos indicada en \texttt{rate}, con un piso que depende del plan de quien paga el tablero, de manera que las solicitudes posteriores puedan reutilizarlo sin necesidad de volver a consultar la API externa. En el plan Max, el usuario puede además forzar una actualización, que ignora el caché, como máximo una vez cada diez segundos por tarjeta. En el diagrama, el fragmento \texttt{alt} representa los dos caminos posibles del flujo, según exista o no un resultado disponible en caché.
 
 \begin{figure}[H]
   \centering
@@ -103,11 +103,11 @@ Finalmente, un minuto antes del vencimiento del token de acceso, el servicio de 
 \end{figure}
 
 \subsection{Uso de servidor MCP}
-La Figura~\ref{fig:seq_mcp} esquematiza la interacción de un agente de inteligencia artificial con el sistema a través del servidor MCP. En primer lugar, el desarrollador genera desde su perfil un token personal, cuyo vencimiento puede configurarse en 7, 15 o 30 días. Por motivos de seguridad, el backend almacena únicamente el hash SHA-256 del token, sin conservar su valor original.
+La Figura~\ref{fig:seq_mcp} esquematiza la interacción de un agente de inteligencia artificial con el sistema a través del servidor MCP. En primer lugar, el desarrollador genera desde su perfil un token personal (con el prefijo \texttt{tiu\_pat\_}), cuyo vencimiento puede configurarse en 7, 15 o 30 días, cada usuario puede tener hasta diez tokens activos, los cuales nunca se renueva. Por motivos de seguridad, el backend almacena únicamente el hash SHA-256 del token, sin conservar su valor original. El acceso por token es una funcionalidad de los planes pagos.
 
-Para interactuar con el sistema, el agente de IA proporciona el token personal al servidor MCP, que expone las herramientas disponibles y traduce cada invocación en una llamada a la API REST del backend. Por ejemplo, la herramienta \texttt{consolidate} permite almacenar una memoria como una tarjeta, mientras que \texttt{retrieve} permite recuperarla junto con las tarjetas relacionadas. Además, \texttt{associate} permite vincular memorias existentes, nombrando la relación y su dirección, que \texttt{retrieve} informa junto con cada tarjeta relacionada.
+Para interactuar con el sistema, el agente de IA proporciona el token personal al servidor MCP, que expone las herramientas disponibles y traduce cada invocación en una o más llamadas a la API REST del backend, reenviando el token sin almacenarlo. El servidor presenta cada tablero como un grafo de conocimiento personal, cada tarjeta como una memoria y cada hilo como una asociación entre memorias. Las herramientas permiten listar, crear y eliminar tableros (\texttt{list\_pkgs}, \texttt{create\_pkg} y \texttt{delete\_pkg}), listar las memorias de un tablero (\texttt{memories}), guardar una memoria de texto (\texttt{consolidate}), modificarla (\texttt{reconsolidate}) y eliminarla (\texttt{forget}), y vincular memorias o desvincularlas (\texttt{associate} y \texttt{dissociate}), nombrando la relación y su dirección. La herramienta \texttt{perceive} guarda una memoria viva: una tarjeta personalizada que consulta una API o una página web mediante \texttt{GET} o \texttt{POST} y se actualiza periódicamente. Las credenciales nunca pasan por el agente, que las referencia como \texttt{\$NOMBRE} para que el backend las resuelva desde la bóveda del tablero. Finalmente, \texttt{retrieve} recupera una memoria con sus datos actualizados, cómo se obtienen si es una memoria viva y las memorias relacionadas, indicando la dirección y la etiqueta de cada relación.
 
-El backend auténtica las solicitudes mediante el token personal y restringe sus permisos a las operaciones de lectura y edición de tableros, tarjetas e hilos. Además, aplica los roles que el usuario posee sobre cada tablero, de modo que el agente no puede realizar operaciones que excedan los permisos de su propietario.
+El backend autentica las solicitudes mediante el token personal y las restringe a una lista explícita de rutas: la lectura de tableros, tarjetas, organizaciones, el perfil y el catálogo de integraciones, y la creación, edición y eliminación de tableros, tarjetas e hilos. Cualquier otra ruta, como la gestión de secretos, el uso compartido, los tokens o la facturación, responde 403. Además, aplica los roles que el usuario posee sobre cada tablero, de modo que el agente no puede realizar operaciones que excedan los permisos de su propietario.
 
 \begin{figure}[H]
   \centering
@@ -142,18 +142,19 @@ La siguiente colección almacena la metadata del tablero, sus miembros con el ro
   members[].user & string & Sí & ID del miembro (referencia a \texttt{users}). \\
   members[].role & string & No & Rol del miembro: \texttt{editor} o \texttt{viewer}. \\
   org & binData (UUID) & Sí & Organización a la que pertenece el tablero (referencia a \texttt{orgs}). Opcional. \\
-  postIts & array (objects) & No & Estructura embebida con datos de renderizado de los post-its. Los campos de estilo de cada tarjeta son opcionales y un valor por defecto no se almacena. \\
-  postIts.[].id & binData (UUID) & No & ID de la configuración completa en la colección \texttt{postits}. \\
-  postIts.[].title & object & No & Título de la tarjeta (\texttt{text}) y si interpola variables del resultado (\texttt{vars}). \\
-  postIts.[].position & object & No & Coordenadas x/y de la tarjeta dentro del lienzo. \\
-  postIts.[].color & string & No & Color de fondo de la tarjeta: la paleta de los hilos o \texttt{white}. Opcional. \\
-  postIts.[].border & string & No & Borde de la tarjeta: \texttt{none}, \texttt{solid}, \texttt{dashed} o \texttt{dotted}. Opcional. \\
-  postIts.[].border\_width & string & No & Grosor del borde: \texttt{thin}, \texttt{normal} o \texttt{thick}. Opcional. \\
-  postIts.[].border\_color & string & No & Color del borde, con las mismas opciones que \texttt{color}; si falta, sigue el color de la tarjeta. Opcional. \\
-  postIts.[].text\_align & string & No & Alineación horizontal del texto: \texttt{left}, \texttt{center} o \texttt{right}. Opcional. \\
-  postIts.[].vertical\_align & string & No & Ubicación vertical del texto: \texttt{top}, \texttt{middle} o \texttt{bottom}; se nota en una tarjeta con alto propio. Opcional. \\
-  postIts.[].width & double & No & Ancho de la tarjeta en píxeles del lienzo, entre 120 y 1600. Opcional. \\
-  postIts.[].height & double & No & Alto de la tarjeta en píxeles del lienzo, entre 60 y 1200. Opcional. \\
+  postits & array (objects) & No & Estructura embebida con datos de renderizado de los post-its. Los campos de estilo de cada tarjeta son opcionales y un valor por defecto no se almacena. \\
+  postits[].id & binData (UUID) & No & ID de la configuración completa en la colección \texttt{postit}. \\
+  postits[].type & string & No & Clave de la integración o plantilla de la que proviene la tarjeta (vacía en una tarjeta personalizada); el frontend la usa para elegir cómo dibujarla. \\
+  postits[].title & object & No & Título de la tarjeta (\texttt{text}) y si interpola variables del resultado (\texttt{vars}). \\
+  postits[].position & object & No & Coordenadas x/y de la tarjeta dentro del lienzo. \\
+  postits[].color & string & No & Color de fondo de la tarjeta: la paleta de los hilos o \texttt{white}. Opcional. \\
+  postits[].border & string & No & Borde de la tarjeta: \texttt{none}, \texttt{solid}, \texttt{dashed} o \texttt{dotted}. Opcional. \\
+  postits[].border\_width & string & No & Grosor del borde: \texttt{thin}, \texttt{normal} o \texttt{thick}. Opcional. \\
+  postits[].border\_color & string & No & Color del borde, con las mismas opciones que \texttt{color}; si falta, sigue el color de la tarjeta. Opcional. \\
+  postits[].text\_align & string & No & Alineación horizontal del texto: \texttt{left}, \texttt{center} o \texttt{right}. Opcional. \\
+  postits[].vertical\_align & string & No & Ubicación vertical del texto: \texttt{top}, \texttt{middle} o \texttt{bottom}; se nota en una tarjeta con alto propio. Opcional. \\
+  postits[].width & double & No & Ancho de la tarjeta en píxeles del lienzo, entre 120 y 1600. Opcional. \\
+  postits[].height & double & No & Alto de la tarjeta en píxeles del lienzo, entre 60 y 1200. Opcional. \\
   strands & array (objects) & No & Lista de conexiones o hilos entre post-its. Los campos de estilo de cada hilo son opcionales y un valor por defecto no se almacena. \\
   strands[].id & binData (UUID) & No & Identificador único del hilo. \\
   strands[].source & binData (UUID) & No & Post-it de origen del hilo. \\
@@ -165,10 +166,10 @@ La siguiente colección almacena la metadata del tablero, sus miembros con el ro
   envs & array (objects) & No & Variables de entorno compartidas en el tablero. \\
 \end{tablacoleccion}
 
-\subsection{Colección: postits}
+\subsection{Colección: postit}
 La siguiente colección contiene la configuración dinámica, los parámetros de integración y los datos de peticiones HTTP de forma autocontenida para cada elemento de un PostIt.
 
-\begin{tablacoleccion}{Colección \texttt{postits} MongoDB}{tab:col_postits}
+\begin{tablacoleccion}{Colección \texttt{postit} MongoDB}{tab:col_postits}
   \_id & binData (UUID) & Sí (Primary) & Identificador único del post-it. \\
   board & binData (UUID) & Sí & ID del tablero al que pertenece (referencia inversa). \\
   wellknown & string & No & Clave de la integración predefinida de la que proviene, si corresponde. \\
@@ -179,7 +180,7 @@ La siguiente colección contiene la configuración dinámica, los parámetros de
   bindings & object (map) & No & Mapa de placeholder a referencia de secreto (\texttt{\{scope, name\}}) en la colección \texttt{secrets}. \\
   params & object (map) & No & Esquema dinámico de pares clave-valor según el tipo de post-it. \\
   resource & string & No & URL del endpoint o recurso externo asociado. \\
-  request & object & No & Documento embebido con la estructura de la petición HTTP (\texttt{method}, \texttt{headers}, \texttt{body}). \\
+  request & object & No & Documento embebido con la estructura de la petición HTTP (\texttt{method}, \texttt{headers}, \texttt{queries}, \texttt{body}). \\
   response & string & No & Tipo de respuesta de la API (JSON o HTML), utilizado para elegir el intérprete de la query. \\
 \end{tablacoleccion}
 
@@ -196,6 +197,8 @@ La siguiente colección almacena las cuentas de usuario junto con las identidade
   admin & bool & No & Indica si es administrador de la plataforma (derivado de \texttt{PLATFORM\_ADMINS}). \\
   identities & array (objects) & No & Identidades vinculadas: \texttt{provider} (\texttt{password} o \texttt{google}), \texttt{subject} y hash \texttt{argon2id}. \\
   identitykeys & array (objects) & Sí (único, parcial) & Claves \texttt{provider:subject} que impiden vincular una misma cuenta externa a dos usuarios. \\
+  plan & string & No & Plan contratado: \texttt{free}, \texttt{pro} o \texttt{max}. Vacío equivale a \texttt{free}. Opcional. \\
+  plan\_expires & date & No & Vencimiento del plan. Si está vencido, el plan vuelve a \texttt{free}. Con una suscripción activa es la fecha del próximo pago más cinco días de gracia. Opcional. \\
   createdat & date & No & Fecha de alta. \\
   updatedat & date & No & Última fecha de modificación. \\
 \end{tablacoleccion}
@@ -207,6 +210,7 @@ La siguiente colección modela las organizaciones, que funcionan como un tenant 
   \_id & binData (UUID) & Sí (Primary) & Identificador único de la organización. \\
   name & string & No & Nombre visible. \\
   members & array (objects) & Sí (\texttt{members.user}) & Miembros con su rol (\texttt{admin} o \texttt{member}). \\
+  owner & string & Sí & Usuario que paga la organización (referencia a \texttt{users}). Los límites de los tableros de la organización provienen de su plan. Opcional. \\
   createdat & date & No & Fecha de alta. \\
 \end{tablacoleccion}
 
@@ -237,6 +241,7 @@ La siguiente colección conforma la bóveda de credenciales. Cada secreto se ide
   authorized & bool & No & Indica si el consentimiento OAuth2 fue completado. \\
   provider & string & No & Proveedor de plataforma (\texttt{google}, \texttt{discord}, etc.) para conexiones administradas. \\
   grants & array (objects) & Sí (\texttt{grants.to.kind}, \texttt{grants.to.id}) & Permisos de uso otorgados a un usuario, grupo o tablero, opcionalmente limitados a un tablero. \\
+  billed\_to & string & Sí & Usuario a cuyo plan se descuenta el secreto (referencia a \texttt{users}). Opcional. \\
   createdat & date & No & Fecha de alta. \\
   updatedat & date & No & Fecha de última modificación. \\
 \end{tablacoleccion}
@@ -314,10 +319,25 @@ La siguiente colección almacena las plantillas de tarjeta que definen los usuar
   updated\_at & date & No & Fecha de la última modificación. \\
 \end{tablacoleccion}
 
+\subsection{Colección: subscriptions}
+La siguiente colección registra las suscripciones de los planes pagos. Cada documento refleja una suscripción mensual de Mercado Pago, que el backend vuelve a leer del proveedor ante cada notificación, de modo que el proveedor es siempre la fuente de verdad.
+
+\begin{tablacoleccion}{Colección \texttt{subscriptions} MongoDB}{tab:col_subscriptions}
+  \_id & string & Sí (Primary) & Identificador de la suscripción en Mercado Pago (preapproval). \\
+  user & string & Sí (con \texttt{created\_at}) & Usuario suscripto (referencia a \texttt{users}). \\
+  plan & string & No & Plan cobrado: \texttt{pro} o \texttt{max}. \\
+  pending\_plan & string & No & Plan inferior que se aplicará con la próxima factura pagada. Opcional. \\
+  status & string & No & Estado en el proveedor: \texttt{pending}, \texttt{authorized}, \texttt{paused} o \texttt{canceled}. \\
+  amount\_ars & int & No & Monto mensual en pesos argentinos. \\
+  next\_payment & date & No & Fecha del próximo cobro. Opcional. \\
+  created\_at & date & Sí (con \texttt{user}) & Fecha de alta. \\
+  updated\_at & date & No & Fecha de la última modificación. \\
+\end{tablacoleccion}
+
 \section{Modelo de dominio}
 
 \subsection{Vista General}
-A continuación se presenta una vista general del modelo de dominio, en la cual las entidades se agrupan por color en tres áreas: tableros y tarjetas, identidad y bóveda de secretos. Las líneas punteadas indican relaciones opcionales. El usuario es la entidad hacia la que confluyen las demás: es dueño o miembro de tableros y grupos, integra organizaciones, es la identidad con la que se ejecuta cada tarjeta y a quién representa cada token personal.
+A continuación se presenta una vista general del modelo de dominio, en la cual las entidades se agrupan por color en cuatro áreas: tableros y tarjetas, identidad, bóveda de secretos y planes. Las líneas punteadas indican relaciones opcionales. El usuario es la entidad hacia la que confluyen las demás: es dueño o miembro de tableros y grupos, integra organizaciones, es la identidad con la que se ejecuta cada tarjeta y a quién representa cada token personal.
 
 \begin{figure}[H]
   \centering
@@ -347,7 +367,7 @@ El área de identidad se detalla en la Figura~\ref{fig:modelo_identidad}, en la 
 \end{figure}
 
 \subsection{Bóveda de secretos}
-Por último, la Figura~\ref{fig:modelo_boveda} muestra el área de la bóveda, en la cual cada tarjeta referencia sus credenciales por ámbito y nombre (\texttt{SecretRef}), sin copiar su valor. Cada secreto se cifra con AES-GCM usando la clave de datos de su ámbito (\texttt{DataKey}), que a su vez se guarda envuelta por la clave maestra versionada, y puede compartirse mediante permisos (\texttt{Grant}) dirigidos a un usuario, un grupo o un tablero.
+La Figura~\ref{fig:modelo_boveda} muestra el área de la bóveda, en la cual cada tarjeta referencia sus credenciales por ámbito y nombre (\texttt{SecretRef}), sin copiar su valor. Cada secreto se cifra con AES-GCM usando la clave de datos de su ámbito (\texttt{DataKey}), que a su vez se guarda envuelta por la clave maestra versionada, y puede compartirse mediante permisos (\texttt{Grant}) dirigidos a un usuario, un grupo o un tablero.
 
 \begin{figure}[H]
   \centering
@@ -355,6 +375,9 @@ Por último, la Figura~\ref{fig:modelo_boveda} muestra el área de la bóveda, e
   \caption{Modelo de la bóveda de secretos}
   \label{fig:modelo_boveda}
 \end{figure}
+
+\subsection{Planes y suscripciones}
+Por último, cada usuario tiene un plan (\texttt{free}, \texttt{pro} o \texttt{max}) con una fecha de vencimiento opcional, y puede tener suscripciones de Mercado Pago que lo mantienen vigente. Los límites de cada plan forman una única tabla (\texttt{Limits}). Cada recurso limitado se factura a un usuario: un tablero a su dueño o al pagador de su organización (\texttt{Org.owner}), y un secreto al usuario indicado en \texttt{billed\_to}. La combinación de pagador, plan y límites que aplica a un recurso se representa con \texttt{Entitlement}.
 
 \section{Descripción de sistemas, servicios y plataformas}
 A continuación se describe cada componente del sistema, su stack tecnológico, su responsabilidad y la justificación de la elección. Los componentes marcados como planificados forman parte del alcance del proyecto pero no están implementados en el incremento actual.
@@ -389,15 +412,16 @@ A continuación se describe cada componente del sistema, su stack tecnológico, 
   \label{tab:componentes_stack}
   \endlastfoot
   Frontend (SPA) & SvelteKit 2.63 + Svelte 5.56 \cite{svelte_docs}, TailwindCSS 4.3 \cite{tailwind_docs}, TypeScript 6.0 \cite{typescript_docs}, Vite 8.0 \cite{vite_docs}, XyFlow 1.6 \cite{xyflow_docs} & Renderizado del tablero tipo lienzo, manipulación de tarjetas e hilos, edición de configuración y polling de datos a través de la API. & Bundle final pequeño y SSR/SSG opcional, ideal para una interfaz altamente interactiva. Svelte 5 (runes) simplifica el estado reactivo del canvas. \\
-  API REST (Backend) & Go 1.27.1 + Gin 1.12 \cite{gin_docs} & Exponer los endpoints bajo \texttt{/api/v1} (auth, users, boards, post-its, groups, orgs, secrets, system); orquestar autenticación, autorización, persistencia, caché y ejecución de integraciones. & Go aporta concurrencia sencilla (goroutines), tipado estático y binarios pequeños para Docker. Gin se eligió por madurez, middleware y bajo overhead. \\
-  Motor de integraciones (Executer) & Go + \texttt{net/http} + \texttt{itchyny/gojq} 0.12 \cite{gojq_docs} + \texttt{PuerkitoBio/goquery} 1.12 \cite{goquery_docs} & Resolver parámetros, ejecutar la petición HTTP, parsear el JSON o HTML y aplicar una expresión jq para extraer el subconjunto que la tarjeta muestra. & \texttt{gojq} y \texttt{goquery} permiten describir la proyección de datos con sintaxis declarativa estándar, evitando código ad-hoc por integración. Corre con timeouts (10 s HTTP, 250 ms query). \\
-  Base de datos principal & MongoDB 8 \cite{mongodb_docs} (\texttt{users}, \texttt{boards}, \texttt{postits}) & Persistencia de tableros, post-its, posiciones, hilos (strands), colaboradores y configuración de integraciones. & El dominio es naturalmente documental: cada post-it tiene un esquema variable según su integración. Un store relacional implicaría JOINs y normalizaciones sin valor agregado. \\
-  Caché de resultados & Redis 7.4 \cite{redis_docs} & Cachear el último resultado de cada post-it, almacenar las sesiones de refresco, los límites de tasa, los locks distribuidos, los handshakes OAuth2 y la presencia por tablero. & TTL nativo por clave que mapea al modelo de tarjeta con su propio refresh rate. Habilita además pub/sub para tiempo real y rate-limiting. \\
+  API REST (Backend) & Go 1.27.1 + Gin 1.12 \cite{gin_docs} & Exponer los endpoints bajo \texttt{/api/v1} (auth, users, tokens, boards, post-its, well-knowns, postit-templates, groups, orgs, secrets, billing, system); orquestar autenticación, autorización, persistencia, caché y ejecución de integraciones. & Go aporta concurrencia sencilla (goroutines), tipado estático y binarios pequeños para Docker. Gin se eligió por madurez, middleware y bajo overhead. \\
+  Motor de integraciones (Executer) & Go + \texttt{net/http} + \texttt{itchyny/gojq} 0.12 \cite{gojq_docs} + \texttt{PuerkitoBio/goquery} 1.12 \cite{goquery_docs} & Resolver parámetros, ejecutar la petición HTTP, parsear el JSON o HTML y aplicar una expresión jq o jquery para extraer el subconjunto que la tarjeta muestra. & \texttt{gojq} y \texttt{goquery} permiten describir la proyección de datos con sintaxis declarativa estándar, evitando código ad-hoc por integración. Corre con límites (10s y 2MB por petición, hasta 3 redirecciones, 250ms por query). \\
+  Base de datos principal & MongoDB 8 \cite{mongodb_docs}, replica set de un nodo & Persistencia de usuarios, tableros, tarjetas, hilos, organizaciones, grupos, la bóveda de secretos y sus claves, tokens personales, el catálogo de integraciones, las plantillas de tarjeta y las suscripciones (11 colecciones, Tabla~\ref{tab:col_boards} y siguientes). & El dominio es naturalmente documental: cada post-it tiene un esquema variable según su integración. Un store relacional implicaría JOINs y normalizaciones sin valor agregado. \\
+  Caché de resultados & Redis 7.4 \cite{redis_docs} & Cachear el último resultado de cada post-it, almacenar las sesiones de refresco, los límites de tasa, los locks distribuidos, los handshakes OAuth2 y la presencia por tablero. & TTL nativo por clave que mapea al modelo de tarjeta con su propio refresh rate. Sus operaciones atómicas sirven además para los límites de tasa, los locks distribuidos y la presencia por tablero. \\
   Reverse proxy / ALB & Nginx \cite{nginx_docs} (\texttt{stable-alpine}) & Terminación HTTP en el puerto 80; ruteo de \texttt{/api/*} al backend, de \texttt{/ws/*} al servicio de tiempo real, de \texttt{/mcp} al servidor MCP y del resto al frontend. & Un único entrypoint público que simplifica CORS al servir front y back desde el mismo origen. \\
   Autenticación & Go: \texttt{argon2id} \cite{rfc9106} 1.0, \texttt{golang-jwt} 5.3 \cite{rfc7519} con EdDSA (Ed25519) \cite{rfc8032}, \texttt{go-oidc} 3.21 \cite{oidc_core} para Google & Registro con verificación de correo, login local y con Google, sesiones con token de acceso de 15 minutos y refresh token rotativo en cookie httpOnly. & Una implementación propia evita depender de un proveedor externo y mantiene el mismo flujo en Docker y en Vercel. \texttt{argon2id} es el algoritmo recomendado por OWASP \cite{owasp_password} para contraseñas. \\
   Correo transaccional & Resend \cite{resend_docs} (\texttt{resend-go} 4.8) + plantillas embebidas & Enviar los correos de verificación de cuenta y recuperación de contraseña en el idioma del destinatario. & API simple y de bajo costo; sin clave configurada los correos se vuelcan al log, lo que simplifica el desarrollo local. \\
   Bóveda de secretos & Go: AES-256-GCM \cite{nist_gcm} con envelope encryption & Almacenar credenciales por ámbito (tablero, miembro, usuario, grupo, sistema), resolverlas al ejecutar una tarjeta y gestionar conexiones OAuth2. & El cifrado por sobre (una clave de datos por ámbito envuelta por una clave maestra versionada) permite rotar claves sin recifrar todos los valores. \\
-  Conector MCP & Servidor MCP en Node.js 24 con \texttt{xmcp} 1.7, que consume la API REST del backend & Exponer tableros y tarjetas a clientes MCP (Claude Desktop, IDEs) para RF-10 y la fase final del cronograma. & Reutiliza la API REST ya validada y sus reglas de autorización; el servidor MCP es una segunda fachada sobre los mismos casos de uso y no almacena datos propios. \\
+  Planes y facturación & Go + SDK oficial de Mercado Pago (\texttt{mercadopago/sdk-go} 1.14) \cite{mercadopago_docs} & Definir los límites de cada plan, decidir quién paga cada recurso, rechazar con 402 las creaciones que excedan el plan y cobrar las suscripciones mensuales, sincronizándolas mediante webhooks. & Una única tabla de límites en el código evita reglas dispersas. Si no hay credenciales configuradas, la facturación se apaga sin afectar el resto del sistema. \\
+  Conector MCP & Servidor MCP en Node.js 24 con \texttt{xmcp} 1.7, que consume la API REST del backend & Exponer tableros y tarjetas a clientes MCP (Claude Desktop, IDEs) para RF-10 y la fase final del cronograma mediante 11 herramientas que presentan cada tablero como un grafo de memorias del agente. & Reutiliza la API REST ya validada y sus reglas de autorización; el servidor MCP es una segunda fachada sobre los mismos casos de uso y no almacena datos propios. Requiere un plan pago (\texttt{api\_access}). \\
   Servicio de tiempo real & Node.js 24 + TypeScript 6.0 + \texttt{socket.io} 4.8 \cite{socketio_docs} & Notificar a cada usuario conectado los cambios de un tablero y mantener la presencia de los participantes. & Los change streams de MongoDB y \texttt{socket.io} permiten propagar cambios sin polling. Separarlo del backend aísla las conexiones persistentes de la API stateless. \\
 \end{longtable}
 \endgroup
