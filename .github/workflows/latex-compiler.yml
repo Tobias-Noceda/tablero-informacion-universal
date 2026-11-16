@@ -3,7 +3,7 @@ name: Build LaTeX document
 on:
   push:
     paths:
-      - docs/*
+      - docs/**/*
       - '!docs/informe.pdf'
 
 jobs:
