@@ -55,7 +55,7 @@ Los precios de cada plan se presentan en la Tabla~\ref{tab:planes_precios}. El i
     \toprule
     Plan & Precio mensual & Importe en pesos \\
     \midrule
-    Free & USD 0 & No aplica \\
+    Free & USD 0 & ARS 0 \\
     Pro & USD 9 & ARS 14.100 \\
     Max & USD 29 & ARS 45.500 \\
     \bottomrule
@@ -68,10 +68,10 @@ Los precios de cada plan se presentan en la Tabla~\ref{tab:planes_precios}. El i
 
 \subsection{Uso verificado en el código}
 \begin{itemize}
-  \item \textbf{Vercel.} Aloja cuatro servicios bajo un mismo origen: la aplicación web, la API en Go, el servicio de tiempo real en Node y el servidor MCP. Cada solicitud a la API es una invocación de función. Cada pestaña abierta mantiene un WebSocket con el servicio de tiempo real.
-  \item \textbf{MongoDB Atlas.} Base principal. Requiere un conjunto de réplicas porque el servicio de tiempo real escucha los cambios de la colección de tableros. Cada consulta de una tarjeta realiza dos lecturas (la tarjeta y su tablero) aunque el resultado esté en caché.
-  \item \textbf{Redis Cloud.} Guarda el resultado de cada tarjeta durante su intervalo de actualización, las sesiones, los límites de tasa y la presencia en línea. Cada consulta de una tarjeta realiza una lectura.
-  \item \textbf{Resend.} Envía tres correos: verificación de cuenta, aviso de cuenta existente y restablecimiento de contraseña.
+  \item \textbf{Vercel:} Aloja cuatro servicios bajo un mismo origen: la aplicación web, la API en Go, el servicio de tiempo real en Node y el servidor MCP. Cada solicitud a la API es una invocación de función. Cada pestaña abierta mantiene un WebSocket con el servicio de tiempo real.
+  \item \textbf{MongoDB Atlas:} Base principal. Requiere un conjunto de réplicas porque el servicio de tiempo real escucha los cambios de la colección de tableros. Cada consulta de una tarjeta realiza dos lecturas (la tarjeta y su tablero) aunque el resultado esté en caché.
+  \item \textbf{Redis Cloud:} Guarda el resultado de cada tarjeta durante su intervalo de actualización, las sesiones, los límites de tasa y la presencia en línea. Cada consulta de una tarjeta realiza una lectura.
+  \item \textbf{Resend:} Envía tres correos: verificación de cuenta, aviso de cuenta existente y restablecimiento de contraseña.
 \end{itemize}
 
 \subsection{Supuestos}
@@ -125,9 +125,9 @@ A partir de 1.000.000 de usuarios se suma el costo de operar infraestructura pro
 \textbf{MongoDB Atlas} \cite{atlas_pricing, atlas_limits}.
 \begin{itemize}
   \item El nivel gratuito M0 admite 100 operaciones por segundo y no ofrece respaldos. No es apto para producción.
-  \item Flex cuesta entre USD 8 y 30 y admite hasta 500 operaciones por segundo, suficiente por capacidad hasta unos 50.000 usuarios.
+  \item Flex cuesta entre USD 8 y 30, y admite hasta 500 operaciones por segundo, suficiente capacidad hasta unos 50.000 usuarios.
   \item Los niveles dedicados comienzan en M10 (USD 57). Se adopta desde 10.000 usuarios por sus respaldos y recursos propios. La fragmentación exige M30 como mínimo.
-  \item Con 5.000.000 de usuarios el pico estimado es de 42.000 operaciones por segundo. Guardar en Redis el tablero y la tarjeta elimina las dos lecturas por consulta y permite permanecer en un nivel M60 sin fragmentar.
+  \item Con 5.000.000 de usuarios el pico estimado es de 42.000 operaciones por segundo. Cachear en Redis el tablero y la tarjeta elimina las dos lecturas por consulta y permite permanecer en un nivel M60 sin fragmentar.
 \end{itemize}
 
 \textbf{Redis Cloud} \cite{redis_pricing}.
@@ -225,16 +225,14 @@ La misma cuenta se repite en los demás hitos en la Tabla~\ref{tab:cobertura_hit
   \small
   \begin{tabular}{l l r r r r r}
     \toprule
-    Usuarios & Pro y Max & \multicolumn{2}{c}{Ingreso neto} & Costo & \multicolumn{2}{c}{Costo / ingreso} \\
-    \cmidrule(lr){3-4} \cmidrule(lr){6-7}
-    & & 10 días & 35 días & & 10 días & 35 días \\
+    Usuarios & Pro & Max & Ingreso neto & Costo / ingreso \\
     \midrule
-    1.000 & 24 y 6 & 369 & 383 & 47 & 12,7~\% & 12,3~\% \\
-    10.000 & 240 y 60 & 3.690 & 3.830 & 255 & 6,9~\% & 6,7~\% \\
-    100.000 & 2.400 y 600 & 36.900 & 38.300 & 1.620 & 4,4~\% & 4,2~\% \\
-    500.000 & 12.000 y 3.000 & 184.400 & 191.500 & 7.300 & 4,0~\% & 3,8~\% \\
-    1.000.000 & 24.000 y 6.000 & 368.800 & 383.000 & 8.700 & 2,4~\% & 2,3~\% \\
-    5.000.000 & 120.000 y 30.000 & 1.844.000 & 1.914.900 & 21.300 & 1,2~\% & 1,1~\% \\
+    1.000 & 24 & 6 & 369 & 12,7~\% \\
+    10.000 & 240 & 60 & 3.690 & 6,9~\% \\
+    100.000 & 2.400 & 600 & 36.900 & 4,4~\% \\
+    500.000 & 12.000 & 3.000 & 184.400 & 4,0~\% \\
+    1.000.000 & 24.000 & 6.000 & 368.800 & 2,4~\% \\
+    5.000.000 & 120.000 & 30.000 & 1.844.000 & 1,2~\% \\
     \bottomrule
   \end{tabular}
   \caption{Pagadores, ingreso neto y costo mensual por hito, en USD}
