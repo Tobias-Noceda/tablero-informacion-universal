@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import logo from '$assets/svgs/corcheria-m2-logo-fondo-oscuro.svg';
 	import LocaleSwitcher from '$components/LocaleSwitcher/LocaleSwitcher.svelte';
+	import { m } from '$lib/paraglide/messages';
 
 	let { children } = $props();
 </script>
@@ -20,6 +21,7 @@
 	</main>
 	<footer class="flex flex-row justify-center gap-4 px-4 py-4 text-sm">
 		<a href={resolve('/about')} class="underline hover:text-main">Corcheria Company</a>
-		<a href={resolve('/privacy')} class="underline hover:text-main">Privacy Policy</a>
+		<a href={resolve('/privacy')} class="underline hover:text-main">{m['legal.privacy_policy']()}</a
+		>
 	</footer>
 </div>

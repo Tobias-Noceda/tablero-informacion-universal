@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import logo from '$assets/svgs/corcheria-m2-logo-fondo-oscuro.svg';
+	import LocaleSwitcher from '$components/LocaleSwitcher/LocaleSwitcher.svelte';
+	import { m } from '$lib/paraglide/messages';
 
 	let { children } = $props();
 </script>
@@ -11,8 +13,9 @@
 	>
 		<a href={resolve('/about')}><img src={logo} alt="Corcheria Company" class="w-32 sm:w-44" /></a>
 		<nav class="flex flex-row items-center gap-2 sm:gap-4 text-xs sm:text-sm font-medium text-main-text">
-			<a href={resolve('/login')} class="hover:underline">Sign in</a>
-			<a href={resolve('/register')} class="hover:underline">Create an account</a>
+			<a href={resolve('/login')} class="hover:underline">{m['auth.login']()}</a>
+			<a href={resolve('/register')} class="hover:underline">{m['auth.register_title']()}</a>
+			<LocaleSwitcher />
 		</nav>
 	</header>
 
@@ -24,7 +27,7 @@
 		class="flex flex-row flex-wrap items-center justify-center gap-4 border-t border-border px-4 py-4 text-sm"
 	>
 		<span>© 2026 Corcheria Company</span>
-		<a href={resolve('/about')} class="underline hover:text-main">Home</a>
-		<a href={resolve('/privacy')} class="underline hover:text-main">Privacy Policy</a>
+		<a href={resolve('/about')} class="underline hover:text-main">{m['legal.home']()}</a>
+		<a href={resolve('/privacy')} class="underline hover:text-main">{m['legal.privacy_policy']()}</a>
 	</footer>
 </div>

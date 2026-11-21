@@ -53,7 +53,7 @@ SvelteKit SPA (`ssr = false`, `prerender = false`). Svelte 5 **runes mode enforc
 
 After editing `messages/{en,es}.json` outside the Vite dev server, regenerate with `npx paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide` before `pnpm check`.
 
-**i18n**: Paraglide. Source messages in `frontend/messages/{en,es}.json`. Generated output in `src/lib/paraglide/`. Import messages as `import { m } from '$lib/paraglide/messages'`.
+**i18n**: Paraglide. Source messages in `frontend/messages/{en,es}.json`. Generated output in `src/lib/paraglide/`. Import messages as `import { m } from '$lib/paraglide/messages'`. `src/lib/i18n/messages.spec.ts` fails when a key is missing in either file or a translation drops a `{placeholder}`. The locale comes from the cookie, else English (`baseLocale`): a first visit, Google's reviewers included, sees English. `LocaleSwitcher` (sign-in and public pages, the top bar when signed out) calls `setLocale`; the user menu does the same, and the profile's buttons save the mail language (`switchLocale`) without changing the interface. `/about` and `/privacy` render `AboutEn`/`AboutEs` and `PrivacyEn`/`PrivacyEs` by locale: long linked text, kept whole per language; change both versions together.
 
 **UI library**: `@xyflow/svelte` for the board canvas. Component primitives in `$components/` (Button, Cursor, Divider, Drawer, Edges, Icon, Input, Modal, Nodes, OrgSwitcher, Secrets, Share, Switch, Toast). Styling via Tailwind CSS 4 + `clsx` + `tailwind-merge` (re-exported as `cn` from `$lib/utils.ts`).
 
