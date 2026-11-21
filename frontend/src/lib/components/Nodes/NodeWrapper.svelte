@@ -20,6 +20,10 @@
 		type CardLook
 	} from '$lib/cards/style';
 	import CardToolbar from './CardToolbar.svelte';
+	import { failureMessage, failureOf } from '$lib/cards/failure';
+	import { formatUpdated } from '$lib/cards/freshness';
+	import { m } from '$lib/paraglide/messages';
+	import { getLocale } from '$lib/paraglide/runtime';
 
 	let {
 		id,
@@ -44,6 +48,13 @@
 	$effect(() => {
 		if (!plainTitle) return results.watch(id);
 	});
+
+	// When the data on screen arrived, and whether the last refresh failed.
+	const freshness = $derived(plainTitle ? undefined : results.freshness(id));
+	const updatedAt = $derived(
+		freshness?.at === undefined ? '' : formatUpdated(freshness.at, Date.now(), getLocale())
+	);
+	const stale = $derived(!!freshness?.failure && freshness.at !== undefined);
 
 	const isSelected = $derived.by(() => data?.isSelected ?? false);
 	// An editor restyles and resizes the open card.
@@ -83,7 +94,7 @@
 
 <div
 	class={cn(
-		'bg-main hover:bg-main-hover rounded-lg customNode text-main-text overflow-hidden flex flex-col',
+		'group bg-main hover:bg-main-hover rounded-lg customNode text-main-text overflow-hidden flex flex-col',
 		alignment.vertical,
 		media ? 'p-2' : 'p-4',
 		isSelected && 'bg-main-hover',
@@ -136,9 +147,33 @@
 				{:else if response}
 					{@render children(response)}
 				{/if}
-			{:catch}
-				An error has occurred
+			{:catch err}
+				<p class="text-sm">{failureMessage(failureOf(err))}</p>
 			{/await}
 		{/if}
 	</div>
+	<!-- Over the bottom padding, so no card changes size: a failed refresh
+		 always shows (the data above is the last that arrived); the time of
+		 the data shows on hover or on the open card. -->
+	{#if stale && freshness?.failure}
+		<span
+			class="absolute bottom-1 right-2 max-w-[90%] truncate text-[10px] font-semibold leading-none"
+			role="status"
+			title={m['card_freshness.stale_detail']({
+				time: updatedAt,
+				reason: failureMessage(freshness.failure)
+			})}
+		>
+			{m['card_freshness.stale']()} · {updatedAt}
+		</span>
+	{:else if updatedAt && results.polls(id)}
+		<span
+			class={cn(
+				'pointer-events-none absolute bottom-1 right-2 text-[10px] leading-none transition-opacity',
+				isSelected ? 'opacity-70' : 'opacity-0 group-hover:opacity-70'
+			)}
+		>
+			{m['card_freshness.updated']({ time: updatedAt })}
+		</span>
+	{/if}
 </div>
