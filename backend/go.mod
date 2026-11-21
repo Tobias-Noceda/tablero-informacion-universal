@@ -16,6 +16,7 @@ require (
 	github.com/resend/resend-go/v4 v4.8.2
 	go.mongodb.org/mongo-driver/v2 v2.6.0
 	golang.org/x/oauth2 v0.37.0
+	golang.org/x/sync v0.20.0
 )
 
 require (
@@ -54,7 +55,6 @@ require (
 	golang.org/x/arch v0.23.0 // indirect
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/net v0.52.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
