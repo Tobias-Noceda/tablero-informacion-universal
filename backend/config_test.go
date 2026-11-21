@@ -49,6 +49,27 @@ func TestLoadConfig_ReadsEverything(t *testing.T) {
 	}
 }
 
+func TestLoadConfig_VersionIsTheDeployedCommit(t *testing.T) {
+	t.Setenv(ENV_VERCEL_COMMIT, "")
+	cfg, err := loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.version != "" {
+		t.Errorf("without a commit version = %q, want empty", cfg.version)
+	}
+
+	t.Setenv(ENV_VERCEL_COMMIT, " 01bd87f3c2a94e5b8d7f6a1e0c9b8a7d6e5f4a3b ")
+	if cfg, _ = loadConfig(); cfg.version != "01bd87f" {
+		t.Errorf("version = %q, want the short commit", cfg.version)
+	}
+
+	t.Setenv(ENV_VERCEL_COMMIT, "abc")
+	if cfg, _ = loadConfig(); cfg.version != "abc" {
+		t.Errorf("version = %q, want a short value kept whole", cfg.version)
+	}
+}
+
 func TestLoadConfig_RejectsBadValues(t *testing.T) {
 	t.Setenv(ENV_AUTH_COOKIE_SECURE, "maybe")
 	if _, err := loadConfig(); err == nil {
