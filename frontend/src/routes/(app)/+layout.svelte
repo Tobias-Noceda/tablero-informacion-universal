@@ -8,8 +8,10 @@
 	import { orgs } from '$stores/org.svelte';
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import DnDProvider from '$providers/DnDProvider.svelte';
 	import TopBar from '$layouts/TopBar/TopBar.svelte';
+	import BoardCreator from '$layouts/BoardCreator/BoardCreator.svelte';
 	import Toast from '$components/Toast/Toast.svelte';
 	import { toast } from '$stores/toast.svelte';
 	// Also what shows a plan refusal (402) and re-reads what the plan allows.
@@ -37,6 +39,12 @@
 				<DnDProvider>
 					{@render children()}
 				</DnDProvider>
+				<!-- The top bar's "Create new" works on every page: outside an
+					 organization it makes a personal board (an organization's
+					 layout has its own creator). -->
+				{#if !page.params.orgId}
+					<BoardCreator org={undefined} />
+				{/if}
 			{/if}
 		</div>
 	</div>

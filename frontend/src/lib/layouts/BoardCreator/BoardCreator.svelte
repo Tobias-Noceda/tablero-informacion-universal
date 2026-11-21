@@ -23,26 +23,33 @@
 	// Never opens at the plan's board limit, whatever asked for it.
 	const space = $derived(boardSpace(org?.id, $boardList));
 
+	// The creator stays mounted across pages, so a closed one starts empty
+	// the next time it opens.
+	function close() {
+		boardName = '';
+		setCreatingBoard(false);
+	}
+
 	async function handleCreate() {
 		const trimmed = boardName.trim();
 		if (!trimmed) return;
 		const board = await boardApi.create(trimmed, org?.id);
 		// Refused (a limit reached from another tab): the notice says why.
 		if (!board?.id) {
-			setCreatingBoard(false);
+			close();
 			return;
 		}
 		await refreshBoards();
 		// The organization's board count moved.
 		void orgs.refresh().catch(() => {});
-		setCreatingBoard(false);
+		close();
 		await goto(resolve(boardPath(board.id, org?.id)));
 	}
 </script>
 
 {#if $isCreatingBoard && space.allowed}
 	<Modal
-		onclose={() => setCreatingBoard(false)}
+		onclose={close}
 		onaccept={handleCreate}
 		acceptDisabled={!boardName.trim()}
 		acceptText={m['create']()}
