@@ -48,6 +48,11 @@ func (srv *GroupService) Create(principal models.Principal, name string, org *uu
 	if err != nil {
 		return nil, err
 	}
+	release, err := srv.plans.Hold(models.LimitGroups, "user:"+principal.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	owned, err := srv.store.CountOwnedGroups(principal.ID)
 	if err != nil {
 		return nil, err
@@ -109,6 +114,16 @@ func (srv *GroupService) AddMember(principal models.Principal, id uuid.UUID, use
 	}
 	if userID == "" {
 		return ErrInvalidUser
+	}
+
+	// Seats are counted on the group as it is in its turn.
+	release, err := srv.plans.Hold(models.LimitSeats, "group:"+id.String())
+	if err != nil {
+		return err
+	}
+	defer release()
+	if group, err = srv.store.FindGroup(id); err != nil {
+		return ErrForbidden
 	}
 
 	if !group.IsMember(userID) {

@@ -91,6 +91,16 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 		return nil, err
 	}
 
+	// The cards are counted on the board as it is in its turn, and the new
+	// one is created before the turn ends.
+	release, err := srv.plans.Hold(models.LimitNodes, "board:"+postIt.Board.String())
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	if board, err = srv.db.FindBoard(postIt.Board); err != nil || board == nil {
+		return nil, ErrNotAMember
+	}
 	plan, err := srv.plans.ForBoard(board)
 	if err != nil {
 		return nil, err
