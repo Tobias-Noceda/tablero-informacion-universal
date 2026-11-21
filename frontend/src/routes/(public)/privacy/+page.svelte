@@ -16,7 +16,7 @@
 	class="flex flex-col gap-4 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-semibold [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-6"
 >
 	<h1 class="text-3xl font-semibold">Privacy Policy</h1>
-	<p class="text-sm opacity-70">Last updated: October 16, 2026</p>
+	<p class="text-sm opacity-70">Last updated: November 21, 2026</p>
 
 	<p>
 		This policy explains what personal data Corcheria Company ("we", "us") collects when you use the
@@ -136,6 +136,11 @@
 	<ul>
 		<li>Our hosting, database and cache providers, which store and process the data above.</li>
 		<li>
+			Vercel Speed Insights, which measures how fast our pages load and respond in your browser. It
+			receives those timings, the address of the page without its query string, and the type of
+			device and browser. It sets no cookies and does not identify you.
+		</li>
+		<li>
 			Resend, which delivers our transactional emails (your email address and the email's content).
 		</li>
 		<li>Google, when you sign in with Google or connect a Google account.</li>
@@ -163,7 +168,10 @@
 		<li>A cookie that remembers your preferred language.</li>
 		<li>Browser storage that remembers the last organization you selected.</li>
 	</ul>
-	<p>We do not use analytics, advertising or third-party tracking cookies.</p>
+	<p>
+		We do not use advertising or third-party tracking cookies. Page performance is measured with
+		Vercel Speed Insights (see section 4), which uses no cookies.
+	</p>
 
 	<h2>6. Retention and deletion</h2>
 	<p>
