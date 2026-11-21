@@ -541,5 +541,24 @@
 			"billing_disabled": "Los pagos no están disponibles en este momento.",
 			"unknown": "No se pudo iniciar la suscripción. Es posible intentarlo de nuevo."
 		}
+	},
+	"card_failure": {
+		"source_auth": "La fuente rechazó la credencial: revisá que siga siendo válida.",
+		"not_found": "La fuente no encontró nada en esa dirección: revisá la URL y los ajustes de la tarjeta.",
+		"rate_limited": "La fuente está limitando los pedidos: probá con un intervalo de actualización más largo.",
+		"source_error": "La fuente respondió con un error ({status}). Probá de nuevo más tarde.",
+		"timeout": "La fuente no respondió a tiempo.",
+		"unreachable": "No se pudo conectar con la fuente: revisá la URL.",
+		"unreadable": "La fuente respondió algo que la tarjeta no puede leer: revisá la URL y el tipo de respuesta.",
+		"query": "La consulta de la tarjeta no encontró ningún valor en la respuesta: revisá la consulta.",
+		"credential": "La credencial que usa esta tarjeta ya no está disponible para vos.",
+		"unavailable": "Esta tarjeta no está disponible por ahora.",
+		"network": "No se pudo conectar con el servidor. Revisá tu conexión.",
+		"unknown": "No se pudo cargar la tarjeta."
+	},
+	"card_freshness": {
+		"updated": "Actualizado {time}",
+		"stale": "No se pudo actualizar",
+		"stale_detail": "Se muestra el último dato ({time}). {reason}"
 	}
 }
