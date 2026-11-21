@@ -24,7 +24,7 @@ func (this *JsonDewIt) parse(postit *models.PostIts, body io.Reader) (any, error
 func (this *JsonDewIt) decode(body io.Reader) (any, error) {
 	var data any
 	if err := json.NewDecoder(body).Decode(&data); err != nil {
-		return nil, err
+		return nil, readFailure(err)
 	}
 
 	return data, nil
@@ -39,16 +39,16 @@ func (this *JsonDewIt) query(data any, queries map[string]string) (any, error) {
 	for key, query := range queries {
 		cmd, err := gojq.Parse(query)
 		if err != nil {
-			return nil, err
+			return nil, queryFailure(err)
 		}
 
 		res, ok := cmd.RunWithContext(ctx, data).Next()
 		if !ok {
-			return nil, fmt.Errorf("Query matched no results")
+			return nil, queryFailure(fmt.Errorf("Query matched no results"))
 		}
 
 		if err, ok := res.(error); ok {
-			return nil, err
+			return nil, queryFailure(err)
 		}
 
 		out[key] = res

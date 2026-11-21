@@ -383,7 +383,40 @@ func fail(c *gin.Context, err error) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate_limited"})
 		return
 	}
+	if code, status := cardFailure(err); code != "" {
+		body := gin.H{"error": err.Error(), "code": code}
+		var source *infrastructure.SourceStatusError
+		if errors.As(err, &source) {
+			body["status"] = source.Status
+		}
+		c.JSON(status, body)
+		return
+	}
 	c.JSON(statusOf(err), gin.H{"error": err.Error()})
+}
+
+// cardFailure is why a card could not run, as a code the board turns into
+// what to check. The message stays in "error": the MCP server shows it to
+// the agent.
+func cardFailure(err error) (string, int) {
+	var source *infrastructure.SourceStatusError
+	switch {
+	case errors.As(err, &source):
+		return "source_status", http.StatusBadGateway
+	case errors.Is(err, infrastructure.ErrSourceTimeout):
+		return "source_timeout", http.StatusGatewayTimeout
+	case errors.Is(err, infrastructure.ErrSourceUnreachable):
+		return "source_unreachable", http.StatusBadGateway
+	case errors.Is(err, infrastructure.ErrSourceUnreadable):
+		return "source_unreadable", http.StatusBadGateway
+	case errors.Is(err, infrastructure.ErrQueryFailed):
+		return "query_failed", http.StatusUnprocessableEntity
+	case errors.Is(err, srv.ErrCredentialUnavailable):
+		return "credential_unavailable", http.StatusForbidden
+	case errors.Is(err, srv.ErrSystemSecretMissing):
+		return "card_unavailable", http.StatusServiceUnavailable
+	}
+	return "", 0
 }
 
 func statusOf(err error) int {

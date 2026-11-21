@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/Secreto31126/tesis/common/ports/safehttp"
 )
@@ -117,12 +118,12 @@ func (*DewIt) request(ctx context.Context, resource *url.URL, method string, que
 
 	res, err := safehttp.Client().Do(req)
 	if err != nil {
-		return nil, err
+		return nil, transportFailure(err)
 	}
 
 	if res.StatusCode != http.StatusOK {
 		res.Body.Close()
-		return nil, fmt.Errorf("Resource returned %d", res.StatusCode)
+		return nil, &infrastructure.SourceStatusError{Status: res.StatusCode}
 	}
 
 	return res, nil

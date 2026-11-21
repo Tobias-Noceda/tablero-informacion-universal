@@ -540,5 +540,24 @@
 			"billing_disabled": "Payments are not available right now.",
 			"unknown": "The subscription could not be started. Try again."
 		}
+	},
+	"card_failure": {
+		"source_auth": "The source refused the credential: check that it is still valid.",
+		"not_found": "The source found nothing at this address: check the URL and the card's settings.",
+		"rate_limited": "The source is limiting requests: try a longer refresh interval.",
+		"source_error": "The source answered with an error ({status}). Try again later.",
+		"timeout": "The source did not answer in time.",
+		"unreachable": "The source could not be reached: check the URL.",
+		"unreadable": "The source answered something the card cannot read: check the URL and the response type.",
+		"query": "The card's query found no value in the answer: check the query.",
+		"credential": "The credential this card uses is no longer available to you.",
+		"unavailable": "This card is temporarily unavailable.",
+		"network": "Could not reach the server. Check your connection.",
+		"unknown": "The card could not be loaded."
+	},
+	"card_freshness": {
+		"updated": "Updated {time}",
+		"stale": "Could not update",
+		"stale_detail": "Showing the last data ({time}). {reason}"
 	}
 }

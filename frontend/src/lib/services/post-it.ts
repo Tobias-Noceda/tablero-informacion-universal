@@ -62,6 +62,21 @@ export async function del(id: UUID): Promise<Strand[]> {
     return deletedEdges;
 }
 
+// Why a card could not run: the HTTP status (0 when the request never got an
+// answer), the backend's `code` (source_status, source_timeout, ...) and, for
+// source_status, what the card's source answered.
+export class CardError extends Error {
+    constructor(
+        readonly status: number,
+        readonly code?: string,
+        readonly sourceStatus?: number,
+        message = '',
+    ) {
+        super(message);
+        this.name = 'CardError';
+    }
+}
+
 // `fresh` skips every cache on the way, so the card runs again now; only a
 // plan with manual refresh may ask for it (402 otherwise). `reload` only
 // skips the browser's copy: after an edit the backend has already dropped
@@ -70,9 +85,22 @@ export async function execute(
     id: UUID,
     { fresh = false, reload = false }: { fresh?: boolean; reload?: boolean } = {},
 ) {
-    const res = fresh
-        ? await api.get(`/v1/post-its/${id}?fresh=1`, { cache: "no-store" })
-        : await api.get(`/v1/post-its/${id}`, reload ? { cache: "no-store" } : undefined);
+    const path: `/${string}` = fresh ? `/v1/post-its/${id}?fresh=1` : `/v1/post-its/${id}`;
+    let res: Response;
+    try {
+        res = await api.request('GET', path, undefined, fresh || reload ? { cache: 'no-store' } : undefined);
+    } catch {
+        throw new CardError(0, 'network');
+    }
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new CardError(
+            res.status,
+            typeof body?.code === 'string' ? body.code : undefined,
+            typeof body?.status === 'number' ? body.status : undefined,
+            typeof body?.error === 'string' ? body.error : res.statusText,
+        );
+    }
     return await res.json() as Record<string, string>;
 }
 
