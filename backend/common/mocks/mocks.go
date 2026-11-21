@@ -2,7 +2,9 @@ package mocks
 
 import (
 	"errors"
+	"fmt"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
@@ -401,6 +403,41 @@ func (m *MockLocker) Acquire(key string, ttl time.Duration) (string, bool, error
 func (m *MockLocker) Release(key, token string) error {
 	if m.ReleaseFn != nil {
 		return m.ReleaseFn(key, token)
+	}
+	return nil
+}
+
+// MemoryLocker is an in-memory infrastructure.Locker, safe to share between
+// goroutines; the TTL is ignored.
+type MemoryLocker struct {
+	mu    sync.Mutex
+	held  map[string]string
+	count int
+}
+
+var _ infrastructure.Locker = (*MemoryLocker)(nil)
+
+func NewMemoryLocker() *MemoryLocker {
+	return &MemoryLocker{held: map[string]string{}}
+}
+
+func (l *MemoryLocker) Acquire(key string, _ time.Duration) (string, bool, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if _, taken := l.held[key]; taken {
+		return "", false, nil
+	}
+	l.count++
+	token := fmt.Sprintf("token-%d", l.count)
+	l.held[key] = token
+	return token, true, nil
+}
+
+func (l *MemoryLocker) Release(key, token string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.held[key] == token {
+		delete(l.held, key)
 	}
 	return nil
 }
