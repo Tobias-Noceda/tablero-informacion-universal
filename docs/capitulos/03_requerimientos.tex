@@ -1,0 +1,228 @@
+% !TEX root = ../main.tex
+\chapter{Requerimientos del Proyecto}
+
+\section{Descripción general de la aplicación}
+El sistema es una aplicación web de tableros inteligentes que permite a los usuarios organizar información proveniente de múltiples fuentes en un único espacio visual, flexible y personalizable. Su unidad básica es la tarjeta, un componente visual que puede contener tanto información estática ingresada por el usuario como datos dinámicos obtenidos en tiempo real desde APIs externas u otras fuentes configurables.
+
+Las tarjetas se disponen libremente sobre un tablero de estilo lienzo, donde el usuario puede posicionarlas, redimensionarlas y conectarlas entre sí mediante hilos visuales que expresan relaciones, dependencias o secuencias temporales. Esta metáfora, inspirada en el clásico pizarrón de corcho, permite construir estructuras de información que se adaptan naturalmente a casos de uso muy diversos.
+
+El sistema ofrece un conjunto de integraciones predefinidas con servicios populares, que permiten a cualquier usuario conectar tarjetas a fuentes de datos conocidas con mínima configuración. Para usuarios más avanzados, se habilita la posibilidad de conectar tarjetas a APIs externas personalizadas o a servidores MCP, extendiendo las capacidades del sistema de forma prácticamente ilimitada.
+
+Adicionalmente, el sistema incorpora un mecanismo de memorias, que permite al usuario guardar y organizar información persistente dentro del tablero, vinculándola con otras tarjetas para mantener contexto a lo largo del tiempo. Esta funcionalidad resulta especialmente útil en flujos de trabajo que involucran modelos de lenguaje u otros sistemas que se benefician del contexto acumulado.
+
+El acceso a la plataforma requiere autenticación, pudiendo el usuario registrarse con email y contraseña, o mediante Google. Cada usuario gestiona sus propios tableros de forma privada, con la posibilidad de compartirlos o exportarlos según sus necesidades.
+
+\section{Usuarios representativos}
+Los usuarios a quienes el proyecto está dirigido cumplen con la siguiente descripción, y a partir de esta se toman decisiones de diseño que mejor reflejen las necesidades de las mismas:
+
+\begin{itemize}
+  \item \textbf{Edad:} Personas de 16 años en adelante, dado que la herramienta está orientada a la gestión y organización de información, considerando la adolescencia como el punto en que una persona pasa a autogestionar sus tareas. Se estima que la mayor concentración de usuarios se ubica en el rango de edades entre los 20 y 45 años, apuntando al público en edad productiva, siendo quienes más información gestionan en el día a día. A modo de no excluir a los grupos mayores o con dificultades para manejar la tecnología, se diseñó una interfaz sencilla y amigable, con herramientas o templates de casos de usos típicos ya armados para reducir la fricción inicial.
+  \item \textbf{Lenguaje:} Se espera que la aplicación pueda introducirse exitosamente en una franja amplia del mercado, por lo que está destinada a personas hispanohablantes y angloparlantes en la primera fase del desarrollo.
+  \item \textbf{Usos y costumbres:} Son personas que buscan simplificar las rutinas de su vida diaria, quieran mejorar la organización de sus actividades, o que manejan grandes volúmenes de información con actualizaciones constantes. También se supone que la mayoría de los usuarios son nativos digitales, aquellos que optan por una gestión complementada con tecnología sobre los medios tradicionales.
+  \item \textbf{Características no influyentes:} No se encontraron razones para discriminar a los usuarios por nivel socioeconómico, sexo, nacionalidad, oficio y cultura.
+\end{itemize}
+
+\section{Especificación de Requisitos (MVP)}
+
+\subsection{Listado de Requisitos Funcionales}
+A continuación se detallan en una tabla todos los requisitos funcionales iniciales.
+
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabularx}{\textwidth}{>{\bfseries}l X l}
+    \toprule
+    ID & Requisito & Prioridad \\
+    \midrule
+    RF-01 & El usuario puede registrarse en la plataforma & Alta \\
+    RF-02 & El usuario puede iniciar sesión con un proveedor externo (Google, GitHub) & Media \\
+    RF-03 & El usuario puede cerrar sesión & Alta \\
+    RF-04 & El usuario puede crear un tablero personalizado & Alta \\
+    RF-05 & El usuario puede agregar tarjetas al tablero & Alta \\
+    RF-06 & El usuario puede vincular tarjetas entre sí mediante hilos visuales & Alta \\
+    RF-07 & El usuario puede conectar una tarjeta a una API externa predefinida & Alta \\
+    RF-08 & El usuario puede conectar una tarjeta a una API externa personalizada & Media \\
+    RF-09 & Las tarjetas se actualizan automáticamente con los últimos datos de su fuente & Alta \\
+    RF-10 & El usuario puede conectarse a un tablero mediante un servidor MCP & Media \\
+    RF-11 & El usuario puede organizar y etiquetar memorias dentro del tablero & Media \\
+    RF-12 & El usuario puede personalizar el estilo visual de cada tarjeta & Baja \\
+    RF-13 & El usuario puede compartir o exportar un tablero & Baja \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Listado de Requisitos Funcionales Iniciales}
+  \label{tab:rf_iniciales}
+\end{table}
+
+\subsection{Listado de Requisitos no funcionales}
+El trabajo apunta a tener un alto grado de calidad, propio de un proyecto de ingeniería informática. Para ello, se busca cumplir no solo con los requisitos funcionales propuestos del producto, sino también requisitos no propios del negocio, que refieren a la calidad del servicio en sí.
+
+A continuación se detalla el listado de requisitos no funcionales de la aplicación:
+
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabularx}{\textwidth}{>{\bfseries}l X l}
+    \toprule
+    ID & Requisito & Categoría \\
+    \midrule
+    RNF-01 & Los tableros deben actualizarse en menos de 5 segundos ante cambios en las tarjetas & Performance \\
+    RNF-02 & Las credenciales de APIs externas deben almacenarse de forma segura & Seguridad \\
+    RNF-03 & El sistema debe ser usable sin conocimientos técnicos avanzados para APIs predefinidas & Usabilidad \\
+    RNF-04 & El sistema debe soportar la incorporación de nuevas integraciones sin rediseño estructural & Extensibilidad \\
+    RNF-05 & El tablero debe ser responsivo y funcionar correctamente en navegadores modernos & Compatibilidad \\
+    RNF-06 & La comunicación con servidores MCP debe seguir el protocolo estándar definido & Interoperabilidad \\
+    RNF-07 & La aplicación debe ofrecer sus servicios con un 99.9\% de disponibilidad & Disponibilidad \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Listado de Requisitos No Funcionales Iniciales}
+  \label{tab:rnf_iniciales}
+\end{table}
+
+\subsection{Historias de usuario}
+
+\subsubsection*{RF-01 - Registrarse en la plataforma}
+Como usuario nuevo, quiero poder registrarme con email y contraseña, para acceder a la plataforma con una cuenta propia.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item El formulario requiere nombre, email y contraseña
+  \item Se valida que el email tenga formato válido y no esté ya registrado
+  \item La contraseña debe cumplir requisitos mínimos de seguridad (mínimo 8 caracteres)
+  \item Al registrarse exitosamente, el usuario queda autenticado y es redirigido al tablero
+\end{itemize}
+
+\subsubsection*{RF-02 - Iniciar sesión con proveedor externo}
+Como usuario, quiero poder iniciar sesión con Google o GitHub, para acceder a la plataforma sin tener que crear credenciales nuevas.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item Se muestran botones de acceso rápido con Google y GitHub
+  \item Al autenticarse por primera vez con un proveedor externo, se crea una cuenta automáticamente
+  \item Si ya existe una cuenta con el mismo email, se vincula al proveedor
+\end{itemize}
+
+\subsubsection*{RF-03 - Cerrar sesión}
+Como usuario autenticado, quiero poder cerrar sesión, para proteger mi cuenta al usar dispositivos compartidos.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item Hay una opción visible de cierre de sesión en la interfaz
+  \item Al cerrar sesión, el usuario es redirigido a la pantalla de login
+  \item Tras cerrar sesión, no es posible acceder a rutas protegidas sin autenticarse nuevamente
+\end{itemize}
+
+\subsubsection*{RF-04 - Crear un tablero}
+Como usuario, quiero poder crear un tablero personalizado, para tener un espacio de trabajo dedicado a un tema o proyecto.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item El usuario puede crear un tablero asignándole un nombre
+  \item El tablero aparece en el listado de tableros del usuario
+  \item El tablero recién creado se abre vacío y listo para agregar tarjetas
+\end{itemize}
+
+\subsubsection*{RF-05 - Agregar tarjeta al tablero}
+Como usuario, quiero poder agregar una tarjeta al tablero, para organizar una nueva pieza de información en mi espacio de trabajo.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item La tarjeta se crea con un título editable
+  \item Puede posicionarse libremente en el tablero
+  \item Puede configurarse como estática o conectada a una fuente
+  \item Puede establecer una conexión con una API
+\end{itemize}
+
+\subsubsection*{RF-06 - Vincular tarjetas mediante hilos visuales}
+Como usuario, quiero poder conectar dos tarjetas con un hilo visual, para expresar relaciones, dependencias o secuencias entre ellas.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item El usuario puede iniciar un hilo desde el borde de una tarjeta y conectarlo a otra
+  \item El hilo persiste al recargar el tablero
+  \item El usuario puede eliminar un hilo sin afectar las tarjetas
+  \item Se puede conectar una tarjeta a múltiples tarjetas simultáneamente
+  \item El usuario puede agregar una etiqueta al hilo para describir la relación
+  \item El usuario puede indicar la dirección de la relación mediante flechas en uno o ambos extremos
+  \item El usuario puede elegir el grosor del hilo y su color dentro de una paleta predefinida
+  \item Solo los editores del tablero pueden modificar el estilo de un hilo
+\end{itemize}
+
+\subsubsection*{RF-07 - Conectar una tarjeta a una API predefinida}
+Como usuario, quiero poder conectar una tarjeta a una integración predefinida (por ejemplo: precio de un vuelo, estado de un repositorio), para ver datos actualizados sin necesidad de configurar nada técnico.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item Hay un listado de integraciones predefinidas disponibles para seleccionar
+  \item El usuario completa únicamente los parámetros visibles de la integración (ej: ciudad de origen, nombre del repositorio)
+  \item La tarjeta muestra los datos obtenidos de la API
+  \item Se indica visualmente cuándo fue la última actualización
+\end{itemize}
+
+\subsubsection*{RF-08 - Conectar una tarjeta a una API personalizada}
+Como usuario avanzado, quiero poder conectar una tarjeta a una API externa propia, para traer cualquier dato que necesite aunque no esté entre las integraciones predefinidas.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item El usuario puede ingresar la URL del endpoint, método HTTP y headers necesarios
+  \item Las credenciales se almacenan de forma segura y no se exponen en la interfaz
+  \item La tarjeta muestra la respuesta de la API o un mensaje de error descriptivo si la llamada falla
+  \item El usuario puede editar o eliminar la configuración de la API en cualquier momento
+\end{itemize}
+
+\subsubsection*{RF-09 - Actualización automática de datos}
+Como usuario, quiero que las tarjetas conectadas a fuentes externas se actualicen automáticamente, para que el tablero refleje siempre el estado actual de la información.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item Las tarjetas conectadas se actualizan periódicamente sin intervención del usuario
+  \item El intervalo de actualización es configurable por tarjeta
+  \item Si una actualización falla, la tarjeta muestra el último dato disponible junto con un indicador de error
+  \item La actualización no interrumpe la interacción del usuario con el tablero
+\end{itemize}
+
+\subsubsection*{RF-10 - Conectarse a un tablero mediante un servidor MCP}
+Como usuario avanzado, quiero poder conectarme a un tablero mediante MCP, para integrar contexto y datos provenientes de modelos de lenguaje u otros sistemas compatibles.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item El usuario puede ingresar la URL del servidor MCP y los parámetros necesarios
+  \item El tablero permite acciones por parte de agentes
+  \item La conexión sigue el protocolo MCP estándar
+  \item Se indica claramente si el servidor no responde o devuelve un error
+\end{itemize}
+
+\subsubsection*{RF-11 - Organizar y etiquetar memorias}
+Como usuario, quiero poder guardar fragmentos de información como memorias dentro del tablero y etiquetarlas, para mantener el contexto acumulado a lo largo del tiempo.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item El usuario puede crear una tarjeta de tipo memoria con texto libre
+  \item Las memorias pueden etiquetarse con categorías personalizadas
+  \item Las memorias pueden vincularse con otras tarjetas del tablero mediante hilos
+  \item Las memorias persisten entre sesiones
+\end{itemize}
+
+\subsubsection*{RF-12 - Personalizar el estilo visual de una tarjeta}
+Como usuario, quiero poder cambiar el color, tamaño o apariencia de una tarjeta, para diferenciar visualmente la información según su relevancia o tipo.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item El usuario puede elegir entre una paleta de colores para el fondo de la tarjeta
+  \item El usuario puede cambiar el tamaño de la tarjeta redimensionándola libremente
+  \item Los cambios de estilo persisten al recargar el tablero
+  \item El usuario puede elegir el color blanco, y el texto de la tarjeta adopta automáticamente un color legible sobre el fondo elegido
+  \item El usuario puede agregar un borde continuo, de guiones o de puntos, y elegir su grosor y su color
+  \item El usuario puede volver a ajustar la tarjeta al tamaño de su contenido
+  \item El usuario puede alinear el texto de la tarjeta horizontalmente (a la izquierda, al centro o a la derecha) y verticalmente (arriba, en el medio o abajo)
+  \item Solo los editores del tablero pueden modificar el estilo de una tarjeta
+\end{itemize}
+
+\subsubsection*{RF-13 - Compartir o exportar un tablero}
+Como usuario, quiero poder compartir mi tablero con otros o exportarlo, para colaborar o guardar una copia de mi trabajo.
+
+\textbf{Criterios de aceptación:}
+\begin{itemize}
+  \item El usuario puede generar un enlace de solo lectura para compartir el tablero
+  \item El usuario puede exportar el tablero en al menos un formato estándar (por ejemplo, JSON o imagen)
+  \item El enlace compartido muestra el estado actual del tablero al momento de la visita
+\end{itemize}

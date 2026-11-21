@@ -1,0 +1,16 @@
+# Ignore all by default
+*
+
+# Do not ignore these files
+!.gitignore
+
+# LaTeX documentation files
+!*.tex
+!*.bib
+!Grupo10-*.pdf
+!/capitulos
+!/figuras
+!/figuras/*.png
+
+# Markdown documentation files
+!*.md
