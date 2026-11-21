@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"net"
 	netmail "net/mail"
 	"os"
 	"strconv"
@@ -32,10 +33,25 @@ const (
 	// Set by Vercel on every deployment; the health route reports it.
 	ENV_VERCEL_COMMIT = "VERCEL_GIT_COMMIT_SHA"
 	SHORT_COMMIT      = 7
+	ENV_VERCEL        = "VERCEL"
+	// Comma-separated IPs or CIDRs whose X-Forwarded-For is believed, or
+	// "none" to key on the connection's own address.
+	ENV_TRUSTED_PROXIES = "TRUSTED_PROXIES"
+	NO_PROXIES          = "none"
 
 	DEFAULT_ACCESS_TTL  = 15 * time.Minute
 	DEFAULT_REFRESH_TTL = 30 * 24 * time.Hour
 	AUTH_COOKIE_PATH    = "/api/v1/auth"
+)
+
+var (
+	// privateNetworks is who forwards requests on Docker: the ALB, which
+	// reaches the backend over a private docker network. A caller outside
+	// them cannot pass off another address.
+	privateNetworks = []string{"127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "::1/128", "fc00::/7"}
+	// everyNetwork is Vercel's default: every request goes through its
+	// proxy, which replaces X-Forwarded-For with the caller's address.
+	everyNetwork = []string{"0.0.0.0/0", "::/0"}
 )
 
 // config is every knob the service graph takes from the environment besides
@@ -60,6 +76,10 @@ type config struct {
 	// version is the deployed commit, empty where the platform does not
 	// say (Docker).
 	version string
+
+	// trustedProxies are the addresses whose X-Forwarded-For names the
+	// client the rate limits key on; nil trusts none.
+	trustedProxies []string
 }
 
 func loadConfig() (config, error) {
@@ -81,6 +101,12 @@ func loadConfig() (config, error) {
 
 		version: shortCommit(os.Getenv(ENV_VERCEL_COMMIT)),
 	}
+
+	proxies, err := trustedProxies(os.Getenv(ENV_TRUSTED_PROXIES), os.Getenv(ENV_VERCEL) != "")
+	if err != nil {
+		return cfg, err
+	}
+	cfg.trustedProxies = proxies
 
 	if raw := strings.TrimSpace(os.Getenv(ENV_BILLING_USD_ARS)); raw != "" {
 		rate, err := strconv.ParseFloat(raw, 64)
@@ -126,6 +152,28 @@ func loadConfig() (config, error) {
 	}
 
 	return cfg, nil
+}
+
+// trustedProxies reads TRUSTED_PROXIES, defaulting to what the deployment
+// puts in front of the backend.
+func trustedProxies(raw string, onVercel bool) ([]string, error) {
+	raw = strings.TrimSpace(raw)
+	switch {
+	case raw == NO_PROXIES:
+		return nil, nil
+	case raw == "" && onVercel:
+		return everyNetwork, nil
+	case raw == "":
+		return privateNetworks, nil
+	}
+
+	proxies := splitList(raw)
+	for _, proxy := range proxies {
+		if _, _, err := net.ParseCIDR(proxy); err != nil && net.ParseIP(proxy) == nil {
+			return nil, fmt.Errorf("%s: %q is neither an IP nor a CIDR", ENV_TRUSTED_PROXIES, proxy)
+		}
+	}
+	return proxies, nil
 }
 
 func shortCommit(sha string) string {
