@@ -84,15 +84,21 @@ func (srv *Service) Create(principal models.Principal, scope models.PostitTempla
 		return nil, ErrNotFound
 	}
 
-	count, err := srv.store.CountPostitTemplates(scope)
-	if err != nil {
-		return nil, err
-	}
 	plan, err := srv.plans.ForTemplateScope(scope)
 	if err != nil {
 		return nil, err
 	}
 	limit, most := limitOf(scope.Kind, plan.Limits)
+	// Counted and stored in the scope's turn.
+	release, err := srv.plans.Hold(limit, string(scope.Kind)+":"+scope.Owner)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	count, err := srv.store.CountPostitTemplates(scope)
+	if err != nil {
+		return nil, err
+	}
 	if err := plan.Admits(limit, int(count), most); err != nil {
 		return nil, err
 	}

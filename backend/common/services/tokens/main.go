@@ -22,6 +22,7 @@ const (
 
 	DEFAULT_DAYS = 15
 	MAX_TOKENS   = 10
+	LIMIT_TOKENS = "tokens"
 	MAX_NAME     = 64
 
 	createLimit  = 10
@@ -102,6 +103,13 @@ func (srv *TokenService) Create(principal models.Principal, name string, days in
 		return nil, infrastructure.ErrRateLimited
 	}
 
+	// Counted and stored in the user's turn, so parallel requests cannot pass
+	// MAX_TOKENS.
+	release, err := srv.plans.Hold(LIMIT_TOKENS, "user:"+principal.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	existing, err := srv.store.ListAccessTokens(principal.ID)
 	if err != nil {
 		return nil, err

@@ -111,10 +111,11 @@ func (srv *SecretsService) Connect(scope models.SecretScope, principal models.Pr
 		return "", err
 	}
 
-	payer, err := srv.admit(scope, name)
+	payer, release, err := srv.admit(scope, name)
 	if err != nil {
 		return "", err
 	}
+	defer release()
 
 	grant := &models.OAuth2Material{Flow: models.OAuth2AuthorizationCode, Provider: provider}
 	if err := srv.sealMaterial(scope, name, grant, false, payer); err != nil {
