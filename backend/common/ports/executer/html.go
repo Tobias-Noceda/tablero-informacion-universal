@@ -22,7 +22,7 @@ func (this *HtmlDewIt) parse(postit *models.PostIts, body io.Reader) (any, error
 func (e *HtmlDewIt) decode(body io.Reader) (*goquery.Document, error) {
 	doc, err := goquery.NewDocumentFromReader(body)
 	if err != nil {
-		return nil, err
+		return nil, readFailure(err)
 	}
 
 	return doc, nil
