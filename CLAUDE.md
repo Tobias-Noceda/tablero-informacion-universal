@@ -75,6 +75,7 @@ pnpm dev                # Vite dev server
 | backend | `PORT`, `MONGODB_URI`, `MONGO_DATABASE`, `REDIS_URL`, `SECRETS_MASTER_KEYS`, `AUTH_SIGNING_KEYS` | Defaults: `31126`, `mongo:27017`, `prod`, `redis:6379`. Keys are required |
 | backend | `PLATFORM_ADMINS` | Emails that are platform admins when they sign in |
 | backend | `AUTH_COOKIE_SECURE`, `ACCESS_TTL`, `REFRESH_TTL` | Defaults `true`, `15m`, `720h`. `false` only for plain-HTTP development; keep `true` on Vercel |
+| backend | `TRUSTED_PROXIES` | Whose `X-Forwarded-For` names the client for the per-address rate limits: IPs/CIDRs, or `none`. Empty: private networks (the Docker ALB) or, with `VERCEL` set, every address (Vercel replaces the header; checked in production) |
 | backend | `GOOGLE_SIGNIN_CLIENT_ID`, `GOOGLE_SIGNIN_CLIENT_SECRET`, `GOOGLE_ISSUER` | Optional "Sign in with Google" (redirect URI `<origin>/auth/google/callback`); empty turns it off |
 | backend | `RESEND_API_KEY`, `MAIL_FROM` | Optional mail delivery through Resend. No key: mails go to the log. A key needs `MAIL_FROM` (`Name <addr@verified-domain>`) or the backend refuses to start |
 | backend | `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`, `BILLING_USD_ARS` | Optional Mercado Pago billing. No token: billing off (plans listed, not buyable). A token needs the other two (webhook secret, ARS per USD) or the backend refuses to start |

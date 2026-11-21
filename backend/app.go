@@ -76,9 +76,7 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	wellKnownService := w_srv.New(db)
 	tokenService := t_srv.New(db, cache, plans, time.Now)
 
-	router := gin.Default()
-	router.RedirectTrailingSlash = false
-	router.Use(cors.New(corsConfig()))
+	router := newRouter(cfg)
 
 	api := router.Group("/api/v1")
 	// Public: an uptime monitor calls it without a session.
