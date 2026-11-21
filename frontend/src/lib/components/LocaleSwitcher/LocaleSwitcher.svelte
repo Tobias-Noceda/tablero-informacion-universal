@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { getLocale, locales, type Locale } from '$lib/paraglide/runtime';
+	import { getLocale, locales, setLocale, type Locale } from '$lib/paraglide/runtime';
 	import { cn } from '$lib/utils';
-	import { switchLocale } from '$modules/locale';
 
 	const languageClass = (locale: Locale) =>
 		cn(
@@ -11,9 +10,12 @@
 		);
 </script>
 
+<!-- For visitors without a session (sign-in pages, public pages): switches the
+	 interface's language (setLocale reloads). A signed-in user picks it from the
+	 user menu, and the language of their mails from the profile. -->
 <div class="flex flex-row items-center gap-3">
 	{#each locales as locale (locale)}
-		<button type="button" class={languageClass(locale)} onclick={() => switchLocale(locale)}>
+		<button type="button" class={languageClass(locale)} onclick={() => setLocale(locale)}>
 			{locale.toUpperCase()}
 		</button>
 	{/each}
