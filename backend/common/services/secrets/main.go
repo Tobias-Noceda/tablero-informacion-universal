@@ -46,32 +46,40 @@ func New(
 // admit decides whether (scope, name) may be stored and who it is billed to:
 // "" for one that already exists (rewriting a value is never a new secret)
 // and for the platform's own, otherwise the scope's payer, as long as their
-// plan has room for one more.
-func (srv *SecretsService) admit(scope models.SecretScope, name string) (string, error) {
+// plan has room for one more. A new secret is admitted in the payer's turn:
+// store it, then release.
+func (srv *SecretsService) admit(scope models.SecretScope, name string) (string, func(), error) {
+	none := func() {}
 	if scope.Kind == models.ScopeSystem {
-		return "", nil
+		return "", none, nil
 	}
 
 	stored, err := srv.store.FindSecrets(scope, []string{name})
 	if err != nil {
-		return "", err
+		return "", none, err
 	}
 	if len(stored) > 0 {
-		return "", nil
+		return "", none, nil
 	}
 
 	plan, err := srv.plans.ForSecretScope(scope)
 	if err != nil {
-		return "", err
+		return "", none, err
+	}
+	release, err := srv.plans.Hold(models.LimitSecrets, "user:"+plan.Payer)
+	if err != nil {
+		return "", none, err
 	}
 	left, err := srv.plans.SecretsLeft(plan)
 	if err != nil {
-		return "", err
+		release()
+		return "", none, err
 	}
 	if left <= 0 {
-		return "", plan.Refuse(models.LimitSecrets, plan.Limits.Secrets)
+		release()
+		return "", none, plan.Refuse(models.LimitSecrets, plan.Limits.Secrets)
 	}
-	return plan.Payer, nil
+	return plan.Payer, release, nil
 }
 
 // aad binds a ciphertext to the scope and name it was created under.
@@ -102,10 +110,11 @@ func (srv *SecretsService) Put(scope models.SecretScope, principal models.Princi
 		return fmt.Errorf("Unsupported secret kind")
 	}
 
-	payer, err := srv.admit(scope, name)
+	payer, release, err := srv.admit(scope, name)
 	if err != nil {
 		return err
 	}
+	defer release()
 
 	return srv.seal(scope, name, kind, []byte(value), clear{billedTo: payer})
 }
@@ -149,10 +158,11 @@ func (srv *SecretsService) PutOAuth2(scope models.SecretScope, principal models.
 	material.ExpiresAt = time.Time{}
 	material.Provider = ""
 
-	payer, err := srv.admit(scope, name)
+	payer, release, err := srv.admit(scope, name)
 	if err != nil {
 		return err
 	}
+	defer release()
 
 	return srv.sealMaterial(scope, name, material, false, payer)
 }

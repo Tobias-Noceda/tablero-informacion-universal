@@ -84,6 +84,11 @@ func (srv *OrgService) Create(principal models.Principal, name string) (*models.
 	if err != nil {
 		return nil, err
 	}
+	release, err := srv.plans.Hold(models.LimitOrgs, "user:"+principal.ID)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	owned, err := srv.store.CountOwnedOrgs(principal.ID)
 	if err != nil {
 		return nil, err
@@ -239,6 +244,16 @@ func (srv *OrgService) SetMember(principal models.Principal, id uuid.UUID, email
 	user, err := srv.users.FindUserByEmail(models.NormalizeEmail(email))
 	if err != nil {
 		return nil, err
+	}
+
+	// Seats are counted on the organization as it is in its turn.
+	release, err := srv.plans.Hold(models.LimitSeats, "org:"+id.String())
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	if org, err = srv.store.FindOrg(id); err != nil {
+		return nil, ErrForbidden
 	}
 
 	if org.RoleOf(user.Id.String()) == "" {

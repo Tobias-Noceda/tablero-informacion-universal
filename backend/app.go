@@ -61,7 +61,7 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	resolver := access.New(db)
 	// What each user's plan allows; every service that creates something
 	// asks it who pays and how much room they have left.
-	plans := e_srv.New(db, db, db, db, db, time.Now)
+	plans := e_srv.New(db, db, db, db, db, cache, time.Now)
 	secrets := s_srv.New(db, s_srv.NewPolicy(db, db, resolver), crypto.NewKeyring(kek, db), oauth.New(), cache, cache, db, resolver, plans)
 
 	authService := a_srv.New(a_srv.Config{AccessTTL: cfg.accessTTL, RefreshTTL: cfg.refreshTTL, Admins: cfg.admins},

@@ -21,7 +21,7 @@ func (c counts) CountPostitTemplates(s models.PostitTemplateScope) (int64, error
 var now = time.Date(2026, 11, 14, 12, 0, 0, 0, time.UTC)
 
 func fixture(users []models.User, orgs []models.Org, c counts) *Service {
-	return New(&mocks.MemoryUserStore{Users: users}, &mocks.MemoryOrgStore{Orgs: orgs}, &mocks.MockDB{}, &mocks.MemoryGroupStore{}, c, func() time.Time { return now })
+	return New(&mocks.MemoryUserStore{Users: users}, &mocks.MemoryOrgStore{Orgs: orgs}, &mocks.MockDB{}, &mocks.MemoryGroupStore{}, c, nil, func() time.Time { return now })
 }
 
 func TestForUser_PlansExpiryAndUnknownAccounts(t *testing.T) {

@@ -26,4 +26,10 @@ type Entitlements interface {
 	SecretsLeft(payer models.Entitlement) (int, error)
 	// Usage counts what user holds of the limits that are theirs alone.
 	Usage(user string) (models.Usage, error)
+	// Hold makes the writes that count against one limit of one holder (a
+	// payer, a board, a scope) take turns, so two requests cannot both see
+	// room for the last one. Count and create after it, then release; read
+	// again anything loaded before, as it may be stale. ErrRateLimited when
+	// the turn does not come.
+	Hold(limit, holder string) (release func(), err error)
 }
