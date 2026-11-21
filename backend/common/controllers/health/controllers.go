@@ -17,8 +17,11 @@ func NewController(health *srv.Service) *Controller {
 
 // RegisterRoutes mounts the health route. It is public: an uptime monitor
 // calls it without a session, and it says nothing about anyone's data.
+// Monitors such as UptimeRobot ask with HEAD by default, which Gin does not
+// route to GET handlers on its own.
 func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 	router.GET("/health", ctrl.Health)
+	router.HEAD("/health", ctrl.Health)
 }
 
 // Health godoc
@@ -29,6 +32,7 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 // @Success      200  {object}  srv.Report
 // @Failure      503  {object}  srv.Report
 // @Router       /health [get]
+// @Router       /health [head]
 func (ctrl *Controller) Health(c *gin.Context) {
 	report := ctrl.health.Check(c.Request.Context())
 
@@ -38,5 +42,9 @@ func (ctrl *Controller) Health(c *gin.Context) {
 	}
 
 	c.Header("Cache-Control", "no-store")
+	if c.Request.Method == http.MethodHead {
+		c.Status(code)
+		return
+	}
 	c.JSON(code, report)
 }

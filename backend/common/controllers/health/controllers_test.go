@@ -20,13 +20,43 @@ func (p pinger) Ping(context.Context) error { return p.err }
 var unreachable = errors.New("connection refused")
 
 func get(mongo, redis pinger) *httptest.ResponseRecorder {
+	return send(http.MethodGet, mongo, redis)
+}
+
+func send(method string, mongo, redis pinger) *httptest.ResponseRecorder {
 	gin.SetMode(gin.TestMode)
 	r := gin.New()
 	NewController(srv.New(mongo, redis, "abc1234")).RegisterRoutes(r.Group("/api/v1"))
 
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/api/v1/health", nil))
+	r.ServeHTTP(w, httptest.NewRequest(method, "/api/v1/health", nil))
 	return w
+}
+
+// Uptime monitors such as UptimeRobot check with HEAD by default: it must
+// answer the same status as GET, without a body.
+func TestHealth_AnswersHEAD(t *testing.T) {
+	for name, c := range map[string]struct {
+		mongo pinger
+		want  int
+	}{
+		"up":   {pinger{}, http.StatusOK},
+		"down": {pinger{err: unreachable}, http.StatusServiceUnavailable},
+	} {
+		t.Run(name, func(t *testing.T) {
+			w := send(http.MethodHead, c.mongo, pinger{})
+
+			if w.Code != c.want {
+				t.Errorf("HEAD status = %d, want %d", w.Code, c.want)
+			}
+			if w.Body.Len() != 0 {
+				t.Errorf("HEAD answered a body: %q", w.Body.String())
+			}
+			if cache := w.Header().Get("Cache-Control"); cache != "no-store" {
+				t.Errorf("Cache-Control = %q, want no-store", cache)
+			}
+		})
+	}
 }
 
 func decode(t *testing.T, w *httptest.ResponseRecorder) srv.Report {
