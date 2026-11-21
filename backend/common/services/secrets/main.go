@@ -17,6 +17,15 @@ const MAX_SECRET_SIZE = 8 << 10 // 8kb, generous for a token, far below a payloa
 // REFRESH_LOCK_TTL bounds how long a crashed refresh can block the others.
 const REFRESH_LOCK_TTL = 30 * time.Second
 
+// REFRESH_WAIT is how long a request that finds another one renewing a token
+// waits for the new token before giving up, re-reading it every
+// REFRESH_STEP. It stays below the provider's own timeout (safehttp, 10 s),
+// so no request is held longer than a slow renewal would take anyway.
+const (
+	REFRESH_WAIT = 5 * time.Second
+	REFRESH_STEP = 100 * time.Millisecond
+)
+
 type SecretsService struct {
 	store      infrastructure.SecretStore
 	policy     infrastructure.ScopePolicy
@@ -27,6 +36,9 @@ type SecretsService struct {
 	groups     infrastructure.GroupReader
 	access     infrastructure.Access
 	plans      infrastructure.Entitlements
+
+	refreshWait time.Duration
+	refreshStep time.Duration
 }
 
 func New(
@@ -40,7 +52,19 @@ func New(
 	access infrastructure.Access,
 	plans infrastructure.Entitlements,
 ) *SecretsService {
-	return &SecretsService{store, policy, keyring, tokens, locks, handshakes, groups, access, plans}
+	return &SecretsService{
+		store:       store,
+		policy:      policy,
+		keyring:     keyring,
+		tokens:      tokens,
+		locks:       locks,
+		handshakes:  handshakes,
+		groups:      groups,
+		access:      access,
+		plans:       plans,
+		refreshWait: REFRESH_WAIT,
+		refreshStep: REFRESH_STEP,
+	}
 }
 
 // admit decides whether (scope, name) may be stored and who it is billed to:
@@ -351,6 +375,29 @@ func (srv *SecretsService) refresh(s *models.Secret, material *models.OAuth2Mate
 	}
 
 	if !held {
+		return srv.awaitRefresh(s, material)
+	}
+
+	defer srv.locks.Release(key, token)
+
+	if err := srv.hydrate(material); err != nil {
+		return err
+	}
+
+	if err := srv.tokens.Fetch(material); err != nil {
+		return err
+	}
+
+	return srv.sealMaterial(s.Scope, s.Name, material, s.Authorized, "")
+}
+
+// awaitRefresh waits for whoever holds the lock to store the renewed token,
+// re-reading the credential until it is fresh. It gives up after
+// refreshWait with a retryable error, so a renewal that never lands holds
+// nobody for longer than that.
+func (srv *SecretsService) awaitRefresh(s *models.Secret, material *models.OAuth2Material) error {
+	deadline := time.Now().Add(srv.refreshWait)
+	for {
 		fresh, err := srv.store.FindSecrets(s.Scope, []string{s.Name})
 		if err != nil {
 			return err
@@ -366,24 +413,14 @@ func (srv *SecretsService) refresh(s *models.Secret, material *models.OAuth2Mate
 		if err := json.Unmarshal(plaintext, material); err != nil {
 			return err
 		}
-		if material.NeedsRefresh() {
+		if !material.NeedsRefresh() {
+			return nil
+		}
+		if !time.Now().Before(deadline) {
 			return fmt.Errorf("Another refresh is in progress")
 		}
-
-		return nil
+		time.Sleep(srv.refreshStep)
 	}
-
-	defer srv.locks.Release(key, token)
-
-	if err := srv.hydrate(material); err != nil {
-		return err
-	}
-
-	if err := srv.tokens.Fetch(material); err != nil {
-		return err
-	}
-
-	return srv.sealMaterial(s.Scope, s.Name, material, s.Authorized, "")
 }
 
 func (srv *SecretsService) Resolve(scope models.SecretScope, names []string) (map[string]string, error) {
