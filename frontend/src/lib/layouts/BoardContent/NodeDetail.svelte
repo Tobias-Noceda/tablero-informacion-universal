@@ -26,6 +26,8 @@
 	import ImageView from '$components/Nodes/Image/ImageView.svelte';
 	import { boardPlan } from '$stores/plan.svelte';
 	import { canRefresh } from '$lib/billing/can';
+	import { failureMessage, failureOf } from '$lib/cards/failure';
+	import { formatUpdated } from '$lib/cards/freshness';
 
 	export type PostItData = PostIt & {
 		title?: { text: string; vars: boolean };
@@ -83,6 +85,12 @@
 		void id;
 		return false;
 	});
+
+	// When the content shown arrived; a failed refresh says why it is old.
+	const freshness = $derived(results.freshness(id));
+	const updatedAt = $derived(
+		freshness?.at === undefined ? '' : formatUpdated(freshness.at, Date.now(), getLocale())
+	);
 
 	let refreshing = $state(false);
 	const MAX_TITLE_LENGTH = 24;
@@ -389,8 +397,18 @@
 					)}
 				{/if}
 			{:catch err}
-				<p class="text-sm text-destructive">{failure(err)}</p>
+				<p class="text-sm text-destructive">{failureMessage(failureOf(err))}</p>
 			{/await}
+			{#if freshness?.failure && updatedAt}
+				<p class="text-xs text-destructive" role="status">
+					{m['card_freshness.stale_detail']({
+						time: updatedAt,
+						reason: failureMessage(freshness.failure)
+					})}
+				</p>
+			{:else if updatedAt && results.polls(id)}
+				<p class="text-xs opacity-70">{m['card_freshness.updated']({ time: updatedAt })}</p>
+			{/if}
 		</section>
 	</div>
 
