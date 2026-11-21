@@ -213,7 +213,16 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 	if err := srv.db.UpdatePostIt(id, set); err != nil {
 		return err
 	}
-	return srv.cache.DropPostItResult(id)
+	if err := srv.cache.DropPostItResult(id); err != nil {
+		return err
+	}
+	// After the drop, or a client told to run the card again could read the
+	// old result back. Missing it only delays the others until their next
+	// refresh, so the saved settings stand.
+	if err := srv.db.BumpPostIt(postit.Board, id); err != nil {
+		log.Printf("post-it %s: telling the board about new settings failed: %v", id, err)
+	}
+	return nil
 }
 
 func touchesCredentials(set map[string]any) bool {

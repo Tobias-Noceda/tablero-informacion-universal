@@ -55,6 +55,9 @@ type Database interface {
 	StylePostIt(boardID, postItID uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error)
 	// Change a Post It title
 	EditTitlePostIt(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error
+	// Raises a card's revision on its board after its settings change, so
+	// the board's change stream reaches everyone who has it open
+	BumpPostIt(boardID, postItID uuid.UUID) error
 	// Update board's name
 	UpdateBoardName(id uuid.UUID, name string) error
 }

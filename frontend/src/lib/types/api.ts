@@ -243,6 +243,9 @@ export type Board = {
         type?: string;
         title?: { text: string; vars: boolean; };
         position: { x: number; y: number; };
+        // Goes up when the card's settings change (they live in its own
+        // document); absent until the first change.
+        rev?: number;
         // data: { url: `/api/post-its/${UUID}` };
     } & CardStyle)[];
     strands: Strand[];
