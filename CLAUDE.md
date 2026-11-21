@@ -107,7 +107,7 @@ go test ./...                      # unit tests, no services needed
 
 ## Architecture: Backend
 
-Layered Go hexagonal structure. All routes are registered under `/api/v1` (nginx and Vercel forward `/api` untouched, do not strip it). Only `/auth/*`, `GET /billing/plans` and `POST /billing/webhook` are public: `app.go` mounts every other controller on a group behind `middleware.RequireAuth`, handlers read the caller with `middleware.Principal(c)` (never from the body or the query), and `/system/*` adds `middleware.RequireAdmin`. Anything the caller may not touch answers `404`.
+Layered Go hexagonal structure. All routes are registered under `/api/v1` (nginx and Vercel forward `/api` untouched, do not strip it). Only `/auth/*`, `GET /health`, `GET /billing/plans` and `POST /billing/webhook` are public: `app.go` mounts every other controller on a group behind `middleware.RequireAuth`, handlers read the caller with `middleware.Principal(c)` (never from the body or the query), and `/system/*` adds `middleware.RequireAdmin`. Anything the caller may not touch answers `404`.
 
 ```
 main.go                           bootstrap, maintenance flags, Run
@@ -115,7 +115,7 @@ app.go                            newApp(): the whole service graph (shared with
 maintenance.go                    -migrate / -rewrap-keys / -rotate-key / -rotate-all-keys
 common/
   models/          domain types (User, Principal, Board, PostIts, Secret, SecretScope, SecretRef, Grant, Group, Org, DataKey, OAuth2Material, SystemSecretName)
-  infrastructure/  port interfaces (Database, Cache, Executer, UserStore, SessionStore, TokenSigner/Verifier, PasswordHasher, RateLimiter, Mailer, IdentityProvider, SecretStore, KeyStore, GroupStore, OrgStore, Access, ScopePolicy, SecretResolver, ...)
+  infrastructure/  port interfaces (Database, Cache, Executer, UserStore, SessionStore, TokenSigner/Verifier, PasswordHasher, RateLimiter, Mailer, IdentityProvider, SecretStore, KeyStore, GroupStore, OrgStore, Access, ScopePolicy, SecretResolver, Pinger, ...)
   ports/
     mongo/         Database, UserStore, SecretStore, KeyStore, GroupStore, OrgStore, WellKnownStore and PostitTemplateStore impls (collections: users, boards, postit, secrets, data_keys, groups, orgs, well_knowns, postit_templates; uuid codec)
     redis/         Cache (post-it results), Locker, HandshakeStore, refresh sessions and rate limits
@@ -131,6 +131,7 @@ common/
   services/
     auth/          register, verify email, login, refresh rotation (10 s reuse grace, then the whole family is revoked), logout, forgot/reset password, Google sign-in; rate limits per address and per account
     users/         a user's own profile
+    health/        pings Mongo and Redis at once (1 s each): ok, degraded (no Redis) or down (no Mongo)
     entitlements/  a user's, board's or org's plan limits (through the payer) and the caller's usage
     billing/       plans with ARS prices, Mercado Pago subscribe/sync/change/cancel, reconcile
     access/        the access resolver: a principal's role on a board (owner|editor|viewer), in a group (owner|member|viewer) and in an organization (admin|member)
@@ -145,6 +146,7 @@ common/
     middleware/    RequireAuth (bearer → Principal), RequireAdmin, SameOrigin (Sec-Fetch-Site on the cookie routes)
     auth/          Gin routes /v1/auth (the refresh cookie: httpOnly, Secure, SameSite=Strict, Path /api/v1/auth)
     users/         Gin routes /v1/users/:id
+    health/        Gin route /v1/health (public; 200 while Mongo answers, 503 otherwise; `version` is `VERCEL_GIT_COMMIT_SHA`, short)
     billing/       Gin routes /v1/billing/* (plans and webhook public)
     boards/        Gin routes /v1/boards (+ strands, members)
     postits/       Gin routes /v1/post-its

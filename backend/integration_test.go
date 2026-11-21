@@ -26,6 +26,7 @@ import (
 	"github.com/Secreto31126/tesis/common/ports/oidc"
 	"github.com/Secreto31126/tesis/common/ports/redis"
 	"github.com/Secreto31126/tesis/common/ports/safehttp"
+	h_srv "github.com/Secreto31126/tesis/common/services/health"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -248,19 +249,30 @@ func (c *client) newBoard(name string) models.Board {
 	return board
 }
 
-// publicBilling are the billing routes that need no session: the plans on
-// offer, and the webhook, which proves itself by its signature.
-var publicBilling = map[string]bool{"/api/v1/billing/plans": true, "/api/v1/billing/webhook": true}
+// publicRoutes need no session besides /auth: the health check, the plans
+// on offer, and the billing webhook, which proves itself by its signature.
+var publicRoutes = map[string]bool{"/api/v1/health": true, "/api/v1/billing/plans": true, "/api/v1/billing/webhook": true}
 
-// Everything but /auth needs a token: the wiring is the only thing that puts
-// a route behind RequireAuth, so walk what is actually mounted.
+// The health check reaches the real stores, as an uptime monitor would.
+func TestEndToEnd_HealthReportsBothStores(t *testing.T) {
+	s := newStack(t)
+
+	var report h_srv.Report
+	s.mustJSON(s.do(http.MethodGet, "/api/v1/health", nil), http.StatusOK, &report)
+	if report.Status != h_srv.StatusOK || report.Mongo != h_srv.StatusOK || report.Redis != h_srv.StatusOK {
+		t.Errorf("report = %+v", report)
+	}
+}
+
+// Everything but the public routes needs a token: the wiring is the only
+// thing that puts a route behind RequireAuth, so walk what is actually mounted.
 func TestEndToEnd_EveryPrivateRouteNeedsAToken(t *testing.T) {
 	s := newStack(t)
 	params := strings.NewReplacer(":id", uuid.NewString(), ":strand", uuid.NewString(), ":user", "u", ":name", "KEY")
 
 	checked := 0
 	for _, route := range s.app.router.Routes() {
-		if strings.HasPrefix(route.Path, "/api/v1/auth/") || publicBilling[route.Path] {
+		if strings.HasPrefix(route.Path, "/api/v1/auth/") || publicRoutes[route.Path] {
 			continue
 		}
 		checked++
