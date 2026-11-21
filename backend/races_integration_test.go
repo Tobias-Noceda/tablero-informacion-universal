@@ -217,7 +217,8 @@ func TestEndToEnd_ParallelDemotionsKeepAnAdmin(t *testing.T) {
 }
 
 // CONC-08: many cards needing one OAuth2 credential renewed at once spend
-// the refresh once; the requests that lose the race are told to retry.
+// the refresh once; the requests that lose the race wait for the new token
+// instead of failing.
 func TestEndToEnd_ParallelResolvesRenewAnOAuth2TokenOnce(t *testing.T) {
 	original := safehttp.IsSafeIP
 	safehttp.IsSafeIP = func(net.IP) bool { return true }
@@ -244,27 +245,21 @@ func TestEndToEnd_ParallelResolvesRenewAnOAuth2TokenOnce(t *testing.T) {
 	}
 
 	const readers = 10
-	var retried atomic.Int32
 	codes := inParallel(readers, func(int) int {
 		resolved, err := s.app.secrets.Resolve(scope, []string{"PROVIDER"})
-		switch {
-		case err == nil && resolved["$PROVIDER"] != "":
-			return http.StatusOK
-		case err != nil:
-			retried.Add(1)
+		renewed := (&models.OAuth2Material{AccessToken: "fresh", TokenType: "bearer"}).Header()
+		if err != nil || resolved["$PROVIDER"] != renewed {
 			return http.StatusConflict
-		default:
-			return http.StatusInternalServerError
 		}
+		return http.StatusOK
 	})
 
 	if n := fetches.Load(); n != 1 {
 		t.Errorf("the provider was asked %d times, want 1", n)
 	}
-	if codes[http.StatusInternalServerError] != 0 || codes[http.StatusOK] == 0 {
-		t.Errorf("answers = %v", codes)
+	if codes[http.StatusOK] != readers {
+		t.Errorf("answers = %v, want every reader to get the renewed token", codes)
 	}
-	t.Logf("%d of %d concurrent resolves were told to retry while the token was renewed", retried.Load(), readers)
 
 	// Once renewed, everyone reads the stored token without asking again.
 	if _, err := s.app.secrets.Resolve(scope, []string{"PROVIDER"}); err != nil {
