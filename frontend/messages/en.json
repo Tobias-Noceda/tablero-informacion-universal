@@ -27,7 +27,8 @@
 			"title": "Theme",
 			"dark": "Dark mode",
 			"light": "Light mode"
-		}
+		},
+		"avatar": "Profile picture"
 	},
 	"nodes": {
 		"title": "Cards",
@@ -41,7 +42,8 @@
 				"title": "Edit card",
 				"action": "Save changes"
 			}
-		}
+		},
+		"google_calendar_empty": "No upcoming events"
 	},
 	"secrets": {
 		"title": "Board credentials",
@@ -559,5 +561,9 @@
 		"updated": "Updated {time}",
 		"stale": "Could not update",
 		"stale_detail": "Showing the last data ({time}). {reason}"
+	},
+	"legal": {
+		"home": "Home",
+		"privacy_policy": "Privacy Policy"
 	}
 }
