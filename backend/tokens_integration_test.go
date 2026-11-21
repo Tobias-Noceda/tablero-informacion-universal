@@ -113,8 +113,8 @@ func TestEndToEnd_AccessTokenReachesOnlyTheAllowlist(t *testing.T) {
 	params := strings.NewReplacer(":id", uuid.NewString(), ":strand", uuid.NewString(), ":user", "u", ":name", "KEY", ":token", uuid.NewString())
 
 	for _, route := range s.app.router.Routes() {
-		// The webhook is public, so a token is no different from anyone.
-		if strings.HasPrefix(route.Path, "/api/v1/auth/") || publicBilling[route.Path] {
+		// Public routes treat a token like anyone else.
+		if strings.HasPrefix(route.Path, "/api/v1/auth/") || publicRoutes[route.Path] {
 			continue
 		}
 		w := s.request(token, route.Method, params.Replace(route.Path), nil)

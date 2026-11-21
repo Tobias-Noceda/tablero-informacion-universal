@@ -29,6 +29,9 @@ const (
 	ENV_MP_ACCESS_TOKEN      = "MP_ACCESS_TOKEN"
 	ENV_MP_WEBHOOK_SECRET    = "MP_WEBHOOK_SECRET"
 	ENV_BILLING_USD_ARS      = "BILLING_USD_ARS"
+	// Set by Vercel on every deployment; the health route reports it.
+	ENV_VERCEL_COMMIT = "VERCEL_GIT_COMMIT_SHA"
+	SHORT_COMMIT      = 7
 
 	DEFAULT_ACCESS_TTL  = 15 * time.Minute
 	DEFAULT_REFRESH_TTL = 30 * 24 * time.Hour
@@ -53,6 +56,10 @@ type config struct {
 	billingUSDARS   float64
 	// gateway replaces Mercado Pago when set; only tests do.
 	gateway infrastructure.PaymentGateway
+
+	// version is the deployed commit, empty where the platform does not
+	// say (Docker).
+	version string
 }
 
 func loadConfig() (config, error) {
@@ -71,6 +78,8 @@ func loadConfig() (config, error) {
 
 		mpAccessToken:   strings.TrimSpace(os.Getenv(ENV_MP_ACCESS_TOKEN)),
 		mpWebhookSecret: strings.TrimSpace(os.Getenv(ENV_MP_WEBHOOK_SECRET)),
+
+		version: shortCommit(os.Getenv(ENV_VERCEL_COMMIT)),
 	}
 
 	if raw := strings.TrimSpace(os.Getenv(ENV_BILLING_USD_ARS)); raw != "" {
@@ -117,6 +126,14 @@ func loadConfig() (config, error) {
 	}
 
 	return cfg, nil
+}
+
+func shortCommit(sha string) string {
+	sha = strings.TrimSpace(sha)
+	if len(sha) > SHORT_COMMIT {
+		return sha[:SHORT_COMMIT]
+	}
+	return sha
 }
 
 // identityProvider is Google sign-in, or nil when no client is configured.
