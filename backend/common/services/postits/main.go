@@ -1,6 +1,9 @@
 package postits
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -11,6 +14,7 @@ import (
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/google/uuid"
+	"golang.org/x/sync/singleflight"
 )
 
 var (
@@ -53,6 +57,9 @@ type PostItsService struct {
 	// result is cached at least, whether a refresh may skip the cache.
 	plans   infrastructure.Entitlements
 	limiter infrastructure.RateLimiter
+	// Runs of a card that missed the cache, shared by whoever asks for the
+	// same card while one is under way.
+	flights singleflight.Group
 }
 
 // PostitTemplates answers which user-defined card type a new card on a
@@ -65,7 +72,17 @@ type PostitTemplates interface {
 }
 
 func New(db infrastructure.Database, cache infrastructure.Cache, run infrastructure.Executer, secrets infrastructure.SecretResolver, access infrastructure.Access, wellKnowns infrastructure.WellKnownReader, templates PostitTemplates, plans infrastructure.Entitlements, limiter infrastructure.RateLimiter) *PostItsService {
-	return &PostItsService{db, cache, run, secrets, access, wellKnowns, templates, plans, limiter}
+	return &PostItsService{
+		db:         db,
+		cache:      cache,
+		exec:       run,
+		secrets:    secrets,
+		access:     access,
+		wellKnowns: wellKnowns,
+		templates:  templates,
+		plans:      plans,
+		limiter:    limiter,
+	}
 }
 
 func (srv *PostItsService) CreatePostIt(principal models.Principal, title *models.BoardPostItTitle, postIt *models.PostIts) (*models.PostIts, error) {
@@ -478,14 +495,35 @@ func (srv *PostItsService) limits(postit *models.PostIts) (models.Entitlement, e
 }
 
 // ExecutePostIt answers the cached result while there is one, and runs the
-// card otherwise. Only a miss looks up the board's plan.
+// card otherwise. Only a miss looks up the board's plan. Requests that miss
+// while the same card is already running wait for that run instead of
+// asking its API again; a failed run is shared but not kept. The sharing is
+// per process: separate instances can still each run the card once.
 func (srv *PostItsService) ExecutePostIt(postit *models.PostIts) (any, error) {
 	cached, err := srv.cache.FindPostItResult(postit.Id)
 	if err == nil {
 		return cached, nil
 	}
 
-	return srv.execute(postit)
+	key, ok := flightKey(postit)
+	if !ok {
+		return srv.execute(postit)
+	}
+	data, err, _ := srv.flights.Do(key, func() (any, error) {
+		return srv.execute(postit)
+	})
+	return data, err
+}
+
+// flightKey is the card as it is set up now: a request that loaded it after
+// an edit does not join a run of the settings it no longer has.
+func flightKey(postit *models.PostIts) (string, bool) {
+	settings, err := json.Marshal(postit)
+	if err != nil {
+		return "", false
+	}
+	sum := sha256.Sum256(settings)
+	return postit.Id.String() + ":" + hex.EncodeToString(sum[:]), true
 }
 
 // RefreshPostIt runs the card without looking at the cache, and caches
