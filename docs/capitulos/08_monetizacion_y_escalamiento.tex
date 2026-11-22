@@ -1,0 +1,274 @@
+% !TEX root = ../main.tex
+\chapter{Monetización y Escalamiento de Recursos}
+\label{chap:monetizacion}
+
+Este capítulo analiza la sostenibilidad económica del sistema: los planes y sus precios, el costo de la infraestructura en cada hito de crecimiento, el punto en el que conviene migrar el despliegue a AWS y la cobertura de esos costos con los ingresos de los planes pagos. Las tarifas se consultaron en las páginas oficiales de cada proveedor el 13 de noviembre de 2026, y todos los importes están expresados en dólares estadounidenses por mes, sin impuestos.
+
+Se proponen tres planes: Free, Pro a USD 9 mensuales y Max a USD 29 mensuales, cobrados en pesos por Mercado Pago. Con una conversión a pago del 3~\% de los usuarios, el ingreso neto supera al costo de infraestructura en todos los hitos analizados: la infraestructura representa el 13~\% del ingreso neto con 1.000 usuarios y menos del 3~\% con 5 millones. La arquitectura actual (Vercel, MongoDB Atlas, Redis Cloud y Resend) es la opción más económica hasta unos 500.000 usuarios, y la migración del cómputo a AWS se justifica a partir de 1.000.000 de usuarios, que equivalen a 100.000 concurrentes. MongoDB Atlas se conserva en todos los hitos.
+
+\section{Modelo de negocio y definición de planes}
+El plan pertenece al usuario. Los límites de un tablero dependen de quien lo paga: su dueño si es personal o el dueño de la organización si pertenece a una. Un usuario del plan Free puede participar sin costo en tableros y organizaciones de otros usuarios. La Tabla~\ref{tab:planes_limites} resume los límites de cada plan, que el backend aplica desde una única tabla en el código (Sección~\ref{sec:planes_facturacion}).
+
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabularx}{\textwidth}{X l l l}
+    \toprule
+    Límite & Free & Pro & Max \\
+    \midrule
+    Organizaciones propias & Ninguna & 3 & 10 \\
+    Tableros por espacio & 5 & 10 & 50 \\
+    Personas por tablero u organización & 5, solo lectura & 5 & 25 \\
+    Nodos por tablero & 25 & 100 & 300 \\
+    Plantillas de usuario & 5 & 10 & 50 \\
+    Plantillas por tablero & Ninguna & 5 & 50 \\
+    Plantillas por organización & Ninguna & 3 & 50 \\
+    Credenciales almacenadas & 5 & 25 & 200 \\
+    Grupos de credenciales & Ninguno & 5 & 25 \\
+    Intervalo mínimo de actualización & 10 min & 2,5 min & 1 min \\
+    Actualización manual sin caché & No & No & Sí \\
+    MCP y tokens de acceso & No & Sí & Sí \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Límites de cada plan}
+  \label{tab:planes_limites}
+\end{table}
+
+Los criterios de diseño de los planes fueron los siguientes:
+
+\begin{itemize}
+  \item \textbf{Intervalo mínimo.} Es el tiempo más corto entre dos actualizaciones de los datos de una tarjeta. Una tarjeta configurada para actualizarse más seguido se actualiza recién al cumplirse ese mínimo: en Free, como mucho una vez cada 10 minutos. Es el principal generador de costo y protege a las fuentes externas de un exceso de consultas. Se aplica como piso del tiempo de caché.
+  \item \textbf{Colaboración.} Es la diferencia principal entre Free y Pro. En Free el dueño puede compartir cada tablero con hasta 4 personas más, que solo pueden verlo. En Pro el total de personas con acceso a un tablero, contando a los miembros de la organización y a los invitados externos, no supera 5, y cualquiera de ellas puede ser editora. Un lector no ejecuta tarjetas nuevas, por lo que compartir en Free agrega lecturas de resultados ya guardados y no consultas a fuentes externas.
+  \item \textbf{Actualización manual.} Queda reservada a Max. La aplicación no guarda en caché las ejecuciones fallidas, por lo que una consulta común ya reintenta.
+  \item \textbf{Tokens de acceso.} Un token no está vinculado a un dispositivo. Por ese motivo no se diferencia su cantidad entre Pro y Max y ambos conservan el tope técnico de 10 tokens activos.
+  \item \textbf{Topes de Max.} Son altos en lugar de ilimitados para acotar el costo máximo de una cuenta.
+  \item \textbf{Excedentes.} Un usuario que queda por encima de un límite conserva lo que ya creó. Solo se impide crear recursos nuevos.
+  \item \textbf{Interfaz.} Las funciones que el plan no permite no se muestran.
+\end{itemize}
+
+Los precios de cada plan se presentan en la Tabla~\ref{tab:planes_precios}. El importe en pesos surge del tipo de cambio oficial vendedor de ARS 1.570 \cite{bna_cotizaciones}.
+
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabular}{l l l}
+    \toprule
+    Plan & Precio mensual & Importe en pesos \\
+    \midrule
+    Free & USD 0 & ARS 0 \\
+    Pro & USD 9 & ARS 14.100 \\
+    Max & USD 29 & ARS 45.500 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Precio de cada plan}
+  \label{tab:planes_precios}
+\end{table}
+
+\section{Uso de los servicios y supuestos de consumo}
+
+\subsection{Uso verificado en el código}
+\begin{itemize}
+  \item \textbf{Vercel:} Aloja cuatro servicios bajo un mismo origen: la aplicación web, la API en Go, el servicio de tiempo real en Node y el servidor MCP. Cada solicitud a la API es una invocación de función. Cada pestaña abierta mantiene un WebSocket con el servicio de tiempo real.
+  \item \textbf{MongoDB Atlas:} Base principal. Requiere un conjunto de réplicas porque el servicio de tiempo real escucha los cambios de la colección de tableros. Cada consulta de una tarjeta realiza dos lecturas (la tarjeta y su tablero) aunque el resultado esté en caché.
+  \item \textbf{Redis Cloud:} Guarda el resultado de cada tarjeta durante su intervalo de actualización, las sesiones, los límites de tasa y la presencia en línea. Cada consulta de una tarjeta realiza una lectura.
+  \item \textbf{Resend:} Envía tres correos: verificación de cuenta, aviso de cuenta existente y restablecimiento de contraseña.
+\end{itemize}
+
+\subsection{Supuestos}
+\begin{enumerate}
+  \item El pico de usuarios concurrentes es el 10~\% de los usuarios totales. El objetivo de 500.000 concurrentes equivale a 5.000.000 de usuarios.
+  \item La concurrencia promedio del mes es el 30~\% del pico.
+  \item Un usuario concurrente mantiene abierto un tablero con 10 tarjetas que consultan una fuente externa. La aplicación consulta cada tarjeta con un intervalo medio de 300 segundos. El plan Free fija un mínimo de 600 segundos, por lo que las cifras de costo de este capítulo son un límite superior: el tráfico de los usuarios gratuitos es la mitad del supuesto.
+  \item De lo anterior resultan 0,038 solicitudes por segundo por usuario concurrente, incluida la carga del tablero y la reconexión del WebSocket, y 3.200 solicitudes mensuales por usuario total. La red de distribución suma 800 solicitudes de archivos estáticos por usuario.
+  \item Cada solicitud consume 5 milisegundos de CPU y transfiere 1,5 KB.
+  \item Los correos mensuales equivalen al 15~\% de los usuarios totales.
+  \item Todas las regiones son de Estados Unidos (Vercel iad1, AWS us-east-1, Atlas y Redis Cloud en us-east-1). No se busca cercanía geográfica. São Paulo se descarta porque encarece el cómputo un 72~\% y la salida de datos un 67~\% \cite{vercel_regional_pricing}.
+\end{enumerate}
+
+\section{Costo por hito de crecimiento}
+Las tarifas de Vercel aplicadas son USD 20 de plan Pro con USD 20 de crédito, USD 0,60 por millón de invocaciones, USD 0,128 por hora de CPU activa, USD 0,0106 por GB hora de memoria, USD 0,06 por GB de transferencia de origen y USD 2 por millón de solicitudes de red por encima del nivel plano contratado \cite{vercel_pricing, vercel_functions_pricing}. La Tabla~\ref{tab:costo_hitos} presenta el costo mensual resultante en cada hito, con el importe de cada proveedor en dólares.
+
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabularx}{\textwidth}{l X r}
+    \toprule
+    Usuarios (pico concurrente) & Infraestructura & Costo mensual \\
+    \midrule
+    1.000 (100) & \makecell[l]{Vercel: 34 \\ Atlas Flex: 8 \\ Redis 250MB: 5 \\ Resend: gratuito} & 47 \\
+    \rowcolor{gray!18}
+    10.000 (1.000) & \makecell[l]{Vercel: 160 \\ Atlas M10: 57 \\ Redis 1GB: 18 \\ Resend: Pro 20} & 255 \\
+    100.000 (10.000) & \makecell[l]{Vercel: 1.150 \\ Atlas M30: 394 \\ Redis 2,5GB: 52 \\ Resend: Pro 20} & 1.620 \\
+    \rowcolor{gray!18}
+    500.000 (50.000) & \makecell[l]{Vercel: 5.700 \\ Atlas M50: 1.460 \\ Redis 5GB: 100 \\ Resend Pro: 35} & 7.300 \\
+    1.000.000 (100.000) & \makecell[l]{AWS: 1.700 \\ Atlas M60: 2.884 \\ Redis 5GB: 100 \\ SES: 15} & 4.700 \\
+    \rowcolor{gray!18}
+    5.000.000 (500.000) & \makecell[l]{AWS: 7.800 \\ Atlas fragmentado: 8.650 \\ ElastiCache: 770 \\ SES: 75} & 17.300 \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Costo mensual de infraestructura por hito de crecimiento, en USD}
+  \label{tab:costo_hitos}
+\end{table}
+
+A partir de 1.000.000 de usuarios se suma el costo de operar infraestructura propia, tratado en la Sección~\ref{sec:migracion_aws}.
+
+\subsection{Saltos de costo por proveedor}
+
+\textbf{Vercel} \cite{vercel_pricing, vercel_limits}.
+\begin{itemize}
+  \item El plan Hobby solo admite uso no comercial. Desde el primer cobro se requiere el plan Pro.
+  \item Las solicitudes de red son el componente dominante. El nivel plano más alto cubre 150 millones de solicitudes por USD 300. Ese volumen se alcanza cerca de 40.000 usuarios. Por encima se factura por uso y llega al 70~\% de la factura de Vercel.
+  \item Cada instancia admite 1.024 descriptores de archivo, lo que limita a unos 800 los WebSockets por instancia. Las conexiones se cierran al cumplirse la duración máxima de la función y el cliente debe reconectar. Con 500.000 concurrentes se necesitan más de 600 instancias permanentes.
+  \item El plan Pro admite 30.000 ejecuciones concurrentes. Por encima se requiere el plan Enterprise.
+\end{itemize}
+
+\textbf{MongoDB Atlas} \cite{atlas_pricing, atlas_limits}.
+\begin{itemize}
+  \item El nivel gratuito M0 admite 100 operaciones por segundo y no ofrece respaldos. No es apto para producción.
+  \item Flex cuesta entre USD 8 y 30, y admite hasta 500 operaciones por segundo, suficiente capacidad hasta unos 50.000 usuarios.
+  \item Los niveles dedicados comienzan en M10 (USD 57). Se adopta desde 10.000 usuarios por sus respaldos y recursos propios. La fragmentación exige M30 como mínimo.
+  \item Con 5.000.000 de usuarios el pico estimado es de 42.000 operaciones por segundo. Cachear en Redis el tablero y la tarjeta elimina las dos lecturas por consulta y permite permanecer en un nivel M60 sin fragmentar.
+\end{itemize}
+
+\textbf{Redis Cloud} \cite{redis_pricing}.
+\begin{itemize}
+  \item El nivel gratuito admite 30 conexiones. Cada instancia de función abre su propia conexión, por lo que resulta insuficiente desde el inicio.
+  \item Los planes Essentials llegan a 12 GB y 16.000 operaciones por segundo (USD 234). Por encima corresponde el plan Pro, con un mínimo de USD 200 y tarifas de red no publicadas.
+\end{itemize}
+
+\textbf{Resend} \cite{resend_pricing}.
+\begin{itemize}
+  \item El nivel gratuito admite 3.000 correos mensuales con un tope de 100 diarios. Se adopta el plan Pro desde 10.000 usuarios porque un pico de registros supera el tope diario.
+  \item El plan de 1.000.000 de correos cuesta USD 650. El mismo volumen en Amazon SES cuesta USD 100 \cite{aws_ses_pricing}.
+\end{itemize}
+
+\section{Alternativa en AWS y criterio de migración}
+\label{sec:migracion_aws}
+
+\subsection{Arquitectura equivalente}
+El proyecto ya dispone de una topología en contenedores con un enrutador nginx por prefijo de ruta (Figura~\ref{fig:arq_docker}). En AWS esa topología se ejecuta sobre ECS Fargate con procesadores ARM detrás de un Application Load Balancer.
+
+Las tarifas aplicadas son USD 28,8 por tarea de 1 vCPU y 2 GB, USD 16,4 por balanceador más USD 0,008 por unidad de capacidad y hora, USD 32,9 por NAT Gateway y USD 0,09 por GB de salida de datos \cite{aws_fargate_pricing, aws_elb_pricing, aws_vpc_pricing}. La Tabla~\ref{tab:costo_aws} detalla el costo de cómputo y red resultante.
+
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \begin{tabularx}{\textwidth}{X r r}
+    \toprule
+    Componente & 1.000.000 de usuarios & 5.000.000 de usuarios \\
+    \midrule
+    API, tiempo real y enrutador en Fargate & 580 & 2.700 \\
+    Balanceador y NAT Gateway & 280 & 1.070 \\
+    Salida de datos y registros & 870 & 4.050 \\
+    \midrule
+    Total de cómputo y red & 1.700 & 7.800 \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Costo mensual de cómputo y red en AWS, en USD}
+  \label{tab:costo_aws}
+\end{table}
+
+Se supone una capacidad de 10.000 WebSockets por tarea de tiempo real y de 500 solicitudes por segundo por tarea de API. Ambos valores son conservadores y deben validarse con una prueba de carga.
+
+\subsection{Servicios que se reemplazan y servicios que se conservan}
+\begin{itemize}
+  \item \textbf{Cómputo.} Se reemplaza Vercel por Fargate. Es el único cambio con ahorro significativo.
+  \item \textbf{Base de datos.} Se conserva MongoDB Atlas, que también opera sobre AWS. Amazon DocumentDB se descarta porque sus flujos de cambios están desactivados por defecto, retienen los eventos 3 horas y admiten solo parte de las operaciones que utiliza el servicio de tiempo real \cite{documentdb_change_streams}.
+  \item \textbf{Caché.} Se conserva Redis Cloud hasta superar las 16.000 operaciones por segundo. Luego se adopta ElastiCache con Valkey (USD 128 por nodo r7g.large) \cite{aws_elasticache_pricing}.
+  \item \textbf{Correo.} El ahorro de SES es de USD 145 mensuales con 1.000.000 de usuarios y de USD 575 con 5.000.000. No justifica un cambio aislado. Se realiza junto con la migración del cómputo y requiere reemplazar un único componente de envío.
+\end{itemize}
+
+\subsection{Criterio}
+La migración tiene dos costos. El primero es puntual: entre 4 y 6 semanas de ingeniería, estimadas en USD 20.000, para reconstruir el despliegue, los entornos de prueba, los registros y la supervisión que Vercel incluye. El segundo es permanente: la operación de la infraestructura, estimada en USD 4.000 mensuales. La migración se justifica cuando el ahorro mensual, descontada la operación, recupera el costo puntual en menos de 6 meses, como se compara en la Tabla~\ref{tab:criterio_migracion}.
+
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \small
+  \begin{tabular}{l r r r}
+    \toprule
+    Usuarios & Costo en Vercel & Costo en AWS con operación & Ahorro mensual neto \\
+    \midrule
+    500.000 & 7.300 & 6.800 & 500 \\
+    1.000.000 & 14.500 & 8.700 & 5.800 \\
+    5.000.000 & 67.000 & 21.300 & 45.700 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Costo mensual en Vercel y en AWS, en USD}
+  \label{tab:criterio_migracion}
+\end{table}
+
+Con 500.000 usuarios el ahorro no cubre la migración en un plazo razonable. Con 1.000.000 se recupera en menos de 4 meses. Por lo tanto la migración se planifica al superar los 500.000 usuarios y se ejecuta antes de 1.000.000. Antes de ese punto corresponde reducir el consumo dentro de Vercel: guardar en Redis las lecturas repetidas y negociar un plan Enterprise si el nivel plano de red resulta insuficiente.
+
+\section{Precios y cobertura de los costos}
+
+\subsection{Referencia de mercado}
+Pro se ubica en la banda de entrada de las herramientas de colaboración con precio por usuario (Miro USD 8 \cite{miro_pricing}, Notion USD 10 \cite{notion_pricing}, Retool USD 10 \cite{retool_pricing}) y por debajo de los tableros de datos de precio fijo (Cyfe USD 29 \cite{cyfe_pricing}, Geckoboard USD 79 \cite{geckoboard_pricing}). Max equivale a 3,2 veces Pro, dentro de la relación habitual entre el plan de entrada y el superior, y actúa como referencia que hace más atractivo a Pro.
+
+\subsection{Supuestos de ingresos}
+\begin{itemize}
+  \item El 3~\% de los usuarios paga. La referencia publicada para productos con plan gratuito y contratación sin vendedor es de 3 a 5~\% \cite{lenny_conversion, chartmogul_conversion}.
+  \item De quienes pagan, el 80~\% elige Pro y el 20~\% Max. No existe un estudio primario sobre esta distribución y se declara como supuesto.
+  \item Mercado Pago retiene 4,49~\% más IVA con acreditación a 10 días, un 5,43~\% efectivo, y 1,49~\% más IVA con acreditación a 35 días, un 1,80~\% efectivo \cite{mercadopago_costos}.
+\end{itemize}
+
+\subsection{Cobertura del costo en cada hito}
+Con 1.000 usuarios el pico es de 100 concurrentes. El 3~\% son 30 pagadores: 24 en Pro y 6 en Max. El ingreso bruto es $24 \times 9 + 6 \times 29 = $ USD 390. Descontada la comisión de Mercado Pago con acreditación a 10 días quedan USD 369. El costo de infraestructura es de USD 47. El ingreso cubre el costo 7,8 veces.
+
+El equilibrio se alcanza con 4 pagadores, 3 en Pro y 1 en Max, que aportan USD 53 netos. Equivale a una conversión del 0,4~\%. Con una conversión pesimista del 1~\%, 8 pagadores en Pro y 2 en Max aportan USD 123 netos y también cubren el costo.
+
+La misma cuenta se repite en los demás hitos en la Tabla~\ref{tab:cobertura_hitos}, que incluye además el ingreso neto con la acreditación a 35 días recomendada en la Sección~\ref{sec:cobro_mp}. Los dos últimos hitos incluyen el costo de operación de AWS.
+
+\begin{table}[H]
+  \centering
+  \renewcommand{\arraystretch}{1.2}
+  \small
+  \begin{tabular}{l l r r r r r}
+    \toprule
+    Usuarios & Pro & Max & Ingreso neto & Costo / ingreso \\
+    \midrule
+    1.000 & 24 & 6 & 369 & 12,7~\% \\
+    10.000 & 240 & 60 & 3.690 & 6,9~\% \\
+    100.000 & 2.400 & 600 & 36.900 & 4,4~\% \\
+    500.000 & 12.000 & 3.000 & 184.400 & 4,0~\% \\
+    1.000.000 & 24.000 & 6.000 & 368.800 & 2,4~\% \\
+    5.000.000 & 120.000 & 30.000 & 1.844.000 & 1,2~\% \\
+    \bottomrule
+  \end{tabular}
+  \caption{Pagadores, ingreso neto y costo mensual por hito, en USD}
+  \label{tab:cobertura_hitos}
+\end{table}
+
+\subsection{Justificación del precio de cada plan}
+\textbf{Free.} Con el mínimo de 10 minutos, un usuario gratuito típico genera 1.600 solicitudes mensuales y cuesta entre USD 0,002 y 0,025 por mes según el hito. Con el tablero al límite (25 nodos, 600 segundos) y 8 horas diarias de uso cuesta USD 0,07. Cada pagador sostiene a 32 usuarios gratuitos, con un costo conjunto inferior a USD 0,80.
+
+\textbf{Pro.} El peor caso es un tablero con 100 nodos, todos con fuente externa, abierto 8 horas por día hábil con el intervalo mínimo de 150 segundos. Genera 352.000 solicitudes mensuales, con un costo de USD 1,02 a la tarifa marginal de Vercel de USD 2,90 por millón de solicitudes. Sumados los usuarios gratuitos que sostiene, el costo máximo atribuible es de USD 1,82, frente a un ingreso neto de USD 8,51. El precio de USD 9 mantiene un margen superior al 78~\% aun en el peor caso y permite un valor competitivo, acorde con el objetivo de concentrar en Pro a la mayoría de los pagadores.
+
+\textbf{Max.} El peor caso es un tablero con 300 nodos con el intervalo mínimo de 60 segundos. Genera 2.100.000 solicitudes mensuales, con un costo de USD 6,10. Con los usuarios gratuitos asociados el costo máximo es de USD 6,90, frente a un ingreso neto de USD 27,43. Un precio inferior a USD 20 dejaría un margen insuficiente frente al uso intensivo que el plan habilita.
+
+\section{Cobro con Mercado Pago}
+\label{sec:cobro_mp}
+La implementación del cobro se describe en la Sección~\ref{sec:planes_facturacion}. Desde el punto de vista comercial, sus características son las siguientes \cite{mercadopago_docs, mercadopago_costos}:
+
+\begin{itemize}
+  \item \textbf{Integración.} Se utiliza el producto Suscripciones sin plan asociado. La aplicación crea la suscripción en estado pendiente y redirige al usuario al sitio de Mercado Pago. No se almacenan ni procesan datos de tarjetas.
+  \item \textbf{Confirmación.} Mercado Pago notifica cada cambio mediante un webhook firmado. La aplicación valida la firma, consulta el estado real de la suscripción y actualiza el plan del usuario.
+  \item \textbf{Reintentos.} Ante un cobro rechazado Mercado Pago realiza hasta 4 reintentos en 10 días. Tras 3 cuotas rechazadas cancela la suscripción.
+  \item \textbf{Cambios de plan.} No existe prorrateo. El aumento de plan rige de inmediato y la reducción al cierre del período.
+  \item \textbf{Moneda.} Las cuentas argentinas cobran en pesos. El precio se define en dólares y el importe en pesos se actualiza con una modificación del monto de cada suscripción.
+  \item \textbf{Comisiones.} 6,99~\% con acreditación inmediata, 4,49~\% a 10 días, 3,39~\% a 18 días y 1,49~\% a 35 días, más IVA. Se recomienda la acreditación a 35 días, con un costo efectivo del 1,80~\%. En un ingreso recurrente la demora solo afecta al primer mes. Con esa opción el ingreso neto de cada hito aumenta un 3,8~\%.
+  \item \textbf{Alternativas.} Mercado Pago no tiene costo fijo. No se identificó una alternativa a la vez más económica y de integración igual o más simple. Los intermediarios que actúan como vendedor registrado cobran cerca del 5~\% más USD 0,50 por operación. El débito directo en cuenta bancaria exige un convenio con el banco. El cobro queda aislado detrás de una interfaz, de modo que un cambio de proveedor afecta a un solo componente.
+  \item \textbf{Impuestos.} Cada cobro requiere factura electrónica. Las retenciones de Ingresos Brutos dependen de la jurisdicción y de la condición fiscal y no están incluidas en las cifras.
+\end{itemize}
+
+\section{Datos no verificados y trabajo futuro}
+Las siguientes cifras no pudieron verificarse con fuentes primarias y quedan sujetas a validación, en particular mediante pruebas de carga sobre MongoDB Atlas dedicado y sobre la concurrencia de WebSockets en Fargate:
+
+\begin{itemize}
+  \item MongoDB no publica las operaciones por segundo de cada nivel dedicado. Los niveles indicados son estimaciones y requieren una prueba de carga.
+  \item El costo de la migración a AWS proviene de fuentes con interés comercial. No se halló un caso independiente.
+  \item La distribución de pagadores entre Pro y Max es un supuesto.
+  \item Mercado Pago no documenta el monto mínimo de una suscripción ni el cobro en dólares para cuentas argentinas.
+  \item Las tarifas de red del plan Pro de Redis Cloud no están publicadas.
+  \item El nivel plano de red de Vercel declara que el tráfico excedente no se factura dentro de un uso razonable. Las cifras suponen el caso desfavorable de facturación por uso.
+\end{itemize}
