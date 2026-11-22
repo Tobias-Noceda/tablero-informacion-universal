@@ -51,8 +51,14 @@ func (r Request) definition() models.PostitTemplate {
 
 type scoping func(c *gin.Context) (models.PostitTemplateScope, bool)
 
+// userScope: "me" names the caller, for a client that does not know its own
+// id (the MCP server only holds an access token).
 func userScope(c *gin.Context) (models.PostitTemplateScope, bool) {
-	return models.PostitTemplateScope{Kind: models.TemplateScopeUser, Owner: c.Param("id")}, true
+	owner := c.Param("id")
+	if owner == "me" {
+		owner = middleware.Principal(c).ID
+	}
+	return models.PostitTemplateScope{Kind: models.TemplateScopeUser, Owner: owner}, true
 }
 
 func boardScope(c *gin.Context) (models.PostitTemplateScope, bool) {

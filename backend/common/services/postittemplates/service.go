@@ -244,9 +244,11 @@ func (srv *Service) find(key string) (*models.PostitTemplate, error) {
 
 // allowed: a user's own scope is theirs alone; a board's is seen by anyone
 // on it and managed by its editors; an organization's is seen by its
-// members and managed by its admins. Access tokens only read.
+// members and managed by its admins. An access token manages a user's and a
+// board's (an agent sets card types up for its person, who then only picks a
+// credential), never an organization's: tokens stay out of organizations.
 func (srv *Service) allowed(principal models.Principal, scope models.PostitTemplateScope, manage bool) bool {
-	if principal.Anonymous() || (manage && principal.Token) {
+	if principal.Anonymous() || (manage && principal.Token && scope.Kind == models.TemplateScopeOrg) {
 		return false
 	}
 
