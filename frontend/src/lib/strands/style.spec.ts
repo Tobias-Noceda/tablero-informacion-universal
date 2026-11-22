@@ -76,6 +76,8 @@ describe('drawing', () => {
 describe('normalizeLabel', () => {
 	it('trims and keeps one line', () => {
 		expect(normalizeLabel('  depends\non  ')).toBe('depends on');
+		// The backend refuses Unicode's line and paragraph separators too.
+		expect(normalizeLabel(`depends${String.fromCharCode(0x2028)}on${String.fromCharCode(0x2029)}it`)).toBe('depends on it');
 	});
 
 	it('counts characters, not code units', () => {
