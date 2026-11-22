@@ -23,7 +23,7 @@ func (r recordedTokens) CreateAccessToken(token *models.AccessToken) error {
 	return r.MemoryAccessTokenStore.CreateAccessToken(token)
 }
 
-// CONC-04: the active tokens are counted and the new one stored in the
+// The active tokens are counted and the new one stored in the
 // user's turn, so parallel requests cannot pass MAX_TOKENS.
 func TestCreate_CountsAndStoresInTheUsersTurn(t *testing.T) {
 	var s mocks.Steps

@@ -1,4 +1,4 @@
-// U9: the hint for the first strand. Drawing one (dragging from a card's
+// The hint for the first strand. Drawing one (dragging from a card's
 // edge onto another) is the gesture people did not find; the hint shows on a
 // board someone may edit, with two cards or more and no strand yet, until
 // they draw one or dismiss it, once per browser and user.

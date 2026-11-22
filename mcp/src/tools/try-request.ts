@@ -10,7 +10,6 @@ const fields = z
     .record(z.string().trim().min(1), z.string())
     .refine((map) => Object.keys(map).length <= 20, "At most 20 entries");
 
-// Define the schema for tool parameters
 export const schema = {
     board_id: z
         .uuid()
@@ -40,7 +39,6 @@ export const schema = {
         ),
 };
 
-// Define tool metadata
 export const metadata: ToolMetadata = {
     name: "try_request",
     description:
@@ -54,7 +52,6 @@ export const metadata: ToolMetadata = {
     },
 };
 
-// Tool implementation
 export default async function ({
     board_id,
     url,

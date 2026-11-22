@@ -1,4 +1,4 @@
-// Picking what a card shows from a response tried with "Try" (U2): a click on
+// Picking what a card shows from a response tried with "Try": a click on
 // a value of the tree becomes an output, its jq query and a name.
 
 /** Where a value sits in the response: object keys and array indices. */

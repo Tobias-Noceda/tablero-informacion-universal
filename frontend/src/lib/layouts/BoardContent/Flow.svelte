@@ -328,7 +328,7 @@
 		}
 	};
 
-	// U7: the copy is added at once; the board's live update brings the same card.
+	// The copy is added at once; the board's live update brings the same card.
 	const duplicateCard = async (id: string) => {
 		if (!canEdit) return;
 		try {
@@ -358,7 +358,7 @@
 		duplicate: duplicateCard
 	});
 
-	// U9: how to draw the first strand, until one is drawn or it is dismissed.
+	// How to draw the first strand, until one is drawn or it is dismissed.
 	let strandHintDone = $state(strandHintSeen(session.userId));
 	const strandHint = $derived(
 		showStrandHint({ canEdit, cards: nodes.length, strands: edges.length, seen: strandHintDone })

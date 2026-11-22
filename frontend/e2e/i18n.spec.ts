@@ -3,9 +3,7 @@ import { expect, test } from '@playwright/test';
 import es from '../messages/es.json' with { type: 'json' };
 import { t } from './support/stack';
 
-// E2E-09 (RNF-08): a first visit is in English; the switcher turns the
-// sign-in page into Spanish, and its links lead to the Spanish public
-// pages (/acerca, /privacidad).
+// A first visit is in English.
 test('switches the language from the sign-in page', async ({ page }) => {
 	await page.goto('/login');
 	await expect(page.getByRole('button', { name: t('auth.login') }).first()).toBeVisible();

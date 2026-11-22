@@ -1,4 +1,4 @@
-// U6: finding a card type in the cards sidebar as the catalogue grows.
+// Finding a card type in the cards sidebar as the catalogue grows.
 
 import type { WellKnown } from '$types/api';
 

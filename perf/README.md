@@ -1,13 +1,13 @@
 # Measurements
 
-Scripts that measure the running app for RNF-01 and chapter 8 of the report. Each run writes a JSON file to `results/` (git-ignored) with what the report needs to say where a number comes from: the time, the commit, the machine and the settings. The plan behind them is in `.claude/docs/plan-informe-final.md` (§3.2 bis): each measurement at least 3 times, reporting p50, p95 and p99 and how much the runs differ.
+Scripts that measure the running app: how fast changes and cards answer, and what one deployment holds. Each run writes a JSON file to `results/` (git-ignored) with what the report needs to say where a number comes from: the time, the commit, the machine and the settings. The plan behind them is in `.claude/docs/plan-informe-final.md` (§3.2 bis): each measurement at least 3 times, reporting p50, p95 and p99 and how much the runs differ.
 
 | Script | Measures | Criterion |
 |---|---|---|
-| `latency.mjs` | RNF-01a: an edit reaching the other members (N sockets on one board, a move per second) and two simultaneous moves of the same card | p95 < 1 s with up to 50 clients (local), < 2 s with 5 (production) |
-| `k6/cards.js` | RNF-01b: a card's answer with the cache cold and warm, and that warm reads never reach the source | warm p95 < 50 ms, cold p95 < source delay + 300 ms |
-| `k6/load.js` | RNF-01c: the API under 10 → 50 → 100 → 200 users opening a board and running its cards | where p95 takes off (validates the 500 req/s of chapter 8) |
-| `capacity.mjs` | Board sockets one realtime task holds (chapter 8 assumes 10,000) | how many open before one is refused |
+| `latency.mjs` | An edit reaching the other members (N sockets on one board, a move per second) and two simultaneous moves of the same card | p95 < 1 s with up to 50 clients (local), < 2 s with 5 (production) |
+| `k6/cards.js` | A card's answer with the cache cold and warm, and that warm reads never reach the source | warm p95 < 50 ms, cold p95 < source delay + 300 ms |
+| `k6/load.js` | The API under 10 → 50 → 100 → 200 users opening a board and running its cards | where p95 takes off (the assumption to check: 500 req/s per task) |
+| `capacity.mjs` | Board sockets one realtime task holds (assumed: 10,000) | how many open before one is refused |
 
 ## Local Docker
 

@@ -33,7 +33,7 @@ func (r recordedOrgs) SetOrgMember(id uuid.UUID, user string, role models.OrgRol
 	return r.MemoryOrgStore.SetOrgMember(id, user, role)
 }
 
-// CONC-04: an organization, or a seat in one, is taken in its turn, on the
+// An organization, or a seat in one, is taken in its turn, on the
 // organization as it is then.
 func TestOrgs_CountAndWriteInTheirTurn(t *testing.T) {
 	var s mocks.Steps

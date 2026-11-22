@@ -22,7 +22,7 @@
 	// At the plan's card limit there is nothing to drop, only a line saying so.
 	const canAdd = $derived(canAddNode(boardPlan.limits, boardPlan.nodes));
 
-	// U6: what was typed in the search box narrows the card types listed.
+	// What was typed in the search box narrows the card types listed.
 	let search = $state('');
 	const shown = $derived(wellKnowns.pickable.filter((wk) => matchesCard(wk, search)));
 

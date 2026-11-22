@@ -15,7 +15,6 @@ const fields = z
     .record(z.string().trim().min(1), z.string())
     .refine((map) => Object.keys(map).length <= 20, "At most 20 entries");
 
-// Define the schema for tool parameters
 export const schema = {
     board_id: z
         .uuid()
@@ -135,7 +134,6 @@ export const schema = {
         .describe("What the person fills in when adding a card of this type"),
 };
 
-// Define tool metadata
 export const metadata: ToolMetadata = {
     name: "create_card_type",
     description:
@@ -149,7 +147,6 @@ export const metadata: ToolMetadata = {
     },
 };
 
-// Tool implementation
 export default async function (input: InferSchema<typeof schema>) {
     let body;
     try {
@@ -179,7 +176,7 @@ export default async function (input: InferSchema<typeof schema>) {
     }
 
     const asks = input.fields.length
-        ? `It asks for ${input.fields.map((f) => `${f.label}${f.type === "credential" ? " (a credential they pick)" : ""}`).join(", ")}.`
+        ? `It asks for ${input.fields.map((field) => `${field.label}${field.type === "credential" ? " (a credential they pick)" : ""}`).join(", ")}.`
         : "It asks for nothing.";
     const scope = input.board_id
         ? "everyone on that board"

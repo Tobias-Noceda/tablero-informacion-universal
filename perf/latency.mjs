@@ -1,4 +1,4 @@
-// RNF-01a: how long an edit takes to reach the other members of a board.
+// How long an edit takes to reach the other members of a board.
 //
 // For each number of clients N: signs in, makes a board with one note, opens
 // N board sockets (as N browser tabs would), then moves the note MOVES times,
@@ -27,7 +27,7 @@ const MOVES = Number(process.env.MOVES ?? 200);
 const INTERVAL_MS = Number(process.env.INTERVAL_MS ?? 1000);
 const CONFLICTS = Number(process.env.CONFLICTS ?? 20);
 const SAME_CLOCK = process.env.SAME_CLOCK === '1';
-const WAIT_MS = 5000; // RNF-01's own bound: an update later than this is lost
+const WAIT_MS = 5000; // an update later than this counts as lost
 const OPEN_BATCH = 25;
 
 // Latencies use the monotonic clock; the split against the server's `ts`
@@ -55,9 +55,9 @@ async function openAll(board, token, n, onUpdate) {
 }
 
 // One round: a write and the N arrivals it causes.
-function round(n) {
+function newRound(n) {
 	let done;
-	const r = {
+	const round = {
 		arrivals: new Array(n).fill(null),
 		wall: new Array(n).fill(null),
 		emitted: null,
@@ -67,14 +67,14 @@ function round(n) {
 		ok: 0,
 		finished: new Promise((resolve) => (done = resolve)),
 		hear(index, ts) {
-			if (r.arrivals[index] !== null) return;
-			r.arrivals[index] = now();
-			r.wall[index] = Date.now();
-			r.emitted ??= ts;
-			if (++r.heard === n) done();
+			if (round.arrivals[index] !== null) return;
+			round.arrivals[index] = now();
+			round.wall[index] = Date.now();
+			round.emitted ??= ts;
+			if (++round.heard === n) done();
 		}
 	};
-	return r;
+	return round;
 }
 
 async function measure(n) {
@@ -93,26 +93,26 @@ async function measure(n) {
 
 	try {
 		for (let move = 0; move < MOVES; move++) {
-			const r = round(n);
-			current = r;
-			r.sentWall = Date.now();
-			r.sent = now();
+			const round = newRound(n);
+			current = round;
+			round.sentWall = Date.now();
+			round.sent = now();
 			await cards.move(token, card.id, 100 + (move % 50) * 10, 100 + Math.floor(move / 50) * 10);
-			r.ok = now();
-			await Promise.race([r.finished, sleep(WAIT_MS)]);
+			round.ok = now();
+			await Promise.race([round.finished, sleep(WAIT_MS)]);
 			current = null;
 
-			r.arrivals.forEach((at, i) => {
-				if (at === null) return void lost++;
-				fromSend.push(at - r.sent);
-				fromOk.push(at - r.ok);
-				if (SAME_CLOCK && r.emitted) toClient.push(r.wall[i] - r.emitted);
+			round.arrivals.forEach((arrival, socket) => {
+				if (arrival === null) return void lost++;
+				fromSend.push(arrival - round.sent);
+				fromOk.push(arrival - round.ok);
+				if (SAME_CLOCK && round.emitted) toClient.push(round.wall[socket] - round.emitted);
 			});
-			if (SAME_CLOCK && r.emitted) toEmit.push(r.emitted - r.sentWall);
-			await sleep(Math.max(0, INTERVAL_MS - (now() - r.sent)));
+			if (SAME_CLOCK && round.emitted) toEmit.push(round.emitted - round.sentWall);
+			await sleep(Math.max(0, INTERVAL_MS - (now() - round.sent)));
 		}
 
-		const conflicts = await conflictRounds(token, board.id, card.id, sockets.length, (fn) => (current = fn));
+		const conflicts = await conflictRounds(token, board.id, card.id, sockets.length, (listener) => (current = listener));
 		return {
 			clients: n,
 			moves: MOVES,
@@ -140,16 +140,16 @@ async function conflictRounds(token, board, card, n, listen) {
 	let diverged = 0;
 	let unheard = 0;
 	for (let i = 0; i < CONFLICTS; i++) {
-		const a = { x: 1000 + i, y: 1000 };
-		const b = { x: 2000 + i, y: 2000 };
-		const r = round(n);
-		listen(r);
-		await Promise.all([cards.move(token, card, a.x, a.y), cards.move(token, card, b.x, b.y)]);
-		await Promise.race([r.finished, sleep(WAIT_MS)]);
+		const first = { x: 1000 + i, y: 1000 };
+		const second = { x: 2000 + i, y: 2000 };
+		const round = newRound(n);
+		listen(round);
+		await Promise.all([cards.move(token, card, first.x, first.y), cards.move(token, card, second.x, second.y)]);
+		await Promise.race([round.finished, sleep(WAIT_MS)]);
 		listen(null);
-		unheard += n - r.heard;
-		const { position } = (await boards.get(token, board)).postits.find((p) => p.id === card);
-		const landed = [a, b].some((p) => p.x === position.x && p.y === position.y);
+		unheard += n - round.heard;
+		const { position } = (await boards.get(token, board)).postits.find((entry) => entry.id === card);
+		const landed = [first, second].some((spot) => spot.x === position.x && spot.y === position.y);
 		if (!landed) diverged++;
 		await sleep(200);
 	}

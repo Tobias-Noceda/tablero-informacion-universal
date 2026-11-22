@@ -3,8 +3,6 @@ import { randomUUID } from 'node:crypto';
 
 import { account, clientAddress, PASSWORD, signIn, t, verificationToken } from './support/stack';
 
-// E2E-01 (RF-01): sign up with the form, confirm the address with the mailed
-// link and land signed in.
 test('signs up, verifies the address and lands signed in', async ({ page }) => {
 	await page.setExtraHTTPHeaders({ 'X-Forwarded-For': clientAddress() });
 	const email = `e2e-form-${randomUUID().slice(0, 8)}@it.test`;
@@ -22,8 +20,6 @@ test('signs up, verifies the address and lands signed in', async ({ page }) => {
 	await expect(page.getByRole('heading', { name: t('landing.title_personal') })).toBeVisible();
 });
 
-// E2E-02 (RF-03): signing out ends the session; the app sends a protected
-// page back to the sign-in form.
 test('signs out and keeps protected pages behind the sign-in', async ({ page }) => {
 	const ana = await account('ana');
 	await signIn(page, ana);

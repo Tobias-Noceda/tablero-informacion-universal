@@ -34,7 +34,7 @@ func (r recordedGroups) AddGroupMember(id uuid.UUID, user string) error {
 	return r.MemoryGroupStore.AddGroupMember(id, user)
 }
 
-// CONC-04: the count and the write that may take the plan's last group or
+// The count and the write that may take the plan's last group or
 // seat happen in the owner's (or the group's) turn, on the group as it is then.
 func TestGroups_CountAndWriteInTheirTurn(t *testing.T) {
 	var s mocks.Steps

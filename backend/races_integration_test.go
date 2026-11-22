@@ -43,7 +43,7 @@ func positionOf(t *testing.T, s *stack, board models.Board, card uuid.UUID) mode
 	return models.Position{}
 }
 
-// CONC-01: editors moving different cards of one board at once lose none
+// Editors moving different cards of one board at once lose none
 // of the moves: each one changes only its own card in the board document.
 func TestEndToEnd_ParallelMovesOfDifferentCardsAllLand(t *testing.T) {
 	s := newStack(t)
@@ -77,7 +77,7 @@ func TestEndToEnd_ParallelMovesOfDifferentCardsAllLand(t *testing.T) {
 	}
 }
 
-// CONC-02: two editors moving the same card at once: the last write wins,
+// Two editors moving the same card at once: the last write wins,
 // whole. The card never ends up with one editor's x and the other's y.
 func TestEndToEnd_ParallelMovesOfOneCardKeepAWholePosition(t *testing.T) {
 	s := newStack(t)
@@ -109,7 +109,7 @@ func TestEndToEnd_ParallelMovesOfOneCardKeepAWholePosition(t *testing.T) {
 	}
 }
 
-// CONC-03: strands drawn to a card while it is deleted never outlive it.
+// Strands drawn to a card while it is deleted never outlive it.
 func TestEndToEnd_StrandsToACardBeingDeletedDoNotDangle(t *testing.T) {
 	s := newStack(t)
 	owner := s.signUp("owner")
@@ -145,7 +145,7 @@ func TestEndToEnd_StrandsToACardBeingDeletedDoNotDangle(t *testing.T) {
 	}
 }
 
-// CONC-06: two requests renewing a session with the same refresh cookie at
+// Two requests renewing a session with the same refresh cookie at
 // once: one gets the new session, the other a 401, and the session lives on.
 func TestEndToEnd_ParallelRenewalsWithOneCookie(t *testing.T) {
 	s := newStack(t)
@@ -181,7 +181,7 @@ func TestEndToEnd_ParallelRenewalsWithOneCookie(t *testing.T) {
 	}
 }
 
-// CONC-07: two admins demoting each other at once: the organization always
+// Two admins demoting each other at once: the organization always
 // keeps an admin.
 func TestEndToEnd_ParallelDemotionsKeepAnAdmin(t *testing.T) {
 	s := newStack(t)
@@ -216,7 +216,7 @@ func TestEndToEnd_ParallelDemotionsKeepAnAdmin(t *testing.T) {
 	}
 }
 
-// CONC-08: many cards needing one OAuth2 credential renewed at once spend
+// Many cards needing one OAuth2 credential renewed at once spend
 // the refresh once; the requests that lose the race wait for the new token
 // instead of failing.
 func TestEndToEnd_ParallelResolvesRenewAnOAuth2TokenOnce(t *testing.T) {
@@ -270,7 +270,7 @@ func TestEndToEnd_ParallelResolvesRenewAnOAuth2TokenOnce(t *testing.T) {
 	}
 }
 
-// CONC-09: a forced refresh (Max plan) reaches the card's API once every
+// A forced refresh (Max plan) reaches the card's API once every
 // ten seconds, however many ask at once.
 func TestEndToEnd_ParallelForcedRefreshesReachTheAPIOnce(t *testing.T) {
 	original := safehttp.IsSafeIP

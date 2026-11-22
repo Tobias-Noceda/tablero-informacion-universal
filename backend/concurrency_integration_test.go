@@ -19,7 +19,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// CONC-05: everyone opening a board at once must not multiply the calls to
+// Everyone opening a board at once must not multiply the calls to
 // a card's API. Requests that miss the cache while the card is running wait
 // for that run.
 func TestEndToEnd_ConcurrentReadsOfACardAskItsAPIOnce(t *testing.T) {
@@ -97,7 +97,7 @@ func inParallel(n int, send func(i int) int) map[int]int {
 	return codes
 }
 
-// CONC-04: a free account asking for many boards at once ends up with no
+// A free account asking for many boards at once ends up with no
 // more than its plan allows; the rest are refused with 402.
 func TestEndToEnd_ParallelCreationsStayWithinThePlan(t *testing.T) {
 	s := newStack(t)
@@ -126,7 +126,7 @@ func TestEndToEnd_ParallelCreationsStayWithinThePlan(t *testing.T) {
 	}
 }
 
-// CONC-04 for the cards of one board, counted on the board document.
+// The cards of one board, counted on the board document.
 func TestEndToEnd_ParallelCardsStayWithinThePlan(t *testing.T) {
 	s := newStack(t)
 	ana := s.register("conc04-cards-" + uuid.NewString()[:8] + "@it.test")

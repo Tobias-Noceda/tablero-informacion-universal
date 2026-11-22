@@ -5,7 +5,6 @@ import { describeCardType, type CardType } from "../modules/card-types";
 
 import { z } from "zod";
 
-// Define the schema for tool parameters
 export const schema = {
     board_id: z
         .uuid()
@@ -15,7 +14,6 @@ export const schema = {
         ),
 };
 
-// Define tool metadata
 export const metadata: ToolMetadata = {
     name: "list_card_types",
     description:
@@ -28,7 +26,6 @@ export const metadata: ToolMetadata = {
     },
 };
 
-// Tool implementation
 export default async function ({ board_id }: InferSchema<typeof schema>) {
     const path = board_id
         ? `/v1/boards/${board_id}/postit-templates/usable`

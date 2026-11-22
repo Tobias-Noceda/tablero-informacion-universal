@@ -2,8 +2,6 @@ import { expect, test } from '@playwright/test';
 
 import { account, BASE_URL, boards, cards, signIn, t } from './support/stack';
 
-// U7: a card is duplicated from its toolbar, next to it, with its look, and
-// the copy stays after a reload.
 test('duplicates a card from its toolbar', async ({ page }) => {
 	const ana = await account('ana');
 	const board = await boards.create(ana, 'Copies');

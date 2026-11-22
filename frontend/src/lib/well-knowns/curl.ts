@@ -1,4 +1,4 @@
-// U3: a cURL command, as API docs show their examples, read into a one-off
+// A cURL command, as API docs show their examples, read into a one-off
 // card's request. Only what a card can send is kept (GET or POST, headers,
 // query string, a JSON body); a credential found in it is never kept as
 // plain text: its row becomes a credential to pick instead.
@@ -36,27 +36,27 @@ export function tokenize(command: string): string[] {
 	let quote: "'" | '"' | null = null;
 
 	for (let i = 0; i < text.length; i++) {
-		const c = text[i];
+		const char = text[i];
 		if (quote === "'") {
-			if (c === "'") quote = null;
-			else current += c;
+			if (char === "'") quote = null;
+			else current += char;
 		} else if (quote === '"') {
-			if (c === '"') quote = null;
-			else if (c === '\\' && i + 1 < text.length && '"\\$`'.includes(text[i + 1]))
+			if (char === '"') quote = null;
+			else if (char === '\\' && i + 1 < text.length && '"\\$`'.includes(text[i + 1]))
 				current += text[++i];
-			else current += c;
-		} else if (c === "'" || c === '"') {
-			quote = c;
+			else current += char;
+		} else if (char === "'" || char === '"') {
+			quote = char;
 			started = true;
-		} else if (c === '\\' && i + 1 < text.length) {
+		} else if (char === '\\' && i + 1 < text.length) {
 			current += text[++i];
 			started = true;
-		} else if (/\s/.test(c)) {
+		} else if (/\s/.test(char)) {
 			if (started) tokens.push(current);
 			current = '';
 			started = false;
 		} else {
-			current += c;
+			current += char;
 			started = true;
 		}
 	}
@@ -109,10 +109,10 @@ const DATA_FLAGS = new Set([
 ]);
 
 function header(raw: string): CurlRow | null {
-	const at = raw.indexOf(':');
-	if (at <= 0) return null;
-	const key = raw.slice(0, at).trim();
-	const value = raw.slice(at + 1).trim();
+	const colon = raw.indexOf(':');
+	if (colon <= 0) return null;
+	const key = raw.slice(0, colon).trim();
+	const value = raw.slice(colon + 1).trim();
 	return SECRET_HEADER.test(key)
 		? { key, value: '', credential: true }
 		: { key, value, credential: false };
@@ -234,13 +234,13 @@ export function parseCurl(command: string): CurlRequest {
 	if (finalMethod === 'GET') body = '';
 
 	if (json) {
-		const has = (name: string) => headers.some((h) => h.key.toLowerCase() === name);
+		const has = (name: string) => headers.some((row) => row.key.toLowerCase() === name);
 		if (!has('content-type'))
 			headers.push({ key: 'Content-Type', value: 'application/json', credential: false });
 		if (!has('accept'))
 			headers.push({ key: 'Accept', value: 'application/json', credential: false });
 	}
-	if (basicAuth && !headers.some((h) => h.key.toLowerCase() === 'authorization')) {
+	if (basicAuth && !headers.some((row) => row.key.toLowerCase() === 'authorization')) {
 		headers.push({ key: 'Authorization', value: '', credential: true });
 	}
 	if (skipped) dropped.push('flags');

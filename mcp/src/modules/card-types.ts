@@ -70,7 +70,9 @@ export function placeholder(name: string): string {
 
 /** The $fields the request uses that the card type does not declare. */
 export function undeclared(input: CardTypeInput): string[] {
-    const declared = new Set(input.fields.map((f) => placeholder(f.name)));
+    const declared = new Set(
+        input.fields.map((field) => placeholder(field.name)),
+    );
     const used = [
         input.url,
         ...Object.values(input.queries ?? {}),
@@ -98,12 +100,13 @@ export function cardTypeBody(input: CardTypeInput) {
         response: input.response,
         query: input.query,
         rate: input.rate,
-        parameters: input.fields.map((f) => ({
-            key: placeholder(f.name),
-            label: f.label,
-            type: FIELD_TYPES[f.type],
-            ...(f.placeholder && { placeholder: f.placeholder }),
-            ...(f.default && f.type !== "credential" && { default: f.default }),
+        parameters: input.fields.map((field) => ({
+            key: placeholder(field.name),
+            label: field.label,
+            type: FIELD_TYPES[field.type],
+            ...(field.placeholder && { placeholder: field.placeholder }),
+            ...(field.default &&
+                field.type !== "credential" && { default: field.default }),
         })),
         outputs: outputs.map((key) => ({
             key,
@@ -128,9 +131,9 @@ export function describeCardType(type: CardType): string {
               ? "this board's"
               : "the organization's";
     const asks = (type.parameters ?? []).map(
-        (p) => `${p.label} (${FIELD_WORDS[p.type] ?? p.type})`,
+        (param) => `${param.label} (${FIELD_WORDS[param.type] ?? param.type})`,
     );
-    const shows = (type.outputs ?? []).map((o) => o.key);
+    const shows = (type.outputs ?? []).map((output) => output.key);
     return [
         `${type.key} - ${type.name} - ${where}`,
         asks.length ? `asks for ${asks.join(", ")}` : "asks for nothing",

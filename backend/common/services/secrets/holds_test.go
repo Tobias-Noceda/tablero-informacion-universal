@@ -18,7 +18,7 @@ func (r recordedSecrets) UpsertSecret(secret *models.Secret) error {
 	return r.memoryStore.UpsertSecret(secret)
 }
 
-// CONC-04: the payer's room for one more secret is checked and the secret
+// The payer's room for one more secret is checked and the secret
 // stored in the payer's turn.
 func TestPut_ChecksRoomAndStoresInThePayersTurn(t *testing.T) {
 	var s mocks.Steps

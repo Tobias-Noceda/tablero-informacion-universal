@@ -4,9 +4,7 @@ import { account, boards, cards, signIn, t } from './support/stack';
 
 const node = (page: Page, text: string) => page.locator('.svelte-flow__node', { hasText: text });
 
-// E2E-07 (RF-15, RNF-01): two people on one board. A change the other makes
-// reaches this browser without a reload: a moved card and a new one. The
-// time a move takes to show is recorded on the test.
+// The time a move takes to show is recorded on the test.
 test('shows what another member does, live', async ({ browser }, info) => {
 	const owner = await account('owner', 'max');
 	const ana = await account('ana');
@@ -48,8 +46,6 @@ test('shows what another member does, live', async ({ browser }, info) => {
 	await context.close();
 });
 
-// E2E-08 (RF-13): someone who may only read sees the board but none of the
-// tools to change it.
 test('keeps a viewer to reading', async ({ page }) => {
 	const owner = await account('owner', 'max');
 	const vic = await account('vic');

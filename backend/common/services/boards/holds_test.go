@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// CONC-04: two requests creating the last board a plan allows take turns,
+// Two requests creating the last board a plan allows take turns,
 // so the second counts the first's board.
 func TestCreateBoard_CountsAndCreatesInItsTurn(t *testing.T) {
 	var s mocks.Steps

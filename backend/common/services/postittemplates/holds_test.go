@@ -23,7 +23,7 @@ func (r recordedTemplates) PutPostitTemplate(c *models.PostitTemplate) error {
 	return r.MemoryPostitTemplateStore.PutPostitTemplate(c)
 }
 
-// CONC-04: a scope's last template is counted and stored in the scope's turn.
+// A scope's last template is counted and stored in the scope's turn.
 func TestCreate_CountsAndStoresInTheScopesTurn(t *testing.T) {
 	f := setup(t)
 	var s mocks.Steps

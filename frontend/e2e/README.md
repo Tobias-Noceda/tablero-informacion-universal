@@ -28,18 +28,18 @@ After changing the frontend, rebuild only it, so the backend keeps the overrides
 
 | Spec | Flow |
 |---|---|
-| `auth` | E2E-01 sign up, verify, land signed in; E2E-02 sign out, protected pages redirect |
-| `starters` | U5: a board made from the Trip example has its 4 cards and 2 strands; picking an example keeps a name already typed |
-| `boards` | E2E-03 create a board, drop a note from the sidebar, reload; create another from inside a board |
-| `cards` | E2E-10 a card whose source is down says what to check, the rest keeps working; a refused save stays in the form |
-| `save-as-type` | U4: a custom card is saved as a card type from its drawer; the form opens filled in, and the saved type is offered in the cards sidebar |
-| `duplicate` | U7: a card is duplicated from its toolbar with its title and colour, next to it, and stays after a reload |
-| `collaboration` | E2E-07 a second member sees moves and new cards live (logs the propagation time); E2E-08 a viewer gets no editing tools |
-| `credentials` | E2E-06 a credential value never shows on the page nor in any response |
-| `catalog-search` | U6: the cards sidebar narrows its card types to what is typed (case and accents aside), says when nothing matches, and Escape clears it |
-| `curl` | U3: a pasted cURL command fills in a custom card (its credential is not kept as text) and can be tried at once; a paste that is not cURL says so |
-| `preview` | U1 + U2: "Try request" shows the source's answer, a click on a value fills the output, the card shows it; a failed try says why |
+| `auth` | Sign up, verify, land signed in; sign out, protected pages redirect |
+| `starters` | A board made from the Trip example has its 4 cards and 2 strands; picking an example keeps a name already typed |
+| `boards` | Create a board, drop a note from the sidebar, reload; create another from inside a board |
+| `cards` | A card whose source is down says what to check, the rest keeps working; a refused save stays in the form |
+| `save-as-type` | A custom card is saved as a card type from its drawer; the form opens filled in, and the saved type is offered in the cards sidebar |
+| `duplicate` | A card is duplicated from its toolbar with its title and colour, next to it, and stays after a reload |
+| `collaboration` | A second member sees moves and new cards live (logs the propagation time); a viewer gets no editing tools |
+| `credentials` | A credential value never shows on the page nor in any response |
+| `catalog-search` | The cards sidebar narrows its card types to what is typed (case and accents aside), says when nothing matches, and Escape clears it |
+| `curl` | A pasted cURL command fills in a custom card (its credential is not kept as text) and can be tried at once; a paste that is not cURL says so |
+| `preview` | "Try request" shows the source's answer, a click on a value fills the output, the card shows it; a failed try says why |
 | `connect` | A strand drawn from a card's edge can be dropped anywhere on the other card |
-| `strand-hint` | U9: the first-strand hint shows with two cards and no strand, and stays gone after drawing one or dismissing it |
+| `strand-hint` | The first-strand hint shows with two cards and no strand, and stays gone after drawing one or dismissing it |
 | `dates` | A card's date parameters are picked from the date picker and saved as YYYY-MM-DD |
-| `i18n` | E2E-09 the sign-in page switches language; the public pages have an address per language and work without scripts |
+| `i18n` | The sign-in page switches language; the public pages have an address per language and work without scripts |

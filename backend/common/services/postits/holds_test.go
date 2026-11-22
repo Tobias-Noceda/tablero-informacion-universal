@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// CONC-04: a board's last card is counted on the board as it is in the
+// A board's last card is counted on the board as it is in the
 // board's turn, and created before the turn ends.
 func TestCreatePostIt_CountsTheBoardsCardsInItsTurn(t *testing.T) {
 	var s mocks.Steps

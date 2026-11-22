@@ -6,7 +6,6 @@ import * as api from "../modules/api";
 
 import { z } from "zod";
 
-// Define the schema for tool parameters
 export const schema = {
     board_id: z.uuid().describe("The memory PKG ID"),
     title: z.string().trim().min(1).max(128).describe("The memory title"),
@@ -20,7 +19,6 @@ export const schema = {
         .describe("The memory position"),
 };
 
-// Define tool metadata
 export const metadata: ToolMetadata = {
     name: "consolidate",
     description:
@@ -33,7 +31,6 @@ export const metadata: ToolMetadata = {
     },
 };
 
-// Tool implementation
 export default async function ({
     board_id,
     title,

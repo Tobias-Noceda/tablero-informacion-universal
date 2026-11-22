@@ -2,8 +2,6 @@ import { expect, test } from '@playwright/test';
 
 import { account, boards, signIn, t } from './support/stack';
 
-// U6: the cards sidebar narrows its card types to what is typed, without
-// case or accents; the custom API card stays offered.
 test('searches the card types in the sidebar', async ({ page }) => {
 	const ana = await account('ana');
 	const board = await boards.create(ana, 'Search');

@@ -141,7 +141,7 @@
 		}
 	}
 
-	// U3: a cURL command fills in the request.
+	// A cURL command fills in the request.
 	let curlOpen = $state(false);
 	let curlText = $state('');
 	let curlNotes = $state<string[]>([]);

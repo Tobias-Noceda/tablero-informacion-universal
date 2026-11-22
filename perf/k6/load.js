@@ -1,4 +1,4 @@
-// RNF-01c / chapter 8: the API under a growing number of people, each doing
+// The API under a growing number of people, each doing
 // what an open board does: GET /boards/:id, then run its CARDS cards at once,
 // then wait THINK_SECONDS. Users step through STAGES (default 10, 50, 100,
 // 200), STAGE_SECONDS each (default 120); every request is tagged with its
@@ -26,7 +26,7 @@ if (STAGES.length * STAGE_SECONDS > 14 * 60) throw new Error('keep the run under
 
 const thresholds = {};
 STAGES.forEach((users) => {
-	// RNF-01's own 5 s bound; these mainly make k6 report every stage.
+	// A loose 5 s bound: these thresholds mainly make k6 report every stage.
 	thresholds[`http_req_duration{stage:${users}}`] = ['p(95)<5000'];
 	thresholds[`http_req_failed{stage:${users}}`] = ['rate<0.01'];
 });
@@ -63,10 +63,10 @@ function stageAt(start) {
 export default function ({ token, board, cards, start }) {
 	const stage = stageAt(start);
 	const opened = http.get(`${BASE_URL}/api/v1/boards/${board}`, executeParams(token, { stage, kind: 'board' }));
-	check(opened, { 'board opens': (r) => r.status === 200 });
+	check(opened, { 'board opens': (response) => response.status === 200 });
 
 	const answers = http.batch(cards.map((id) => ['GET', executeUrl(id), null, executeParams(token, { stage, kind: 'card' })]));
-	check(answers, { 'every card answers': (rs) => rs.every((r) => r.status === 200) });
+	check(answers, { 'every card answers': (responses) => responses.every((response) => response.status === 200) });
 
 	sleep(THINK_SECONDS);
 }

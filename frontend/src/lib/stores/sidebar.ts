@@ -38,7 +38,7 @@ export const setManagingCardTypes = (value: boolean) => {
 
 export const isManagingCardTypes = { subscribe: managingCardTypes.subscribe };
 
-// A new card type to start from (U4: a one-off card saved as a type), taken
+// A new card type to start from (a one-off card saved as a type), taken
 // once by the card types panel when it opens.
 const cardTypeSeed = writable<Draft | null>(null);
 

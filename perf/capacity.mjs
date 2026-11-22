@@ -37,8 +37,8 @@ try {
 			})
 		);
 		const elapsed = performance.now() - begin;
-		const refused = opened.filter((o) => o.status === 'rejected');
-		sockets.push(...opened.filter((o) => o.status === 'fulfilled').map((o) => o.value));
+		const refused = opened.filter((outcome) => outcome.status === 'rejected');
+		sockets.push(...opened.filter((outcome) => outcome.status === 'fulfilled').map((outcome) => outcome.value));
 		steps.push({ open: sockets.length, step_ms: Math.round(elapsed), handshake_ms: percentiles(times) });
 		console.log(`${sockets.length} open, step ${Math.round(elapsed)} ms, handshake p95 ${percentiles(times).p95 ?? '-'} ms`);
 

@@ -26,178 +26,178 @@ type duplicateFixture struct {
 }
 
 func newDuplicateFixture(cards int) *duplicateFixture {
-	f := &duplicateFixture{board: uuid.New(), card: uuid.New()}
-	f.source = &models.PostIts{
-		Id: f.card, Board: f.board, RunAs: boardOwner.ID,
+	fixture := &duplicateFixture{board: uuid.New(), card: uuid.New()}
+	fixture.source = &models.PostIts{
+		Id: fixture.card, Board: fixture.board, RunAs: boardOwner.ID,
 		Resource: &url.URL{Scheme: "https", Host: "example.com", Path: "/price"},
 		Request:  models.Request{Method: "GET", Headers: map[string]string{"Accept": "application/json"}},
 		Response: "json", Query: map[string]string{"price": ".price"}, Rate: 600,
 		Params: map[string]string{"$coin": "bitcoin"},
 	}
 	width := float32(240)
-	f.entry = models.BoardPostIt{
-		Id: f.card, Type: "", Title: models.BoardPostItTitle{Text: "Price {{price}}", Vars: true},
+	fixture.entry = models.BoardPostIt{
+		Id: fixture.card, Type: "", Title: models.BoardPostItTitle{Text: "Price {{price}}", Vars: true},
 		Position:  models.Position{X: 100, Y: 200},
 		CardStyle: models.CardStyle{Color: "blue", Width: width},
 	}
 
-	f.db = boardOf(boardOwner, member)
-	find := f.db.FindBoardFn
-	f.db.FindBoardFn = func(id uuid.UUID) (*models.Board, error) {
+	fixture.db = boardOf(boardOwner, member)
+	find := fixture.db.FindBoardFn
+	fixture.db.FindBoardFn = func(id uuid.UUID) (*models.Board, error) {
 		b, _ := find(id)
-		b.PostIts = append([]models.BoardPostIt{f.entry}, make([]models.BoardPostIt, cards-1)...)
+		b.PostIts = append([]models.BoardPostIt{fixture.entry}, make([]models.BoardPostIt, cards-1)...)
 		return b, nil
 	}
-	f.db.FindPostItFn = func(id uuid.UUID) (*models.PostIts, error) {
-		if id != f.card {
+	fixture.db.FindPostItFn = func(id uuid.UUID) (*models.PostIts, error) {
+		if id != fixture.card {
 			return nil, errors.New("not found")
 		}
-		copied := *f.source
+		copied := *fixture.source
 		return &copied, nil
 	}
-	f.db.CreatePostItFn = func(p *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error) {
+	fixture.db.CreatePostItFn = func(p *models.PostIts, title models.BoardPostItTitle, ptype string, pos models.Position) (*models.PostIts, error) {
 		p.Id = uuid.New()
-		f.created, f.title, f.ptype, f.createdAt = p, title, ptype, pos
+		fixture.created, fixture.title, fixture.ptype, fixture.createdAt = p, title, ptype, pos
 		return p, nil
 	}
-	f.db.StylePostItFn = func(_, _ uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error) {
-		f.styled = &patch
+	fixture.db.StylePostItFn = func(_, _ uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error) {
+		fixture.styled = &patch
 		style := patch.Apply(models.CardStyle{})
 		return &style, nil
 	}
-	return f
+	return fixture
 }
 
-func (f *duplicateFixture) service(secrets *mocks.MockSecretResolver, plans mocks.StaticEntitlements) *PostItsService {
+func (fixture *duplicateFixture) service(secrets *mocks.MockSecretResolver, plans mocks.StaticEntitlements) *PostItsService {
 	if secrets == nil {
 		secrets = &mocks.MockSecretResolver{}
 	}
-	return New(f.db, &mocks.MockCache{}, &mocks.MockExecuter{}, secrets, access.New(nil), builtins(), nil, plans, &mocks.CountingLimiter{})
+	return New(fixture.db, &mocks.MockCache{}, &mocks.MockExecuter{}, secrets, access.New(nil), builtins(), nil, plans, &mocks.CountingLimiter{})
 }
 
 func TestDuplicatePostIt_CopiesTheCardNextToIt(t *testing.T) {
-	f := newDuplicateFixture(1)
-	svc := f.service(nil, mocks.StaticEntitlements{})
+	fixture := newDuplicateFixture(1)
+	svc := fixture.service(nil, mocks.StaticEntitlements{})
 
-	got, err := svc.DuplicatePostIt(member, f.card)
+	got, err := svc.DuplicatePostIt(member, fixture.card)
 	if err != nil {
 		t.Fatalf("DuplicatePostIt: %v", err)
 	}
-	if f.created == nil || f.created.Id == f.card {
-		t.Fatalf("no new card was stored: %+v", f.created)
+	if fixture.created == nil || fixture.created.Id == fixture.card {
+		t.Fatalf("no new card was stored: %+v", fixture.created)
 	}
-	if f.created.Board != f.board || f.created.Query["price"] != ".price" || f.created.Params["$coin"] != "bitcoin" ||
-		f.created.Resource.String() != "https://example.com/price" || f.created.Rate != 600 {
-		t.Errorf("settings were not copied: %+v", f.created)
+	if fixture.created.Board != fixture.board || fixture.created.Query["price"] != ".price" || fixture.created.Params["$coin"] != "bitcoin" ||
+		fixture.created.Resource.String() != "https://example.com/price" || fixture.created.Rate != 600 {
+		t.Errorf("settings were not copied: %+v", fixture.created)
 	}
-	if f.created.RunAs != member.ID {
-		t.Errorf("the copy runs as %q, want whoever duplicated it", f.created.RunAs)
+	if fixture.created.RunAs != member.ID {
+		t.Errorf("the copy runs as %q, want whoever duplicated it", fixture.created.RunAs)
 	}
-	if f.title != f.entry.Title || f.ptype != f.entry.Type {
-		t.Errorf("title/type = %+v/%q, want %+v/%q", f.title, f.ptype, f.entry.Title, f.entry.Type)
+	if fixture.title != fixture.entry.Title || fixture.ptype != fixture.entry.Type {
+		t.Errorf("title/type = %+v/%q, want %+v/%q", fixture.title, fixture.ptype, fixture.entry.Title, fixture.entry.Type)
 	}
-	if f.createdAt.X <= f.entry.Position.X || f.createdAt.Y <= f.entry.Position.Y {
-		t.Errorf("the copy is at %+v, want beside %+v", f.createdAt, f.entry.Position)
+	if fixture.createdAt.X <= fixture.entry.Position.X || fixture.createdAt.Y <= fixture.entry.Position.Y {
+		t.Errorf("the copy is at %+v, want beside %+v", fixture.createdAt, fixture.entry.Position)
 	}
-	if f.styled == nil || f.styled.Apply(models.CardStyle{}) != f.entry.CardStyle {
-		t.Errorf("style patch = %+v, want the card's style", f.styled)
+	if fixture.styled == nil || fixture.styled.Apply(models.CardStyle{}) != fixture.entry.CardStyle {
+		t.Errorf("style patch = %+v, want the card's style", fixture.styled)
 	}
-	if got.Id != f.created.Id || got.Title != f.entry.Title || got.CardStyle != f.entry.CardStyle || got.Position != f.createdAt {
+	if got.Id != fixture.created.Id || got.Title != fixture.entry.Title || got.CardStyle != fixture.entry.CardStyle || got.Position != fixture.createdAt {
 		t.Errorf("answered %+v", got)
 	}
 
-	f.created.Params["$coin"] = "ether"
-	f.created.Request.Headers["Accept"] = "text/html"
-	if f.source.Params["$coin"] != "bitcoin" || f.source.Request.Headers["Accept"] != "application/json" {
+	fixture.created.Params["$coin"] = "ether"
+	fixture.created.Request.Headers["Accept"] = "text/html"
+	if fixture.source.Params["$coin"] != "bitcoin" || fixture.source.Request.Headers["Accept"] != "application/json" {
 		t.Error("the copy shares its maps with the card it was made from")
 	}
 }
 
 func TestDuplicatePostIt_LeavesAnUnstyledCardUnstyled(t *testing.T) {
-	f := newDuplicateFixture(1)
-	f.entry.CardStyle = models.CardStyle{}
-	svc := f.service(nil, mocks.StaticEntitlements{})
+	fixture := newDuplicateFixture(1)
+	fixture.entry.CardStyle = models.CardStyle{}
+	svc := fixture.service(nil, mocks.StaticEntitlements{})
 
-	if _, err := svc.DuplicatePostIt(member, f.card); err != nil {
+	if _, err := svc.DuplicatePostIt(member, fixture.card); err != nil {
 		t.Fatal(err)
 	}
-	if f.styled != nil {
-		t.Errorf("styled an unstyled copy: %+v", f.styled)
+	if fixture.styled != nil {
+		t.Errorf("styled an unstyled copy: %+v", fixture.styled)
 	}
 }
 
 func TestDuplicatePostIt_OnlyEditors(t *testing.T) {
 	viewer := models.Principal{ID: "viewer-id"}
-	f := newDuplicateFixture(1)
-	find := f.db.FindBoardFn
-	f.db.FindBoardFn = func(id uuid.UUID) (*models.Board, error) {
+	fixture := newDuplicateFixture(1)
+	find := fixture.db.FindBoardFn
+	fixture.db.FindBoardFn = func(id uuid.UUID) (*models.Board, error) {
 		b, err := find(id)
 		b.Members = append(b.Members, models.BoardMember{User: viewer.ID, Role: models.BoardViewer})
 		return b, err
 	}
-	svc := f.service(nil, mocks.StaticEntitlements{})
+	svc := fixture.service(nil, mocks.StaticEntitlements{})
 
 	for _, who := range []models.Principal{viewer, outsider} {
-		if _, err := svc.DuplicatePostIt(who, f.card); !errors.Is(err, ErrNotAMember) {
+		if _, err := svc.DuplicatePostIt(who, fixture.card); !errors.Is(err, ErrNotAMember) {
 			t.Errorf("%s: got %v, want ErrNotAMember", who.ID, err)
 		}
 	}
-	if f.created != nil {
+	if fixture.created != nil {
 		t.Error("a card was stored")
 	}
 }
 
 func TestDuplicatePostIt_CountsAgainstThePlan(t *testing.T) {
 	max := models.LimitsFor(models.PlanFree).NodesPerBoard
-	f := newDuplicateFixture(max)
+	fixture := newDuplicateFixture(max)
 	held := ""
 	plans := mocks.StaticEntitlements{Plan: models.PlanFree, HoldFn: func(limit, holder string) (func(), error) {
 		held = limit + ":" + holder
 		return func() {}, nil
 	}}
-	svc := f.service(nil, plans)
+	svc := fixture.service(nil, plans)
 
-	if _, err := svc.DuplicatePostIt(member, f.card); !limited(err, models.LimitNodes) {
+	if _, err := svc.DuplicatePostIt(member, fixture.card); !limited(err, models.LimitNodes) {
 		t.Errorf("got %v, want the nodes limit", err)
 	}
-	if held != models.LimitNodes+":board:"+f.board.String() {
+	if held != models.LimitNodes+":board:"+fixture.board.String() {
 		t.Errorf("held %q, want the board's nodes turn", held)
 	}
-	if f.created != nil {
+	if fixture.created != nil {
 		t.Error("a card was stored past the limit")
 	}
 }
 
 func TestDuplicatePostIt_ChecksTheCredentialsAsWhoeverDuplicates(t *testing.T) {
-	f := newDuplicateFixture(1)
-	theirs := models.SecretRef{Scope: models.MemberScope(f.board, boardOwner.ID), Name: "KEY"}
-	f.source.Bindings = map[string]models.SecretRef{"KEY": theirs}
-	f.source.Request.Headers["Authorization"] = "$KEY"
+	fixture := newDuplicateFixture(1)
+	theirs := models.SecretRef{Scope: models.MemberScope(fixture.board, boardOwner.ID), Name: "KEY"}
+	fixture.source.Bindings = map[string]models.SecretRef{"KEY": theirs}
+	fixture.source.Request.Headers["Authorization"] = "$KEY"
 	refused := errors.New("not yours")
 	var asked models.Principal
 	secrets := &mocks.MockSecretResolver{CanBindFn: func(p models.Principal, _ uuid.UUID, _ []models.SecretRef) error {
 		asked = p
 		return refused
 	}}
-	svc := f.service(secrets, mocks.StaticEntitlements{})
+	svc := fixture.service(secrets, mocks.StaticEntitlements{})
 
-	if _, err := svc.DuplicatePostIt(member, f.card); !errors.Is(err, refused) {
+	if _, err := svc.DuplicatePostIt(member, fixture.card); !errors.Is(err, refused) {
 		t.Errorf("got %v, want the binding refused", err)
 	}
 	if asked != member {
 		t.Errorf("bindings checked as %+v, want the member duplicating", asked)
 	}
-	if f.created != nil {
+	if fixture.created != nil {
 		t.Error("a card was stored with a credential its new runner may not use")
 	}
 }
 
 func TestDuplicatePostIt_RefusesACardTypeNoLongerOffered(t *testing.T) {
-	f := newDuplicateFixture(1)
-	f.source.WellKnown = "no_longer_there"
-	svc := f.service(nil, mocks.StaticEntitlements{})
+	fixture := newDuplicateFixture(1)
+	fixture.source.WellKnown = "no_longer_there"
+	svc := fixture.service(nil, mocks.StaticEntitlements{})
 
-	if _, err := svc.DuplicatePostIt(member, f.card); !errors.Is(err, ErrUnknownWellKnown) {
+	if _, err := svc.DuplicatePostIt(member, fixture.card); !errors.Is(err, ErrUnknownWellKnown) {
 		t.Errorf("got %v, want ErrUnknownWellKnown", err)
 	}
 }

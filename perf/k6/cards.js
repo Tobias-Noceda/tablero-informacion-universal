@@ -1,4 +1,4 @@
-// RNF-01b: how long a card takes to answer, with the cache cold and warm.
+// How long a card takes to answer, with the cache cold and warm.
 //
 //   cold  COLD cards, each run once: the backend calls the source (which
 //         answers after SOURCE_DELAY_MS) and caches the result
@@ -49,13 +49,13 @@ export function setup() {
 export function cold({ token, cold }) {
 	const id = cold[exec.scenario.iterationInTest];
 	const res = http.get(executeUrl(id), executeParams(token, { cache: 'cold' }));
-	check(res, { 'cold card answers 200': (r) => r.status === 200 });
+	check(res, { 'cold card answers 200': (response) => response.status === 200 });
 }
 
 export function warm({ token, warm }) {
 	const id = warm[Math.floor(Math.random() * warm.length)];
 	const res = http.get(executeUrl(id), executeParams(token, { cache: 'warm' }));
-	check(res, { 'warm card answers 200': (r) => r.status === 200 });
+	check(res, { 'warm card answers 200': (response) => response.status === 200 });
 }
 
 export function teardown({ token, board, cold, warm, hitsBefore }) {

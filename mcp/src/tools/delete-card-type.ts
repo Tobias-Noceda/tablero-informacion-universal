@@ -4,7 +4,6 @@ import * as api from "../modules/api";
 
 import { z } from "zod";
 
-// Define the schema for tool parameters
 export const schema = {
     key: z
         .string()
@@ -15,7 +14,6 @@ export const schema = {
         .describe("The card type's key, from list_card_types"),
 };
 
-// Define tool metadata
 export const metadata: ToolMetadata = {
     name: "delete_card_type",
     description:
@@ -28,7 +26,6 @@ export const metadata: ToolMetadata = {
     },
 };
 
-// Tool implementation
 export default async function ({ key }: InferSchema<typeof schema>) {
     await api.del(`/v1/postit-templates/${key}`);
     return `Card type ${key} deleted`;

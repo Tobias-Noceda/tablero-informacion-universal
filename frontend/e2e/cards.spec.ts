@@ -2,8 +2,6 @@ import { expect, test } from '@playwright/test';
 
 import { account, boards, cards, signIn, t } from './support/stack';
 
-// E2E-10 (RF-09, RNF-07): a card whose source cannot be reached says what
-// to check, and the rest of the board keeps working.
 test('a card that cannot reach its source says so, alone', async ({ page }) => {
 	const ana = await account('ana');
 	const board = await boards.create(ana, 'Sources');

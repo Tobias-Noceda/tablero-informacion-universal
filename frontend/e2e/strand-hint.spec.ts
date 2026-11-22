@@ -6,12 +6,12 @@ const node = (page: Page, text: string) => page.locator('.svelte-flow__node', { 
 
 // Drags from just inside the left edge of one card onto the other.
 async function drawStrand(page: Page, from: string, to: string) {
-	const a = await node(page, from).boundingBox();
-	const b = await node(page, to).boundingBox();
-	if (!a || !b) throw new Error('cards not on screen');
-	await page.mouse.move(a.x + 3, a.y + a.height / 2);
+	const source = await node(page, from).boundingBox();
+	const target = await node(page, to).boundingBox();
+	if (!source || !target) throw new Error('cards not on screen');
+	await page.mouse.move(source.x + 3, source.y + source.height / 2);
 	await page.mouse.down();
-	await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 10 });
+	await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 10 });
 	await page.mouse.up();
 }
 
@@ -25,8 +25,6 @@ async function boardWithTwoCards(name: string) {
 	return { ana, board };
 }
 
-// U9: the hint shows on a board with two cards and no strand, and goes away
-// for good once the first strand is drawn.
 test('shows how to draw the first strand until one is drawn', async ({ page }) => {
 	const { ana, board } = await boardWithTwoCards('linker');
 	await signIn(page, ana);

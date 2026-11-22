@@ -1,4 +1,4 @@
-// U4: a one-off card saved as a card type (a post-it template) to reuse it.
+// A one-off card saved as a card type (a post-it template) to reuse it.
 // The template form opens filled in from the card, to be named and checked.
 
 import type { Draft, ParameterRow, Row } from './draft';
@@ -46,8 +46,13 @@ export function templateDraftFrom(card: OneOffDraft): Draft {
 	const headers = values(card.headers);
 	const queries = values(card.queries);
 	const outputs = card.outputs
-		.filter((o) => o.key.trim() || o.query.trim())
-		.map((o) => ({ key: o.key.trim(), label: o.key.trim(), query: o.query.trim(), example: '' }));
+		.filter((output) => output.key.trim() || output.query.trim())
+		.map((output) => ({
+			key: output.key.trim(),
+			label: output.key.trim(),
+			query: output.query.trim(),
+			example: ''
+		}));
 
 	return {
 		name: nameFrom(card.title),

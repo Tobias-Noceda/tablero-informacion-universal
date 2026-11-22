@@ -1,4 +1,4 @@
-// U5: example boards to start from, so a new board is not a blank canvas.
+// Example boards to start from, so a new board is not a blank canvas.
 // Built from card types that need no credential, placed and linked, and made
 // with the same API calls as by hand: create each card, move it, colour it,
 // then draw the strands.
@@ -21,8 +21,8 @@ export type StarterCard = {
 export type Starter = { key: StarterKey; cards: StarterCard[]; strands: [string, string][] };
 
 const day = (from: Date, plus: number) => {
-	const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + plus);
-	return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+	const date = new Date(from.getFullYear(), from.getMonth(), from.getDate() + plus);
+	return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
 export const STARTERS: Starter[] = [

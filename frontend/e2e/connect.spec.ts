@@ -16,12 +16,14 @@ test('drops a strand anywhere on the other card', async ({ page }) => {
 	await signIn(page, ana);
 	await page.goto(`/boards/${board.id}`);
 
-	const a = (await node(page, 'From here').boundingBox())!;
-	const b = (await node(page, 'To there').boundingBox())!;
-	await page.mouse.move(a.x + 3, a.y + a.height / 2);
+	const source = (await node(page, 'From here').boundingBox())!;
+	const target = (await node(page, 'To there').boundingBox())!;
+	await page.mouse.move(source.x + 3, source.y + source.height / 2);
 	await page.mouse.down();
 	// Inside B, away from its edge strip and from its centre.
-	await page.mouse.move(b.x + b.width * 0.3, b.y + b.height * 0.3, { steps: 12 });
+	await page.mouse.move(target.x + target.width * 0.3, target.y + target.height * 0.3, {
+		steps: 12
+	});
 	await page.mouse.up();
 
 	await expect(page.locator('.svelte-flow__edge')).toHaveCount(1);

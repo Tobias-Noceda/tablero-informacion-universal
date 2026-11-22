@@ -24,7 +24,7 @@
 	import Input from '$components/Input/Input.svelte';
 
     let boardName = $state('');
-	// U5: an example board to start from, or none.
+	// An example board to start from, or none.
 	let starter = $state<StarterKey | null>(null);
 	let creating = $state(false);
 

@@ -2,7 +2,6 @@ import { expect, test } from '@playwright/test';
 
 import { account, boards, signIn, t } from './support/stack';
 
-// U5: a board made from an example starts with its cards placed and linked.
 test('creates a board from an example', async ({ page }) => {
 	const ana = await account('ana');
 	await signIn(page, ana);

@@ -16,9 +16,8 @@ async function createBoard(page: Page, name: string) {
 	);
 }
 
-// E2E-03 (RF-04, RF-05): a board made from the landing, a note dropped on it
-// from the cards sidebar, still there after a reload; and a second board
-// made from inside the first (the top bar's "Create new", PR 3c).
+// The second board is made from inside the first, through the top bar's
+// "Create new", which used to do nothing there.
 test('creates boards and keeps the cards put on them', async ({ page }) => {
 	await signIn(page, await account('maker'));
 	await page.goto('/');

@@ -13,11 +13,11 @@ const pad = (n: number) => String(n).padStart(2, '0');
 export function toPicker(kind: DateKind, stored: string | undefined): string {
 	if (!stored) return '';
 	if (kind === 'date') return DATE.test(stored) ? stored : '';
-	const at = new Date(stored);
-	if (Number.isNaN(at.getTime())) return '';
+	const instant = new Date(stored);
+	if (Number.isNaN(instant.getTime())) return '';
 	return (
-		`${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` +
-		`T${pad(at.getHours())}:${pad(at.getMinutes())}`
+		`${instant.getFullYear()}-${pad(instant.getMonth() + 1)}-${pad(instant.getDate())}` +
+		`T${pad(instant.getHours())}:${pad(instant.getMinutes())}`
 	);
 }
 
@@ -25,18 +25,22 @@ export function toPicker(kind: DateKind, stored: string | undefined): string {
 export function fromPicker(kind: DateKind, picked: string): string {
 	if (!picked) return '';
 	if (kind === 'date') return picked;
-	const at = new Date(picked);
-	if (Number.isNaN(at.getTime())) return '';
-	return at.toISOString().replace(/\.\d{3}Z$/, 'Z');
+	const instant = new Date(picked);
+	if (Number.isNaN(instant.getTime())) return '';
+	return instant.toISOString().replace(/\.\d{3}Z$/, 'Z');
 }
 
 /** Whether a stored value is one the backend takes for that kind. */
 export function validDate(kind: DateKind, stored: string): boolean {
 	if (kind === 'date') {
 		if (!DATE.test(stored)) return false;
-		const [y, m, d] = stored.split('-').map(Number);
-		const day = new Date(Date.UTC(y, m - 1, d));
-		return day.getUTCFullYear() === y && day.getUTCMonth() === m - 1 && day.getUTCDate() === d;
+		const [year, month, dayOfMonth] = stored.split('-').map(Number);
+		const day = new Date(Date.UTC(year, month - 1, dayOfMonth));
+		return (
+			day.getUTCFullYear() === year &&
+			day.getUTCMonth() === month - 1 &&
+			day.getUTCDate() === dayOfMonth
+		);
 	}
 	return (
 		/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(stored) &&

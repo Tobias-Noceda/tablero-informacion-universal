@@ -4,7 +4,7 @@ import { account, boards, signIn, t } from './support/stack';
 
 const VALUE = 'sk_live_E2E_NEVER_SHOWN_42';
 
-// E2E-06 (RF-14, RNF-02): a credential is saved by name, and its value never
+// A credential is saved by name, and its value never
 // comes back: not on the page, not in any answer the app receives.
 test('keeps a credential value out of the page and every response', async ({ page }) => {
 	const ana = await account('ana');

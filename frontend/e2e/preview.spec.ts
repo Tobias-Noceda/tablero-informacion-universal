@@ -15,8 +15,6 @@ async function openOneOff(page: Page) {
 	return page.getByRole('dialog');
 }
 
-// U1 + U2: "Try request" shows what the source answers, a click on a value
-// becomes the card's output, and the card shows it once created.
 test('builds a card by trying the request and clicking the value', async ({ page }) => {
 	const ana = await account('ana');
 	const board = await boards.create(ana, 'Try it');
@@ -45,7 +43,6 @@ test('builds a card by trying the request and clicking the value', async ({ page
 	await expect(page.locator('.svelte-flow__node').first()).toContainText(/\d+/);
 });
 
-// A source that cannot be reached says so before the card is saved.
 test('says why a tried request failed', async ({ page }) => {
 	const ana = await account('ana');
 	const board = await boards.create(ana, 'Try it');

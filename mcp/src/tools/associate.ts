@@ -7,7 +7,6 @@ import { arrowFrom, strandBetween } from "../modules/strands";
 
 import { z } from "zod";
 
-// Define the schema for tool parameters
 export const schema = {
     board_id: z.uuid().describe("The memory PKG ID"),
     id: z.uuid().describe("The memory ID"),
@@ -28,7 +27,6 @@ export const schema = {
         ),
 };
 
-// Define tool metadata
 export const metadata: ToolMetadata = {
     name: "associate",
     description:
@@ -57,7 +55,6 @@ function restyle(
     return Object.keys(patch).length > 0 ? patch : null;
 }
 
-// Tool implementation
 export default async function ({
     board_id,
     id,

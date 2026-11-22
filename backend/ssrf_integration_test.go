@@ -11,7 +11,7 @@ import (
 	"github.com/Secreto31126/tesis/common/models"
 )
 
-// SEC-10: a card of one's own cannot reach the platform's network. During
+// A card of one's own cannot reach the platform's network. During
 // these tests Mongo and Redis listen on the host's loopback, which makes
 // them a real target, not a stand-in.
 func TestEndToEnd_ACardCannotReachInternalAddresses(t *testing.T) {

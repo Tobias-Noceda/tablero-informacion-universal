@@ -8,7 +8,7 @@
 	let { ondismiss }: Props = $props();
 </script>
 
-<!-- U9: shown over the board until the first strand is drawn or this is dismissed. -->
+<!-- Shown over the board until the first strand is drawn or this is dismissed. -->
 <div
 	role="status"
 	class="flex max-w-sm items-center gap-3 rounded-lg border border-main-border bg-background px-3 py-2 text-sm text-foreground shadow-md"

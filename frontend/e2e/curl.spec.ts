@@ -2,8 +2,6 @@ import { expect, test } from '@playwright/test';
 
 import { account, boards, signIn, t } from './support/stack';
 
-// U3: a cURL command fills in a custom card's request; a credential in it is
-// not kept as text, and the request can be tried right away.
 test('fills a custom card in from a cURL command', async ({ page }) => {
 	const ana = await account('ana');
 	const board = await boards.create(ana, 'From docs');

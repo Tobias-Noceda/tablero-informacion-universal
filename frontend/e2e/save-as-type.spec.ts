@@ -2,9 +2,6 @@ import { expect, test } from '@playwright/test';
 
 import { account, BASE_URL, boards, cards, signIn, t } from './support/stack';
 
-// U4: a one-off card is saved as a card type from its detail drawer; the
-// type's form opens filled in from the card, and once saved the type is
-// offered in the cards sidebar.
 test('saves a custom card as a card type', async ({ page }) => {
 	const ana = await account('ana', 'pro');
 	const board = await boards.create(ana, 'Reuse');
