@@ -88,6 +88,24 @@ func (db *MongoDB) setDeleted(key string, deleted bool) error {
 	return nil
 }
 
+// typedParameters gives a stored definition's date and date-time parameters
+// the type its built-in now declares. They were seeded as text before those
+// types existed, and seeding never rewrites a stored definition; only a
+// parameter still typed as text changes, so a type an admin chose stays.
+func typedParameters(wk models.WellKnown) []mongo.WriteModel {
+	var writes []mongo.WriteModel
+	for _, p := range wk.Parameters {
+		if p.Type != models.ParameterDate && p.Type != models.ParameterDateTime {
+			continue
+		}
+		writes = append(writes, mongo.NewUpdateOneModel().
+			SetFilter(bson.M{"_id": wk.Key}).
+			SetUpdate(bson.M{"$set": bson.M{"parameters.$[p].type": p.Type}}).
+			SetArrayFilters([]any{bson.M{"p.key": p.Key, "p.type": models.ParameterString}}))
+	}
+	return writes
+}
+
 func (db *MongoDB) SeedWellKnowns(defs []models.WellKnown) error {
 	if len(defs) == 0 {
 		return nil
@@ -102,6 +120,7 @@ func (db *MongoDB) SeedWellKnowns(defs []models.WellKnown) error {
 			SetFilter(bson.M{"_id": wk.Key}).
 			SetUpdate(bson.M{"$setOnInsert": wk}).
 			SetUpsert(true))
+		writes = append(writes, typedParameters(wk)...)
 	}
 
 	_, err := db.wellKnowns.BulkWrite(ctx, writes, options.BulkWrite().SetOrdered(false))

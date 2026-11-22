@@ -99,3 +99,53 @@ func TestMongo_WellKnownsSeedAndTombstones(t *testing.T) {
 		t.Errorf("restore missing: %v", err)
 	}
 }
+
+// A built-in seeded before date types existed has its date parameters as
+// text; the next seed types them, and leaves alone a type an admin chose.
+func TestMongo_WellKnownsSeedTypesOldDateParameters(t *testing.T) {
+	db := integrationDB(t)
+
+	key := "it_" + uuid.NewString()[:8]
+	old := models.WellKnown{
+		Key: key, NameEn: "Dated", NameEs: "Con fecha", Builtin: true,
+		TitleEn: "{{x}}", TitleEs: "{{x}}",
+		Resource: "https://example.com", Request: models.Request{Method: "GET", Queries: map[string]string{"from": "$from", "to": "$to", "at": "$at"}},
+		Response: "json", Query: map[string]string{"x": ".x"},
+		Parameters: []models.WellKnownParameter{
+			{Key: "$from", LabelEn: "From", LabelEs: "Desde", Type: models.ParameterString},
+			{Key: "$to", LabelEn: "To", LabelEs: "Hasta", Type: models.ParameterNumber},
+			{Key: "$at", LabelEn: "At", LabelEs: "A las", Type: models.ParameterString},
+		},
+		Outputs: []models.WellKnownOutput{{Key: "x", LabelEn: "X", LabelEs: "X"}},
+	}
+	if err := db.SeedWellKnowns([]models.WellKnown{old}); err != nil {
+		t.Fatalf("seed old: %v", err)
+	}
+
+	now := old
+	now.Parameters = []models.WellKnownParameter{
+		{Key: "$from", LabelEn: "From", LabelEs: "Desde", Type: models.ParameterDate},
+		{Key: "$to", LabelEn: "To", LabelEs: "Hasta", Type: models.ParameterDate},
+		{Key: "$at", LabelEn: "At", LabelEs: "A las", Type: models.ParameterDateTime},
+	}
+	for range 2 {
+		if err := db.SeedWellKnowns([]models.WellKnown{now}); err != nil {
+			t.Fatalf("seed new: %v", err)
+		}
+	}
+
+	found, err := db.FindWellKnown(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]models.WellKnownParameterType{}
+	for _, p := range found.Parameters {
+		got[p.Key] = p.Type
+	}
+	want := map[string]models.WellKnownParameterType{"$from": models.ParameterDate, "$to": models.ParameterNumber, "$at": models.ParameterDateTime}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("%s: type %q, want %q", k, got[k], v)
+		}
+	}
+}

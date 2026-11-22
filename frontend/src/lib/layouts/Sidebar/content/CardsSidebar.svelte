@@ -12,6 +12,7 @@
 	import { boardPlan } from '$stores/plan.svelte';
 	import { canAddNode } from '$lib/billing/can';
 	import PlanHint from '$components/PlanHint/PlanHint.svelte';
+	import { matchesCard } from '$lib/well-knowns/search';
 
 	const type = useDnD();
 
@@ -20,6 +21,10 @@
 
 	// At the plan's card limit there is nothing to drop, only a line saying so.
 	const canAdd = $derived(canAddNode(boardPlan.limits, boardPlan.nodes));
+
+	// What was typed in the search box narrows the card types listed.
+	let search = $state('');
+	const shown = $derived(wellKnowns.pickable.filter((wk) => matchesCard(wk, search)));
 
 	const onDragStart = (event: DragEvent, nodeType: string) => {
 		if (!event.dataTransfer) {
@@ -34,7 +39,17 @@
 
 <div class="nodes-container items-start justify-start">
   {#if canAdd}
-  <!-- A card wired to any API, without a card type. -->
+  <input
+    type="search"
+    bind:value={search}
+    placeholder={m['nodes.search']()}
+    aria-label={m['nodes.search']()}
+    class="w-full rounded-md border border-white/40 bg-white/10 px-2 py-1.5 text-sm text-main-text placeholder:text-main-text/70 focus:border-white focus:outline-none"
+    onkeydown={(event) => {
+      if (event.key === 'Escape') search = '';
+    }}
+  />
+  <!-- A card wired to any API, without a card type: always offered. -->
   <SidebarElement
     class="border-dashed! border-white/70! bg-transparent! font-semibold"
     ondragstart={(event) => onDragStart(event, ONE_OFF)}
@@ -45,7 +60,7 @@
     <span class="mr-1 font-mono text-xs">{'{ }'}</span>
     {m['one_off.sidebar']()}
   </SidebarElement>
-  {#each wellKnowns.pickable as wk (wk.key)}
+  {#each shown as wk (wk.key)}
     {@const description = wk[`description_${getLocale()}`]}
     <SidebarElement
       class={wk.key}
@@ -62,6 +77,10 @@
       {/if}
       {wk[`name_${getLocale()}`]}
     </SidebarElement>
+  {:else}
+    {#if search.trim()}
+      <p class="px-1 text-sm text-main-text opacity-80" role="status">{m['nodes.search_empty']({ query: search.trim() })}</p>
+    {/if}
   {/each}
   {:else}
     <PlanHint

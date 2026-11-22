@@ -1,0 +1,63 @@
+import { expect, test, type Page } from '@playwright/test';
+
+import { account, boards, cards, signIn, t } from './support/stack';
+
+const node = (page: Page, text: string) => page.locator('.svelte-flow__node', { hasText: text });
+
+// The time a move takes to show is recorded on the test.
+test('shows what another member does, live', async ({ browser }, info) => {
+	const owner = await account('owner', 'max');
+	const ana = await account('ana');
+	const board = await boards.create(owner, 'Shared');
+	await boards.share(owner, board.id, ana.email, 'editor');
+	const card = await cards.note(owner, board.id, 'Moving note');
+	await cards.move(owner, card.id, 100, 100);
+
+	const context = await browser.newContext();
+	const page = await context.newPage();
+	await signIn(page, ana);
+	await page.goto(`/boards/${board.id}`);
+	await expect(node(page, 'Moving note')).toBeVisible();
+
+	// The board's socket connects after the cards are drawn, and a move made
+	// before it does is not sent to this page. Moves until one arrives live
+	// (each to a new spot: a move to where the card is changes nothing), so
+	// the move timed below finds the socket open.
+	let nudge = 0;
+	await expect(async () => {
+		nudge++;
+		await cards.move(owner, card.id, 100 + nudge, 100);
+		await expect(node(page, 'Moving note')).toHaveAttribute(
+			'style',
+			new RegExp(String.raw`translate\(${100 + nudge}px, 100px\)`),
+			{ timeout: 1000 }
+		);
+	}).toPass({ timeout: 20_000 });
+
+	const sent = Date.now();
+	await cards.move(owner, card.id, 420, 260);
+	await expect(node(page, 'Moving note')).toHaveAttribute('style', /translate\(420px, 260px\)/);
+	const latency = Date.now() - sent;
+	info.annotations.push({ type: 'propagation (ms)', description: String(latency) });
+	console.log(`a move reached the other member in ${latency} ms`);
+
+	await cards.note(owner, board.id, 'Arrived live');
+	await expect(node(page, 'Arrived live')).toBeVisible();
+	await context.close();
+});
+
+test('keeps a viewer to reading', async ({ page }) => {
+	const owner = await account('owner', 'max');
+	const vic = await account('vic');
+	const board = await boards.create(owner, 'Read only');
+	await boards.share(owner, board.id, vic.email, 'viewer');
+	await cards.note(owner, board.id, 'Look, do not touch');
+
+	await signIn(page, vic);
+	await page.goto(`/boards/${board.id}`);
+
+	await expect(node(page, 'Look, do not touch')).toBeVisible();
+	await expect(page.getByRole('button', { name: t('nodes.title') })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: t('secrets.title') })).toHaveCount(0);
+	await expect(node(page, 'Look, do not touch')).not.toHaveClass(/draggable/);
+});

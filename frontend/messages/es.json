@@ -1,6 +1,5 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
-	"hello_world": "Hola {name} desde es!",
 	"input_loading": "Cargando...",
 	"board_dropdown_placeholder": "Seleccionar un tablero",
 	"board_name_label": "Nombre del tablero",
@@ -17,6 +16,24 @@
 		"template_label": "Plantilla",
 		"create_board": "Crear un nuevo tablero"
 	},
+	"starters": {
+		"label": "Empezar desde",
+		"empty": "Vacío",
+		"empty_hint": "Un tablero en blanco",
+		"finance": "Finanzas",
+		"finance_hint": "Dólar, riesgo país y cripto",
+		"trip": "Viaje",
+		"trip_hint": "Clima, calidad del aire y lista para llevar",
+		"dev": "Equipo de desarrollo",
+		"dev_hint": "Repositorios de GitHub y objetivos del sprint",
+		"finance_note_title": "Para seguir",
+		"finance_note": "Anotá acá lo que querés seguir y conectalo con las tarjetas de las que depende.",
+		"trip_note_title": "Para llevar",
+		"trip_note": "- Pasaporte\n- Cargador y adaptador\n- Algo de efectivo",
+		"dev_note_title": "Objetivos del sprint",
+		"dev_note": "- Sacar la próxima versión\n- Revisar los issues abiertos\n- Tomarse un recreo cada tanto",
+		"partial": "El tablero se creó, pero no se pudieron agregar algunas tarjetas del ejemplo."
+	},
 	"user_info": {
 		"language": {
 			"title": "Idioma",
@@ -28,7 +45,8 @@
 			"title": "Tema",
 			"dark": "Modo oscuro",
 			"light": "Modo claro"
-		}
+		},
+		"avatar": "Foto de perfil"
 	},
 	"nodes": {
 		"title": "Tarjetas",
@@ -42,7 +60,10 @@
 				"title": "Editar tarjeta",
 				"action": "Guardar cambios"
 			}
-		}
+		},
+		"google_calendar_empty": "No hay próximos eventos",
+		"search": "Buscar tipos de tarjeta",
+		"search_empty": "Ningún tipo de tarjeta coincide con “{query}”: la tarjeta de API a medida puede leer cualquier API."
 	},
 	"secrets": {
 		"title": "Credenciales del tablero",
@@ -258,7 +279,10 @@
 		"no_content": "Esta tarjeta no tiene valores.",
 		"error": "No se pudo cargar la tarjeta.",
 		"forbidden": "La credencial que usa esta tarjeta ya no está disponible para vos.",
-		"delete": "Eliminar tarjeta"
+		"delete": "Eliminar tarjeta",
+		"save_as_type": "Guardar como tipo de tarjeta",
+		"save_as_type_hint": "Reutilizá este pedido como tipo de tarjeta: le ponés nombre y elegís quién puede usarlo.",
+		"save_as_type_post": "Los tipos de tarjeta solo hacen pedidos GET: esta tarjeta manda un POST."
 	},
 	"board": {
 		"title": "Configuración del tablero",
@@ -308,6 +332,8 @@
 		"default": "Valor por defecto (opcional)",
 		"type_string": "Texto",
 		"type_number": "Número",
+		"type_date": "Fecha",
+		"type_datetime": "Fecha y hora",
 		"type_secret": "Credencial",
 		"add_parameter": "Agregar campo",
 		"queries": "Parámetros de la URL",
@@ -343,6 +369,10 @@
 		"draft_kept": "Tu plantilla sin guardar se conserva; pasá a una pestaña donde puedas crear para guardarla.",
 		"creating_in": "Nueva plantilla en: {where}"
 	},
+	"date_input": {
+		"unreadable": "“{value}” no es una fecha: elegí una.",
+		"utc": "Se envía en UTC: {value}"
+	},
 	"one_off": {
 		"sidebar": "Tarjeta de API propia",
 		"sidebar_hint": "Soltala en el tablero y conectala a cualquier API, sin crear una plantilla.",
@@ -373,6 +403,21 @@
 		"err_body_json": "El cuerpo no es un JSON válido.",
 		"err_body_size": "El cuerpo pesa más de {max} KB.",
 		"err_body_credential": "El cuerpo usa ${name}, pero no hay ninguna credencial con ese nombre que puedas usar."
+	},
+	"curl": {
+		"toggle": "Pegar un comando cURL",
+		"hint": "La documentación de las APIs trae sus ejemplos en cURL: pegá uno para completar la dirección, los encabezados y el cuerpo.",
+		"placeholder": "curl https://api.example.com/v1/data -H 'Accept: application/json'",
+		"apply": "Completar el formulario",
+		"applied": "El formulario se completó con el comando.",
+		"credentials": "Hay credenciales en {names}: no se guardan en la tarjeta. Cargalas en las credenciales del tablero y elegilas en esos campos.",
+		"dropped_method": "Una tarjeta solo manda GET o POST, así que se reemplazó el método del comando.",
+		"dropped_body": "El cuerpo no es JSON y se dejó afuera.",
+		"dropped_flags": "Algunas opciones de curl no aplican a una tarjeta y se ignoraron.",
+		"not_curl": "Eso no parece un comando cURL.",
+		"no_url": "El comando no tiene una dirección.",
+		"unclosed_quote": "Hay comillas sin cerrar.",
+		"bad_url": "La dirección del comando no es válida."
 	},
 	"strands": {
 		"toolbar": "Estilo de la conexión",
@@ -417,7 +462,10 @@
 		"align_right": "Alinear a la derecha",
 		"valign_top": "Arriba (requiere un alto propio)",
 		"valign_middle": "En el medio (requiere un alto propio)",
-		"valign_bottom": "Abajo (requiere un alto propio)"
+		"valign_bottom": "Abajo (requiere un alto propio)",
+		"duplicate": "Duplicar",
+		"duplicate_hint": "Duplicar esta tarjeta al lado",
+		"duplicate_failed": "No se pudo duplicar la tarjeta"
 	},
 	"image": {
 		"missing": "Esta tarjeta todavía no tiene la dirección de una imagen.",
@@ -541,5 +589,49 @@
 			"billing_disabled": "Los pagos no están disponibles en este momento.",
 			"unknown": "No se pudo iniciar la suscripción. Es posible intentarlo de nuevo."
 		}
+	},
+	"card_failure": {
+		"source_auth": "La fuente rechazó la credencial: revisá que siga siendo válida.",
+		"not_found": "La fuente no encontró nada en esa dirección: revisá la URL y los ajustes de la tarjeta.",
+		"rate_limited": "La fuente está limitando los pedidos: probá con un intervalo de actualización más largo.",
+		"source_error": "La fuente respondió con un error ({status}). Probá de nuevo más tarde.",
+		"timeout": "La fuente no respondió a tiempo.",
+		"unreachable": "No se pudo conectar con la fuente: revisá la URL.",
+		"unreadable": "La fuente respondió algo que la tarjeta no puede leer: revisá la URL y el tipo de respuesta.",
+		"query": "La consulta de la tarjeta no encontró ningún valor en la respuesta: revisá la consulta.",
+		"credential": "La credencial que usa esta tarjeta ya no está disponible para vos.",
+		"unavailable": "Esta tarjeta no está disponible por ahora.",
+		"network": "No se pudo conectar con el servidor. Revisá tu conexión.",
+		"unknown": "No se pudo cargar la tarjeta."
+	},
+	"card_freshness": {
+		"updated": "Actualizado {time}",
+		"stale": "No se pudo actualizar",
+		"stale_detail": "Se muestra el último dato ({time}). {reason}"
+	},
+	"legal": {
+		"home": "Inicio",
+		"privacy_policy": "Política de privacidad"
+	},
+	"card_preview": {
+		"try": "Probar pedido",
+		"trying": "Probando…",
+		"try_hint": "Hace el pedido ahora, sin guardar la tarjeta, y muestra lo que responde: hacé clic en un valor para mostrarlo en la tarjeta.",
+		"try_needs_url": "Primero escribí la dirección.",
+		"try_needs_json": "Elegir valores funciona con respuestas JSON; para HTML, escribí los selectores a mano.",
+		"too_many": "Demasiados intentos seguidos: esperá un minuto y volvé a probar.",
+		"invalid": "El pedido todavía no es válido: {detail}",
+		"answered": "La fuente respondió:",
+		"empty": "La fuente respondió sin nada para elegir.",
+		"items": "{count} elementos",
+		"more": "… y {count} más",
+		"pick": "Mostrar este valor en la tarjeta",
+		"pick_all": "todos",
+		"pick_all_hint": "Mostrar este valor para cada elemento de la lista",
+		"picked": "Se agregó “{name}”: ponelo en el título como {variable}."
+	},
+	"strand_hint": {
+		"text": "Conectá dos tarjetas: arrastrá desde el borde de una hasta la otra.",
+		"dismiss": "Entendido"
 	}
 }

@@ -162,6 +162,36 @@ type CardStylePatch struct {
 	Height        *float32           `json:"height,omitempty"`
 }
 
+// Patch is the patch that gives an unstyled card style s (its set fields).
+func (s CardStyle) Patch() CardStylePatch {
+	var p CardStylePatch
+	if s.Color != "" {
+		p.Color = &s.Color
+	}
+	if s.Border != "" {
+		p.Border = &s.Border
+	}
+	if s.BorderWidth != "" {
+		p.BorderWidth = &s.BorderWidth
+	}
+	if s.BorderColor != "" {
+		p.BorderColor = &s.BorderColor
+	}
+	if s.TextAlign != "" {
+		p.TextAlign = &s.TextAlign
+	}
+	if s.VerticalAlign != "" {
+		p.VerticalAlign = &s.VerticalAlign
+	}
+	if s.Width != 0 {
+		p.Width = &s.Width
+	}
+	if s.Height != 0 {
+		p.Height = &s.Height
+	}
+	return p
+}
+
 // Empty reports whether p changes nothing.
 func (p CardStylePatch) Empty() bool {
 	return p.Color == nil && p.Border == nil && p.BorderWidth == nil && p.BorderColor == nil &&

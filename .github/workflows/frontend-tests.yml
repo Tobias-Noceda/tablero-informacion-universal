@@ -1,0 +1,70 @@
+name: Frontend tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - frontend/**
+      - .github/workflows/frontend-tests.yml
+
+# A pull request gets its own group (by number: a run that starts after the
+# merge would otherwise fall back to the base branch's ref and cancel its
+# runs). Only pull requests cancel: on main every merge gets tested.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: check, lint & test
+    # Pinned: ubuntu-latest moved to 26.04, where Playwright 1.60 has no
+    # Chromium build. Move it once Playwright supports the newer image.
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Same pinned pnpm as frontend/dist/Dockerfile
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@11.6.0 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # The generated messages are git-ignored; svelte-check needs them.
+      - name: Compile messages
+        run: pnpm exec paraglide-js compile --project ./project.inlang --outdir ./src/lib/paraglide
+
+      - name: Type check
+        run: pnpm check
+
+      # Prettier is not enforced yet: much of the code predates it.
+      - name: Lint
+        run: pnpm exec eslint .
+
+      # The client and Storybook projects run in Chromium.
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Test
+        run: pnpm test
+
+      - name: Coverage
+        if: always()
+        run: |
+          pnpm exec vitest run --project server --coverage --coverage.reporter=text-summary | tee coverage.txt
+          {
+            echo '### Frontend coverage (logic, Node project)'
+            echo '```'
+            grep -E 'Statements|Branches|Functions|Lines' coverage.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

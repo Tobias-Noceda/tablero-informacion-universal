@@ -6,14 +6,12 @@ import * as api from "../modules/api";
 
 import { z } from "zod";
 
-// Define the schema for tool parameters
 export const schema = {
     board_id: z.uuid().describe("The memory PKG ID"),
     memory_id_1: z.uuid().describe("One memory ID"),
     memory_id_2: z.uuid().describe("Other memory ID"),
 };
 
-// Define tool metadata
 export const metadata: ToolMetadata = {
     name: "dissociate",
     description:
@@ -26,7 +24,6 @@ export const metadata: ToolMetadata = {
     },
 };
 
-// Tool implementation
 export default async function ({
     board_id,
     memory_id_1,

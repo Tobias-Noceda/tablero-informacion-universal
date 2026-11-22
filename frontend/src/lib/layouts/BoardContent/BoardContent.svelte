@@ -28,6 +28,8 @@
 	import SideBar from '$layouts/Sidebar/SideBar.svelte';
 	import Flow from './Flow.svelte';
 	import { nodeType } from '$lib/well-knowns/one-off';
+	import { changedCards } from '$lib/cards/revisions';
+	import { results } from '$stores/postit-results.svelte';
 	import { strandToEdge } from '$lib/strands/style';
 	import BoardConfiguration from '$layouts/BoardConfiguration/BoardConfiguration.svelte';
 	import { deleteBoard, renameBoard } from '$services/board';
@@ -53,6 +55,11 @@
 	});
 
 	function boardUpdate(update: Update) {
+		// Someone saved a card's settings: its result changed too, so it runs
+		// again now rather than at its next refresh.
+		if (update.board.postits) {
+			for (const id of changedCards(data.nodes, update.board.postits)) results.rerun(id);
+		}
 		data = {
 			...data,
 			boardName: update.board.name ?? data.boardName,

@@ -18,6 +18,9 @@ type BoardPostIt struct {
 	Title     BoardPostItTitle `bson:"title" json:"title"`
 	Position  Position         `bson:"position" json:"position"`
 	CardStyle `bson:",inline"`
+	// Rev goes up whenever the card's settings change, which live in its own
+	// document: the board's clients run the card again when it moves.
+	Rev int `bson:"rev,omitempty" json:"rev,omitempty"`
 }
 
 // BoardRole is what someone may do on a board: viewers look, editors work on

@@ -6,7 +6,11 @@
 	import Icon from '$components/Icon/Icon.svelte';
 	import Input from '$components/Input/Input.svelte';
 	import Modal from '$components/Modal/Modal.svelte';
+	import ResponseTree from '$components/ResponseTree/ResponseTree.svelte';
 	import type { PostItData } from '$layouts/BoardContent/NodeDetail.svelte';
+	import { failureMessage, failureOf } from '$lib/cards/failure';
+	import { CurlError, fillFromCurl, parseCurl } from '$lib/well-knowns/curl';
+	import { jqPath, lastIndex, outputName, type JsonPath } from '$lib/cards/preview';
 	import { m } from '$lib/paraglide/messages';
 	import { refKey } from '$lib/secrets/binding';
 	import { groupByOrigin } from '$lib/secrets/origin';
@@ -137,6 +141,88 @@
 		}
 	}
 
+	// A cURL command fills in the request.
+	let curlOpen = $state(false);
+	let curlText = $state('');
+	let curlNotes = $state<string[]>([]);
+	let curlError = $state('');
+
+	function applyCurl() {
+		curlError = '';
+		curlNotes = [];
+		try {
+			const parsed = parseCurl(curlText);
+			draft = fillFromCurl(draft, parsed);
+			tried = null;
+			curlNotes = [
+				m['curl.applied'](),
+				...(parsed.credentials.length
+					? [m['curl.credentials']({ names: parsed.credentials.join(', ') })]
+					: []),
+				...parsed.dropped.map((code) =>
+					code === 'method'
+						? m['curl.dropped_method']()
+						: code === 'body_not_json'
+							? m['curl.dropped_body']()
+							: m['curl.dropped_flags']()
+				)
+			];
+			curlText = '';
+			curlOpen = false;
+		} catch (e) {
+			curlError = e instanceof CurlError ? m[`curl.${e.code}`]() : m['curl.not_curl']();
+		}
+	}
+
+	// "Try request": the source's whole answer, to pick outputs from.
+	let trying = $state(false);
+	let tried = $state<{ response: unknown } | null>(null);
+	let tryError = $state('');
+	let picked = $state('');
+	const canTry = $derived(draft.resource.trim() !== '' && draft.response === 'json');
+
+	async function tryRequest() {
+		if (!canTry || trying) return;
+		trying = true;
+		tryError = '';
+		picked = '';
+		const { body } = oneOffBody(draft, usableSecrets, boardId);
+		try {
+			const answer = await postItsApi.preview(boardId, {
+				resource: body.resource,
+				request: body.request,
+				response: 'json',
+				bindings: body.bindings
+			});
+			tried = { response: answer.response ?? null };
+		} catch (e) {
+			tried = null;
+			tryError = tryFailure(e);
+		} finally {
+			trying = false;
+		}
+	}
+
+	function tryFailure(e: unknown) {
+		if (e instanceof postItsApi.CardError) {
+			if (e.status === 429) return m['card_preview.too_many']();
+			if (e.status === 400) return m['card_preview.invalid']({ detail: e.message });
+			if (e.code) return failureMessage(failureOf(e));
+		}
+		return m['card_failure.unknown']();
+	}
+
+	// A value clicked in the answer becomes an output (in the first empty row).
+	function pick(path: JsonPath, every: boolean) {
+		const index = every ? lastIndex(path) : undefined;
+		const name = outputName(path, outputKeys(draft), index !== undefined);
+		const output = { key: name, query: jqPath(path, index) };
+		const blank = draft.outputs.findIndex((o) => !o.key.trim() && !o.query.trim());
+		if (blank >= 0) draft.outputs[blank] = output;
+		else draft.outputs.push(output);
+		picked = m['card_preview.picked']({ name, variable: `{{${name}}}` });
+	}
+
 	function insertVariable(key: string) {
 		const separator = draft.title && !draft.title.endsWith(' ') ? ' ' : '';
 		draft.title = `${draft.title}${separator}{{${key}}}`;
@@ -265,6 +351,39 @@
 	</h2>
 	<p class="text-xs opacity-70">{m['one_off.hint']()}</p>
 
+	<details class="rounded-md border border-main-border p-2 text-sm" bind:open={curlOpen}>
+		<summary class="cursor-pointer font-semibold">{m['curl.toggle']()}</summary>
+		<div class="mt-2 flex flex-col gap-2">
+			<p class="text-xs opacity-70">{m['curl.hint']()}</p>
+			<textarea
+				bind:value={curlText}
+				rows="4"
+				spellcheck="false"
+				aria-label={m['curl.toggle']()}
+				class={cn(fieldClass, 'resize-y font-mono text-xs')}
+				placeholder={m['curl.placeholder']()}
+			></textarea>
+			<Button
+				variant="secondary"
+				class="self-start px-3 py-1 text-sm"
+				disabled={!curlText.trim()}
+				onclick={applyCurl}
+			>
+				{m['curl.apply']()}
+			</Button>
+			{#if curlError}
+				<p class="text-xs text-destructive" role="alert">{curlError}</p>
+			{/if}
+		</div>
+	</details>
+	{#if curlNotes.length > 0}
+		<ul class="flex flex-col gap-0.5 text-xs" aria-live="polite">
+			{#each curlNotes as note, i (i)}
+				<li class={i === 0 ? 'font-semibold' : ''}>{note}</li>
+			{/each}
+		</ul>
+	{/if}
+
 	<div class="flex flex-col gap-3 border-t border-main-border pt-3">
 		<div class="flex items-end gap-2">
 			<div class="flex flex-col gap-1 text-sm">
@@ -382,6 +501,42 @@
 			m['one_off.request_hint'](),
 			draft.headers
 		)}
+
+		<section class="flex flex-col gap-2 rounded-md border border-main-border p-2" aria-live="polite">
+			<div class="flex flex-wrap items-center gap-2">
+				<Button
+					variant="secondary"
+					class="px-3 py-1 text-sm"
+					onclick={tryRequest}
+					disabled={!canTry || trying}
+				>
+					{trying ? m['card_preview.trying']() : m['card_preview.try']()}
+				</Button>
+				<p class="min-w-0 flex-1 text-xs opacity-70">
+					{!draft.resource.trim()
+						? m['card_preview.try_needs_url']()
+						: draft.response !== 'json'
+							? m['card_preview.try_needs_json']()
+							: m['card_preview.try_hint']()}
+				</p>
+			</div>
+			{#if tryError}
+				<p class="text-sm text-destructive" role="alert">{tryError}</p>
+			{/if}
+			{#if tried}
+				{#if tried.response === null}
+					<p class="text-xs opacity-70">{m['card_preview.empty']()}</p>
+				{:else}
+					<p class="text-xs font-semibold">{m['card_preview.answered']()}</p>
+					<div class={cn('max-h-64 overflow-auto rounded-md border border-border p-2', scrollClass)}>
+						<ResponseTree value={tried.response} onpick={pick} />
+					</div>
+				{/if}
+				{#if picked}
+					<p class="text-xs font-semibold">{picked}</p>
+				{/if}
+			{/if}
+		</section>
 
 		<fieldset class="flex flex-col gap-1">
 			<legend class="text-sm font-semibold">{m['postit_templates.outputs']()}</legend>

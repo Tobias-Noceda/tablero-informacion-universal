@@ -4,12 +4,10 @@ import * as api from "../modules/api";
 
 import { z } from "zod";
 
-// Define the schema for tool parameters
 export const schema = {
     id: z.uuid().describe("The memory PKG ID"),
 };
 
-// Define tool metadata
 export const metadata: ToolMetadata = {
     name: "delete_pkg",
     description:
@@ -22,7 +20,6 @@ export const metadata: ToolMetadata = {
     },
 };
 
-// Tool implementation
 export default async function ({ id }: InferSchema<typeof schema>) {
     await api.del(`/v1/boards/${id}`);
     return "PKG deleted";

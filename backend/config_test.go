@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"testing"
 	"time"
 
@@ -46,6 +47,59 @@ func TestLoadConfig_ReadsEverything(t *testing.T) {
 	}
 	if cfg.google != (oidc.Config{Issuer: "http://localhost:8899/default", ClientID: "client", ClientSecret: "secret"}) || cfg.identityProvider() == nil {
 		t.Errorf("google = %+v", cfg.google)
+	}
+}
+
+func TestLoadConfig_VersionIsTheDeployedCommit(t *testing.T) {
+	t.Setenv(ENV_VERCEL_COMMIT, "")
+	cfg, err := loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.version != "" {
+		t.Errorf("without a commit version = %q, want empty", cfg.version)
+	}
+
+	t.Setenv(ENV_VERCEL_COMMIT, " 01bd87f3c2a94e5b8d7f6a1e0c9b8a7d6e5f4a3b ")
+	if cfg, _ = loadConfig(); cfg.version != "01bd87f" {
+		t.Errorf("version = %q, want the short commit", cfg.version)
+	}
+
+	t.Setenv(ENV_VERCEL_COMMIT, "abc")
+	if cfg, _ = loadConfig(); cfg.version != "abc" {
+		t.Errorf("version = %q, want a short value kept whole", cfg.version)
+	}
+}
+
+func TestLoadConfig_TrustedProxies(t *testing.T) {
+	for name, c := range map[string]struct {
+		vercel, proxies string
+		want            []string
+	}{
+		"docker trusts only private networks": {"", "", privateNetworks},
+		"vercel trusts what it forwards":      {"1", "", everyNetwork},
+		"a list replaces the default":         {"1", " 10.0.0.0/8, 192.168.1.10 ", []string{"10.0.0.0/8", "192.168.1.10"}},
+		"none trusts no proxy":                {"", "none", nil},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv(ENV_VERCEL, c.vercel)
+			t.Setenv(ENV_TRUSTED_PROXIES, c.proxies)
+
+			cfg, err := loadConfig()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(cfg.trustedProxies, c.want) {
+				t.Errorf("trusted proxies = %v, want %v", cfg.trustedProxies, c.want)
+			}
+		})
+	}
+}
+
+func TestLoadConfig_RejectsABadProxy(t *testing.T) {
+	t.Setenv(ENV_TRUSTED_PROXIES, "10.0.0.0/8,not-an-address")
+	if _, err := loadConfig(); err == nil {
+		t.Error("an entry that is neither an IP nor a CIDR was accepted")
 	}
 }
 

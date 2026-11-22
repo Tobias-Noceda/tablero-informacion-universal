@@ -121,7 +121,7 @@
 			{#if space.allowed}
 				<button class={addButtonClass} onclick={() => setCreatingBoard(true)}>
 					<Icon name="plus" class="w-5 h-5 text-main-text mb-0.5 mr-1" />
-					<span class="min-w-0 flex-1 truncate">Create new</span>
+					<span class="min-w-0 flex-1 truncate">{m['landing.create_board']()}</span>
 				</button>
 			{:else}
 				<PlanHint

@@ -65,7 +65,34 @@ const (
 	ParameterNumber WellKnownParameterType = "number"
 	// ParameterSecret renders a picker over the board's credentials.
 	ParameterSecret WellKnownParameterType = "secret"
+	// ParameterDate is a calendar day, YYYY-MM-DD; the form shows a date picker.
+	ParameterDate WellKnownParameterType = "date"
+	// ParameterDateTime is an instant in RFC 3339 (2026-01-01T00:00:00Z); the
+	// form shows a date and time picker and sends it in UTC.
+	ParameterDateTime WellKnownParameterType = "datetime"
 )
+
+// ErrInvalidParameter: a value is not what its parameter's type takes.
+var ErrInvalidParameter = errors.New("Invalid parameter value")
+
+// CheckValue refuses a date or date-time parameter's value that the card's
+// API could not read, so the card is not saved to fail on every run. Other
+// types take any text.
+func (p WellKnownParameter) CheckValue(value string) error {
+	var layout, example string
+	switch p.Type {
+	case ParameterDate:
+		layout, example = time.DateOnly, "2026-01-31"
+	case ParameterDateTime:
+		layout, example = time.RFC3339, "2026-01-31T09:00:00Z"
+	default:
+		return nil
+	}
+	if _, err := time.Parse(layout, value); err != nil {
+		return fmt.Errorf("%w: %s must look like %s", ErrInvalidParameter, p.Key, example)
+	}
+	return nil
+}
 
 type WellKnownParameter struct {
 	// Exact key in the card's Params, usually a "$placeholder".
@@ -126,6 +153,9 @@ func (wk WellKnown) Instantiate(params map[string]string) (*PostIts, *BoardPostI
 	}
 	for _, p := range wk.Parameters {
 		if value, ok := params[p.Key]; ok {
+			if err := p.CheckValue(value); err != nil {
+				return nil, nil, err
+			}
 			postit.Params[p.Key] = value
 			continue
 		}
@@ -171,9 +201,14 @@ func (wk WellKnown) Validate() error {
 			return fmt.Errorf("parameter %q needs label_en and label_es", p.Key)
 		}
 		switch p.Type {
-		case ParameterString, ParameterNumber, ParameterSecret:
+		case ParameterString, ParameterNumber, ParameterSecret, ParameterDate, ParameterDateTime:
 		default:
-			return fmt.Errorf("parameter %q: type must be string, number or secret", p.Key)
+			return fmt.Errorf("parameter %q: type must be string, number, secret, date or datetime", p.Key)
+		}
+		if p.Default != nil && *p.Default != "" {
+			if err := p.CheckValue(*p.Default); err != nil {
+				return fmt.Errorf("parameter %q: the default %w", p.Key, err)
+			}
 		}
 		params[p.Key] = true
 	}

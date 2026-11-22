@@ -50,6 +50,10 @@
     onsubmit
   }: Props = $props();
 
+  // The label names the field also when no id is given (screen readers, getByLabel).
+  const generatedId = $props.id();
+  const fieldId = $derived(id ?? generatedId);
+
   const finalLabelClass = $derived(cn(
     'text-sm font-medium text-foreground',
     labelClass
@@ -97,7 +101,7 @@
 
 <div class="flex flex-col gap-1 w-full">
   {#if label}
-    <label class={finalLabelClass} for={id}>
+    <label class={finalLabelClass} for={fieldId}>
       {label}
       {#if required}
         <span class="text-destructive">*</span>
@@ -107,7 +111,7 @@
   <div class="relative">
     {#if multiline}
       <textarea
-        {id}
+        id={fieldId}
         bind:this={textareaElement}
         class={finalClass}
         placeholder={skeleton ? m.input_loading() : placeholder}
@@ -128,7 +132,7 @@
       ></textarea>
     {:else}
       <input
-        {id}
+        id={fieldId}
         type={type === 'password' ? (showPassword ? 'text' : 'password') : type}
         {name}
         {autocomplete}

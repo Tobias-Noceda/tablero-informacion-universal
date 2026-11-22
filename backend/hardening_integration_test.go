@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -22,7 +23,7 @@ func (s *stack) fromSite(site string, cookie *http.Cookie, method, path string) 
 	req.Header.Set("Sec-Fetch-Site", site)
 	w := httptest.NewRecorder()
 	s.app.router.ServeHTTP(w, req)
-	s.responses = append(s.responses, w)
+	s.record(w)
 	return w
 }
 
@@ -96,6 +97,36 @@ func TestEndToEnd_LoginIsRateLimited(t *testing.T) {
 	bob := s.signUp("bob")
 	s.mustJSON(s.requestFrom(freshAddress(), "", http.MethodPost, "/api/v1/auth/login",
 		map[string]string{"email": bob.email, "password": itPassword}), http.StatusOK, &session)
+}
+
+// Behind the Docker ALB, a caller who writes their own X-Forwarded-For
+// cannot dodge the per-address login limit: nginx appends the real address
+// and only the ALB's private network is trusted, so the made-up entries are
+// never read.
+func TestEndToEnd_AMadeUpForwardedForDoesNotDodgeTheLoginLimit(t *testing.T) {
+	s := newStackWith(t, func(cfg *config) { cfg.trustedProxies = privateNetworks })
+	const alb, caller = "172.18.0.5:41000", "198.51.100.23"
+
+	login := func(attempt int) *httptest.ResponseRecorder {
+		body := strings.NewReader(`{"email":"nobody-` + uuid.NewString()[:8] + `@it.test","password":"wrong password"}`)
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", body)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Forwarded-For", fmt.Sprintf("203.0.113.%d, %s", attempt, caller))
+		req.RemoteAddr = alb
+		w := httptest.NewRecorder()
+		s.app.router.ServeHTTP(w, req)
+		return w
+	}
+
+	// A new account every time, so only the per-address limit can stop it.
+	for attempt := 1; attempt <= 10; attempt++ {
+		if w := login(attempt); w.Code != http.StatusUnauthorized {
+			t.Fatalf("attempt %d: %d, want 401", attempt, w.Code)
+		}
+	}
+	if w := login(11); w.Code != http.StatusTooManyRequests {
+		t.Errorf("eleventh attempt from the same caller: %d, want 429", w.Code)
+	}
 }
 
 // Adding people by email tells whether they have an account, so boards and

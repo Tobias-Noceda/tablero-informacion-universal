@@ -7,12 +7,10 @@ import { lines } from "../modules/memory";
 
 import { z } from "zod";
 
-// Define the schema for tool parameters
 export const schema = {
     id: z.uuid().describe("The memory PKG ID"),
 };
 
-// Define tool metadata
 export const metadata: ToolMetadata = {
     name: "memories",
     description:
@@ -25,7 +23,6 @@ export const metadata: ToolMetadata = {
     },
 };
 
-// Tool implementation
 export default async function ({ id }: InferSchema<typeof schema>) {
     const res = await api.get(`/v1/boards/${id}`);
     const board = (await res.json()) as Board;

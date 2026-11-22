@@ -1,6 +1,7 @@
 <script lang="ts">
   import { cn } from '$lib/utils';
   import DefaultPfp from '$assets/images/default-pfp.png';
+  import { m } from '$lib/paraglide/messages';
 
   interface Props {
     src?: string;
@@ -51,13 +52,13 @@
   {:else if !src || hasError}
     <img
       src={DefaultPfp}
-      alt="Default Avatar"
+      alt={m['user_info.avatar']()}
       style={imgStyle}
     />
   {:else}
     <img
       src={currentSrc}
-      alt="Avatar"
+      alt={m['user_info.avatar']()}
       referrerpolicy="no-referrer"
       style={imgStyle}
       onerror={handleError}

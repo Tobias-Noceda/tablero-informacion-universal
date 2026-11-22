@@ -7,6 +7,7 @@ import (
 	bl_ctrl "github.com/Secreto31126/tesis/common/controllers/billing"
 	"github.com/Secreto31126/tesis/common/controllers/boards"
 	g_ctrl "github.com/Secreto31126/tesis/common/controllers/groups"
+	h_ctrl "github.com/Secreto31126/tesis/common/controllers/health"
 	"github.com/Secreto31126/tesis/common/controllers/middleware"
 	o_ctrl "github.com/Secreto31126/tesis/common/controllers/orgs"
 	"github.com/Secreto31126/tesis/common/controllers/postits"
@@ -29,6 +30,7 @@ import (
 	b_srv "github.com/Secreto31126/tesis/common/services/boards"
 	e_srv "github.com/Secreto31126/tesis/common/services/entitlements"
 	g_srv "github.com/Secreto31126/tesis/common/services/groups"
+	h_srv "github.com/Secreto31126/tesis/common/services/health"
 	o_srv "github.com/Secreto31126/tesis/common/services/orgs"
 	p_srv "github.com/Secreto31126/tesis/common/services/postits"
 	cw_srv "github.com/Secreto31126/tesis/common/services/postittemplates"
@@ -59,7 +61,7 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	resolver := access.New(db)
 	// What each user's plan allows; every service that creates something
 	// asks it who pays and how much room they have left.
-	plans := e_srv.New(db, db, db, db, db, time.Now)
+	plans := e_srv.New(db, db, db, db, db, cache, time.Now)
 	secrets := s_srv.New(db, s_srv.NewPolicy(db, db, resolver), crypto.NewKeyring(kek, db), oauth.New(), cache, cache, db, resolver, plans)
 
 	authService := a_srv.New(a_srv.Config{AccessTTL: cfg.accessTTL, RefreshTTL: cfg.refreshTTL, Admins: cfg.admins},
@@ -74,11 +76,11 @@ func newApp(db *mongo.MongoDB, cache *redis.RedisDB, kek *crypto.Sealer, keys *j
 	wellKnownService := w_srv.New(db)
 	tokenService := t_srv.New(db, cache, plans, time.Now)
 
-	router := gin.Default()
-	router.RedirectTrailingSlash = false
-	router.Use(cors.New(corsConfig()))
+	router := newRouter(cfg)
 
 	api := router.Group("/api/v1")
+	// Public: an uptime monitor calls it without a session.
+	h_ctrl.NewController(h_srv.New(db, cache, cfg.version)).RegisterRoutes(api)
 	a_ctrl.NewController(authService, a_ctrl.Cookies{Secure: cfg.cookieSecure, Path: AUTH_COOKIE_PATH}).RegisterRoutes(api)
 
 	// The plans on offer are public (the pricing page shows them signed

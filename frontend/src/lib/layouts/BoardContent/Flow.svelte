@@ -4,9 +4,11 @@
 		SvelteFlow,
 		Controls,
 		useSvelteFlow,
+		useConnection,
 		type Node,
 		type Edge,
 		ConnectionMode,
+		Panel,
 		type Connection
 	} from '@xyflow/svelte';
 
@@ -35,6 +37,9 @@
 	import { theme } from '$stores/theme.svelte';
 	import Realtime from './Realtime.svelte';
 	import Cursors from './Cursors.svelte';
+	import StrandHint from '$components/StrandHint/StrandHint.svelte';
+	import { markStrandHintSeen, showStrandHint, strandHintSeen } from '$lib/strands/hint';
+	import { session } from '$modules/session.svelte';
 	import type { NodeMoves, Update } from '$modules/realtime.svelte';
 	import { isManagingSecrets, setManagingSecrets } from '$stores/sidebar';
 	import { results } from '$stores/postit-results.svelte';
@@ -45,7 +50,10 @@
 
 	import NodeConfigurationPanel from '$layouts/NodeConfiguration/NodeConfigurationPanel.svelte';
 	import OneOffCardPanel from '$layouts/OneOffCard/OneOffCardPanel.svelte';
-	import { ONE_OFF } from '$lib/well-knowns/one-off';
+	import { nodeType, ONE_OFF } from '$lib/well-knowns/one-off';
+	import { mapPostitWithTitle } from '$lib/helpers/post-it';
+	import { m } from '$lib/paraglide/messages';
+	import { toast } from '$stores/toast.svelte';
 
 	let {
 		nodes,
@@ -119,6 +127,9 @@
 	});
 
 	const { screenToFlowPosition } = useSvelteFlow();
+	// While a strand is being drawn, a whole card is a place to drop it, not
+	// only its edge (the `connecting` rules in Nodes/index.css).
+	const connection = useConnection();
 
 	mouses.updateMappers(screenToFlowPosition);
 
@@ -237,7 +248,11 @@
 	}) => {
 		const node = event.targetNode;
 		if (!node) return;
-		await postItsApi.move(node.id, node.position.x, node.position.y);
+		try {
+			await postItsApi.move(node.id, node.position.x, node.position.y);
+		} catch (err) {
+			console.error('Could not move the card:', err);
+		}
 	};
 
 	// Edge handlers
@@ -313,13 +328,45 @@
 		}
 	};
 
+	// The copy is added at once; the board's live update brings the same card.
+	const duplicateCard = async (id: string) => {
+		if (!canEdit) return;
+		try {
+			const copy = await postItsApi.duplicate(id);
+			const node = mapPostitWithTitle({ ...copy, type: nodeType(copy.type) });
+			if (!nodes.some((n) => n.id === node.id)) nodes = [...nodes, node];
+		} catch (err) {
+			// A plan limit is told by the API layer; anything else here.
+			if (err instanceof postItsApi.PostItError && err.status === 402) return;
+			toast.notify({
+				title: m['cards.duplicate_failed'](),
+				description: err instanceof postItsApi.PostItError ? err.message : '',
+				variant: 'destructive'
+			});
+		}
+	};
+
 	setCardEditor({
 		get canEdit() {
 			return canEdit;
 		},
+		get canAdd() {
+			return canAddNode(boardPlan.limits, nodes.length);
+		},
 		restyle: restyleCard,
-		resized: resizeCard
+		resized: resizeCard,
+		duplicate: duplicateCard
 	});
+
+	// How to draw the first strand, until one is drawn or it is dismissed.
+	let strandHintDone = $state(strandHintSeen(session.userId));
+	const strandHint = $derived(
+		showStrandHint({ canEdit, cards: nodes.length, strands: edges.length, seen: strandHintDone })
+	);
+	function dismissStrandHint() {
+		strandHintDone = true;
+		markStrandHintSeen(session.userId);
+	}
 
 	const onConnect = async (connection: Connection) => {
 		const exists = edges.find(
@@ -337,6 +384,7 @@
 
 		const strand = await edgesApi.connect(boardId, connection.source, connection.target);
 		edges = [...edges, strandToEdge(strand)];
+		dismissStrandHint();
 	};
 
 	// Backspace in a field of the detail drawer edits the field, not the board.
@@ -423,7 +471,7 @@
 <div class="relative flex flex-row flex-1 min-h-0 h-full w-full">
 	<main class="dndflow">
 		<Realtime bind:this={realtime} {boardId} {boardUpdate} {onNodeMoves}>
-			<div class="reactflow-wrapper">
+			<div class="reactflow-wrapper" class:connecting={connection.current.inProgress}>
 				<SvelteFlow
 					bind:nodes
 					bind:edges
@@ -449,6 +497,11 @@
 				>
 					<Controls />
 					<Cursors />
+					{#if strandHint}
+						<Panel position="bottom-center">
+							<StrandHint ondismiss={dismissStrandHint} />
+						</Panel>
+					{/if}
 				</SvelteFlow>
 			</div>
 		</Realtime>

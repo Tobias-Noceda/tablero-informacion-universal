@@ -78,6 +78,8 @@
     fill={svgData.isStrokeStyle ? "none" : "currentColor"}
     stroke={svgData.isStrokeStyle ? "currentColor" : "none"}
   >
+    <!-- The body comes from the app's own icon map, never from users. -->
+    <!-- eslint-disable-next-line svelte/no-at-html-tags -->
     {@html svgData.body}
   </svg>
 {/if}

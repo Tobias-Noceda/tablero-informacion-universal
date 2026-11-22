@@ -22,10 +22,14 @@
 	import Switch from '$components/Switch/Switch.svelte';
 	import { renderMarkdown } from '$lib/helpers/markdown';
 	import type { PostIt, PostItSettings, SecretRef } from '$types/api';
-	import { ONE_OFF } from '$lib/well-knowns/one-off';
+	import { ONE_OFF, oneOffFrom } from '$lib/well-knowns/one-off';
+	import { canBecomeTemplate, templateDraftFrom } from '$lib/well-knowns/one-off-template';
+	import { startCardTypeFrom } from '$stores/sidebar';
 	import ImageView from '$components/Nodes/Image/ImageView.svelte';
 	import { boardPlan } from '$stores/plan.svelte';
 	import { canRefresh } from '$lib/billing/can';
+	import { failureMessage, failureOf } from '$lib/cards/failure';
+	import { formatUpdated } from '$lib/cards/freshness';
 
 	export type PostItData = PostIt & {
 		title?: { text: string; vars: boolean };
@@ -83,6 +87,12 @@
 		void id;
 		return false;
 	});
+
+	// When the content shown arrived; a failed refresh says why it is old.
+	const freshness = $derived(results.freshness(id));
+	const updatedAt = $derived(
+		freshness?.at === undefined ? '' : formatUpdated(freshness.at, Date.now(), getLocale())
+	);
 
 	let refreshing = $state(false);
 	const MAX_TITLE_LENGTH = 24;
@@ -389,16 +399,44 @@
 					)}
 				{/if}
 			{:catch err}
-				<p class="text-sm text-destructive">{failure(err)}</p>
+				<p class="text-sm text-destructive">{failureMessage(failureOf(err))}</p>
 			{/await}
+			{#if freshness?.failure && updatedAt}
+				<p class="text-xs text-destructive" role="status">
+					{m['card_freshness.stale_detail']({
+						time: updatedAt,
+						reason: failureMessage(freshness.failure)
+					})}
+				</p>
+			{:else if updatedAt && results.polls(id)}
+				<p class="text-xs opacity-70">{m['card_freshness.updated']({ time: updatedAt })}</p>
+			{/if}
 		</section>
 	</div>
 
-	{#if canDelete}
-		<div class="flex shrink-0 items-center justify-center p-4 pt-0">
-			<Button variant="destructive" class="shrink-0" onclick={() => ondelete(node)}>
-				{m['node_detail.delete']()}
-			</Button>
+	{#if canDelete || (canEdit && isOneOff)}
+		<div class="flex shrink-0 flex-wrap items-center justify-center gap-2 p-4 pt-0">
+			{#if canEdit && isOneOff}
+				{#await settings then stored}
+					{@const card = oneOffFrom(stored, title?.text ?? '', stored.board)}
+					{@const allowed = canBecomeTemplate(card)}
+					<Tooltip content={allowed ? m['node_detail.save_as_type_hint']() : m['node_detail.save_as_type_post']()} placement="top">
+						<Button
+							variant="secondary"
+							class="shrink-0"
+							disabled={!allowed}
+							onclick={() => startCardTypeFrom(templateDraftFrom(card))}
+						>
+							{m['node_detail.save_as_type']()}
+						</Button>
+					</Tooltip>
+				{/await}
+			{/if}
+			{#if canDelete}
+				<Button variant="destructive" class="shrink-0" onclick={() => ondelete(node)}>
+					{m['node_detail.delete']()}
+				</Button>
+			{/if}
 		</div>
 	{/if}
 </aside>

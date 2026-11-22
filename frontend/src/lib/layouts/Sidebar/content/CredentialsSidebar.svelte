@@ -58,7 +58,9 @@
 						{/if}
 					</span>
 					{#if secretScope[0] === 'mine'}
-						<span class="text-xs font-medium opacity-90 text-red-900"> Personal </span>
+						<span class="text-xs font-medium opacity-90 text-red-900"
+							>{m['secrets.tab_mine']()}</span
+						>
 					{/if}
 				</div>
 			</SidebarElement>

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -31,6 +32,10 @@ func integrationDB(t *testing.T) *MongoDB {
 		t.Fatalf("connect: %v", err)
 	}
 	if err := db.client.Ping(context.Background(), nil); err != nil {
+		// In CI the services are there by design: a skip would hide a broken setup.
+		if os.Getenv("CI") != "" {
+			t.Fatalf("mongo not reachable: %v", err)
+		}
 		t.Skipf("mongo not reachable: %v", err)
 	}
 	if err := db.EnsureIndexes(); err != nil {

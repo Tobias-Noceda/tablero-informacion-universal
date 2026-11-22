@@ -1,0 +1,47 @@
+name: MCP tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - mcp/**
+      - .github/workflows/mcp-tests.yml
+
+# A pull request gets its own group (by number: a run that starts after the
+# merge would otherwise fall back to the base branch's ref and cancel its
+# runs). Only pull requests cancel: on main every merge gets tested.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  test:
+    name: test & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The versions mcp/package.json pins in devEngines
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.2
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@12.16.1 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Every tool against a stand-in board service; the end-to-end test is
+      # skipped without MCP_E2E_URL and MCP_E2E_TOKEN.
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

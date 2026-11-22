@@ -16,6 +16,24 @@
 		"template_label": "Template",
 		"create_board": "Create a new board"
 	},
+	"starters": {
+		"label": "Start from",
+		"empty": "Empty",
+		"empty_hint": "A blank board",
+		"finance": "Finance",
+		"finance_hint": "Dollar, country risk and crypto",
+		"trip": "Trip",
+		"trip_hint": "Weather, air quality and a packing list",
+		"dev": "Dev team",
+		"dev_hint": "GitHub repositories and the sprint's goals",
+		"finance_note_title": "To watch",
+		"finance_note": "Write here what you want to follow, and link it to the cards it depends on.",
+		"trip_note_title": "To pack",
+		"trip_note": "- Passport\n- Charger and adapter\n- Some cash",
+		"dev_note_title": "Sprint goals",
+		"dev_note": "- Ship the next release\n- Review the open issues\n- Take a break now and then",
+		"partial": "The board was created, but some of the example's cards could not be added."
+	},
 	"user_info": {
 		"language": {
 			"title": "Language",
@@ -27,7 +45,8 @@
 			"title": "Theme",
 			"dark": "Dark mode",
 			"light": "Light mode"
-		}
+		},
+		"avatar": "Profile picture"
 	},
 	"nodes": {
 		"title": "Cards",
@@ -41,7 +60,10 @@
 				"title": "Edit card",
 				"action": "Save changes"
 			}
-		}
+		},
+		"google_calendar_empty": "No upcoming events",
+		"search": "Search card types",
+		"search_empty": "No card type matches “{query}”: the custom API card can read any API."
 	},
 	"secrets": {
 		"title": "Board credentials",
@@ -257,7 +279,10 @@
 		"no_content": "This card has no values.",
 		"error": "The card could not be loaded.",
 		"forbidden": "The credential this card uses is no longer available to you.",
-		"delete": "Delete card"
+		"delete": "Delete card",
+		"save_as_type": "Save as card type",
+		"save_as_type_hint": "Reuse this request as a card type: you name it and choose who can use it.",
+		"save_as_type_post": "Card types only make GET requests: this card sends a POST."
 	},
 	"board": {
 		"title": "Board configuration",
@@ -307,6 +332,8 @@
 		"default": "Default value (optional)",
 		"type_string": "Text",
 		"type_number": "Number",
+		"type_date": "Date",
+		"type_datetime": "Date and time",
 		"type_secret": "Credential",
 		"add_parameter": "Add field",
 		"queries": "Query string",
@@ -342,6 +369,10 @@
 		"draft_kept": "Your unsaved template is kept; switch to a tab where you can create to save it.",
 		"creating_in": "New template in: {where}"
 	},
+	"date_input": {
+		"unreadable": "“{value}” is not a date: pick one.",
+		"utc": "Sent in UTC: {value}"
+	},
 	"one_off": {
 		"sidebar": "Custom API card",
 		"sidebar_hint": "Drop it on the board and connect it to any API, without creating a template.",
@@ -372,6 +403,21 @@
 		"err_body_json": "The body is not valid JSON.",
 		"err_body_size": "The body is larger than {max} KB.",
 		"err_body_credential": "The body uses ${name}, but there is no credential with that name you can use."
+	},
+	"curl": {
+		"toggle": "Paste a cURL command",
+		"hint": "API docs show their examples as cURL: paste one to fill in the address, headers and body.",
+		"placeholder": "curl https://api.example.com/v1/data -H 'Accept: application/json'",
+		"apply": "Fill in the form",
+		"applied": "The form was filled in from the command.",
+		"credentials": "Credentials found in {names}: they are not kept on the card. Store them in the board's credentials and pick them in those fields.",
+		"dropped_method": "A card only sends GET or POST, so the command's method was replaced.",
+		"dropped_body": "The body is not JSON and was left out.",
+		"dropped_flags": "Some curl options do not apply to a card and were ignored.",
+		"not_curl": "That does not look like a cURL command.",
+		"no_url": "The command has no address.",
+		"unclosed_quote": "A quote is not closed.",
+		"bad_url": "The command's address is not valid."
 	},
 	"strands": {
 		"toolbar": "Connection style",
@@ -416,7 +462,10 @@
 		"align_right": "Align right",
 		"valign_top": "Top (needs a height of its own)",
 		"valign_middle": "Middle (needs a height of its own)",
-		"valign_bottom": "Bottom (needs a height of its own)"
+		"valign_bottom": "Bottom (needs a height of its own)",
+		"duplicate": "Duplicate",
+		"duplicate_hint": "Duplicate this card next to it",
+		"duplicate_failed": "The card could not be duplicated"
 	},
 	"image": {
 		"missing": "This card has no image address yet.",
@@ -540,5 +589,49 @@
 			"billing_disabled": "Payments are not available right now.",
 			"unknown": "The subscription could not be started. Try again."
 		}
+	},
+	"card_failure": {
+		"source_auth": "The source refused the credential: check that it is still valid.",
+		"not_found": "The source found nothing at this address: check the URL and the card's settings.",
+		"rate_limited": "The source is limiting requests: try a longer refresh interval.",
+		"source_error": "The source answered with an error ({status}). Try again later.",
+		"timeout": "The source did not answer in time.",
+		"unreachable": "The source could not be reached: check the URL.",
+		"unreadable": "The source answered something the card cannot read: check the URL and the response type.",
+		"query": "The card's query found no value in the answer: check the query.",
+		"credential": "The credential this card uses is no longer available to you.",
+		"unavailable": "This card is temporarily unavailable.",
+		"network": "Could not reach the server. Check your connection.",
+		"unknown": "The card could not be loaded."
+	},
+	"card_freshness": {
+		"updated": "Updated {time}",
+		"stale": "Could not update",
+		"stale_detail": "Showing the last data ({time}). {reason}"
+	},
+	"legal": {
+		"home": "Home",
+		"privacy_policy": "Privacy Policy"
+	},
+	"card_preview": {
+		"try": "Try request",
+		"trying": "Trying…",
+		"try_hint": "Runs the request now, without saving the card, and shows what it answers: click a value to show it on the card.",
+		"try_needs_url": "Write the address first.",
+		"try_needs_json": "Picking values works with JSON responses; for HTML, write the selectors by hand.",
+		"too_many": "Too many tries in a row: wait a minute and try again.",
+		"invalid": "The request is not valid yet: {detail}",
+		"answered": "The source answered:",
+		"empty": "The source answered with nothing to pick.",
+		"items": "{count} items",
+		"more": "… and {count} more",
+		"pick": "Show this value on the card",
+		"pick_all": "all",
+		"pick_all_hint": "Show this value for every element of the list",
+		"picked": "Added “{name}”: put it in the title as {variable}."
+	},
+	"strand_hint": {
+		"text": "Connect two cards: drag from the edge of one onto the other.",
+		"dismiss": "Got it"
 	}
 }

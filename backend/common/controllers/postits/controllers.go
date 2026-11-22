@@ -26,8 +26,10 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 	boardGroup := router.Group("/post-its")
 	{
 		boardGroup.POST("", ctrl.CreatePostIt)
+		boardGroup.POST("/preview", ctrl.PreviewPostIt)
 		boardGroup.GET("/:id", ctrl.ExecutePostIt)
 		boardGroup.DELETE("/:id", ctrl.DeletePostIt)
+		boardGroup.POST("/:id/duplicate", ctrl.DuplicatePostIt)
 
 		boardGroup.GET("/:id/settings", ctrl.GetPostIt)
 		boardGroup.PATCH("/:id/settings", ctrl.EditPostIt)
@@ -76,6 +78,69 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, postIt)
+}
+
+// PreviewPostIt godoc
+// @Summary      Try a card's request
+// @Description  Runs a one-off card's request as the caller (an editor of the board) without saving it, and answers its outputs, or the whole JSON response when it has none. Limited per user; closed to access tokens.
+// @Tags         post-its
+// @Accept       json
+// @Param        body body PreviewPostItRequest true "The request being written"
+// @Success      200  {object}  srv.Preview
+// @Failure      400  {object}  map[string]string{"error": "string"}
+// @Failure      404  {object}  map[string]string{"error": "string"}
+// @Failure      429  {object}  map[string]string{"error": "string"}
+// @Failure      502  {object}  map[string]string{"error": "string", "code": "string"}
+// @Router       /post-its/preview [post]
+func (ctrl *Controller) PreviewPostIt(c *gin.Context) {
+	var req PreviewPostItRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	preview, err := ctrl.service.PreviewPostIt(middleware.Principal(c), &models.PostIts{
+		Board:    req.Board,
+		Resource: req.Resource.URL,
+		Request:  req.Request,
+		Response: req.Response,
+		Query:    req.Query,
+		Bindings: req.Bindings,
+	})
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	c.Writer.Header().Set("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, preview)
+}
+
+// DuplicatePostIt godoc
+// @Summary      Duplicate a card
+// @Description  Copies a card next to it on its board (settings, title, style). Editors only; the copy runs as the caller, who must be allowed to use its credentials, and counts against the board's plan.
+// @Tags         post-its
+// @Param        id   path      string  true  "Post-it UUID" format(uuid)
+// @Success      201  {object}  models.BoardPostIt
+// @Failure      400  {object}  map[string]string{"error": "string"}
+// @Failure      402  {object}  map[string]string{"error": "string"}
+// @Failure      403  {object}  map[string]string{"error": "string"}
+// @Failure      404  {object}  map[string]string{"error": "string"}
+// @Router       /post-its/{id}/duplicate [post]
+func (ctrl *Controller) DuplicatePostIt(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid uuid"})
+		return
+	}
+
+	copied, err := ctrl.service.DuplicatePostIt(middleware.Principal(c), id)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, copied)
 }
 
 // GetPostIt godoc
@@ -383,7 +448,40 @@ func fail(c *gin.Context, err error) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "rate_limited"})
 		return
 	}
+	if code, status := cardFailure(err); code != "" {
+		body := gin.H{"error": err.Error(), "code": code}
+		var source *infrastructure.SourceStatusError
+		if errors.As(err, &source) {
+			body["status"] = source.Status
+		}
+		c.JSON(status, body)
+		return
+	}
 	c.JSON(statusOf(err), gin.H{"error": err.Error()})
+}
+
+// cardFailure is why a card could not run, as a code the board turns into
+// what to check. The message stays in "error": the MCP server shows it to
+// the agent.
+func cardFailure(err error) (string, int) {
+	var source *infrastructure.SourceStatusError
+	switch {
+	case errors.As(err, &source):
+		return "source_status", http.StatusBadGateway
+	case errors.Is(err, infrastructure.ErrSourceTimeout):
+		return "source_timeout", http.StatusGatewayTimeout
+	case errors.Is(err, infrastructure.ErrSourceUnreachable):
+		return "source_unreachable", http.StatusBadGateway
+	case errors.Is(err, infrastructure.ErrSourceUnreadable):
+		return "source_unreadable", http.StatusBadGateway
+	case errors.Is(err, infrastructure.ErrQueryFailed):
+		return "query_failed", http.StatusUnprocessableEntity
+	case errors.Is(err, srv.ErrCredentialUnavailable):
+		return "credential_unavailable", http.StatusForbidden
+	case errors.Is(err, srv.ErrSystemSecretMissing):
+		return "card_unavailable", http.StatusServiceUnavailable
+	}
+	return "", 0
 }
 
 func statusOf(err error) int {
@@ -399,6 +497,7 @@ func statusOf(err error) int {
 		errors.Is(err, srv.ErrTemplateFixed),
 		errors.Is(err, srv.ErrInvalidRate),
 		errors.Is(err, models.ErrWellKnownMissingVariable),
+		errors.Is(err, models.ErrInvalidParameter),
 		errors.Is(err, infrastructure.ErrUnknownCredential):
 		return http.StatusBadRequest
 	case errors.Is(err, srv.ErrSystemSecretMissing):

@@ -42,7 +42,7 @@ func (s *stack) withCookie(cookie *http.Cookie, method, path string) *httptest.R
 	req.AddCookie(cookie)
 	w := httptest.NewRecorder()
 	s.app.router.ServeHTTP(w, req)
-	s.responses = append(s.responses, w)
+	s.record(w)
 	return w
 }
 
@@ -52,7 +52,7 @@ func (s *stack) bearer(token, method, path string) *httptest.ResponseRecorder {
 	req.Header.Set("Authorization", "Bearer "+token)
 	w := httptest.NewRecorder()
 	s.app.router.ServeHTTP(w, req)
-	s.responses = append(s.responses, w)
+	s.record(w)
 	return w
 }
 

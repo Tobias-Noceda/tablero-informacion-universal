@@ -6,7 +6,6 @@ import * as api from "../modules/api";
 
 import { z } from "zod";
 
-// Define the schema for tool parameters
 export const schema = {
     name: z.string().trim().min(1).max(32).describe("The memory PKG name"),
     organization: z
@@ -19,7 +18,6 @@ export const schema = {
         ),
 };
 
-// Define tool metadata
 export const metadata: ToolMetadata = {
     name: "create_pkg",
     description:
@@ -32,7 +30,6 @@ export const metadata: ToolMetadata = {
     },
 };
 
-// Tool implementation
 export default async function ({
     name,
     organization,

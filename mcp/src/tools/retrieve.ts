@@ -9,13 +9,11 @@ import { relation } from "../modules/strands";
 
 import { z } from "zod";
 
-// Define the schema for tool parameters
 export const schema = {
     board_id: z.uuid().describe("The memory PKG ID"),
     postit_id: z.uuid().describe("The memory ID"),
 };
 
-// Define tool metadata
 export const metadata: ToolMetadata = {
     name: "retrieve",
     description:
@@ -29,7 +27,6 @@ export const metadata: ToolMetadata = {
     },
 };
 
-// Tool implementation
 export default async function ({
     board_id,
     postit_id,

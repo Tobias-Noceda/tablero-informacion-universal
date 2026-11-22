@@ -72,9 +72,10 @@ export function applyPatch(edge: StrandEdge, patch: StrandStyle): StrandEdge {
 	return { ...edge, data };
 }
 
-// One line of at most MAX_STRAND_LABEL characters, as the backend keeps it.
+// One line of at most MAX_STRAND_LABEL characters, as the backend keeps it:
+// controls and Unicode's line and paragraph separators become spaces.
 export function normalizeLabel(label: string): string {
-	return Array.from(label.replace(/[\p{Cc}]+/gu, ' ').trim())
+	return Array.from(label.replace(/[\p{Cc}\u{2028}\u{2029}]+/gu, ' ').trim())
 		.slice(0, MAX_STRAND_LABEL)
 		.join('')
 		.trim();

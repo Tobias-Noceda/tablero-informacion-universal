@@ -1,6 +1,9 @@
 package postits
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -11,6 +14,7 @@ import (
 	"github.com/Secreto31126/tesis/common/infrastructure"
 	"github.com/Secreto31126/tesis/common/models"
 	"github.com/google/uuid"
+	"golang.org/x/sync/singleflight"
 )
 
 var (
@@ -53,6 +57,9 @@ type PostItsService struct {
 	// result is cached at least, whether a refresh may skip the cache.
 	plans   infrastructure.Entitlements
 	limiter infrastructure.RateLimiter
+	// Runs of a card that missed the cache, shared by whoever asks for the
+	// same card while one is under way.
+	flights singleflight.Group
 }
 
 // PostitTemplates answers which user-defined card type a new card on a
@@ -65,22 +72,29 @@ type PostitTemplates interface {
 }
 
 func New(db infrastructure.Database, cache infrastructure.Cache, run infrastructure.Executer, secrets infrastructure.SecretResolver, access infrastructure.Access, wellKnowns infrastructure.WellKnownReader, templates PostitTemplates, plans infrastructure.Entitlements, limiter infrastructure.RateLimiter) *PostItsService {
-	return &PostItsService{db, cache, run, secrets, access, wellKnowns, templates, plans, limiter}
+	return &PostItsService{
+		db:         db,
+		cache:      cache,
+		exec:       run,
+		secrets:    secrets,
+		access:     access,
+		wellKnowns: wellKnowns,
+		templates:  templates,
+		plans:      plans,
+		limiter:    limiter,
+	}
 }
 
 func (srv *PostItsService) CreatePostIt(principal models.Principal, title *models.BoardPostItTitle, postIt *models.PostIts) (*models.PostIts, error) {
-	board, err := srv.require(principal, postIt.Board, models.BoardEditor)
-	if err != nil {
+	if _, err := srv.require(principal, postIt.Board, models.BoardEditor); err != nil {
 		return nil, err
 	}
 
-	plan, err := srv.plans.ForBoard(board)
+	_, release, err := srv.roomForCard(postIt.Board)
 	if err != nil {
 		return nil, err
 	}
-	if err := plan.Admits(models.LimitNodes, len(board.PostIts), plan.Limits.NodesPerBoard); err != nil {
-		return nil, err
-	}
+	defer release()
 
 	if postIt.WellKnown != "" {
 		def, err := srv.definition(principal, postIt.Board, postIt.WellKnown)
@@ -118,6 +132,30 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 	entry.Vars = titleVars(entry.Text, outputsOf(postIt))
 
 	return srv.db.CreatePostIt(postIt, entry, postIt.WellKnown, models.Position{X: 750, Y: 350})
+}
+
+// roomForCard takes the board's turn for a new card and checks its plan has
+// room for one more. The cards are counted on the board as it is in the turn,
+// and the caller creates the card before calling release.
+func (srv *PostItsService) roomForCard(boardID uuid.UUID) (*models.Board, func(), error) {
+	release, err := srv.plans.Hold(models.LimitNodes, "board:"+boardID.String())
+	if err != nil {
+		return nil, nil, err
+	}
+	board, err := srv.db.FindBoard(boardID)
+	if err != nil || board == nil {
+		release()
+		return nil, nil, ErrNotAMember
+	}
+	plan, err := srv.plans.ForBoard(board)
+	if err == nil {
+		err = plan.Admits(models.LimitNodes, len(board.PostIts), plan.Limits.NodesPerBoard)
+	}
+	if err != nil {
+		release()
+		return nil, nil, err
+	}
+	return board, release, nil
 }
 
 // definition is the live well-known a new card is made from: one of the
@@ -181,6 +219,11 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 	if err := applyOneOff(postit, set); err != nil {
 		return err
 	}
+	if params, ok := set["params"].(map[string]string); ok {
+		if err := srv.checkParams(postit, params); err != nil {
+			return err
+		}
+	}
 
 	if touchesCredentials(set) {
 		bindings := postit.Bindings
@@ -196,7 +239,40 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 	if err := srv.db.UpdatePostIt(id, set); err != nil {
 		return err
 	}
-	return srv.cache.DropPostItResult(id)
+	if err := srv.cache.DropPostItResult(id); err != nil {
+		return err
+	}
+	// After the drop, or a client told to run the card again could read the
+	// old result back. Missing it only delays the others until their next
+	// refresh, so the saved settings stand.
+	if err := srv.db.BumpPostIt(postit.Board, id); err != nil {
+		log.Printf("post-it %s: telling the board about new settings failed: %v", id, err)
+	}
+	return nil
+}
+
+// checkParams refuses edited values the card's type would not take (a date
+// that is not one), as creating the card does. Only the catalogue's types are
+// looked up: a card made from a post-it template was checked when it was made.
+func (srv *PostItsService) checkParams(postit *models.PostIts, params map[string]string) error {
+	if postit.WellKnown == "" {
+		return nil
+	}
+	def, err := srv.wellKnowns.FindWellKnown(postit.WellKnown)
+	if errors.Is(err, infrastructure.ErrWellKnownNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, p := range def.Parameters {
+		if value, ok := params[p.Key]; ok {
+			if err := p.CheckValue(value); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func touchesCredentials(set map[string]any) bool {
@@ -478,14 +554,35 @@ func (srv *PostItsService) limits(postit *models.PostIts) (models.Entitlement, e
 }
 
 // ExecutePostIt answers the cached result while there is one, and runs the
-// card otherwise. Only a miss looks up the board's plan.
+// card otherwise. Only a miss looks up the board's plan. Requests that miss
+// while the same card is already running wait for that run instead of
+// asking its API again; a failed run is shared but not kept. The sharing is
+// per process: separate instances can still each run the card once.
 func (srv *PostItsService) ExecutePostIt(postit *models.PostIts) (any, error) {
 	cached, err := srv.cache.FindPostItResult(postit.Id)
 	if err == nil {
 		return cached, nil
 	}
 
-	return srv.execute(postit)
+	key, ok := flightKey(postit)
+	if !ok {
+		return srv.execute(postit)
+	}
+	data, err, _ := srv.flights.Do(key, func() (any, error) {
+		return srv.execute(postit)
+	})
+	return data, err
+}
+
+// flightKey is the card as it is set up now: a request that loaded it after
+// an edit does not join a run of the settings it no longer has.
+func flightKey(postit *models.PostIts) (string, bool) {
+	settings, err := json.Marshal(postit)
+	if err != nil {
+		return "", false
+	}
+	sum := sha256.Sum256(settings)
+	return postit.Id.String() + ":" + hex.EncodeToString(sum[:]), true
 }
 
 // RefreshPostIt runs the card without looking at the cache, and caches

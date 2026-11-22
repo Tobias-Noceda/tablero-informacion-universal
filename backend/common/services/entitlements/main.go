@@ -2,6 +2,7 @@ package entitlements
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
@@ -26,13 +27,52 @@ type Service struct {
 	boards infrastructure.BoardReader
 	groups infrastructure.GroupReader
 	counts Counter
-	now    func() time.Time
+	// Takes turns on a limit across processes; nil holds nothing.
+	locks infrastructure.Locker
+	wait  time.Duration
+	now   func() time.Time
 }
 
 var _ infrastructure.Entitlements = (*Service)(nil)
 
-func New(users infrastructure.UserReader, orgs infrastructure.OrgReader, boards infrastructure.BoardReader, groups infrastructure.GroupReader, counts Counter, now func() time.Time) *Service {
-	return &Service{users, orgs, boards, groups, counts, now}
+func New(users infrastructure.UserReader, orgs infrastructure.OrgReader, boards infrastructure.BoardReader, groups infrastructure.GroupReader, counts Counter, locks infrastructure.Locker, now func() time.Time) *Service {
+	return &Service{users: users, orgs: orgs, boards: boards, groups: groups, counts: counts, locks: locks, wait: HOLD_WAIT, now: now}
+}
+
+const (
+	// HOLD_TTL frees a turn whose holder died; far longer than a count and
+	// an insert.
+	HOLD_TTL = 10 * time.Second
+	// HOLD_WAIT is how long a request waits for its turn before it is told
+	// to try again.
+	HOLD_WAIT = 5 * time.Second
+	holdStep  = 20 * time.Millisecond
+)
+
+func (srv *Service) Hold(limit, holder string) (func(), error) {
+	if srv.locks == nil {
+		return func() {}, nil
+	}
+
+	key := "limit:" + limit + ":" + holder
+	start := time.Now()
+	for {
+		token, held, err := srv.locks.Acquire(key, HOLD_TTL)
+		if err != nil {
+			return nil, err
+		}
+		if held {
+			return func() {
+				if err := srv.locks.Release(key, token); err != nil {
+					log.Printf("entitlements: releasing %s: %v", key, err)
+				}
+			}, nil
+		}
+		if time.Since(start) >= srv.wait {
+			return nil, infrastructure.ErrRateLimited
+		}
+		time.Sleep(holdStep)
+	}
 }
 
 // free is what an account that cannot be found is on: nothing it owned is

@@ -1,0 +1,16 @@
+{
+  "name": "perf",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Measurements of the running app: live update propagation and API load (see README.md)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "latency": "node latency.mjs"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.8.3"
+  }
+}

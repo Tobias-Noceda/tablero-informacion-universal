@@ -5,6 +5,7 @@ package redis
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -20,6 +21,10 @@ func integrationCache(t *testing.T) *RedisDB {
 		t.Fatalf("connect: %v", err)
 	}
 	if err := db.client.Ping(context.Background()).Err(); err != nil {
+		// In CI the services are there by design: a skip would hide a broken setup.
+		if os.Getenv("CI") != "" {
+			t.Fatalf("redis not reachable: %v", err)
+		}
 		t.Skipf("redis not reachable: %v", err)
 	}
 
@@ -126,5 +131,48 @@ func TestRedis_RateLimiterCountsWithinWindow(t *testing.T) {
 	defer cancel()
 	if ttl := db.client.TTL(ctx, "rate:"+key).Val(); ttl <= 0 || ttl > time.Minute {
 		t.Errorf("window ttl = %v", ttl)
+	}
+}
+
+// A counter left without a window (the old limiter set it in a second call
+// that could fail) would refuse that key forever. The next attempt gives it
+// a window again, so it empties as any other.
+func TestRedis_RateLimiterHealsACounterWithoutAWindow(t *testing.T) {
+	db := integrationCache(t)
+	key := "login:" + uuid.NewString()
+
+	ctx, cancel := timeout()
+	defer cancel()
+	if err := db.client.Set(ctx, "rate:"+key, 50, 0).Err(); err != nil {
+		t.Fatal(err)
+	}
+
+	if ok, err := db.Allow(key, 3, time.Minute); err != nil || ok {
+		t.Fatalf("allowed = %v, %v; the stuck counter is still over the limit", ok, err)
+	}
+	if ttl := db.client.TTL(ctx, "rate:"+key).Val(); ttl <= 0 || ttl > time.Minute {
+		t.Errorf("window ttl = %v, want the counter to expire within the window", ttl)
+	}
+}
+
+// The window starts with the first attempt and later ones do not stretch it.
+func TestRedis_RateLimiterKeepsTheFirstWindow(t *testing.T) {
+	db := integrationCache(t)
+	key := "login:" + uuid.NewString()
+
+	if _, err := db.Allow(key, 10, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := timeout()
+	defer cancel()
+	if err := db.client.PExpire(ctx, "rate:"+key, 30*time.Second).Err(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := db.Allow(key, 10, time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	if ttl := db.client.TTL(ctx, "rate:"+key).Val(); ttl > 30*time.Second {
+		t.Errorf("window ttl = %v, want the second attempt to leave it alone", ttl)
 	}
 }

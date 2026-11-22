@@ -99,6 +99,12 @@ var tokenWrites = map[string]bool{
 	"PATCH /api/v1/boards/:id/strands/:strand":  true,
 	"DELETE /api/v1/boards/:id/strands/:strand": true,
 	"POST /api/v1/post-its":                     true,
+	"POST /api/v1/post-its/:id/duplicate":       true,
+	"POST /api/v1/post-its/preview":             true,
+	"POST /api/v1/users/:id/postit-templates":   true,
+	"POST /api/v1/boards/:id/postit-templates":  true,
+	"PUT /api/v1/postit-templates/:key":         true,
+	"DELETE /api/v1/postit-templates/:key":      true,
 	"DELETE /api/v1/post-its/:id":               true,
 	"PATCH /api/v1/post-its/:id/settings":       true,
 	"PATCH /api/v1/post-its/:id/position":       true,
@@ -113,8 +119,8 @@ func TestEndToEnd_AccessTokenReachesOnlyTheAllowlist(t *testing.T) {
 	params := strings.NewReplacer(":id", uuid.NewString(), ":strand", uuid.NewString(), ":user", "u", ":name", "KEY", ":token", uuid.NewString())
 
 	for _, route := range s.app.router.Routes() {
-		// The webhook is public, so a token is no different from anyone.
-		if strings.HasPrefix(route.Path, "/api/v1/auth/") || publicBilling[route.Path] {
+		// Public routes treat a token like anyone else.
+		if strings.HasPrefix(route.Path, "/api/v1/auth/") || publicRoutes[route.Path] {
 			continue
 		}
 		w := s.request(token, route.Method, params.Replace(route.Path), nil)
@@ -122,5 +128,65 @@ func TestEndToEnd_AccessTokenReachesOnlyTheAllowlist(t *testing.T) {
 		if allowed && route.Method != http.MethodGet && !tokenWrites[route.Method+" "+route.Path] {
 			t.Errorf("%s %s let a token through: %d", route.Method, route.Path, w.Code)
 		}
+	}
+}
+
+// An agent sets up card types for its person and for a board, which they then
+// use picking only their own credential; it tries a request before saving.
+// An organization's card types stay out of its reach.
+func TestEndToEnd_AccessTokenSetsUpCardTypes(t *testing.T) {
+	s := newStack(t)
+	ana := s.signUp("ana")
+	board := ana.newBoard("Repos")
+	pat := &client{s, ana.id, ana.email, ana.tokenFor("agent").Token}
+
+	cardType := map[string]any{
+		"name":     "GitHub repo",
+		"title":    map[string]any{"text": "{{name}} has {{stars}} stars", "vars": true},
+		"resource": "https://api.github.com/repos/$repo",
+		"request": map[string]any{
+			"method":  "GET",
+			"headers": map[string]string{"Authorization": "$credential"},
+			"queries": map[string]string{},
+		},
+		"response": "json",
+		"query":    map[string]string{"name": ".full_name", "stars": ".stargazers_count"},
+		"rate":     600,
+		"parameters": []map[string]any{
+			{"key": "$repo", "label": "Repository (owner/name)", "type": "string"},
+			{"key": "$credential", "label": "GitHub token", "type": "secret"},
+		},
+		"outputs": []map[string]any{{"key": "name", "label": "Name"}, {"key": "stars", "label": "Stars"}},
+	}
+
+	var mine models.PostitTemplate
+	s.mustJSON(pat.do(http.MethodPost, "/api/v1/users/"+ana.id+"/postit-templates", cardType), http.StatusCreated, &mine)
+	s.mustJSON(pat.do(http.MethodPost, "/api/v1/boards/"+board.Id.String()+"/postit-templates", cardType), http.StatusCreated, nil)
+
+	var listed []models.PostitTemplate
+	s.mustJSON(pat.do(http.MethodGet, "/api/v1/users/"+ana.id+"/postit-templates", nil), http.StatusOK, &listed)
+	if len(listed) != 1 || listed[0].Key != mine.Key {
+		t.Errorf("listed = %+v", listed)
+	}
+	// The person sees it as one of their card types on the board.
+	s.mustJSON(ana.do(http.MethodGet, "/api/v1/postit-templates/"+mine.Key, nil), http.StatusOK, nil)
+
+	cardType["name"] = "GitHub repository"
+	s.mustJSON(pat.do(http.MethodPut, "/api/v1/postit-templates/"+mine.Key, cardType), http.StatusOK, nil)
+	if w := pat.do(http.MethodDelete, "/api/v1/postit-templates/"+mine.Key, nil); w.Code != http.StatusNoContent {
+		t.Errorf("delete: %d %s", w.Code, w.Body.String())
+	}
+
+	// Trying a request reaches the preview (here refused by the SSRF guard).
+	w := pat.do(http.MethodPost, "/api/v1/post-its/preview", map[string]any{"board": board.Id, "resource": "http://127.0.0.1:9/x"})
+	if w.Code == http.StatusForbidden {
+		t.Errorf("preview with a token: %d %s", w.Code, w.Body.String())
+	}
+
+	var org models.Org
+	s.mustJSON(ana.do(http.MethodPost, "/api/v1/orgs", map[string]string{"name": "acme"}), http.StatusCreated, &org)
+	defer ana.do(http.MethodDelete, "/api/v1/orgs/"+org.Id.String(), nil)
+	if w := pat.do(http.MethodPost, "/api/v1/orgs/"+org.Id.String()+"/postit-templates", cardType); w.Code != http.StatusForbidden && w.Code != http.StatusNotFound {
+		t.Errorf("org card type with a token: %d, want refused", w.Code)
 	}
 }

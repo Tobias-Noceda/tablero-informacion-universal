@@ -32,6 +32,10 @@ func TestStrandStyle_Normalized(t *testing.T) {
 		},
 		{name: "a label over the limit", give: StrandStyle{Label: strings.Repeat("a", MaxStrandLabel+1)}, wantErr: true},
 		{name: "a label over two lines", give: StrandStyle{Label: "one\ntwo"}, wantErr: true},
+		// Found by FuzzStrandPatch: not controls, but they still break the line.
+		{name: "a Unicode line separator", give: StrandStyle{Label: "one" + string(rune(0x2028)) + "two"}, wantErr: true},
+		{name: "a Unicode paragraph separator", give: StrandStyle{Label: "one" + string(rune(0x2029)) + "two"}, wantErr: true},
+		{name: "bytes that are not text", give: StrandStyle{Label: "\xff\xfe"}, wantErr: true},
 		{name: "an unknown arrow", give: StrandStyle{Arrow: "sideways"}, wantErr: true},
 		{name: "an unknown width", give: StrandStyle{Width: "huge"}, wantErr: true},
 		{name: "a colour outside the palette", give: StrandStyle{Color: "#ff0000"}, wantErr: true},

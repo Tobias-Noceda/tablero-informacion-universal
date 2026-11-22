@@ -1,21 +1,38 @@
 import { headers } from "xmcp/headers";
 
 // ApiError is a backend answer other than 2xx, with its `error` code.
+// Its fields are declared, not parameter properties, so Node can run this
+// file by stripping types (the tests do).
 export class ApiError extends Error {
-    constructor(
-        readonly status: number,
-        readonly code: string,
-        // Which plan limit refused it (a 402 `plan_limit`), if any.
-        readonly limit?: string,
-    ) {
-        super(describe(status, code, limit));
+    readonly status: number;
+    readonly code: string;
+    // Which plan limit refused it (a 402 `plan_limit`), if any.
+    readonly limit?: string;
+    // The backend's explanation of a refused body (its `message`), if any.
+    readonly detail?: string;
+
+    constructor(status: number, code: string, limit?: string, detail?: string) {
+        super(describe(status, code, limit, detail));
         this.name = "ApiError";
+        this.status = status;
+        this.code = code;
+        this.limit = limit;
+        this.detail = detail;
     }
 }
 
 // What the agent (and the person behind it) should read for each failure.
-function describe(status: number, code: string, limit?: string) {
+function describe(
+    status: number,
+    code: string,
+    limit?: string,
+    detail?: string,
+) {
     switch (status) {
+        case 400:
+            return detail
+                ? `Refused (${code}): ${detail}`
+                : `The board service answered 400 (${code}).`;
         case 402:
             return limit === "api_access"
                 ? "The MCP server requires a Pro or Max plan. Upgrade the account that created this access token."
@@ -24,7 +41,7 @@ function describe(status: number, code: string, limit?: string) {
             return "The access token is invalid, expired or revoked. Create a new one in your profile.";
         case 403:
             return code === "token_not_allowed"
-                ? "Access tokens can only read and edit boards and their cards."
+                ? "Access tokens can only read and edit boards, their cards and card types."
                 : `Not allowed (${code}).`;
         case 404:
             return "Not found, or you have no access to it.";
@@ -73,6 +90,7 @@ async function request(
             response.status,
             typeof payload?.error === "string" ? payload.error : "unknown",
             typeof payload?.limit === "string" ? payload.limit : undefined,
+            typeof payload?.message === "string" ? payload.message : undefined,
         );
     }
 

@@ -15,6 +15,11 @@ export default defineConfig({
 	build: {
 		sourcemap: true
 	},
+	define: {
+		// Built by Vercel (the adapter in svelte.config.js keys on the same
+		// variable): only its deployments serve Speed Insights' script.
+		__VERCEL_BUILD__: JSON.stringify(Boolean(process.env.VERCEL))
+	},
 	server: {
 		proxy: {
 			'/api': 'http://localhost',						// Docker ALB

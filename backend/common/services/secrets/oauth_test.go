@@ -255,7 +255,8 @@ func TestResolve_OAuth2PersistsRotatedRefreshToken(t *testing.T) {
 }
 
 // Losing the lock means another worker is already refreshing; this one must
-// not also spend the refresh token.
+// not also spend the refresh token. It waits for the new token, but only for
+// so long: a refresh that never lands does not hold it forever.
 func TestResolve_OAuth2DoesNotRefreshWithoutTheLock(t *testing.T) {
 	store := newStore()
 	fetched := false
@@ -269,11 +270,16 @@ func TestResolve_OAuth2DoesNotRefreshWithoutTheLock(t *testing.T) {
 		AcquireFn: func(string, time.Duration) (string, bool, error) { return "", false, nil },
 	}
 	srv := oauthService(t, store, tokens, locks)
+	srv.refreshWait = 50 * time.Millisecond
 	board := models.BoardScope(uuid.New())
 
 	_ = srv.PutOAuth2(board, owner, "SPOTIFY", clientCredentials())
 
+	start := time.Now()
 	_, err := srv.Resolve(board, []string{"SPOTIFY"})
+	if elapsed := time.Since(start); elapsed < srv.refreshWait || elapsed > 20*srv.refreshWait {
+		t.Errorf("gave up after %v, want about %v", elapsed, srv.refreshWait)
+	}
 	if err == nil {
 		t.Fatal("expected the loser of the race to report a retryable error")
 	}

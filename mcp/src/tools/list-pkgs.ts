@@ -4,10 +4,8 @@ import type { ToolMetadata } from "xmcp";
 
 import * as api from "../modules/api";
 
-// Define the schema for tool parameters
 export const schema = {};
 
-// Define tool metadata
 export const metadata: ToolMetadata = {
     name: "list_pkgs",
     description:
@@ -20,7 +18,6 @@ export const metadata: ToolMetadata = {
     },
 };
 
-// Tool implementation
 export default async function () {
     const [b_res, o_res] = await Promise.all([
         api.get("/v1/boards"),

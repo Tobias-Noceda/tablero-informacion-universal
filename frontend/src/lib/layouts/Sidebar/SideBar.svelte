@@ -2,6 +2,7 @@
     import { getSidebar, isConfiguringBoard, isSharing, setConfiguringBoard, setSharing, setSidebar } from '$stores/sidebar';
     import { cn } from '$lib/utils';
     import Icon from '$components/Icon/Icon.svelte';
+    import { m } from '$lib/paraglide/messages';
     import CardsSidebar from './content/CardsSidebar.svelte';
     import CredentialsSidebar from './content/CredentialsSidebar.svelte';
 	import type { BoardRole, UUID } from '$types/api';
@@ -12,8 +13,12 @@
 <div
     class="flex flex-col justify-between bg-sidebar! border-r border-sidebar-border transition-transform duration-300 h-full p-2 w-14 max-w-14 z-100!"
 >
-    {#snippet SidebarButton(iconName: string, isActive: boolean, onClick: () => void)}
+    <!-- Icon-only buttons: the label is what assistive technology (and the e2e tests) read. -->
+    {#snippet SidebarButton(iconName: string, label: string, isActive: boolean, onClick: () => void)}
         <button
+            aria-label={label}
+            title={label}
+            aria-pressed={isActive}
             class={cn(
                 'flex flex-row items-center rounded-md bg-sidebar hover:bg-sidebar-hover cursor-pointer p-2',
                 isActive ? 'bg-sidebar-hover' : ''
@@ -25,18 +30,18 @@
     {/snippet}
     <div class="flex flex-col gap-3">
         {#if role === 'owner' || role === 'editor'}
-            {@render SidebarButton('card-stack', $getSidebar === 'cards', () =>
+            {@render SidebarButton('card-stack', m['nodes.title'](), $getSidebar === 'cards', () =>
                 setSidebar($getSidebar === 'cards' ? null : 'cards')
             )}
-            {@render SidebarButton('key', $getSidebar === 'credentials', () =>
+            {@render SidebarButton('key', m['secrets.title'](), $getSidebar === 'credentials', () =>
                 setSidebar($getSidebar === 'credentials' ? null : 'credentials')
             )}
         {/if}
     </div>
     <div class="flex flex-col gap-3">
-        {@render SidebarButton('users', $isSharing, () => setSharing(true))}
+        {@render SidebarButton('users', m['members.share'](), $isSharing, () => setSharing(true))}
         {#if role === 'owner'}
-            {@render SidebarButton('configuration', $isConfiguringBoard, () => setConfiguringBoard(true))}
+            {@render SidebarButton('configuration', m['board.title'](), $isConfiguringBoard, () => setConfiguringBoard(true))}
         {/if}
     </div>
 </div>

@@ -146,6 +146,17 @@ func (srv *BoardService) CreateBoard(principal models.Principal, name string, or
 	if err != nil {
 		return nil, err
 	}
+	// Count and create in the space's turn, or two requests could both take
+	// the last board the plan allows.
+	holder := "user:" + principal.ID
+	if org != nil {
+		holder = "org:" + org.String()
+	}
+	release, err := srv.plans.Hold(models.LimitBoards, holder)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
 	count := srv.db.CountPersonalBoards
 	if org != nil {
 		count = func(string) (int64, error) { return srv.db.CountOrgBoards(*org) }
@@ -252,6 +263,16 @@ func (srv *BoardService) SetMember(principal models.Principal, id uuid.UUID, ema
 		return nil, ErrOwnerRole
 	}
 
+	// The seats are counted on the board as it is in this board's turn: the
+	// one read above may miss someone added meanwhile.
+	release, err := srv.plans.Hold(models.LimitSeats, "board:"+id.String())
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	if board, err = srv.db.FindBoard(id); err != nil || board == nil {
+		return nil, ErrForbidden
+	}
 	plan, org, err := srv.payer(board)
 	if err != nil {
 		return nil, err

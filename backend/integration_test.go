@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -26,6 +27,7 @@ import (
 	"github.com/Secreto31126/tesis/common/ports/oidc"
 	"github.com/Secreto31126/tesis/common/ports/redis"
 	"github.com/Secreto31126/tesis/common/ports/safehttp"
+	h_srv "github.com/Secreto31126/tesis/common/services/health"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -42,12 +44,21 @@ const (
 // environment (see run_backend_integration.*) and records every response so
 // the test can prove none of them carried a secret.
 type stack struct {
-	t         *testing.T
-	app       *app
-	db        *mongo.MongoDB
-	cache     *redis.RedisDB
-	mailer    *mocks.RecordingMailer
+	t      *testing.T
+	app    *app
+	db     *mongo.MongoDB
+	cache  *redis.RedisDB
+	mailer *mocks.RecordingMailer
+	// responses is appended to from many goroutines in the concurrency
+	// tests: always through record, under mu.
+	mu        sync.Mutex
 	responses []*httptest.ResponseRecorder
+}
+
+func (s *stack) record(w *httptest.ResponseRecorder) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.responses = append(s.responses, w)
 }
 
 func newStack(t *testing.T) *stack {
@@ -65,6 +76,10 @@ func newStackWith(t *testing.T, adjust func(*config)) *stack {
 		t.Fatalf("mongo: %v", err)
 	}
 	if err := db.EnsureIndexes(); err != nil {
+		// In CI the services are there by design: a skip would hide a broken setup.
+		if os.Getenv("CI") != "" {
+			t.Fatalf("mongo not reachable: %v", err)
+		}
 		t.Skipf("mongo not reachable: %v", err)
 	}
 	if err := wellknowns.New(db).Seed(); err != nil {
@@ -125,7 +140,7 @@ func (s *stack) requestFrom(remote, token, method, path string, body any) *httpt
 	}
 	w := httptest.NewRecorder()
 	s.app.router.ServeHTTP(w, req)
-	s.responses = append(s.responses, w)
+	s.record(w)
 	return w
 }
 
@@ -149,6 +164,8 @@ func (s *stack) mustJSON(w *httptest.ResponseRecorder, want int, out any) {
 
 func (s *stack) assertNoResponseContains(needle string) {
 	s.t.Helper()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for i, w := range s.responses {
 		if strings.Contains(w.Body.String(), needle) {
 			s.t.Errorf("response #%d carried %q: %s", i, needle, w.Body.String())
@@ -248,19 +265,30 @@ func (c *client) newBoard(name string) models.Board {
 	return board
 }
 
-// publicBilling are the billing routes that need no session: the plans on
-// offer, and the webhook, which proves itself by its signature.
-var publicBilling = map[string]bool{"/api/v1/billing/plans": true, "/api/v1/billing/webhook": true}
+// publicRoutes need no session besides /auth: the health check, the plans
+// on offer, and the billing webhook, which proves itself by its signature.
+var publicRoutes = map[string]bool{"/api/v1/health": true, "/api/v1/billing/plans": true, "/api/v1/billing/webhook": true}
 
-// Everything but /auth needs a token: the wiring is the only thing that puts
-// a route behind RequireAuth, so walk what is actually mounted.
+// The health check reaches the real stores, as an uptime monitor would.
+func TestEndToEnd_HealthReportsBothStores(t *testing.T) {
+	s := newStack(t)
+
+	var report h_srv.Report
+	s.mustJSON(s.do(http.MethodGet, "/api/v1/health", nil), http.StatusOK, &report)
+	if report.Status != h_srv.StatusOK || report.Mongo != h_srv.StatusOK || report.Redis != h_srv.StatusOK {
+		t.Errorf("report = %+v", report)
+	}
+}
+
+// Everything but the public routes needs a token: the wiring is the only
+// thing that puts a route behind RequireAuth, so walk what is actually mounted.
 func TestEndToEnd_EveryPrivateRouteNeedsAToken(t *testing.T) {
 	s := newStack(t)
 	params := strings.NewReplacer(":id", uuid.NewString(), ":strand", uuid.NewString(), ":user", "u", ":name", "KEY")
 
 	checked := 0
 	for _, route := range s.app.router.Routes() {
-		if strings.HasPrefix(route.Path, "/api/v1/auth/") || publicBilling[route.Path] {
+		if strings.HasPrefix(route.Path, "/api/v1/auth/") || publicRoutes[route.Path] {
 			continue
 		}
 		checked++

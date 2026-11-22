@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -57,7 +58,11 @@ func TestWellKnownValidate(t *testing.T) {
 		},
 		"uppercase parameter": func(wk *WellKnown) { wk.Parameters[0].Key = "$COIN" },
 		"repeated parameter":  func(wk *WellKnown) { wk.Parameters[1].Key = "$coin" },
-		"bad parameter type":  func(wk *WellKnown) { wk.Parameters[0].Type = "date" },
+		"bad parameter type":  func(wk *WellKnown) { wk.Parameters[0].Type = "time" },
+		"bad date default": func(wk *WellKnown) {
+			wk.Parameters[0].Type = ParameterDate
+			wk.Parameters[0].Default = new("tomorrow")
+		},
 		"unlabelled parameter": func(wk *WellKnown) {
 			wk.Parameters[0].LabelEs = ""
 		},
@@ -130,5 +135,61 @@ func TestWellKnownInstantiate(t *testing.T) {
 	// Platform credentials never reach the stored card.
 	if _, leaked := postit.Params["$api_key"]; leaked {
 		t.Error("a system secret placeholder became a param")
+	}
+}
+
+func TestWellKnownValidate_AcceptsDateParameters(t *testing.T) {
+	for _, kind := range []WellKnownParameterType{ParameterDate, ParameterDateTime} {
+		wk := WellKnown{
+			Key: "dated", NameEn: "Dated", NameEs: "Con fecha", TitleEn: "{{x}}", TitleEs: "{{x}}",
+			Resource: "https://example.com", Request: Request{Method: "GET", Queries: map[string]string{"from": "$from"}},
+			Response: "json", Query: map[string]string{"x": ".x"},
+			Parameters: []WellKnownParameter{{Key: "$from", LabelEn: "From", LabelEs: "Desde", Type: kind}},
+			Outputs:    []WellKnownOutput{{Key: "x", LabelEn: "X", LabelEs: "X"}},
+		}
+		if err := wk.Validate(); err != nil {
+			t.Errorf("%s: %v", kind, err)
+		}
+	}
+}
+
+func TestWellKnownParameter_CheckValue(t *testing.T) {
+	cases := []struct {
+		kind  WellKnownParameterType
+		value string
+		ok    bool
+	}{
+		{ParameterDate, "2026-11-22", true},
+		{ParameterDate, "2026-02-30", false},
+		{ParameterDate, "22/11/2026", false},
+		{ParameterDate, "2026-11-22T10:00:00Z", false},
+		{ParameterDateTime, "2026-11-22T10:00:00Z", true},
+		{ParameterDateTime, "2026-11-22T10:00:00-03:00", true},
+		{ParameterDateTime, "2026-11-22T10:00", false},
+		{ParameterDateTime, "2026-11-22", false},
+		{ParameterString, "anything", true},
+		{ParameterNumber, "not checked here", true},
+	}
+	for _, c := range cases {
+		err := WellKnownParameter{Key: "$from", Type: c.kind}.CheckValue(c.value)
+		if (err == nil) != c.ok {
+			t.Errorf("%s %q: err = %v, want ok = %v", c.kind, c.value, err, c.ok)
+		}
+		if err != nil && !errors.Is(err, ErrInvalidParameter) {
+			t.Errorf("%s %q: %v is not ErrInvalidParameter", c.kind, c.value, err)
+		}
+	}
+}
+
+func TestWellKnownInstantiate_ChecksDates(t *testing.T) {
+	wk := WellKnown{
+		Key: "dated", Resource: "https://example.com", Response: "json",
+		Parameters: []WellKnownParameter{{Key: "$from", Type: ParameterDate}},
+	}
+	if _, _, err := wk.Instantiate(map[string]string{"$from": "mañana"}); !errors.Is(err, ErrInvalidParameter) {
+		t.Errorf("got %v, want ErrInvalidParameter", err)
+	}
+	if _, _, err := wk.Instantiate(map[string]string{"$from": "2026-11-22"}); err != nil {
+		t.Errorf("a valid date was refused: %v", err)
 	}
 }

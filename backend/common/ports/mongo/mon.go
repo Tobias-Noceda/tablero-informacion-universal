@@ -378,6 +378,13 @@ func (db *MongoDB) EditTitlePostIt(boardID, postItID uuid.UUID, title models.Boa
 
 // StylePostIt sets the patch's fields on the card's board entry and unsets
 // the empty ones, so a default style is stored as no style at all.
+func (db *MongoDB) BumpPostIt(boardID, postItID uuid.UUID) error {
+	return db.updateBoard(
+		bson.M{"_id": boardID, "postits.id": postItID},
+		bson.M{"$inc": bson.M{"postits.$.rev": 1}},
+	)
+}
+
 func (db *MongoDB) StylePostIt(boardID, postItID uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error) {
 	set, unset := bson.M{}, bson.M{}
 	putText := func(field string, value *string) {

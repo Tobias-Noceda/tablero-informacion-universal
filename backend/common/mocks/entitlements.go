@@ -14,6 +14,15 @@ type StaticEntitlements struct {
 	Plans   map[string]models.Plan
 	Secrets map[string]int
 	Used    map[string]models.Usage
+	// HoldFn sees every Hold; unset, Hold holds nothing.
+	HoldFn func(limit, holder string) (func(), error)
+}
+
+func (s StaticEntitlements) Hold(limit, holder string) (func(), error) {
+	if s.HoldFn != nil {
+		return s.HoldFn(limit, holder)
+	}
+	return func() {}, nil
 }
 
 var _ infrastructure.Entitlements = StaticEntitlements{}

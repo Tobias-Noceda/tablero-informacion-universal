@@ -2,7 +2,9 @@ package mocks
 
 import (
 	"errors"
+	"fmt"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/Secreto31126/tesis/common/infrastructure"
@@ -31,6 +33,7 @@ type MockDB struct {
 	UpdateStrandFn        func(boardID, strandID uuid.UUID, patch models.StrandPatch) (*models.Strand, error)
 	MovePostItFn          func(boardID, postItID uuid.UUID, pos models.Position) error
 	EditTitlePostItFn     func(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error
+	BumpPostItFn          func(boardID, postItID uuid.UUID) error
 	StylePostItFn         func(boardID, postItID uuid.UUID, patch models.CardStylePatch) (*models.CardStyle, error)
 	UpdateBoardNameFn     func(id uuid.UUID, name string) error
 	CountPersonalBoardsFn func(user string) (int64, error)
@@ -147,6 +150,13 @@ func (m *MockDB) MovePostIt(boardID, postItID uuid.UUID, pos models.Position) er
 func (m *MockDB) EditTitlePostIt(boardID, postItID uuid.UUID, title models.BoardPostItTitle) error {
 	if m.EditTitlePostItFn != nil {
 		return m.EditTitlePostItFn(boardID, postItID, title)
+	}
+	return nil
+}
+
+func (m *MockDB) BumpPostIt(boardID, postItID uuid.UUID) error {
+	if m.BumpPostItFn != nil {
+		return m.BumpPostItFn(boardID, postItID)
 	}
 	return nil
 }
@@ -393,6 +403,41 @@ func (m *MockLocker) Acquire(key string, ttl time.Duration) (string, bool, error
 func (m *MockLocker) Release(key, token string) error {
 	if m.ReleaseFn != nil {
 		return m.ReleaseFn(key, token)
+	}
+	return nil
+}
+
+// MemoryLocker is an in-memory infrastructure.Locker, safe to share between
+// goroutines; the TTL is ignored.
+type MemoryLocker struct {
+	mu    sync.Mutex
+	held  map[string]string
+	count int
+}
+
+var _ infrastructure.Locker = (*MemoryLocker)(nil)
+
+func NewMemoryLocker() *MemoryLocker {
+	return &MemoryLocker{held: map[string]string{}}
+}
+
+func (l *MemoryLocker) Acquire(key string, _ time.Duration) (string, bool, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if _, taken := l.held[key]; taken {
+		return "", false, nil
+	}
+	l.count++
+	token := fmt.Sprintf("token-%d", l.count)
+	l.held[key] = token
+	return token, true, nil
+}
+
+func (l *MemoryLocker) Release(key, token string) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.held[key] == token {
+		delete(l.held, key)
 	}
 	return nil
 }
