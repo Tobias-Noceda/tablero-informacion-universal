@@ -384,6 +384,21 @@
 		"err_body_size": "El cuerpo pesa más de {max} KB.",
 		"err_body_credential": "El cuerpo usa ${name}, pero no hay ninguna credencial con ese nombre que puedas usar."
 	},
+	"curl": {
+		"toggle": "Pegar un comando cURL",
+		"hint": "La documentación de las APIs trae sus ejemplos en cURL: pegá uno para completar la dirección, los encabezados y el cuerpo.",
+		"placeholder": "curl https://api.example.com/v1/data -H 'Accept: application/json'",
+		"apply": "Completar el formulario",
+		"applied": "El formulario se completó con el comando.",
+		"credentials": "Hay credenciales en {names}: no se guardan en la tarjeta. Cargalas en las credenciales del tablero y elegilas en esos campos.",
+		"dropped_method": "Una tarjeta solo manda GET o POST, así que se reemplazó el método del comando.",
+		"dropped_body": "El cuerpo no es JSON y se dejó afuera.",
+		"dropped_flags": "Algunas opciones de curl no aplican a una tarjeta y se ignoraron.",
+		"not_curl": "Eso no parece un comando cURL.",
+		"no_url": "El comando no tiene una dirección.",
+		"unclosed_quote": "Hay comillas sin cerrar.",
+		"bad_url": "La dirección del comando no es válida."
+	},
 	"strands": {
 		"toolbar": "Estilo de la conexión",
 		"label": "Etiqueta",

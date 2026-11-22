@@ -384,6 +384,21 @@
 		"err_body_size": "The body is larger than {max} KB.",
 		"err_body_credential": "The body uses ${name}, but there is no credential with that name you can use."
 	},
+	"curl": {
+		"toggle": "Paste a cURL command",
+		"hint": "API docs show their examples as cURL: paste one to fill in the address, headers and body.",
+		"placeholder": "curl https://api.example.com/v1/data -H 'Accept: application/json'",
+		"apply": "Fill in the form",
+		"applied": "The form was filled in from the command.",
+		"credentials": "Credentials found in {names}: they are not kept on the card. Store them in the board's credentials and pick them in those fields.",
+		"dropped_method": "A card only sends GET or POST, so the command's method was replaced.",
+		"dropped_body": "The body is not JSON and was left out.",
+		"dropped_flags": "Some curl options do not apply to a card and were ignored.",
+		"not_curl": "That does not look like a cURL command.",
+		"no_url": "The command has no address.",
+		"unclosed_quote": "A quote is not closed.",
+		"bad_url": "The command's address is not valid."
+	},
 	"strands": {
 		"toolbar": "Connection style",
 		"label": "Label",
