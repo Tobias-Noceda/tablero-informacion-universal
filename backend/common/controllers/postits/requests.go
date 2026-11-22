@@ -49,6 +49,17 @@ type CreatePostItRequest struct {
 	Bindings  map[string]models.SecretRef `json:"bindings"`
 }
 
+// PreviewPostItRequest is a one-off card's request as it is being written:
+// no title or rate, and outputs optional (none answers the whole response).
+type PreviewPostItRequest struct {
+	Board    uuid.UUID                   `json:"board" binding:"required"`
+	Resource resourceURL                 `json:"resource" binding:"required"`
+	Request  models.Request              `json:"request"`
+	Response string                      `json:"response" binding:"omitempty,eq=json|eq=html"`
+	Query    map[string]string           `json:"query" binding:"omitempty,dive,keys,required,endkeys,required"`
+	Bindings map[string]models.SecretRef `json:"bindings"`
+}
+
 type MovePostItRequest struct {
 	// Pointers so 0 is a position: `required` refuses a zero value.
 	X *float32 `json:"x" binding:"required"`
