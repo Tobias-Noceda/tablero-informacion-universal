@@ -26,7 +26,9 @@
 		look,
 		sized,
 		tall,
-		onchange
+		onchange,
+		canDuplicate = false,
+		onduplicate
 	}: {
 		look: CardLook;
 		/** Whether the card has a size of its own, so it can go back to fitting its content. */
@@ -34,6 +36,9 @@
 		/** Whether the card has a height of its own, the only case where the vertical alignment shows. */
 		tall: boolean;
 		onchange: (patch: CardStyle) => void;
+		/** Whether the board has room for a copy (its plan). */
+		canDuplicate?: boolean;
+		onduplicate?: () => void;
 	} = $props();
 
 	const borderNames: Record<CardBorder, () => string> = {
@@ -163,6 +168,23 @@
 				<path d="M2 6V2h4M14 6V2h-4M2 10v4h4M14 10v4h-4" stroke-linecap="round" stroke-linejoin="round" />
 			</svg>
 		</button>
+
+		{#if onduplicate}
+			{@render separator()}
+			<button
+				type="button"
+				class={option(false)}
+				title={m['cards.duplicate_hint']()}
+				aria-label={m['cards.duplicate']()}
+				disabled={!canDuplicate}
+				onclick={onduplicate}
+			>
+				<svg viewBox="0 0 16 16" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+					<rect x="5" y="5" width="9" height="9" rx="1.5" />
+					<path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" stroke-linecap="round" />
+				</svg>
+			</button>
+		{/if}
 	</div>
 
 	<div class="flex items-center gap-1" role="group" aria-label={m['cards.border']()}>

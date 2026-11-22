@@ -424,7 +424,10 @@
 		"align_right": "Alinear a la derecha",
 		"valign_top": "Arriba (requiere un alto propio)",
 		"valign_middle": "En el medio (requiere un alto propio)",
-		"valign_bottom": "Abajo (requiere un alto propio)"
+		"valign_bottom": "Abajo (requiere un alto propio)",
+		"duplicate": "Duplicar",
+		"duplicate_hint": "Duplicar esta tarjeta al lado",
+		"duplicate_failed": "No se pudo duplicar la tarjeta"
 	},
 	"image": {
 		"missing": "Esta tarjeta todavía no tiene la dirección de una imagen.",

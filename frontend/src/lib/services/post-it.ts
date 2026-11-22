@@ -57,6 +57,13 @@ export async function update_well_known_settings(
     await ensure(await api.patch(`/v1/post-its/${postItId}/settings`, { params, bindings }));
 }
 
+// A copy of the card next to it on its board (settings, title, style), as the
+// board lists its cards; it runs as the caller.
+export async function duplicate(id: UUID): Promise<PostItWithTitle> {
+    const res = await ensure(await api.post(`/v1/post-its/${id}/duplicate`, {}));
+    return await res.json() as PostItWithTitle;
+}
+
 export async function del(id: UUID): Promise<Strand[]> {
     const deletedEdges = await api.del(`/v1/post-its/${id}`).then(async (res) => await res.json() as Strand[]);
     return deletedEdges;

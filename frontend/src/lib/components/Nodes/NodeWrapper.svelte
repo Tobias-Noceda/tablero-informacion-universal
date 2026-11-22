@@ -77,7 +77,14 @@
 </script>
 
 <NodeToolbar isVisible={showTools} position={Position.Top}>
-	<CardToolbar {look} {sized} tall={!!height} onchange={(patch) => editor?.restyle(id, patch)} />
+	<CardToolbar
+		{look}
+		{sized}
+		tall={!!height}
+		onchange={(patch) => editor?.restyle(id, patch)}
+		canDuplicate={editor?.canAdd ?? false}
+		onduplicate={() => editor?.duplicate(id)}
+	/>
 </NodeToolbar>
 
 <NodeResizer
