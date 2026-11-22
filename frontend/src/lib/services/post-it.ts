@@ -38,7 +38,7 @@ export async function create_well_known(
     params: Record<string, string>,
     bindings: Record<string, SecretRef> = {},
 ) {
-    const res = await api.post("/v1/post-its", { board, title, well_known, params, bindings });
+    const res = await ensure(await api.post("/v1/post-its", { board, title, well_known, params, bindings }));
     return mapPostitWithTitle(await res.json() as PostItWithTitle);
 }
 
@@ -46,7 +46,7 @@ export async function update_well_known_title(
     postItId: UUID,
     title: { text: string, vars: boolean },
 ) {
-    await api.patch(`/v1/post-its/${postItId}/title`, { title });
+    await ensure(await api.patch(`/v1/post-its/${postItId}/title`, { title }));
 }
 
 export async function update_well_known_settings(
@@ -54,7 +54,7 @@ export async function update_well_known_settings(
     params: Record<string, string>,
     bindings: Record<string, SecretRef> = {},
 ) {
-    await api.patch(`/v1/post-its/${postItId}/settings`, { params, bindings });
+    await ensure(await api.patch(`/v1/post-its/${postItId}/settings`, { params, bindings }));
 }
 
 export async function del(id: UUID): Promise<Strand[]> {
@@ -118,7 +118,7 @@ export async function update_settings(
 }
 
 export async function move(id: UUID, x: number, y: number) {
-    await api.patch(`/v1/post-its/${id}/position`, { x, y });
+    await ensure(await api.patch(`/v1/post-its/${id}/position`, { x, y }));
 }
 
 // Changes only the fields sent; an empty value (0 for a size) goes back to
