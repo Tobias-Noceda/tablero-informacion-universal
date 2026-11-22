@@ -8,7 +8,7 @@ A universal information dashboard ("tablero de información universal") where us
 
 ## Monorepo layout
 
-`backend/` (Go API), `realtime/` (Node socket service), `frontend/` (SvelteKit SPA) and `mcp/` (xmcp MCP server, see `mcp/README.md`). `frontend/CLAUDE.md` and `realtime/CLAUDE.md` hold the notes for those services; they load when working in that folder.
+`backend/` (Go API), `realtime/` (Node socket service), `frontend/` (SvelteKit SPA), `mcp/` (xmcp MCP server, see `mcp/README.md`) and `perf/` (measurement scripts: propagation latency, k6 load, socket capacity, with a fake data source as a compose overlay; see `perf/README.md`). `frontend/CLAUDE.md` and `realtime/CLAUDE.md` hold the notes for those services; they load when working in that folder.
 
 ### Two deployment targets, one topology
 
