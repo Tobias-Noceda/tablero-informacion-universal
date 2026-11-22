@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -66,6 +67,10 @@ func newStackWith(t *testing.T, adjust func(*config)) *stack {
 		t.Fatalf("mongo: %v", err)
 	}
 	if err := db.EnsureIndexes(); err != nil {
+		// In CI the services are there by design: a skip would hide a broken setup.
+		if os.Getenv("CI") != "" {
+			t.Fatalf("mongo not reachable: %v", err)
+		}
 		t.Skipf("mongo not reachable: %v", err)
 	}
 	if err := wellknowns.New(db).Seed(); err != nil {

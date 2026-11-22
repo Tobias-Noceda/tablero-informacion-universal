@@ -5,6 +5,7 @@ package redis
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -20,6 +21,10 @@ func integrationCache(t *testing.T) *RedisDB {
 		t.Fatalf("connect: %v", err)
 	}
 	if err := db.client.Ping(context.Background()).Err(); err != nil {
+		// In CI the services are there by design: a skip would hide a broken setup.
+		if os.Getenv("CI") != "" {
+			t.Fatalf("redis not reachable: %v", err)
+		}
 		t.Skipf("redis not reachable: %v", err)
 	}
 
