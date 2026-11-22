@@ -41,4 +41,8 @@ Tokens need a Pro or Max plan on the account that created them: on Free, creatin
 
 `pnpm test` runs the unit tests in `test/` (`node --test`, Node strips the types; they stay out of `src/` so the xmcp build does not compile them).
 
+- Every tool has tests in `test/tools.test.ts`: they call it directly against a stand-in board service (`test/support/backend.ts` replaces `fetch` and records each request) and check what it asked for and what it answered. `test/api.test.ts` covers what the agent reads when the backend refuses.
+- `test/support/hooks.mjs` lets plain `node --test` load the tools: it adds the `.ts` the sources leave out and swaps `xmcp/headers`, which only works inside a request xmcp serves, for a stand-in whose bearer the tests set. Code in `src/` must stay strippable (no parameter properties, enums or namespaces).
+- `test/e2e.test.ts` talks to a running server as a client would (JSON-RPC over HTTP) and walks a board through every memory tool, creating and deleting its own board. It is skipped unless `MCP_E2E_URL` (e.g. `http://localhost/mcp` behind the Docker ALB) and `MCP_E2E_TOKEN` (a `tiu_pat_` of a Pro or Max account) are set.
+
 To try it without an agent: `npx @modelcontextprotocol/inspector`, transport "Streamable HTTP", URL `http://localhost/mcp`, header `Authorization: Bearer tiu_pat_…`.

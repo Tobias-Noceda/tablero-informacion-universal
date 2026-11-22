@@ -1,15 +1,20 @@
 import { headers } from "xmcp/headers";
 
 // ApiError is a backend answer other than 2xx, with its `error` code.
+// Its fields are declared, not parameter properties, so Node can run this
+// file by stripping types (the tests do).
 export class ApiError extends Error {
-    constructor(
-        readonly status: number,
-        readonly code: string,
-        // Which plan limit refused it (a 402 `plan_limit`), if any.
-        readonly limit?: string,
-    ) {
+    readonly status: number;
+    readonly code: string;
+    // Which plan limit refused it (a 402 `plan_limit`), if any.
+    readonly limit?: string;
+
+    constructor(status: number, code: string, limit?: string) {
         super(describe(status, code, limit));
         this.name = "ApiError";
+        this.status = status;
+        this.code = code;
+        this.limit = limit;
     }
 }
 
