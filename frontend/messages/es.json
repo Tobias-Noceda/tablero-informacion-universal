@@ -565,5 +565,22 @@
 	"legal": {
 		"home": "Inicio",
 		"privacy_policy": "Política de privacidad"
+	},
+	"card_preview": {
+		"try": "Probar pedido",
+		"trying": "Probando…",
+		"try_hint": "Hace el pedido ahora, sin guardar la tarjeta, y muestra lo que responde: hacé clic en un valor para mostrarlo en la tarjeta.",
+		"try_needs_url": "Primero escribí la dirección.",
+		"try_needs_json": "Elegir valores funciona con respuestas JSON; para HTML, escribí los selectores a mano.",
+		"too_many": "Demasiados intentos seguidos: esperá un minuto y volvé a probar.",
+		"invalid": "El pedido todavía no es válido: {detail}",
+		"answered": "La fuente respondió:",
+		"empty": "La fuente respondió sin nada para elegir.",
+		"items": "{count} elementos",
+		"more": "… y {count} más",
+		"pick": "Mostrar este valor en la tarjeta",
+		"pick_all": "todos",
+		"pick_all_hint": "Mostrar este valor para cada elemento de la lista",
+		"picked": "Se agregó “{name}”: ponelo en el título como {variable}."
 	}
 }

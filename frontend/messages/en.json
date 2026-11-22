@@ -565,5 +565,22 @@
 	"legal": {
 		"home": "Home",
 		"privacy_policy": "Privacy Policy"
+	},
+	"card_preview": {
+		"try": "Try request",
+		"trying": "Trying…",
+		"try_hint": "Runs the request now, without saving the card, and shows what it answers: click a value to show it on the card.",
+		"try_needs_url": "Write the address first.",
+		"try_needs_json": "Picking values works with JSON responses; for HTML, write the selectors by hand.",
+		"too_many": "Too many tries in a row: wait a minute and try again.",
+		"invalid": "The request is not valid yet: {detail}",
+		"answered": "The source answered:",
+		"empty": "The source answered with nothing to pick.",
+		"items": "{count} items",
+		"more": "… and {count} more",
+		"pick": "Show this value on the card",
+		"pick_all": "all",
+		"pick_all_hint": "Show this value for every element of the list",
+		"picked": "Added “{name}”: put it in the title as {variable}."
 	}
 }
