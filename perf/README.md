@@ -65,4 +65,13 @@ k6 run -e BASE_URL=https://<the app> -e CARD_KIND=note -e STAGES=10,25 -e STAGE_
   | 100 | 6.9 / 9.2 / 10.2 | 3.6 |
 
   Split (short run): about 5 ms from the request to the realtime's emission (backend, Mongo, change stream) and 1–3 ms from there to the clients. Two orders of magnitude under the 1 s criterion; the report still needs the 3 runs and production.
+- **Production** (`https://corcheria.company`, 2026-11-22, from a laptop in Buenos Aires over home internet): one full `latency.mjs` run, 100 moves per level, 0 lost, 0 diverged in 20 conflict rounds each. The plan's production criterion is p95 < 2 s.
+
+  | Clients | from_send p50 / p95 / p99 (ms) | from_ok p95 (ms) |
+  |---|---|---|
+  | 5 | 69 / 92 / 167 | 3.6 |
+  | 10 | 64 / 90 / 111 | 3.0 |
+  | 25 | 67 / 114 / 174 | 3.5 |
+
+  A first smoke run (5 clients, 20 moves) had p95 ≈ 500 ms: cold starts. A k6 smoke run (2 users, 30 s, notes only) had p95 ≈ 95 ms and no errors. The team stopped there; the other runs were not needed. Raw JSON stays in `results/` on the machine that ran them.
 - `k6/cards.js` on a laptop: cold p95 ≈ source delay + 5 ms, warm p95 ≈ 12 ms, and the source saw exactly one request per cold card.

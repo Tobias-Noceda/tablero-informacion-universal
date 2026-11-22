@@ -84,7 +84,8 @@ func TestPermissions(t *testing.T) {
 	}{
 		{models.TemplateScopeUser, ana, true, true},
 		{models.TemplateScopeUser, bob, false, false},
-		{models.TemplateScopeUser, token, true, false},
+		{models.TemplateScopeUser, token, true, true}, // an agent sets card types up for its person
+		{models.TemplateScopeBoard, token, true, true},
 		{models.TemplateScopeBoard, ana, true, true},
 		{models.TemplateScopeBoard, bob, true, true},
 		{models.TemplateScopeBoard, cy, true, false},
@@ -92,7 +93,8 @@ func TestPermissions(t *testing.T) {
 		{models.TemplateScopeBoard, eve, false, false},
 		{models.TemplateScopeOrg, admin, true, true},
 		{models.TemplateScopeOrg, mem, true, false},
-		{models.TemplateScopeOrg, ana, false, false}, // on the board, not in the org
+		{models.TemplateScopeOrg, models.Principal{ID: admin.ID, Token: true}, true, false}, // never an organization's
+		{models.TemplateScopeOrg, ana, false, false},                                        // on the board, not in the org
 		{models.TemplateScopeOrg, eve, false, false},
 	}
 	for _, c := range cases {

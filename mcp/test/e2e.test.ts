@@ -13,16 +13,25 @@ const TOKEN = process.env.MCP_E2E_TOKEN;
 const TOOLS = [
     "associate",
     "consolidate",
+    "create_card_type",
     "create_pkg",
+    "delete_card_type",
     "delete_pkg",
     "dissociate",
     "forget",
+    "list_card_types",
     "list_pkgs",
     "memories",
     "perceive",
     "reconsolidate",
     "retrieve",
+    "try_request",
 ];
+
+// A source the backend can reach in the Docker stack started with
+// perf/docker-compose.perf.yaml (its SSRF guard lets 203.0.113.0/24 through).
+const SOURCE =
+    process.env.MCP_E2E_SOURCE ?? "http://203.0.113.10:8080/value?delay=0";
 
 type RpcResult = {
     result?: {
@@ -180,6 +189,44 @@ describe("MCP server end to end", { skip: !URL_ || !TOKEN }, () => {
                     postit_id: second,
                 }),
                 /\(none\)/,
+            );
+
+            // A card type for the person: tried first, then set up, listed
+            // and removed.
+            assert.match(
+                await client.call("try_request", {
+                    board_id: board,
+                    url: SOURCE,
+                }),
+                /"value":/,
+            );
+            const made = await client.call("create_card_type", {
+                board_id: board,
+                name: "e2e value",
+                title: "Value: {{value}}",
+                url: SOURCE.split("?")[0],
+                queries: { delay: "$delay" },
+                query: { value: ".value" },
+                fields: [
+                    {
+                        name: "delay",
+                        label: "Delay (ms)",
+                        type: "number",
+                        default: "0",
+                    },
+                ],
+            });
+            const key = made.match(/custom_[0-9a-f]{32}/)?.[0];
+            assert.ok(key, made);
+            assert.match(
+                await client.call("list_card_types", { board_id: board }),
+                new RegExp(
+                    String.raw`${key} - e2e value - this board's - asks for Delay \(ms\) \(number\)`,
+                ),
+            );
+            assert.match(
+                await client.call("delete_card_type", { key }),
+                /deleted/,
             );
 
             await client.call("forget", { id: second });

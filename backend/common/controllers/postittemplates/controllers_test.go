@@ -142,9 +142,34 @@ func TestAccessTokens(t *testing.T) {
 	if w := do(r, "pat:ana", http.MethodGet, "/boards/"+board.String()+"/postit-templates/usable", ""); w.Code != http.StatusOK {
 		t.Errorf("token reads the board's types: %d %s", w.Code, w.Body)
 	}
-	for _, path := range []string{"/users/ana/postit-templates", "/boards/" + board.String() + "/postit-templates"} {
-		if w := do(r, "pat:ana", http.MethodPost, path, catFact); w.Code != http.StatusForbidden || !strings.Contains(w.Body.String(), "token_not_allowed") {
-			t.Errorf("token create %s: %d %s", path, w.Code, w.Body)
+	// An agent sets card types up for its person and for a board they edit.
+	for _, path := range []string{"/users/ana/postit-templates", "/users/me/postit-templates", "/boards/" + board.String() + "/postit-templates"} {
+		w := do(r, "pat:ana", http.MethodPost, path, catFact)
+		if w.Code != http.StatusCreated {
+			t.Fatalf("token create %s: %d %s", path, w.Code, w.Body)
 		}
+		var created models.PostitTemplate
+		_ = json.Unmarshal(w.Body.Bytes(), &created)
+		if w := do(r, "pat:ana", http.MethodDelete, "/postit-templates/"+created.Key, ""); w.Code != http.StatusNoContent {
+			t.Errorf("token delete %s: %d %s", created.Key, w.Code, w.Body)
+		}
+	}
+	// Board roles still apply: bob only views the board.
+	if w := do(r, "pat:bob", http.MethodPost, "/boards/"+board.String()+"/postit-templates", catFact); w.Code != http.StatusNotFound {
+		t.Errorf("a viewer's token creates on the board: %d", w.Code)
+	}
+}
+
+func TestUserScope_MeIsTheCaller(t *testing.T) {
+	r, _ := setup(t)
+
+	if w := do(r, "ana", http.MethodPost, "/users/me/postit-templates", catFact); w.Code != http.StatusCreated {
+		t.Fatalf("create as me: %d %s", w.Code, w.Body)
+	}
+	if w := do(r, "ana", http.MethodGet, "/users/ana/postit-templates", ""); !strings.Contains(w.Body.String(), "custom_") {
+		t.Errorf("ana's list does not have it: %s", w.Body)
+	}
+	if w := do(r, "bob", http.MethodGet, "/users/me/postit-templates", ""); w.Code != http.StatusOK || strings.Contains(w.Body.String(), "custom_") {
+		t.Errorf("bob's me: %d %s", w.Code, w.Body)
 	}
 }

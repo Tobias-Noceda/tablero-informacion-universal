@@ -44,7 +44,7 @@ describe("api errors", () => {
         backend = refusing(403, { error: "token_not_allowed" });
         await assert.rejects(
             api.get("/v1/boards"),
-            /can only read and edit boards and their cards/,
+            /can only read and edit boards, their cards and card types/,
         );
     });
 

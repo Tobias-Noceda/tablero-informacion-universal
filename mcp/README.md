@@ -17,6 +17,14 @@ An [xmcp](https://xmcp.dev) server (Streamable HTTP, `/mcp`) that lets an agent 
 
 Every request needs `Authorization: Bearer <token>`. The server forwards it unchanged to the backend, which decides what the caller may see. Nothing is stored here. For how this could grow into OAuth for non-technical users, see `AUTH.md`.
 
+## Card types
+
+Besides memories, an agent can set up **card types** (post-it templates) for its person or for a board: a ready-made card for an API it knows, which the person then adds from the cards sidebar filling in only its fields. A credential field is an empty slot each person fills with one of their own stored credentials, so a card type never holds a secret.
+
+- `try_request` makes a request once, as a card would, and answers its whole JSON (cut when long) without saving anything, to write jq expressions against the real answer (`POST /post-its/preview`, a few per minute).
+- `create_card_type` sets one up (`/users/me/postit-templates`, or a board's): URL, query string and headers (values may use a field as `$name`), the values it shows (jq or CSS) and the fields it asks for (`text`, `number`, `date`, `datetime`, `credential`). A `$name` no field declares is refused before asking the board; the board's own explanation of an invalid one is passed on.
+- `list_card_types` lists the person's own, or what a board may use; `delete_card_type` removes one.
+
 ## Tokens (developers)
 
 1. Sign in to the app and open **Profile → Developer access tokens**.
@@ -41,8 +49,8 @@ Tokens need a Pro or Max plan on the account that created them: on Free, creatin
 
 `pnpm test` runs the unit tests in `test/` (`node --test`, Node strips the types; they stay out of `src/` so the xmcp build does not compile them).
 
-- Every tool has tests in `test/tools.test.ts`: they call it directly against a stand-in board service (`test/support/backend.ts` replaces `fetch` and records each request) and check what it asked for and what it answered. `test/api.test.ts` covers what the agent reads when the backend refuses.
+- Every tool has tests in `test/tools.test.ts` (the card type tools in `test/card-type-tools.test.ts`, their helpers in `test/card-types.test.ts`): they call it directly against a stand-in board service (`test/support/backend.ts` replaces `fetch` and records each request) and check what it asked for and what it answered. `test/api.test.ts` covers what the agent reads when the backend refuses.
 - `test/support/hooks.mjs` lets plain `node --test` load the tools: it adds the `.ts` the sources leave out and swaps `xmcp/headers`, which only works inside a request xmcp serves, for a stand-in whose bearer the tests set. Code in `src/` must stay strippable (no parameter properties, enums or namespaces).
-- `test/e2e.test.ts` talks to a running server as a client would (JSON-RPC over HTTP) and walks a board through every memory tool, creating and deleting its own board. It is skipped unless `MCP_E2E_URL` (e.g. `http://localhost/mcp` behind the Docker ALB) and `MCP_E2E_TOKEN` (a `tiu_pat_` of a Pro or Max account) are set.
+- `test/e2e.test.ts` talks to a running server as a client would (JSON-RPC over HTTP) and walks a board through every memory tool and the card type tools, creating and deleting its own board. The card type steps fetch the fake source of `perf/docker-compose.perf.yaml` (start the stack with it, or set `MCP_E2E_SOURCE` to a JSON URL the backend can reach). It is skipped unless `MCP_E2E_URL` (e.g. `http://localhost/mcp` behind the Docker ALB) and `MCP_E2E_TOKEN` (a `tiu_pat_` of a Pro or Max account) are set.
 
 To try it without an agent: `npx @modelcontextprotocol/inspector`, transport "Streamable HTTP", URL `http://localhost/mcp`, header `Authorization: Bearer tiu_pat_…`.
