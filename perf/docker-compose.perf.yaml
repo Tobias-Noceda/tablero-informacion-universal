@@ -1,0 +1,67 @@
+# Adds what the measurements need to the Docker stack (see perf/README.md):
+#
+#   docker compose -f docker-compose.yaml -f perf/docker-compose.perf.yaml up -d --build
+#   docker compose -f docker-compose.yaml -f perf/docker-compose.perf.yaml run --rm k6 run /scripts/cards.js
+#   docker compose -f docker-compose.yaml -f perf/docker-compose.perf.yaml run --rm node capacity.mjs
+#
+# The backend fetches card sources through its SSRF guard, which refuses
+# private, loopback and other internal addresses, so the fake source cannot
+# sit on an ordinary Docker network. It gets 203.0.113.0/24 instead
+# (TEST-NET-3, RFC 5737: reserved for documentation, never routed on the
+# internet), which the guard lets through, and the backend joins that network.
+# Nothing in the backend changes for a measurement.
+# Paths are relative to the first file (the repository root).
+
+services:
+  source:
+    image: node:24-alpine
+    command: ["node", "/source/server.mjs"]
+    volumes:
+      - ./perf/source:/source:ro
+    networks:
+      perf_source:
+        ipv4_address: 203.0.113.10
+
+  backend:
+    networks:
+      - perf_source
+
+  k6:
+    image: grafana/k6:1.0.0
+    profiles: ["tools"]
+    volumes:
+      - ./perf/k6:/scripts:ro
+      - ./perf/results:/results
+    environment:
+      BASE_URL: http://alb
+      SOURCE_URL: http://203.0.113.10:8080
+      PERF_EMAIL: ${PERF_EMAIL:-}
+      PERF_PASSWORD: ${PERF_PASSWORD:-}
+    networks:
+      - backend
+      - perf_source
+
+  # The Node scripts from inside the Docker network: Docker Desktop's port
+  # forwarding stops at 2000 connections from the host, which capacity.mjs
+  # would otherwise measure instead of the stack.
+  node:
+    image: node:24-alpine
+    profiles: ["tools"]
+    working_dir: /perf
+    entrypoint: ["node"]
+    volumes:
+      - ./perf:/perf
+    environment:
+      BASE_URL: http://alb
+      PERF_EMAIL: ${PERF_EMAIL:-}
+      PERF_PASSWORD: ${PERF_PASSWORD:-}
+    ulimits:
+      nofile: 65536
+    networks:
+      - backend
+
+networks:
+  perf_source:
+    ipam:
+      config:
+        - subnet: 203.0.113.0/24
