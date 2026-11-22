@@ -26,3 +26,16 @@
         var(--handle-border) var(--handle-border)
     );
 }
+
+/* While a strand is being drawn the whole card takes it, so it can be dropped
+   anywhere on the other card instead of aiming for its edge. Out of a drag
+   the centre is left free to move the card. */
+.connecting .svelte-flow__handle.customHandle {
+    clip-path: none;
+}
+
+/* The card a strand would land on if dropped now. */
+.connecting .svelte-flow__node:has(.customHandle.connectingto.valid) .customNode {
+    outline: 2px solid var(--app-main, currentColor);
+    outline-offset: 3px;
+}

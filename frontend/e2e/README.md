@@ -39,6 +39,7 @@ After changing the frontend, rebuild only it, so the backend keeps the overrides
 | `catalog-search` | U6: the cards sidebar narrows its card types to what is typed (case and accents aside), says when nothing matches, and Escape clears it |
 | `curl` | U3: a pasted cURL command fills in a custom card (its credential is not kept as text) and can be tried at once; a paste that is not cURL says so |
 | `preview` | U1 + U2: "Try request" shows the source's answer, a click on a value fills the output, the card shows it; a failed try says why |
+| `connect` | A strand drawn from a card's edge can be dropped anywhere on the other card |
 | `strand-hint` | U9: the first-strand hint shows with two cards and no strand, and stays gone after drawing one or dismissing it |
 | `dates` | A card's date parameters are picked from the date picker and saved as YYYY-MM-DD |
 | `i18n` | E2E-09 the sign-in page switches language; the public pages have an address per language and work without scripts |

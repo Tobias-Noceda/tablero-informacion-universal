@@ -4,6 +4,7 @@
 		SvelteFlow,
 		Controls,
 		useSvelteFlow,
+		useConnection,
 		type Node,
 		type Edge,
 		ConnectionMode,
@@ -126,6 +127,9 @@
 	});
 
 	const { screenToFlowPosition } = useSvelteFlow();
+	// While a strand is being drawn, a whole card is a place to drop it, not
+	// only its edge (the `connecting` rules in Nodes/index.css).
+	const connection = useConnection();
 
 	mouses.updateMappers(screenToFlowPosition);
 
@@ -467,7 +471,7 @@
 <div class="relative flex flex-row flex-1 min-h-0 h-full w-full">
 	<main class="dndflow">
 		<Realtime bind:this={realtime} {boardId} {boardUpdate} {onNodeMoves}>
-			<div class="reactflow-wrapper">
+			<div class="reactflow-wrapper" class:connecting={connection.current.inProgress}>
 				<SvelteFlow
 					bind:nodes
 					bind:edges
