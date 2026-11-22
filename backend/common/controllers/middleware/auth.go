@@ -62,6 +62,7 @@ var accessTokenRoutes = map[string]bool{
 	"PATCH /api/v1/boards/:id/strands/:strand":       true,
 	"DELETE /api/v1/boards/:id/strands/:strand":      true,
 	"POST /api/v1/post-its":                          true,
+	"POST /api/v1/post-its/:id/duplicate":            true,
 	"DELETE /api/v1/post-its/:id":                    true,
 	"PATCH /api/v1/post-its/:id/settings":            true,
 	"PATCH /api/v1/post-its/:id/position":            true,

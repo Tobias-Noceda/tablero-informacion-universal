@@ -29,6 +29,7 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 		boardGroup.POST("/preview", ctrl.PreviewPostIt)
 		boardGroup.GET("/:id", ctrl.ExecutePostIt)
 		boardGroup.DELETE("/:id", ctrl.DeletePostIt)
+		boardGroup.POST("/:id/duplicate", ctrl.DuplicatePostIt)
 
 		boardGroup.GET("/:id/settings", ctrl.GetPostIt)
 		boardGroup.PATCH("/:id/settings", ctrl.EditPostIt)
@@ -113,6 +114,33 @@ func (ctrl *Controller) PreviewPostIt(c *gin.Context) {
 
 	c.Writer.Header().Set("Cache-Control", "no-store")
 	c.JSON(http.StatusOK, preview)
+}
+
+// DuplicatePostIt godoc
+// @Summary      Duplicate a card
+// @Description  Copies a card next to it on its board (settings, title, style). Editors only; the copy runs as the caller, who must be allowed to use its credentials, and counts against the board's plan.
+// @Tags         post-its
+// @Param        id   path      string  true  "Post-it UUID" format(uuid)
+// @Success      201  {object}  models.BoardPostIt
+// @Failure      400  {object}  map[string]string{"error": "string"}
+// @Failure      402  {object}  map[string]string{"error": "string"}
+// @Failure      403  {object}  map[string]string{"error": "string"}
+// @Failure      404  {object}  map[string]string{"error": "string"}
+// @Router       /post-its/{id}/duplicate [post]
+func (ctrl *Controller) DuplicatePostIt(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid uuid"})
+		return
+	}
+
+	copied, err := ctrl.service.DuplicatePostIt(middleware.Principal(c), id)
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, copied)
 }
 
 // GetPostIt godoc
