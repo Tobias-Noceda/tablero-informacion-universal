@@ -43,7 +43,9 @@
 				"action": "Guardar cambios"
 			}
 		},
-		"google_calendar_empty": "No hay próximos eventos"
+		"google_calendar_empty": "No hay próximos eventos",
+		"search": "Buscar tipos de tarjeta",
+		"search_empty": "Ningún tipo de tarjeta coincide con “{query}”: la tarjeta de API a medida puede leer cualquier API."
 	},
 	"secrets": {
 		"title": "Credenciales del tablero",
