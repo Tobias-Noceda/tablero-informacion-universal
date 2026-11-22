@@ -61,4 +61,4 @@ After editing `messages/{en,es}.json` outside the Vite dev server, regenerate wi
 
 `pnpm build` is the Vercel build (`.vercel/output`); `ADAPTER=static pnpm build` produces the static `build/` that Docker serves.
 
-Vitest has three sub-projects: `client` (Playwright/Chromium, `*.svelte.spec.ts`), `server` (Node, `*.spec.ts`), `storybook`.
+Vitest has three sub-projects: `client` (Playwright/Chromium, `*.svelte.spec.ts`), `server` (Node, `*.spec.ts`), `storybook`. CI (`frontend-tests.yml`) runs `pnpm check`, `eslint .` and `pnpm test` (all three, after `playwright install chromium`); `prettier --check` is not enforced yet, as much of the code predates it.
