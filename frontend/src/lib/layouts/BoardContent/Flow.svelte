@@ -7,6 +7,7 @@
 		type Node,
 		type Edge,
 		ConnectionMode,
+		Panel,
 		type Connection
 	} from '@xyflow/svelte';
 
@@ -35,6 +36,9 @@
 	import { theme } from '$stores/theme.svelte';
 	import Realtime from './Realtime.svelte';
 	import Cursors from './Cursors.svelte';
+	import StrandHint from '$components/StrandHint/StrandHint.svelte';
+	import { markStrandHintSeen, showStrandHint, strandHintSeen } from '$lib/strands/hint';
+	import { session } from '$modules/session.svelte';
 	import type { NodeMoves, Update } from '$modules/realtime.svelte';
 	import { isManagingSecrets, setManagingSecrets } from '$stores/sidebar';
 	import { results } from '$stores/postit-results.svelte';
@@ -325,6 +329,16 @@
 		resized: resizeCard
 	});
 
+	// U9: how to draw the first strand, until one is drawn or it is dismissed.
+	let strandHintDone = $state(strandHintSeen(session.userId));
+	const strandHint = $derived(
+		showStrandHint({ canEdit, cards: nodes.length, strands: edges.length, seen: strandHintDone })
+	);
+	function dismissStrandHint() {
+		strandHintDone = true;
+		markStrandHintSeen(session.userId);
+	}
+
 	const onConnect = async (connection: Connection) => {
 		const exists = edges.find(
 			(e) => e.source === connection.source && e.target === connection.target
@@ -341,6 +355,7 @@
 
 		const strand = await edgesApi.connect(boardId, connection.source, connection.target);
 		edges = [...edges, strandToEdge(strand)];
+		dismissStrandHint();
 	};
 
 	// Backspace in a field of the detail drawer edits the field, not the board.
@@ -453,6 +468,11 @@
 				>
 					<Controls />
 					<Cursors />
+					{#if strandHint}
+						<Panel position="bottom-center">
+							<StrandHint ondismiss={dismissStrandHint} />
+						</Panel>
+					{/if}
 				</SvelteFlow>
 			</div>
 		</Realtime>

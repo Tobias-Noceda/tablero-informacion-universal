@@ -34,5 +34,6 @@ After changing the frontend, rebuild only it, so the backend keeps the overrides
 | `collaboration` | E2E-07 a second member sees moves and new cards live (logs the propagation time); E2E-08 a viewer gets no editing tools |
 | `credentials` | E2E-06 a credential value never shows on the page nor in any response |
 | `preview` | U1 + U2: "Try request" shows the source's answer, a click on a value fills the output, the card shows it; a failed try says why |
+| `strand-hint` | U9: the first-strand hint shows with two cards and no strand, and stays gone after drawing one or dismissing it |
 | `dates` | A card's date parameters are picked from the date picker and saved as YYYY-MM-DD |
 | `i18n` | E2E-09 the sign-in page switches language; the public pages have an address per language and work without scripts |

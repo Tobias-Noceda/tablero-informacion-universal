@@ -588,5 +588,9 @@
 		"pick_all": "all",
 		"pick_all_hint": "Show this value for every element of the list",
 		"picked": "Added “{name}”: put it in the title as {variable}."
+	},
+	"strand_hint": {
+		"text": "Connect two cards: drag from the edge of one onto the other.",
+		"dismiss": "Got it"
 	}
 }
