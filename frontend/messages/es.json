@@ -582,5 +582,9 @@
 		"pick_all": "todos",
 		"pick_all_hint": "Mostrar este valor para cada elemento de la lista",
 		"picked": "Se agregó “{name}”: ponelo en el título como {variable}."
+	},
+	"strand_hint": {
+		"text": "Conectá dos tarjetas: arrastrá desde el borde de una hasta la otra.",
+		"dismiss": "Entendido"
 	}
 }
