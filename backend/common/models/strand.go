@@ -158,14 +158,23 @@ func (p StrandPatch) Apply(s StrandStyle) StrandStyle {
 }
 
 func normalizeStrandLabel(label string) (string, error) {
+	if !utf8.ValidString(label) {
+		return "", fmt.Errorf("%w: label is not text", ErrInvalidStrand)
+	}
 	label = strings.TrimSpace(label)
 	if utf8.RuneCountInString(label) > MaxStrandLabel {
 		return "", fmt.Errorf("%w: label longer than %d characters", ErrInvalidStrand, MaxStrandLabel)
 	}
-	if strings.ContainsFunc(label, unicode.IsControl) {
+	if strings.ContainsFunc(label, breaksLine) {
 		return "", fmt.Errorf("%w: label is a single line of text", ErrInvalidStrand)
 	}
 	return label, nil
+}
+
+// breaksLine is a control character or one of Unicode's line and paragraph
+// separators, which are not controls but still start a new line.
+func breaksLine(r rune) bool {
+	return unicode.IsControl(r) || r == 0x2028 || r == 0x2029
 }
 
 func validateStrandEnums(arrow StrandArrow, width StrandWidth, color StrandColor) error {
