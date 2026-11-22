@@ -70,7 +70,7 @@
 		tu cuenta en cualquier momento.
 	</p>
 	<p>
-		Leé la <a href={resolve('/privacy')} class="underline hover:text-main">Política de privacidad</a
+		Leé la <a href={resolve('/privacidad')} class="underline hover:text-main">Política de privacidad</a
 		>
 		para conocer en detalle qué datos recopilamos y cómo los usamos.
 	</p>
