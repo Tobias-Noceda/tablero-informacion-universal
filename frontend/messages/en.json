@@ -16,6 +16,24 @@
 		"template_label": "Template",
 		"create_board": "Create a new board"
 	},
+	"starters": {
+		"label": "Start from",
+		"empty": "Empty",
+		"empty_hint": "A blank board",
+		"finance": "Finance",
+		"finance_hint": "Dollar, country risk and crypto",
+		"trip": "Trip",
+		"trip_hint": "Weather, air quality and a packing list",
+		"dev": "Dev team",
+		"dev_hint": "GitHub repositories and the sprint's goals",
+		"finance_note_title": "To watch",
+		"finance_note": "Write here what you want to follow, and link it to the cards it depends on.",
+		"trip_note_title": "To pack",
+		"trip_note": "- Passport\n- Charger and adapter\n- Some cash",
+		"dev_note_title": "Sprint goals",
+		"dev_note": "- Ship the next release\n- Review the open issues\n- Take a break now and then",
+		"partial": "The board was created, but some of the example's cards could not be added."
+	},
 	"user_info": {
 		"language": {
 			"title": "Language",

@@ -29,6 +29,7 @@ After changing the frontend, rebuild only it, so the backend keeps the overrides
 | Spec | Flow |
 |---|---|
 | `auth` | E2E-01 sign up, verify, land signed in; E2E-02 sign out, protected pages redirect |
+| `starters` | U5: a board made from the Trip example has its 4 cards and 2 strands; picking an example keeps a name already typed |
 | `boards` | E2E-03 create a board, drop a note from the sidebar, reload; create another from inside a board |
 | `cards` | E2E-10 a card whose source is down says what to check, the rest keeps working; a refused save stays in the form |
 | `save-as-type` | U4: a custom card is saved as a card type from its drawer; the form opens filled in, and the saved type is offered in the cards sidebar |

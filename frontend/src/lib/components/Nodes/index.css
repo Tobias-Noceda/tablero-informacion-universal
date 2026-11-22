@@ -1,4 +1,8 @@
-.customHandle {
+/* .svelte-flow__handle too: Svelte Flow's own handle rule has the same weight,
+   so otherwise whichever stylesheet the bundle loads last wins, and a card
+   could be dragged from its edge instead of connected (the handle shrinks to
+   Svelte Flow's few pixels). */
+.svelte-flow__handle.customHandle {
     --handle-border: 10px;
     width: 100%;
     height: 100%;

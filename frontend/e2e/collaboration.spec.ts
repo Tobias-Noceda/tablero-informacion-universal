@@ -21,6 +21,21 @@ test('shows what another member does, live', async ({ browser }, info) => {
 	await page.goto(`/boards/${board.id}`);
 	await expect(node(page, 'Moving note')).toBeVisible();
 
+	// The board's socket connects after the cards are drawn, and a move made
+	// before it does is not sent to this page. Moves until one arrives live
+	// (each to a new spot: a move to where the card is changes nothing), so
+	// the move timed below finds the socket open.
+	let nudge = 0;
+	await expect(async () => {
+		nudge++;
+		await cards.move(owner, card.id, 100 + nudge, 100);
+		await expect(node(page, 'Moving note')).toHaveAttribute(
+			'style',
+			new RegExp(String.raw`translate\(${100 + nudge}px, 100px\)`),
+			{ timeout: 1000 }
+		);
+	}).toPass({ timeout: 20_000 });
+
 	const sent = Date.now();
 	await cards.move(owner, card.id, 420, 260);
 	await expect(node(page, 'Moving note')).toHaveAttribute('style', /translate\(420px, 260px\)/);

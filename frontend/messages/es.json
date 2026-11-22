@@ -16,6 +16,24 @@
 		"template_label": "Plantilla",
 		"create_board": "Crear un nuevo tablero"
 	},
+	"starters": {
+		"label": "Empezar desde",
+		"empty": "Vacío",
+		"empty_hint": "Un tablero en blanco",
+		"finance": "Finanzas",
+		"finance_hint": "Dólar, riesgo país y cripto",
+		"trip": "Viaje",
+		"trip_hint": "Clima, calidad del aire y lista para llevar",
+		"dev": "Equipo de desarrollo",
+		"dev_hint": "Repositorios de GitHub y objetivos del sprint",
+		"finance_note_title": "Para seguir",
+		"finance_note": "Anotá acá lo que querés seguir y conectalo con las tarjetas de las que depende.",
+		"trip_note_title": "Para llevar",
+		"trip_note": "- Pasaporte\n- Cargador y adaptador\n- Algo de efectivo",
+		"dev_note_title": "Objetivos del sprint",
+		"dev_note": "- Sacar la próxima versión\n- Revisar los issues abiertos\n- Tomarse un recreo cada tanto",
+		"partial": "El tablero se creó, pero no se pudieron agregar algunas tarjetas del ejemplo."
+	},
 	"user_info": {
 		"language": {
 			"title": "Idioma",
