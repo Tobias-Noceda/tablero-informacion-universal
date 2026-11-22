@@ -8,6 +8,7 @@
 	import { orgs } from '$stores/org.svelte';
 	import { wellKnowns } from '$stores/well-knowns.svelte';
 	import { draftFrom, emptyDraft, type Draft } from '$lib/well-knowns/draft';
+	import { takeCardTypeSeed } from '$stores/sidebar';
 	import type { BoardRole, PostitTemplate, PostitTemplateBody, UUID } from '$types/api';
 	import PostitTemplateForm from './PostitTemplateForm.svelte';
 	import { boardPlan, plan } from '$stores/plan.svelte';
@@ -97,11 +98,13 @@
 		!limits || canAddTemplate(tab, limits, loading ? undefined : list.length)
 	);
 	let error = $state('');
+	// Opened from a card being saved as a type: its form, filled in, is shown.
+	const seed = takeCardTypeSeed();
 	// null: nothing open; 'new': a new one; otherwise the one being edited.
-	let editing = $state<PostitTemplate | 'new' | null>(null);
+	let editing = $state<PostitTemplate | 'new' | null>(seed ? 'new' : null);
 	// A new card type being written. Kept across tabs: it is created in
 	// whichever scope is shown when it is saved.
-	let newDraft = $state<Draft>(emptyDraft());
+	let newDraft = $state<Draft>(seed ?? emptyDraft());
 	let editDraft = $state<Draft>(emptyDraft());
 
 	function startNew() {

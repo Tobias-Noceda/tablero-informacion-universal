@@ -22,7 +22,9 @@
 	import Switch from '$components/Switch/Switch.svelte';
 	import { renderMarkdown } from '$lib/helpers/markdown';
 	import type { PostIt, PostItSettings, SecretRef } from '$types/api';
-	import { ONE_OFF } from '$lib/well-knowns/one-off';
+	import { ONE_OFF, oneOffFrom } from '$lib/well-knowns/one-off';
+	import { canBecomeTemplate, templateDraftFrom } from '$lib/well-knowns/one-off-template';
+	import { startCardTypeFrom } from '$stores/sidebar';
 	import ImageView from '$components/Nodes/Image/ImageView.svelte';
 	import { boardPlan } from '$stores/plan.svelte';
 	import { canRefresh } from '$lib/billing/can';
@@ -412,11 +414,29 @@
 		</section>
 	</div>
 
-	{#if canDelete}
-		<div class="flex shrink-0 items-center justify-center p-4 pt-0">
-			<Button variant="destructive" class="shrink-0" onclick={() => ondelete(node)}>
-				{m['node_detail.delete']()}
-			</Button>
+	{#if canDelete || (canEdit && isOneOff)}
+		<div class="flex shrink-0 flex-wrap items-center justify-center gap-2 p-4 pt-0">
+			{#if canEdit && isOneOff}
+				{#await settings then stored}
+					{@const card = oneOffFrom(stored, title?.text ?? '', stored.board)}
+					{@const allowed = canBecomeTemplate(card)}
+					<Tooltip content={allowed ? m['node_detail.save_as_type_hint']() : m['node_detail.save_as_type_post']()} placement="top">
+						<Button
+							variant="secondary"
+							class="shrink-0"
+							disabled={!allowed}
+							onclick={() => startCardTypeFrom(templateDraftFrom(card))}
+						>
+							{m['node_detail.save_as_type']()}
+						</Button>
+					</Tooltip>
+				{/await}
+			{/if}
+			{#if canDelete}
+				<Button variant="destructive" class="shrink-0" onclick={() => ondelete(node)}>
+					{m['node_detail.delete']()}
+				</Button>
+			{/if}
 		</div>
 	{/if}
 </aside>

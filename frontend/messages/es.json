@@ -259,7 +259,10 @@
 		"no_content": "Esta tarjeta no tiene valores.",
 		"error": "No se pudo cargar la tarjeta.",
 		"forbidden": "La credencial que usa esta tarjeta ya no está disponible para vos.",
-		"delete": "Eliminar tarjeta"
+		"delete": "Eliminar tarjeta",
+		"save_as_type": "Guardar como tipo de tarjeta",
+		"save_as_type_hint": "Reutilizá este pedido como tipo de tarjeta: le ponés nombre y elegís quién puede usarlo.",
+		"save_as_type_post": "Los tipos de tarjeta solo hacen pedidos GET: esta tarjeta manda un POST."
 	},
 	"board": {
 		"title": "Configuración del tablero",

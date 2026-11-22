@@ -259,7 +259,10 @@
 		"no_content": "This card has no values.",
 		"error": "The card could not be loaded.",
 		"forbidden": "The credential this card uses is no longer available to you.",
-		"delete": "Delete card"
+		"delete": "Delete card",
+		"save_as_type": "Save as card type",
+		"save_as_type_hint": "Reuse this request as a card type: you name it and choose who can use it.",
+		"save_as_type_post": "Card types only make GET requests: this card sends a POST."
 	},
 	"board": {
 		"title": "Board configuration",
