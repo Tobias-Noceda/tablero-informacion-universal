@@ -237,7 +237,11 @@
 	}) => {
 		const node = event.targetNode;
 		if (!node) return;
-		await postItsApi.move(node.id, node.position.x, node.position.y);
+		try {
+			await postItsApi.move(node.id, node.position.x, node.position.y);
+		} catch (err) {
+			console.error('Could not move the card:', err);
+		}
 	};
 
 	// Edge handlers

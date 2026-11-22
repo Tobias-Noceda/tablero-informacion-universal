@@ -11,6 +11,7 @@
 	import { session } from '$modules/session.svelte';
 	import Modal from '$components/Modal/Modal.svelte';
 	import Input from '$components/Input/Input.svelte';
+	import { filledParams } from '$lib/cards/params';
 	import { m } from '$lib/paraglide/messages';
 	import { groupByOrigin } from '$lib/secrets/origin';
 	import { getLocale } from '$lib/paraglide/runtime';
@@ -71,12 +72,22 @@
 	let creatingTitle = $state<string>('');
 	// A secret parameter holds the picked secret's key, not its name.
 	let pickedKeys = $state<Record<string, string>>({});
+	// Why the last save failed; the modal stays open until it works.
+	let error = $state('');
+
+	function failure(err: unknown) {
+		return m['one_off.error']({
+			detail: err instanceof postItsApi.PostItError ? err.message : m['postit_templates.error_generic']()
+		});
+	}
 
 	const creatingParams = $derived(wellKnowns.parameters((creatingNode ?? currentPostIt)?.type));
+	// As the backend decides it: a parameter without a default, or whose
+	// default is empty, has to be filled in.
 	const missingRequired = $derived(
 		creatingParams.some((p) => {
 			const value = p.type === 'secret' ? pickedKeys[p.key] : paramValues[p.key];
-			return p.default === undefined && !(value ?? '').trim();
+			return !(p.default ?? '').trim() && !(value ?? '').trim();
 		})
 	);
 
@@ -113,26 +124,35 @@
 		);
 		const secrets = bindingsFor(picked, boardId);
 
+		// A blank optional parameter is left out: the card type's default fills it.
 		const params = {
-			...Object.fromEntries(
-				creatingParams
-					.filter((p) => p.type !== 'secret')
-					.map((p) => [p.key, (paramValues[p.key] ?? '').trim()])
+			...filledParams(
+				Object.fromEntries(
+					creatingParams.filter((p) => p.type !== 'secret').map((p) => [p.key, paramValues[p.key] ?? ''])
+				)
 			),
 			...secrets.params
 		};
 
 		const title = creatingTitle.trim();
 
-		// The backend recomputes vars, this only mirrors it.
-		const newPostIt = await postItsApi.create_well_known(
-			boardId,
-			{ text: title, vars: titleAnalysis.vars },
-			creatingNode.type!,
-			params,
-			secrets.bindings
-		);
-		await postItsApi.move(newPostIt.id, creatingNode.position.x, creatingNode.position.y);
+		// The backend recomputes vars, this only mirrors it. A refusal keeps the
+		// modal open with the reason instead of leaving a card that was never made.
+		let newPostIt;
+		try {
+			error = '';
+			newPostIt = await postItsApi.create_well_known(
+				boardId,
+				{ text: title, vars: titleAnalysis.vars },
+				creatingNode.type!,
+				params,
+				secrets.bindings
+			);
+			await postItsApi.move(newPostIt.id, creatingNode.position.x, creatingNode.position.y);
+		} catch (err) {
+			error = failure(err);
+			return;
+		}
 
 		// The create response is the stored post-it, which has no title (that
 		// lives on the board): show the one just sent instead of waiting for the
@@ -167,18 +187,24 @@
 
         const title = creatingTitle.trim();
 
-        if (!sameParams(creatingParams, params, originalConfig?.paramValues ?? {}) || !sameBindings(secrets.bindings, originalConfig?.bindings ?? {})) {
-            await postItsApi.update_well_known_settings(
-                currentPostIt.id,
-                params,
-                secrets.bindings
-            );
-        }
-        if (title !== (currentPostIt.title?.text ?? '')) {
-            await postItsApi.update_well_known_title(
-                currentPostIt.id,
-                { text: title, vars: titleAnalysis.vars }
-            );
+        try {
+            error = '';
+            if (!sameParams(creatingParams, params, originalConfig?.paramValues ?? {}) || !sameBindings(secrets.bindings, originalConfig?.bindings ?? {})) {
+                await postItsApi.update_well_known_settings(
+                    currentPostIt.id,
+                    params,
+                    secrets.bindings
+                );
+            }
+            if (title !== (currentPostIt.title?.text ?? '')) {
+                await postItsApi.update_well_known_title(
+                    currentPostIt.id,
+                    { text: title, vars: titleAnalysis.vars }
+                );
+            }
+        } catch (err) {
+            error = failure(err);
+            return;
         }
         onPersistNode('update', { ...currentPostIt, data: { title: { text: title, vars: titleAnalysis.vars } } } as Node);
         pickedKeys = {};
@@ -224,6 +250,7 @@
         onclose={() => {
             creatingTitle = '';
             pickedKeys = {};
+            error = '';
             onclose();
         }}
         onaccept={() => {
@@ -239,6 +266,9 @@
         <div class="flex w-full justify-center">
             <h2 class="text-xl font-semibold">{creatingNode ? m['nodes.modify_modal.create.title']() : m['nodes.modify_modal.edit.title']()}</h2>
         </div>
+        {#if error}
+            <p class="text-sm text-destructive" role="alert">{error}</p>
+        {/if}
         <Input
             label={m['card_title.label']()}
             placeholder={placeholder()}

@@ -21,7 +21,7 @@
 	<p>
 		Esta política explica qué datos personales recopila Corcheria Company ("nosotros") cuando usás
 		el tablero de Corcheria Company en
-		<a href={resolve('/about')} class="underline hover:text-main">corcheria.company</a>, por qué los
+		<a href={resolve('/acerca')} class="underline hover:text-main">corcheria.company</a>, por qué los
 		recopilamos, con quién los compartimos y qué opciones tenés. Corcheria Company es un tablero
 		online compartido donde fijás tarjetas que muestran información en vivo de servicios externos.
 	</p>
