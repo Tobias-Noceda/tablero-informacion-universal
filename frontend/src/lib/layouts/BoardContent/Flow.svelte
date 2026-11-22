@@ -49,7 +49,10 @@
 
 	import NodeConfigurationPanel from '$layouts/NodeConfiguration/NodeConfigurationPanel.svelte';
 	import OneOffCardPanel from '$layouts/OneOffCard/OneOffCardPanel.svelte';
-	import { ONE_OFF } from '$lib/well-knowns/one-off';
+	import { nodeType, ONE_OFF } from '$lib/well-knowns/one-off';
+	import { mapPostitWithTitle } from '$lib/helpers/post-it';
+	import { m } from '$lib/paraglide/messages';
+	import { toast } from '$stores/toast.svelte';
 
 	let {
 		nodes,
@@ -321,12 +324,34 @@
 		}
 	};
 
+	// U7: the copy is added at once; the board's live update brings the same card.
+	const duplicateCard = async (id: string) => {
+		if (!canEdit) return;
+		try {
+			const copy = await postItsApi.duplicate(id);
+			const node = mapPostitWithTitle({ ...copy, type: nodeType(copy.type) });
+			if (!nodes.some((n) => n.id === node.id)) nodes = [...nodes, node];
+		} catch (err) {
+			// A plan limit is told by the API layer; anything else here.
+			if (err instanceof postItsApi.PostItError && err.status === 402) return;
+			toast.notify({
+				title: m['cards.duplicate_failed'](),
+				description: err instanceof postItsApi.PostItError ? err.message : '',
+				variant: 'destructive'
+			});
+		}
+	};
+
 	setCardEditor({
 		get canEdit() {
 			return canEdit;
 		},
+		get canAdd() {
+			return canAddNode(boardPlan.limits, nodes.length);
+		},
 		restyle: restyleCard,
-		resized: resizeCard
+		resized: resizeCard,
+		duplicate: duplicateCard
 	});
 
 	// U9: how to draw the first strand, until one is drawn or it is dismissed.

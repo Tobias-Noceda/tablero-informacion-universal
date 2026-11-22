@@ -16,6 +16,9 @@ export interface CardEditor {
 	restyle(id: string, patch: CardStyle): void;
 	// moved: a top or left handle was dragged, so the card's corner moved too.
 	resized(id: string, bounds: CardBounds, moved: boolean): void;
+	// Whether the board's plan has room for one more card.
+	readonly canAdd: boolean;
+	duplicate(id: string): void;
 }
 
 const key = Symbol('card-editor');

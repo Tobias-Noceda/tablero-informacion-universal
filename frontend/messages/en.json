@@ -424,7 +424,10 @@
 		"align_right": "Align right",
 		"valign_top": "Top (needs a height of its own)",
 		"valign_middle": "Middle (needs a height of its own)",
-		"valign_bottom": "Bottom (needs a height of its own)"
+		"valign_bottom": "Bottom (needs a height of its own)",
+		"duplicate": "Duplicate",
+		"duplicate_hint": "Duplicate this card next to it",
+		"duplicate_failed": "The card could not be duplicated"
 	},
 	"image": {
 		"missing": "This card has no image address yet.",

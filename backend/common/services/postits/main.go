@@ -86,28 +86,15 @@ func New(db infrastructure.Database, cache infrastructure.Cache, run infrastruct
 }
 
 func (srv *PostItsService) CreatePostIt(principal models.Principal, title *models.BoardPostItTitle, postIt *models.PostIts) (*models.PostIts, error) {
-	board, err := srv.require(principal, postIt.Board, models.BoardEditor)
-	if err != nil {
+	if _, err := srv.require(principal, postIt.Board, models.BoardEditor); err != nil {
 		return nil, err
 	}
 
-	// The cards are counted on the board as it is in its turn, and the new
-	// one is created before the turn ends.
-	release, err := srv.plans.Hold(models.LimitNodes, "board:"+postIt.Board.String())
+	_, release, err := srv.roomForCard(postIt.Board)
 	if err != nil {
 		return nil, err
 	}
 	defer release()
-	if board, err = srv.db.FindBoard(postIt.Board); err != nil || board == nil {
-		return nil, ErrNotAMember
-	}
-	plan, err := srv.plans.ForBoard(board)
-	if err != nil {
-		return nil, err
-	}
-	if err := plan.Admits(models.LimitNodes, len(board.PostIts), plan.Limits.NodesPerBoard); err != nil {
-		return nil, err
-	}
 
 	if postIt.WellKnown != "" {
 		def, err := srv.definition(principal, postIt.Board, postIt.WellKnown)
@@ -145,6 +132,30 @@ func (srv *PostItsService) CreatePostIt(principal models.Principal, title *model
 	entry.Vars = titleVars(entry.Text, outputsOf(postIt))
 
 	return srv.db.CreatePostIt(postIt, entry, postIt.WellKnown, models.Position{X: 750, Y: 350})
+}
+
+// roomForCard takes the board's turn for a new card and checks its plan has
+// room for one more. The cards are counted on the board as it is in the turn,
+// and the caller creates the card before calling release.
+func (srv *PostItsService) roomForCard(boardID uuid.UUID) (*models.Board, func(), error) {
+	release, err := srv.plans.Hold(models.LimitNodes, "board:"+boardID.String())
+	if err != nil {
+		return nil, nil, err
+	}
+	board, err := srv.db.FindBoard(boardID)
+	if err != nil || board == nil {
+		release()
+		return nil, nil, ErrNotAMember
+	}
+	plan, err := srv.plans.ForBoard(board)
+	if err == nil {
+		err = plan.Admits(models.LimitNodes, len(board.PostIts), plan.Limits.NodesPerBoard)
+	}
+	if err != nil {
+		release()
+		return nil, nil, err
+	}
+	return board, release, nil
 }
 
 // definition is the live well-known a new card is made from: one of the
