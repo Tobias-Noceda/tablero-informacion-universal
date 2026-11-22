@@ -35,6 +35,7 @@ After changing the frontend, rebuild only it, so the backend keeps the overrides
 | `duplicate` | U7: a card is duplicated from its toolbar with its title and colour, next to it, and stays after a reload |
 | `collaboration` | E2E-07 a second member sees moves and new cards live (logs the propagation time); E2E-08 a viewer gets no editing tools |
 | `credentials` | E2E-06 a credential value never shows on the page nor in any response |
+| `curl` | U3: a pasted cURL command fills in a custom card (its credential is not kept as text) and can be tried at once; a paste that is not cURL says so |
 | `preview` | U1 + U2: "Try request" shows the source's answer, a click on a value fills the output, the card shows it; a failed try says why |
 | `strand-hint` | U9: the first-strand hint shows with two cards and no strand, and stays gone after drawing one or dismissing it |
 | `dates` | A card's date parameters are picked from the date picker and saved as YYYY-MM-DD |
