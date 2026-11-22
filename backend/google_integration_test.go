@@ -77,7 +77,7 @@ func (s *stack) finishGoogle(callback googleCallback) *httptest.ResponseRecorder
 	}
 	w := httptest.NewRecorder()
 	s.app.router.ServeHTTP(w, req)
-	s.responses = append(s.responses, w)
+	s.record(w)
 	return w
 }
 
