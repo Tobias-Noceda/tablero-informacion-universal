@@ -27,7 +27,7 @@ test('builds a card by trying the request and clicking the value', async ({ page
 	const tryButton = dialog.getByRole('button', { name: t('card_preview.try') });
 	await expect(tryButton).toBeDisabled();
 
-	await dialog.getByPlaceholder('https://api.example.com/v1/data').fill(SOURCE);
+	await dialog.getByPlaceholder('https://api.example.com/v1/data', { exact: true }).fill(SOURCE);
 	await tryButton.click();
 	await expect(dialog.getByText(t('card_preview.answered'))).toBeVisible();
 
@@ -53,7 +53,9 @@ test('says why a tried request failed', async ({ page }) => {
 	await page.goto(`/boards/${board.id}`);
 
 	const dialog = await openOneOff(page);
-	await dialog.getByPlaceholder('https://api.example.com/v1/data').fill('http://127.0.0.1:9/value');
+	await dialog
+		.getByPlaceholder('https://api.example.com/v1/data', { exact: true })
+		.fill('http://127.0.0.1:9/value');
 	await dialog.getByRole('button', { name: t('card_preview.try') }).click();
 
 	await expect(dialog.getByRole('alert')).toHaveText(t('card_failure.unreachable'));

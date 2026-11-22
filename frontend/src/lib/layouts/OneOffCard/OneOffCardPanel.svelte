@@ -9,6 +9,7 @@
 	import ResponseTree from '$components/ResponseTree/ResponseTree.svelte';
 	import type { PostItData } from '$layouts/BoardContent/NodeDetail.svelte';
 	import { failureMessage, failureOf } from '$lib/cards/failure';
+	import { CurlError, fillFromCurl, parseCurl } from '$lib/well-knowns/curl';
 	import { jqPath, lastIndex, outputName, type JsonPath } from '$lib/cards/preview';
 	import { m } from '$lib/paraglide/messages';
 	import { refKey } from '$lib/secrets/binding';
@@ -137,6 +138,39 @@
 				return m['one_off.err_body_size']({ max: String(MAX_REQUEST_BODY / 1024) });
 			case 'body_credential':
 				return m['one_off.err_body_credential']({ name: problem.value });
+		}
+	}
+
+	// U3: a cURL command fills in the request.
+	let curlOpen = $state(false);
+	let curlText = $state('');
+	let curlNotes = $state<string[]>([]);
+	let curlError = $state('');
+
+	function applyCurl() {
+		curlError = '';
+		curlNotes = [];
+		try {
+			const parsed = parseCurl(curlText);
+			draft = fillFromCurl(draft, parsed);
+			tried = null;
+			curlNotes = [
+				m['curl.applied'](),
+				...(parsed.credentials.length
+					? [m['curl.credentials']({ names: parsed.credentials.join(', ') })]
+					: []),
+				...parsed.dropped.map((code) =>
+					code === 'method'
+						? m['curl.dropped_method']()
+						: code === 'body_not_json'
+							? m['curl.dropped_body']()
+							: m['curl.dropped_flags']()
+				)
+			];
+			curlText = '';
+			curlOpen = false;
+		} catch (e) {
+			curlError = e instanceof CurlError ? m[`curl.${e.code}`]() : m['curl.not_curl']();
 		}
 	}
 
@@ -316,6 +350,39 @@
 		{creating ? m['one_off.create_title']() : m['one_off.edit_title']()}
 	</h2>
 	<p class="text-xs opacity-70">{m['one_off.hint']()}</p>
+
+	<details class="rounded-md border border-main-border p-2 text-sm" bind:open={curlOpen}>
+		<summary class="cursor-pointer font-semibold">{m['curl.toggle']()}</summary>
+		<div class="mt-2 flex flex-col gap-2">
+			<p class="text-xs opacity-70">{m['curl.hint']()}</p>
+			<textarea
+				bind:value={curlText}
+				rows="4"
+				spellcheck="false"
+				aria-label={m['curl.toggle']()}
+				class={cn(fieldClass, 'resize-y font-mono text-xs')}
+				placeholder={m['curl.placeholder']()}
+			></textarea>
+			<Button
+				variant="secondary"
+				class="self-start px-3 py-1 text-sm"
+				disabled={!curlText.trim()}
+				onclick={applyCurl}
+			>
+				{m['curl.apply']()}
+			</Button>
+			{#if curlError}
+				<p class="text-xs text-destructive" role="alert">{curlError}</p>
+			{/if}
+		</div>
+	</details>
+	{#if curlNotes.length > 0}
+		<ul class="flex flex-col gap-0.5 text-xs" aria-live="polite">
+			{#each curlNotes as note, i (i)}
+				<li class={i === 0 ? 'font-semibold' : ''}>{note}</li>
+			{/each}
+		</ul>
+	{/if}
 
 	<div class="flex flex-col gap-3 border-t border-main-border pt-3">
 		<div class="flex items-end gap-2">
