@@ -309,6 +309,8 @@
 		"default": "Default value (optional)",
 		"type_string": "Text",
 		"type_number": "Number",
+		"type_date": "Date",
+		"type_datetime": "Date and time",
 		"type_secret": "Credential",
 		"add_parameter": "Add field",
 		"queries": "Query string",
@@ -343,6 +345,10 @@
 		"org_elsewhere": "This board is not in that organization: its templates can only be used on its own boards.",
 		"draft_kept": "Your unsaved template is kept; switch to a tab where you can create to save it.",
 		"creating_in": "New template in: {where}"
+	},
+	"date_input": {
+		"unreadable": "“{value}” is not a date: pick one.",
+		"utc": "Sent in UTC: {value}"
 	},
 	"one_off": {
 		"sidebar": "Custom API card",

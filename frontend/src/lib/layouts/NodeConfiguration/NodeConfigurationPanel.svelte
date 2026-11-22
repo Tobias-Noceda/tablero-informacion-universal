@@ -1,4 +1,6 @@
 <script lang="ts">
+    import DateInput from '$components/DateInput/DateInput.svelte';
+    import { isDateKind } from '$lib/cards/dates';
 	import type { Node } from '@xyflow/svelte';
 
 	import * as postItsApi from '$services/post-it';
@@ -349,6 +351,14 @@
                         />
                     {/if}
                 </label>
+            {:else if isDateKind(param.type)}
+                <DateInput
+                    kind={param.type}
+                    label={param[`label_${getLocale()}`]!}
+                    labelClass="font-semibold"
+                    required={!param.default}
+                    bind:value={paramValues[param.key]}
+                />
             {:else}
                 <Input
                     label={param[`label_${getLocale()}`]!}

@@ -469,6 +469,7 @@ func statusOf(err error) int {
 		errors.Is(err, srv.ErrTemplateFixed),
 		errors.Is(err, srv.ErrInvalidRate),
 		errors.Is(err, models.ErrWellKnownMissingVariable),
+		errors.Is(err, models.ErrInvalidParameter),
 		errors.Is(err, infrastructure.ErrUnknownCredential):
 		return http.StatusBadRequest
 	case errors.Is(err, srv.ErrSystemSecretMissing):

@@ -58,8 +58,8 @@ func Builtin() []models.WellKnown {
 			Parameters: []models.WellKnownParameter{
 				{Key: "$latitude", LabelEn: "Latitude", LabelEs: "Latitud", Type: models.ParameterNumber, Default: new("-34.6131")},
 				{Key: "$longitude", LabelEn: "Longitude", LabelEs: "Longitud", Type: models.ParameterNumber, Default: new("-58.3772")},
-				{Key: "$start_date", LabelEn: "Start date", LabelEs: "Fecha de inicio", Type: models.ParameterString, PlaceholderEn: new("YYYY-MM-DD"), PlaceholderEs: new("AAAA-MM-DD")},
-				{Key: "$end_date", LabelEn: "End date", LabelEs: "Fecha de fin", Type: models.ParameterString, PlaceholderEn: new("YYYY-MM-DD"), PlaceholderEs: new("AAAA-MM-DD")},
+				{Key: "$start_date", LabelEn: "Start date", LabelEs: "Fecha de inicio", Type: models.ParameterDate, PlaceholderEn: new("YYYY-MM-DD"), PlaceholderEs: new("AAAA-MM-DD")},
+				{Key: "$end_date", LabelEn: "End date", LabelEs: "Fecha de fin", Type: models.ParameterDate, PlaceholderEn: new("YYYY-MM-DD"), PlaceholderEs: new("AAAA-MM-DD")},
 			},
 			Outputs: []models.WellKnownOutput{
 				{Key: "min", LabelEn: "Minimum °C", LabelEs: "Mínimo °C", ExampleEn: 12.4, ExampleEs: 12.4},
@@ -347,7 +347,7 @@ func Builtin() []models.WellKnown {
 			},
 			Rate: 300,
 			Parameters: []models.WellKnownParameter{
-				{Key: "$time_min", LabelEn: "From", LabelEs: "De", Type: models.ParameterString, PlaceholderEn: new("2026-01-01T00:00:00Z"), PlaceholderEs: new("2026-01-01T00:00:00Z")},
+				{Key: "$time_min", LabelEn: "From", LabelEs: "De", Type: models.ParameterDateTime, PlaceholderEn: new("2026-01-01T00:00:00Z"), PlaceholderEs: new("2026-01-01T00:00:00Z")},
 				{Key: "$credential", LabelEn: "Google account", LabelEs: "Cuenta de Google", Type: models.ParameterSecret},
 			},
 			Outputs: []models.WellKnownOutput{

@@ -208,6 +208,11 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 	if err := applyOneOff(postit, set); err != nil {
 		return err
 	}
+	if params, ok := set["params"].(map[string]string); ok {
+		if err := srv.checkParams(postit, params); err != nil {
+			return err
+		}
+	}
 
 	if touchesCredentials(set) {
 		bindings := postit.Bindings
@@ -231,6 +236,30 @@ func (srv *PostItsService) UpdatePostIt(principal models.Principal, id uuid.UUID
 	// refresh, so the saved settings stand.
 	if err := srv.db.BumpPostIt(postit.Board, id); err != nil {
 		log.Printf("post-it %s: telling the board about new settings failed: %v", id, err)
+	}
+	return nil
+}
+
+// checkParams refuses edited values the card's type would not take (a date
+// that is not one), as creating the card does. Only the catalogue's types are
+// looked up: a card made from a post-it template was checked when it was made.
+func (srv *PostItsService) checkParams(postit *models.PostIts, params map[string]string) error {
+	if postit.WellKnown == "" {
+		return nil
+	}
+	def, err := srv.wellKnowns.FindWellKnown(postit.WellKnown)
+	if errors.Is(err, infrastructure.ErrWellKnownNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, p := range def.Parameters {
+		if value, ok := params[p.Key]; ok {
+			if err := p.CheckValue(value); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
