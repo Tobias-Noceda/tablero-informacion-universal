@@ -44,12 +44,21 @@ const (
 // environment (see run_backend_integration.*) and records every response so
 // the test can prove none of them carried a secret.
 type stack struct {
-	t         *testing.T
-	app       *app
-	db        *mongo.MongoDB
-	cache     *redis.RedisDB
-	mailer    *mocks.RecordingMailer
+	t      *testing.T
+	app    *app
+	db     *mongo.MongoDB
+	cache  *redis.RedisDB
+	mailer *mocks.RecordingMailer
+	// responses is appended to from many goroutines in the concurrency
+	// tests: always through record, under mu.
+	mu        sync.Mutex
 	responses []*httptest.ResponseRecorder
+}
+
+func (s *stack) record(w *httptest.ResponseRecorder) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.responses = append(s.responses, w)
 }
 
 func newStack(t *testing.T) *stack {
@@ -131,7 +140,7 @@ func (s *stack) requestFrom(remote, token, method, path string, body any) *httpt
 	}
 	w := httptest.NewRecorder()
 	s.app.router.ServeHTTP(w, req)
-	s.responses = append(s.responses, w)
+	s.record(w)
 	return w
 }
 
@@ -155,6 +164,8 @@ func (s *stack) mustJSON(w *httptest.ResponseRecorder, want int, out any) {
 
 func (s *stack) assertNoResponseContains(needle string) {
 	s.t.Helper()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for i, w := range s.responses {
 		if strings.Contains(w.Body.String(), needle) {
 			s.t.Errorf("response #%d carried %q: %s", i, needle, w.Body.String())
