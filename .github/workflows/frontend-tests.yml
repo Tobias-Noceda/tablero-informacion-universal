@@ -9,9 +9,12 @@ on:
       - frontend/**
       - .github/workflows/frontend-tests.yml
 
+# A pull request gets its own group (by number: a run that starts after the
+# merge would otherwise fall back to the base branch's ref and cancel its
+# runs). Only pull requests cancel: on main every merge gets tested.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
