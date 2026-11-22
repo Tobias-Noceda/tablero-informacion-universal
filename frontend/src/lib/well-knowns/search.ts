@@ -9,7 +9,10 @@ type Searchable = Pick<
 
 /** Lowercase, without accents, so "dolar" finds "Dólar". */
 export function fold(text: string): string {
-	return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+	return text
+		.normalize('NFD')
+		.replace(/\p{Mn}/gu, '')
+		.toLowerCase();
 }
 
 /**
