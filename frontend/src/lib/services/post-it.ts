@@ -92,16 +92,35 @@ export async function execute(
     } catch {
         throw new CardError(0, 'network');
     }
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new CardError(
-            res.status,
-            typeof body?.code === 'string' ? body.code : undefined,
-            typeof body?.status === 'number' ? body.status : undefined,
-            typeof body?.error === 'string' ? body.error : res.statusText,
-        );
-    }
+    if (!res.ok) throw await cardError(res);
     return await res.json() as Record<string, string>;
+}
+
+async function cardError(res: Response) {
+    const body = await res.json().catch(() => ({}));
+    return new CardError(
+        res.status,
+        typeof body?.code === 'string' ? body.code : undefined,
+        typeof body?.status === 'number' ? body.status : undefined,
+        typeof body?.error === 'string' ? body.error : res.statusText,
+    );
+}
+
+// What a one-off card being written would show, without saving it: its
+// outputs, or the whole JSON response when it has none. Fails like a card
+// (CardError); 429 when the editor tried too often.
+export async function preview(
+    board: UUID,
+    body: Pick<OneOffRequest, 'resource' | 'request' | 'response' | 'bindings'> & { query?: Record<string, string> },
+): Promise<{ outputs?: Record<string, unknown>; response?: unknown }> {
+    let res: Response;
+    try {
+        res = await api.request('POST', '/v1/post-its/preview', { board, ...body });
+    } catch {
+        throw new CardError(0, 'network');
+    }
+    if (!res.ok) throw await cardError(res);
+    return await res.json();
 }
 
 export async function get_settings(id: UUID) {

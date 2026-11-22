@@ -26,6 +26,7 @@ func (ctrl *Controller) RegisterRoutes(router gin.IRouter) {
 	boardGroup := router.Group("/post-its")
 	{
 		boardGroup.POST("", ctrl.CreatePostIt)
+		boardGroup.POST("/preview", ctrl.PreviewPostIt)
 		boardGroup.GET("/:id", ctrl.ExecutePostIt)
 		boardGroup.DELETE("/:id", ctrl.DeletePostIt)
 
@@ -76,6 +77,42 @@ func (ctrl *Controller) CreatePostIt(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, postIt)
+}
+
+// PreviewPostIt godoc
+// @Summary      Try a card's request
+// @Description  Runs a one-off card's request as the caller (an editor of the board) without saving it, and answers its outputs, or the whole JSON response when it has none. Limited per user; closed to access tokens.
+// @Tags         post-its
+// @Accept       json
+// @Param        body body PreviewPostItRequest true "The request being written"
+// @Success      200  {object}  srv.Preview
+// @Failure      400  {object}  map[string]string{"error": "string"}
+// @Failure      404  {object}  map[string]string{"error": "string"}
+// @Failure      429  {object}  map[string]string{"error": "string"}
+// @Failure      502  {object}  map[string]string{"error": "string", "code": "string"}
+// @Router       /post-its/preview [post]
+func (ctrl *Controller) PreviewPostIt(c *gin.Context) {
+	var req PreviewPostItRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	preview, err := ctrl.service.PreviewPostIt(middleware.Principal(c), &models.PostIts{
+		Board:    req.Board,
+		Resource: req.Resource.URL,
+		Request:  req.Request,
+		Response: req.Response,
+		Query:    req.Query,
+		Bindings: req.Bindings,
+	})
+	if err != nil {
+		fail(c, err)
+		return
+	}
+
+	c.Writer.Header().Set("Cache-Control", "no-store")
+	c.JSON(http.StatusOK, preview)
 }
 
 // GetPostIt godoc
