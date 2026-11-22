@@ -43,7 +43,9 @@
 				"action": "Save changes"
 			}
 		},
-		"google_calendar_empty": "No upcoming events"
+		"google_calendar_empty": "No upcoming events",
+		"search": "Search card types",
+		"search_empty": "No card type matches “{query}”: the custom API card can read any API."
 	},
 	"secrets": {
 		"title": "Board credentials",

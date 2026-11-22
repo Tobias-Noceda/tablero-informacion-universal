@@ -38,7 +38,7 @@ export function outputName(path: JsonPath, taken: string[], every = false): stri
 	let base =
 		(key ?? 'value')
 			.normalize('NFD')
-			.replace(/[̀-ͯ]/g, '')
+			.replace(/\p{Mn}/gu, '')
 			.replace(/[^A-Za-z0-9_]+/g, '_')
 			.replace(/^_+|_+$/g, '')
 			.toLowerCase() || 'value';
