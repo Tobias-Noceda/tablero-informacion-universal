@@ -1,0 +1,44 @@
+name: MCP tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    paths:
+      - mcp/**
+      - .github/workflows/mcp-tests.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # The versions mcp/package.json pins in devEngines
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.2
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@12.16.1 --activate
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Every tool against a stand-in board service; the end-to-end test is
+      # skipped without MCP_E2E_URL and MCP_E2E_TOKEN.
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

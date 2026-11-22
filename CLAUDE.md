@@ -106,6 +106,8 @@ go test ./...                      # unit tests, no services needed
 ../run_backend_integration.sh      # or .ps1 — real Mongo + Redis + mock OAuth2 via docker compose
 ```
 
+CI (`.github/workflows/`): `go-tests.yml` builds, vets and runs the unit tests with `-race`, and runs every integration test against Mongo, Redis and the mock OAuth2 server as service containers (`TestLiveDuende`, which reaches a public demo server, stays out). With `CI` set, an integration helper whose store does not answer fails instead of skipping. `frontend-tests.yml` compiles the messages, runs `pnpm check`, ESLint (Prettier is not enforced yet) and every Vitest project in Chromium, with a coverage summary; `mcp-tests.yml` runs the MCP tests and its build; `realtime-tests.yml` lints and tests realtime.
+
 ## Architecture: Backend
 
 Layered Go hexagonal structure. All routes are registered under `/api/v1` (nginx and Vercel forward `/api` untouched, do not strip it). Only `/auth/*`, `GET`/`HEAD /health`, `GET /billing/plans` and `POST /billing/webhook` are public: `app.go` mounts every other controller on a group behind `middleware.RequireAuth`, handlers read the caller with `middleware.Principal(c)` (never from the body or the query), and `/system/*` adds `middleware.RequireAdmin`. Anything the caller may not touch answers `404`.

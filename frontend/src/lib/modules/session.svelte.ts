@@ -23,6 +23,8 @@ export class Session implements api.Authenticator {
 	#booting: Promise<void> | null = null;
 	#refreshing: Promise<boolean> | null = null;
 	#channel: BroadcastChannel | null = null;
+	// Callbacks to run, never rendered: nothing needs to react to the set.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity
 	#listeners = new Set<UserChangeListener>();
 
 	constructor(private readonly channelName = 'tiu-session') {}
