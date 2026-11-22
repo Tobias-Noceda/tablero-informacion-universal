@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DateInput from '$components/DateInput/DateInput.svelte';
+	import { isDateKind } from '$lib/cards/dates';
 	import Button from '$components/Button/Button.svelte';
 	import Dropdown from '$components/Dropdown/Dropdown.svelte';
 	import Icon from '$components/Icon/Icon.svelte';
@@ -19,7 +21,7 @@
 
 	let { draft = $bindable(), onsave, oncancel }: Props = $props();
 
-	const PARAM_TYPES = ['string', 'number', 'secret'] as ('string' | 'number' | 'secret')[];
+	const PARAM_TYPES = ['string', 'number', 'date', 'datetime', 'secret'] as const;
 
 	let saving = $state(false);
 	// Shown once the user tried to save, so an empty form is not all red.
@@ -232,7 +234,11 @@
 						placeholder={m['postit_templates.placeholder']()}
 						bind:value={param.placeholder}
 					/>
-					{#if param.type !== 'secret'}
+					{#if isDateKind(param.type)}
+						<div class="flex-1" title={m['postit_templates.default']()}>
+							<DateInput kind={param.type} class="px-2 py-1 text-sm" bind:value={param.default} />
+						</div>
+					{:else if param.type !== 'secret'}
 						<input
 							class={fieldClass + ' flex-1'}
 							placeholder={m['postit_templates.default']()}

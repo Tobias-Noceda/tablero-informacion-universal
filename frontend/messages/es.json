@@ -309,6 +309,8 @@
 		"default": "Valor por defecto (opcional)",
 		"type_string": "Texto",
 		"type_number": "Número",
+		"type_date": "Fecha",
+		"type_datetime": "Fecha y hora",
 		"type_secret": "Credencial",
 		"add_parameter": "Agregar campo",
 		"queries": "Parámetros de la URL",
@@ -343,6 +345,10 @@
 		"org_elsewhere": "Este tablero no pertenece a esa organización: sus plantillas solo se usan en sus propios tableros.",
 		"draft_kept": "Tu plantilla sin guardar se conserva; pasá a una pestaña donde puedas crear para guardarla.",
 		"creating_in": "Nueva plantilla en: {where}"
+	},
+	"date_input": {
+		"unreadable": "“{value}” no es una fecha: elegí una.",
+		"utc": "Se envía en UTC: {value}"
 	},
 	"one_off": {
 		"sidebar": "Tarjeta de API propia",

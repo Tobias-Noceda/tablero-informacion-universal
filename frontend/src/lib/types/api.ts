@@ -411,7 +411,7 @@ export type WellKnownParameter = {
 	label_en: string;
 	label_es: string;
 	/** "secret" renders a picker over the board's stored credentials. */
-	type: 'string' | 'number' | 'secret';
+	type: 'string' | 'number' | 'secret' | 'date' | 'datetime';
 	placeholder_en?: string;
 	placeholder_es?: string;
 	/** Prefilled value. A parameter without one must be supplied by the user. */
