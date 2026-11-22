@@ -59,7 +59,12 @@ func (e *DewIt) Execute(postit *models.PostIts) (any, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), safehttp.REQUEST_TIMEOUT)
 	defer cancel()
 
-	res, err := e.request(ctx, postit.Resource, postit.Request.Method, postit.Request.Queries, postit.Request.Headers, body)
+	resource, err := fillResource(postit.Resource, postit.Params)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := e.request(ctx, resource, postit.Request.Method, postit.Request.Queries, postit.Request.Headers, body)
 	if err != nil {
 		return nil, err
 	}
